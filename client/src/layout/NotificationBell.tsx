@@ -1,0 +1,66 @@
+import { useEffect, useRef, useState } from 'react';
+import { api } from '../lib/api';
+import { Dot } from '../components/ui/Badge';
+
+interface Notification {
+  text: string;
+  time: string;
+  color: string;
+}
+
+export function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unread, setUnread] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    api.get<{ notifications: Notification[]; unread: boolean }>('/notifications').then((d) => {
+      setNotifications(d.notifications);
+      setUnread(d.unread);
+    });
+  }, []);
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  const toggle = () => {
+    setOpen((o) => !o);
+    if (!open && unread) {
+      api.post('/notifications/read').then(() => setUnread(false));
+    }
+  };
+
+  return (
+    <div className="fixed top-6 right-9 z-50" ref={ref}>
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-[38px] h-[38px] rounded-[10px] border border-border bg-white cursor-pointer flex items-center justify-center relative"
+        style={{ boxShadow: '0 2px 6px rgba(11,31,58,0.06)' }}
+      >
+        <span className="rounded-full border-2 border-navy" style={{ width: 14, height: 14, borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
+        {unread && <span className="absolute rounded-full bg-red border-[1.5px] border-white" style={{ top: 7, right: 8, width: 8, height: 8 }} />}
+      </button>
+      {open && (
+        <div className="absolute top-[calc(100%+8px)] right-0 w-80 bg-white border border-border rounded-xl shadow-dropdown overflow-hidden">
+          <div className="px-4 py-3.5 font-bold text-[13.5px] border-b border-hairline">Notificações</div>
+          {notifications.map((n, i) => (
+            <div key={i} className="flex gap-2.5 px-4 py-3 border-b border-[#F7F8FA] last:border-b-0">
+              <Dot color={n.color} className="mt-1.5" />
+              <div>
+                <div className="text-[12.5px] leading-snug">{n.text}</div>
+                <div className="text-[11px] text-textMuted mt-0.5">{n.time}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

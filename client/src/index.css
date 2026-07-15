@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: #f5f7fa;
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #0b1f3a;
+    -webkit-font-smoothing: antialiased;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d6dce5;
+    border-radius: 4px;
+  }
+  input, select, button, textarea {
+    font-family: inherit;
+  }
+}
+
+@layer utilities {
+  .font-mono-num {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}

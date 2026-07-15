@@ -1,0 +1,122 @@
+import { useEffect, useState } from 'react';
+import { api } from '../../lib/api';
+import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
+import { Segmented } from '../../components/ui/Segmented';
+import { RangeBar } from '../../components/ui/ProgressBar';
+
+interface RateChannel {
+  label: string;
+  isLastro: boolean;
+  rangeLabel: string;
+  leftPct: number;
+  widthPct: number;
+  barColor: string;
+}
+interface Estimate {
+  rangeLabel: string;
+  desagioFmt: string;
+  liquidoFmt: string;
+}
+
+export function ComparadorPage() {
+  const [input, setInput] = useState({ valor: '50.000', prazo: '30', score: 'A' });
+  const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [channels, setChannels] = useState<RateChannel[]>([]);
+
+  useEffect(() => {
+    api.get<{ rateChannels: RateChannel[]; estimate: Estimate }>('/comparador/rates').then((d) => {
+      setChannels(d.rateChannels);
+      setEstimate(d.estimate);
+    });
+  }, []);
+
+  const setField = async (field: string, value: string) => {
+    setInput((s) => ({ ...s, [field]: value }));
+    const data = await api.post<{ estimate: Estimate; rateChannels: RateChannel[] }>('/comparador/field', { field, value });
+    setEstimate(data.estimate);
+    setChannels(data.rateChannels);
+  };
+
+  return (
+    <div>
+      <PageHeader title="Comparador de Taxas" subtitle="Taxa média de antecipação por canal — leilão multi-financiador reduz o spread" />
+
+      <NavyCard className="p-7 mb-5">
+        <div className="font-bold text-[15px] mb-1">Simule a sua operação</div>
+        <div className="text-[#9FB3D6] text-[12.5px] mb-5">Estimativa com base no score do sacado, valor e prazo — via leilão Lastro</div>
+        <div className="grid gap-3.5 mb-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div>
+            <div className="text-xs font-bold text-[#9FB3D6] mb-1.5">Valor (R$)</div>
+            <input
+              value={input.valor}
+              onChange={(e) => setField('valor', e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg text-white outline-none text-sm"
+              style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)' }}
+            />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#9FB3D6] mb-1.5">Prazo (dias)</div>
+            <input
+              value={input.prazo}
+              onChange={(e) => setField('prazo', e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-lg text-white outline-none text-sm"
+              style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)' }}
+            />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#9FB3D6] mb-1.5">Score do sacado</div>
+            <Segmented dark options={['AA', 'A', 'B', 'C']} value={input.score} onChange={(v) => setField('score', v)} />
+          </div>
+        </div>
+        <div className="flex gap-6 pt-4.5 flex-wrap" style={{ borderTop: '1px solid rgba(255,255,255,0.14)' }}>
+          <div>
+            <div className="text-[#9FB3D6] text-xs font-semibold">Taxa estimada</div>
+            <div className="text-xl font-extrabold font-mono-num mt-1">{estimate?.rangeLabel}</div>
+          </div>
+          <div>
+            <div className="text-[#9FB3D6] text-xs font-semibold">Deságio estimado</div>
+            <div className="text-xl font-extrabold font-mono-num mt-1">{estimate?.desagioFmt}</div>
+          </div>
+          <div>
+            <div className="text-[#9FB3D6] text-xs font-semibold">Valor líquido a receber</div>
+            <div className="text-xl font-extrabold font-mono-num mt-1 text-[#4C8CFF]">{estimate?.liquidoFmt}</div>
+          </div>
+        </div>
+      </NavyCard>
+
+      <Card className="p-7 mb-5">
+        <div className="flex flex-col gap-5.5">
+          {channels.map((ch) => (
+            <div key={ch.label}>
+              <div className="flex justify-between items-baseline mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="font-bold text-[14.5px]">{ch.label}</div>
+                  {ch.isLastro && <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-chip text-blue">LASTRO</span>}
+                </div>
+                <div className="font-mono-num font-bold text-sm">{ch.rangeLabel}</div>
+              </div>
+              <RangeBar leftPct={ch.leftPct} widthPct={ch.widthPct} color={ch.barColor} />
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <Card className="p-5.5">
+          <div className="font-bold text-[14.5px] mb-2.5">Por que o leilão comprime a taxa</div>
+          <div className="text-textSecondary text-[13.5px] leading-relaxed">
+            Quando vários financiadores disputam a mesma duplicata, a competição empurra o deságio para baixo — o mesmo efeito que a duplicata escritural amplia ao tornar o recebível
+            auditável e negociável por qualquer instituição, não só pelo banco do sacado.
+          </div>
+        </Card>
+        <Card className="p-5.5">
+          <div className="font-bold text-[14.5px] mb-2.5">Escala do mercado endereçável</div>
+          <div className="text-textSecondary text-[13.5px] leading-relaxed">
+            O Banco Central estima um mercado potencial de R$ 10–11 trilhões/ano em recebíveis mercantis — hoje apenas 10–15% das duplicatas emitidas chegam ao mercado financeiro como
+            garantia de crédito.
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
