@@ -24,16 +24,16 @@ export function ComparadorPage() {
   const [channels, setChannels] = useState<RateChannel[]>([]);
 
   useEffect(() => {
-    api.get<{ rateChannels: RateChannel[]; estimate: Estimate }>('/comparador/rates').then((d) => {
-      setChannels(d.rateChannels);
-      setEstimate(d.estimate);
-    });
+    api.get<{ rateChannels: RateChannel[] }>('/comparador/rates').then((d) => setChannels(d.rateChannels));
+    api.post<Estimate>('/comparador/estimate', input).then(setEstimate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setField = async (field: string, value: string) => {
-    setInput((s) => ({ ...s, [field]: value }));
-    const data = await api.post<{ estimate: Estimate; rateChannels: RateChannel[] }>('/comparador/field', { field, value });
-    setEstimate(data.estimate);
+    const nextInput = { ...input, [field]: value };
+    setInput(nextInput);
+    const data = await api.post<Estimate & { rateChannels: RateChannel[] }>('/comparador/estimate', nextInput);
+    setEstimate(data);
     setChannels(data.rateChannels);
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -42,32 +42,27 @@ export function RiscoPage() {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selected, setSelected] = useState<SelectedSacado | null>(null);
-  const skipNextSearch = useRef(false);
 
   useEffect(() => {
-    if (skipNextSearch.current) {
-      skipNextSearch.current = false;
-      return;
-    }
+    if (selected) return;
     const t = setTimeout(() => {
-      api.get<{ suggestions: string[]; selected: SelectedSacado | null }>(`/risco?q=${encodeURIComponent(query)}`).then((d) => {
-        setSuggestions(d.suggestions);
-        setSelected(d.selected);
-      });
+      if (!query.trim()) {
+        setSuggestions([]);
+        return;
+      }
+      api.get<{ suggestions: string[] }>(`/risco/search?q=${encodeURIComponent(query)}`).then((d) => setSuggestions(d.suggestions));
     }, 150);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, selected]);
 
   const select = async (name: string) => {
-    const data = await api.post<{ selected: SelectedSacado }>('/risco/select', { name });
-    skipNextSearch.current = true;
+    const data = await api.get<SelectedSacado>(`/risco/${encodeURIComponent(name)}`);
     setQuery(name);
     setSuggestions([]);
-    setSelected(data.selected);
+    setSelected(data);
   };
 
-  const clear = async () => {
-    await api.post('/risco/clear');
+  const clear = () => {
     setQuery('');
     setSelected(null);
   };

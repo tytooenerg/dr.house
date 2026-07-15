@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
 
@@ -21,7 +22,7 @@ export function ErpPage() {
     api.get<ErpData>('/erp').then(setData);
   }, []);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   const toggleConnector = (key: string) => api.post<ErpData>(`/erp/${key}/toggle`).then(setData);
 

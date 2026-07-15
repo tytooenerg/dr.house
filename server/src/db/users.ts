@@ -1,0 +1,59 @@
+import { db } from './index.js';
+import { defaultSettings, type Role, type UserRow, type UserSettings } from './types.js';
+
+export function getUserById(id: number): UserRow | undefined {
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
+}
+
+export function getUserByEmail(email: string): UserRow | undefined {
+  return db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim()) as UserRow | undefined;
+}
+
+export function createUser(input: { email: string; passwordHash: string; nome: string; companyName: string; role: Role }): UserRow {
+  const info = db
+    .prepare('INSERT INTO users (email, password_hash, nome, company_name, role, settings) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(input.email.toLowerCase().trim(), input.passwordHash, input.nome, input.companyName, input.role, JSON.stringify(defaultSettings()));
+  return getUserById(Number(info.lastInsertRowid))!;
+}
+
+export function getSettings(user: UserRow): UserSettings {
+  try {
+    return { ...defaultSettings(), ...JSON.parse(user.settings) };
+  } catch {
+    return defaultSettings();
+  }
+}
+
+export function saveSettings(userId: number, settings: UserSettings) {
+  db.prepare('UPDATE users SET settings = ? WHERE id = ?').run(JSON.stringify(settings), userId);
+}
+
+export function updateSettings(userId: number, patch: Partial<UserSettings>) {
+  const user = getUserById(userId)!;
+  const merged = { ...getSettings(user), ...patch };
+  saveSettings(userId, merged);
+  return merged;
+}
+
+export function updateProfile(userId: number, patch: { nome?: string; telefone?: string; email?: string }) {
+  const user = getUserById(userId)!;
+  db.prepare('UPDATE users SET nome = ?, telefone = ?, email = ? WHERE id = ?').run(
+    patch.nome ?? user.nome,
+    patch.telefone ?? user.telefone,
+    (patch.email ?? user.email).toLowerCase().trim(),
+    userId
+  );
+  return getUserById(userId)!;
+}
+
+export function updateKybForm(userId: number, field: 'cnpj' | 'tipo' | 'pl', value: string) {
+  const user = getUserById(userId)!;
+  const form = JSON.parse(user.kyb_form || '{}');
+  form[field] = value;
+  db.prepare('UPDATE users SET kyb_form = ? WHERE id = ?').run(JSON.stringify(form), userId);
+  return form;
+}
+
+export function markKybDone(userId: number) {
+  db.prepare('UPDATE users SET kyb_done = 1 WHERE id = ?').run(userId);
+}

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, getToken, setToken, setUnauthorizedHandler } from '../lib/api';
 
 export type Role = 'investidor' | 'cedente' | 'sacado';
 
@@ -8,67 +8,101 @@ export interface OnboardingStep {
   body: string;
 }
 
-export interface SessionData {
-  isLoggedIn: boolean;
-  pickedRole: Role | null;
-  userRole: Role | null;
-  showKyb: boolean;
-  kybStep: number;
+export interface SessionUser {
+  id: number;
+  email: string;
+  nome: string;
+  telefone: string;
+  companyName: string;
+  role: Role;
   kybDone: boolean;
-  kybForm: { cnpj: string; tipo: string; pl: string };
+  kybForm: { cnpj?: string; tipo?: string; pl?: string };
   kybTipoOptions: string[];
+  needsKyb: boolean;
   showOnboarding: boolean;
-  onboardingStep: number;
   onboardingSteps: OnboardingStep[];
-  onboardingCurrent: OnboardingStep;
-  onboardingIsLast: boolean;
   sessionLabel: string;
   navTabs: string[];
-  userName: string;
 }
 
 interface SessionContextValue {
-  session: SessionData | null;
+  user: SessionUser | null;
   loading: boolean;
+  authError: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role }) => Promise<void>;
+  logout: () => void;
+  submitKyb: (form: { cnpj: string; tipo: string; pl: string }) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
-  selectRole: (role: Role) => Promise<void>;
-  enter: () => Promise<void>;
-  updateKyb: (field: 'cnpj' | 'tipo' | 'pl', value: string) => Promise<void>;
-  kybNext: () => Promise<void>;
-  kybBack: () => Promise<void>;
-  onboardingNext: () => Promise<void>;
-  onboardingSkip: () => Promise<void>;
-  logout: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<SessionData | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const data = await api.get<SessionData>('/session');
-    setSession(data);
+    if (!getToken()) {
+      setUser(null);
+      return;
+    }
+    try {
+      const data = await api.get<{ user: SessionUser }>('/auth/me');
+      setUser(data.user);
+    } catch {
+      setUser(null);
+    }
   }, []);
 
   useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
     refresh().finally(() => setLoading(false));
+    return () => setUnauthorizedHandler(null);
   }, [refresh]);
 
-  const value: SessionContextValue = {
-    session,
-    loading,
-    refresh,
-    selectRole: async (role) => setSession(await api.post('/session/role', { role })),
-    enter: async () => setSession(await api.post('/session/enter')),
-    updateKyb: async (field, value) => setSession(await api.post('/session/kyb', { field, value })),
-    kybNext: async () => setSession(await api.post('/session/kyb/next')),
-    kybBack: async () => setSession(await api.post('/session/kyb/back')),
-    onboardingNext: async () => setSession(await api.post('/session/onboarding/next')),
-    onboardingSkip: async () => setSession(await api.post('/session/onboarding/skip')),
-    logout: async () => setSession(await api.post('/session/logout')),
-  };
+  const login = useCallback(async (email: string, password: string) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token: string; user: SessionUser }>('/auth/login', { email, password });
+      setToken(data.token);
+      setUser(data.user);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível entrar.');
+      throw err;
+    }
+  }, []);
+
+  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role }) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token: string; user: SessionUser }>('/auth/register', input);
+      setToken(data.token);
+      setUser(data.user);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível criar a conta.');
+      throw err;
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  const submitKyb = useCallback(async (form: { cnpj: string; tipo: string; pl: string }) => {
+    const data = await api.post<{ user: SessionUser }>('/auth/kyb', form);
+    setUser(data.user);
+  }, []);
+
+  const completeOnboarding = useCallback(async () => {
+    await api.post('/auth/onboarding/complete');
+    setUser((u) => (u ? { ...u, showOnboarding: false } : u));
+  }, []);
+
+  const value: SessionContextValue = { user, loading, authError, login, register, logout, submitKyb, completeOnboarding, refresh };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

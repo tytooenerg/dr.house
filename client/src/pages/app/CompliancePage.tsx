@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -32,7 +33,7 @@ export function CompliancePage() {
     });
   }, []);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   const runDupCheck = async () => {
     const d = await api.post<{ dupQuery: string; dupChecked: boolean }>('/compliance/dup-check', { query: dupQuery });

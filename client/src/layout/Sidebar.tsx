@@ -9,23 +9,29 @@ import { useIsMobile } from '../lib/useIsMobile';
 const GROUPS: ('operacoes' | 'analise' | 'plataforma')[] = ['operacoes', 'analise', 'plataforma'];
 
 export function Sidebar() {
-  const { session, logout } = useSession();
+  const { user, logout } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  if (!session) return null;
-  const allowed = new Set(session.navTabs);
-  const initials = session.userName
+  if (!user) return null;
+  const allowed = new Set(user.navTabs);
+  const initials = user.nome
     .split(' ')
     .map((n) => n[0])
     .slice(0, 2)
     .join('')
     .toUpperCase();
 
+  const handleLogout = () => {
+    logout();
+    navigate('/', { replace: true });
+  };
+
   return (
-    <div
+    <nav
+      aria-label="Navegação principal"
       className="bg-navy flex flex-col gap-8 flex-shrink-0 py-7 px-[18px]"
       style={{ width: isMobile ? '100%' : 248, maxHeight: isMobile ? 260 : undefined, overflowY: 'auto' }}
     >
@@ -50,11 +56,14 @@ export function Sidebar() {
             <div key={group}>
               <button
                 type="button"
+                aria-expanded={isOpen}
                 className="flex items-center justify-between px-3 pt-3 pb-0.5 border-none bg-transparent cursor-pointer w-full"
                 onClick={() => setCollapsed((c) => ({ ...c, [group]: !c[group] }))}
               >
                 <span className="text-[10.5px] font-bold text-[#5C6B87] uppercase tracking-wider">{GROUP_LABELS[group]}</span>
-                <span className="text-[9px] text-[#5C6B87]">{isOpen ? '▾' : '▸'}</span>
+                <span className="text-[9px] text-[#5C6B87]" aria-hidden="true">
+                  {isOpen ? '▾' : '▸'}
+                </span>
               </button>
               {isOpen &&
                 items.map((item) => {
@@ -63,6 +72,7 @@ export function Sidebar() {
                     <button
                       key={item.key}
                       type="button"
+                      aria-current={active ? 'page' : undefined}
                       onClick={() => navigate(item.path)}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg border-none cursor-pointer text-left text-sm font-semibold w-full mt-0.5 transition-colors"
                       style={{ background: active ? '#1E5EFF' : 'transparent', color: active ? '#fff' : '#B8C2D4' }}
@@ -80,13 +90,13 @@ export function Sidebar() {
       <div className="mt-auto flex items-center gap-2.5 p-3 rounded-[10px]" style={{ background: 'rgba(255,255,255,0.06)' }}>
         <div className="w-[34px] h-[34px] rounded-full bg-blue text-white flex items-center justify-center font-bold text-[13px]">{initials}</div>
         <div className="flex-1 min-w-0">
-          <div className="text-white text-[13px] font-semibold truncate">{session.userName}</div>
-          <div className="text-[#8B97AC] text-[11.5px]">{session.sessionLabel}</div>
+          <div className="text-white text-[13px] font-semibold truncate">{user.nome}</div>
+          <div className="text-[#8B97AC] text-[11.5px]">{user.sessionLabel}</div>
         </div>
-        <button type="button" className="bg-transparent border-none text-[#8B97AC] text-[11.5px] font-bold cursor-pointer" onClick={() => logout()}>
+        <button type="button" className="bg-transparent border-none text-[#8B97AC] text-[11.5px] font-bold cursor-pointer" onClick={handleLogout}>
           Sair
         </button>
       </div>
-    </div>
+    </nav>
   );
 }

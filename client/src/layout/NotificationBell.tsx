@@ -25,8 +25,15 @@ export function NotificationBell() {
     function onClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
     document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, []);
 
   const toggle = () => {
@@ -41,6 +48,9 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={toggle}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Notificações"
         className="w-[38px] h-[38px] rounded-[10px] border border-border bg-white cursor-pointer flex items-center justify-center relative"
         style={{ boxShadow: '0 2px 6px rgba(11,31,58,0.06)' }}
       >

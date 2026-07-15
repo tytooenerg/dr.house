@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -21,12 +22,15 @@ const NOTIF_ROWS: { key: keyof ProfileData['notifPrefs']; label: string; hint: s
 export function PerfilPage() {
   const [data, setData] = useState<ProfileData | null>(null);
   const [saved, setSaved] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteNome, setInviteNome] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
 
   useEffect(() => {
     api.get<ProfileData>('/profile').then(setData);
   }, []);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   const setField = async (field: keyof ProfileData['profileForm'], value: string) => {
     const d = await api.post<ProfileData>('/profile/field', { field, value });
@@ -41,6 +45,16 @@ export function PerfilPage() {
   const save = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  };
+
+  const submitInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteNome.trim() || !inviteEmail.trim()) return;
+    const d = await api.post<ProfileData>('/profile/team/invite', { nome: inviteNome, email: inviteEmail });
+    setData(d);
+    setInviteNome('');
+    setInviteEmail('');
+    setInviting(false);
   };
 
   return (
@@ -112,10 +126,27 @@ export function PerfilPage() {
       <div className="bg-white border border-border rounded-card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4.5 border-b border-border">
           <div className="font-bold text-[15px]">Equipe</div>
-          <button type="button" className="px-3.5 py-2 rounded-lg border border-inputBorder bg-white text-navy text-[12.5px] font-bold cursor-pointer">
-            Convidar membro
+          <button type="button" onClick={() => setInviting((v) => !v)} className="px-3.5 py-2 rounded-lg border border-inputBorder bg-white text-navy text-[12.5px] font-bold cursor-pointer">
+            {inviting ? 'Cancelar' : 'Convidar membro'}
           </button>
         </div>
+        {inviting && (
+          <form onSubmit={submitInvite} className="flex items-end gap-2.5 px-5 py-3.5 border-b border-hairline bg-[#F7F8FA]">
+            <div className="flex-1">
+              <Field label="Nome">
+                <Input value={inviteNome} onChange={(e) => setInviteNome(e.target.value)} placeholder="Nome do convidado" />
+              </Field>
+            </div>
+            <div className="flex-1">
+              <Field label="E-mail">
+                <Input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="email@empresa.com.br" />
+              </Field>
+            </div>
+            <Button type="submit" size="sm">
+              Enviar convite
+            </Button>
+          </form>
+        )}
         {data.teamMembers.map((m) => (
           <div key={m.email} className="flex items-center justify-between px-5 py-3.5 border-b border-hairline last:border-b-0">
             <div>

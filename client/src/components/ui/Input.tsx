@@ -1,10 +1,14 @@
-import { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import { InputHTMLAttributes, ReactElement, SelectHTMLAttributes, TextareaHTMLAttributes, cloneElement, isValidElement, useId } from 'react';
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactElement<{ id?: string }> }) {
+  const id = useId();
+  const child = isValidElement(children) ? cloneElement(children, { id: children.props.id ?? id }) : children;
   return (
     <div>
-      <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">{label}</div>
-      {children}
+      <label htmlFor={id} className="block text-[12.5px] font-bold text-textSecondary mb-1.5">
+        {label}
+      </label>
+      {child}
     </div>
   );
 }

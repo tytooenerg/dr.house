@@ -4,26 +4,28 @@ import { NotificationBell } from './NotificationBell';
 import { AiChat } from './AiChat';
 import { useSession } from '../state/SessionContext';
 import { useIsMobile } from '../lib/useIsMobile';
-import { KybModal } from '../pages/auth/KybModal';
 import { OnboardingModal } from '../pages/auth/OnboardingModal';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 export function AppShell() {
-  const { session, loading } = useSession();
+  const { user, loading } = useSession();
   const isMobile = useIsMobile();
 
   if (loading) return null;
-  if (!session?.isLoggedIn) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/" replace />;
+  if (user.needsKyb) return <Navigate to="/" replace />;
 
   return (
     <div className="flex min-h-screen w-full bg-bg text-navy relative" style={{ flexDirection: isMobile ? 'column' : 'row' }}>
       <NotificationBell />
       <Sidebar />
       <div className="flex-1 min-w-0" style={{ padding: isMobile ? '20px 18px' : '36px 44px', maxWidth: 1240 }}>
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </div>
       <AiChat />
-      {session.showOnboarding && <OnboardingModal />}
-      {session.showKyb && <KybModal />}
+      {user.showOnboarding && <OnboardingModal />}
     </div>
   );
 }

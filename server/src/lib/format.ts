@@ -20,3 +20,19 @@ export function parseBRLNumber(s: string | undefined): number {
   if (!s) return 0;
   return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
 }
+
+// SQLite CURRENT_TIMESTAMP columns are stored as "YYYY-MM-DD HH:MM:SS" UTC with no
+// offset marker; append "Z" so Date parses them as UTC instead of local time.
+export function toIsoUtc(sqliteTimestamp: string): string {
+  return sqliteTimestamp.includes('T') ? sqliteTimestamp : sqliteTimestamp.replace(' ', 'T') + 'Z';
+}
+
+export function fmtRelative(sqliteTimestamp: string): string {
+  const then = new Date(toIsoUtc(sqliteTimestamp)).getTime();
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (diffSec < 60) return 'agora';
+  if (diffSec < 3600) return `há ${Math.floor(diffSec / 60)} min`;
+  if (diffSec < 86400) return `há ${Math.floor(diffSec / 3600)} h`;
+  const days = Math.floor(diffSec / 86400);
+  return `há ${days} dia${days > 1 ? 's' : ''}`;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { Card, PageHeader } from '../../components/ui/Card';
 import { Donut } from '../../components/ui/Gauge';
 
@@ -39,7 +40,7 @@ export function DashboardPage() {
     api.get<DashboardData>('/dashboard').then(setData);
   }, []);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   return (
     <div>

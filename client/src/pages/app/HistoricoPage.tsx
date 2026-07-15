@@ -11,15 +11,23 @@ interface Historico {
   retornoFmt: string;
   status: string;
 }
+interface HistoricoData {
+  totalInvestidoFmt: string;
+  retornoAcumuladoFmt: string;
+  rentabilidadeMediaFmt: string;
+  historico: Historico[];
+}
 
 const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr';
 
 export function HistoricoPage() {
-  const [historico, setHistorico] = useState<Historico[]>([]);
+  const [data, setData] = useState<HistoricoData | null>(null);
 
   useEffect(() => {
-    api.get<{ historico: Historico[] }>('/historico').then((d) => setHistorico(d.historico));
+    api.get<HistoricoData>('/historico').then(setData);
   }, []);
+
+  const historico = data?.historico ?? [];
 
   return (
     <div>
@@ -28,15 +36,15 @@ export function HistoricoPage() {
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <NavyCard>
           <div className="text-[#8B97AC] text-[13px] font-semibold">Total investido</div>
-          <div className="text-2xl font-extrabold mt-2.5">R$ 842.600</div>
+          <div className="text-2xl font-extrabold mt-2.5">{data?.totalInvestidoFmt ?? '—'}</div>
         </NavyCard>
         <Card>
           <div className="text-textSecondary text-[13px] font-semibold">Retorno acumulado</div>
-          <div className="text-2xl font-extrabold mt-2.5 text-green">+R$ 31.240</div>
+          <div className="text-2xl font-extrabold mt-2.5 text-green">{data?.retornoAcumuladoFmt ?? '—'}</div>
         </Card>
         <Card>
           <div className="text-textSecondary text-[13px] font-semibold">Rentabilidade média</div>
-          <div className="text-2xl font-extrabold mt-2.5">1,8% a.m.</div>
+          <div className="text-2xl font-extrabold mt-2.5">{data?.rentabilidadeMediaFmt ?? '—'}</div>
         </Card>
       </div>
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -28,7 +29,7 @@ export function DevPage() {
     load();
   }, []);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   const toggleReveal = () => api.post<DevData>('/dev/key/reveal').then(setData);
   const toggleWebhook = () => api.post<DevData>('/dev/webhook/toggle').then(setData);

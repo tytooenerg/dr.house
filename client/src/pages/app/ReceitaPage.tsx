@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Donut } from '../../components/ui/Gauge';
 
@@ -24,7 +25,7 @@ export function ReceitaPage() {
     api.get<RevenueData>('/revenue').then(setData);
   }, []);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   return (
     <div>

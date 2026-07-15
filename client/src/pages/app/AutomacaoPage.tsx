@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
 import { Input } from '../../components/ui/Input';
@@ -33,7 +34,7 @@ export function AutomacaoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.autoBidEnabled]);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   const toggle = () => api.post<AutomationData>('/automacao/toggle').then(setData);
   const setRule = (field: string, value: string) => api.post<AutomationData>('/automacao/rule', { field, value }).then(setData);

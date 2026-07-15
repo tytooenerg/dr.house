@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { useSession } from '../../state/SessionContext';
 
 interface Aceite {
   id: number;
@@ -10,10 +11,12 @@ interface Aceite {
   statusBg: string;
   statusColor: string;
   isPending: boolean;
-  isProcessing: boolean;
+  isProcessing?: boolean;
+  cedente?: string;
 }
 
 export function SacadoPage() {
+  const { user } = useSession();
   const [aceites, setAceites] = useState<Aceite[]>([]);
 
   const load = () => api.get<{ aceites: Aceite[] }>('/aceites').then((d) => setAceites(d.aceites));
@@ -35,8 +38,10 @@ export function SacadoPage() {
         <div className="text-textSecondary text-sm mt-1">Visão que a empresa pagadora vê ao entrar na Lastro para confirmar ou contestar duplicatas emitidas contra ela</div>
       </div>
       <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-chip text-blue text-[12.5px] font-bold mb-6">
-        <span className="w-[22px] h-[22px] rounded-full bg-blue text-white flex items-center justify-center text-[10px]">GA</span>
-        Simulando login como: Grupo Atlas Varejo (sacado)
+        <span className="w-[22px] h-[22px] rounded-full bg-blue text-white flex items-center justify-center text-[10px]">
+          {user?.companyName.slice(0, 2).toUpperCase()}
+        </span>
+        Logado como: {user?.companyName} (sacado)
       </div>
 
       <div className="flex flex-col gap-3.5">
@@ -44,7 +49,7 @@ export function SacadoPage() {
           <div key={a.id} className="bg-white border border-border rounded-card px-6 py-5 flex flex-col gap-3.5">
             <div className="min-w-0">
               <div className="font-mono-num text-xs text-textSecondary">{a.duplicataId}</div>
-              <div className="font-bold text-[15px] mt-0.5">{a.valorFmt} a pagar — emitida por um fornecedor</div>
+              <div className="font-bold text-[15px] mt-0.5">{a.valorFmt} a pagar — emitida por {a.cedente || 'um fornecedor'}</div>
               <div className="text-textSecondary text-[12.5px] mt-1">{a.prazo}</div>
             </div>
             <div className="flex items-center justify-between gap-3 flex-wrap">

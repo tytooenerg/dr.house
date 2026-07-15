@@ -5,3 +5,6 @@ dist/
 .env
 .env.local
 *.tsbuildinfo
+server/data/
+server/uploads/
+coverage/

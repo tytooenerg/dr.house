@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 
@@ -33,7 +34,7 @@ export function ContaPage() {
     load();
   }, []);
 
-  if (!data) return null;
+  if (!data) return <PageSkeleton />;
 
   const runAction = async (key: string) => {
     if (key === 'bank') await api.post('/account/kyc/bank');
