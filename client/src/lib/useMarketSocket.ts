@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getToken } from './api';
+import { getToken, refreshAccessToken } from './api';
 
 export function useMarketSocket<T>() {
   const [offers, setOffers] = useState<T[]>([]);
@@ -7,15 +7,20 @@ export function useMarketSocket<T>() {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) return;
+    if (!getToken()) return;
 
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout>;
 
-    function connect() {
+    async function connect() {
+      // Access tokens are short-lived (15min); refresh proactively so a WS reconnect
+      // after a long idle period doesn't hand the server an already-expired token.
+      await refreshAccessToken();
+      const token = getToken();
+      if (cancelled || !token) return;
+
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market?token=${encodeURIComponent(token!)}`);
+      const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market?token=${encodeURIComponent(token)}`);
       wsRef.current = ws;
 
       ws.onopen = () => setConnected(true);

@@ -2,14 +2,18 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { approveKyb } from '../src/db/users.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
 });
 
+// KYB must be approved before an investidor can bid/buy — simulate the admin
+// approval step directly so these tests aren't coupled to the back-office flow.
 async function registerInvestidor() {
   const email = `inv-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
   const res = await request(app).post('/api/auth/register').send({ nome: 'Investidor', email, password: 'senha123', companyName: 'Fundo Teste', role: 'investidor' });
+  approveKyb(res.body.user.id);
   return res.body.token as string;
 }
 

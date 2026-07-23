@@ -23,6 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'conta', label: 'Conta & Liquidação', path: '/app/conta', group: 'plataforma' },
   { key: 'receita', label: 'Modelo de Receita', path: '/app/receita', group: 'plataforma' },
   { key: 'perfil', label: 'Perfil & Configurações', path: '/app/perfil', group: 'plataforma' },
+  { key: 'admin', label: 'Back-office', path: '/app/admin', group: 'plataforma' },
 ];
 
 export const GROUP_LABELS: Record<string, string> = {
@@ -35,4 +36,5 @@ export const DEFAULT_TAB_BY_ROLE: Record<string, string> = {
   investidor: 'dashboard',
   cedente: 'minhas',
   sacado: 'sacado',
+  admin: 'admin',
 };

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../auth/middleware.js';
 import { listOpenDisputesByCedente, getDispute, listEvents, setEvidenceStatus, addEvent, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
+import { recordAuditEvent } from '../db/audit.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 
@@ -57,8 +58,9 @@ disputaRouter.post('/:id/resolve', (req, res) => {
     return;
   }
   const dispute = getDispute(id)!;
-  resolveDispute(id);
+  resolveDispute(id, 'cedente: evidência aceita, aceite restabelecido', req.user!.id);
   const aceite = getAceite(dispute.aceite_id);
   if (aceite) setAceiteStatus(aceite.id, 'aceita');
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'dispute.resolved_by_cedente', { disputeId: id });
   res.json({ disputes: view(req) });
 });

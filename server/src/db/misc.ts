@@ -1,8 +1,17 @@
 import { db } from './index.js';
+import { getSettings, getUserById } from './users.js';
+import { sendEmail } from '../lib/mailer.js';
 
 // --- notifications ---
-export function addNotification(userId: number, text: string, color: string) {
+// `category` is optional — pass it only for real events the user can toggle in
+// Perfil (leilão/aceite/disputa); seed/demo notifications skip it so they never trigger email.
+export function addNotification(userId: number, text: string, color: string, category?: 'leilao' | 'aceite' | 'disputa') {
   db.prepare('INSERT INTO notifications (user_id, text, color) VALUES (?, ?, ?)').run(userId, text, color);
+  if (!category) return;
+  const user = getUserById(userId);
+  if (!user) return;
+  const prefs = getSettings(user).notifPrefs;
+  if (prefs[category]) sendEmail(user.email, 'Lastro — nova atualização na sua conta', text);
 }
 
 export function listNotifications(userId: number, limit = 20) {

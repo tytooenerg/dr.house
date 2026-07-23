@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { api, getToken, setToken, setUnauthorizedHandler } from '../lib/api';
+import { api, getRefreshToken, getToken, setSessionTokens, setUnauthorizedHandler } from '../lib/api';
 
-export type Role = 'investidor' | 'cedente' | 'sacado';
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin';
 
 export interface OnboardingStep {
   title: string;
@@ -18,7 +18,10 @@ export interface SessionUser {
   kybDone: boolean;
   kybForm: { cnpj?: string; tipo?: string; pl?: string };
   kybTipoOptions: string[];
+  kybStatus: 'none' | 'pending' | 'approved' | 'rejected';
+  kybRejectReason: string;
   needsKyb: boolean;
+  kybPending: boolean;
   showOnboarding: boolean;
   onboardingSteps: OnboardingStep[];
   sessionLabel: string;
@@ -66,8 +69,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setAuthError(null);
     try {
-      const data = await api.post<{ token: string; user: SessionUser }>('/auth/login', { email, password });
-      setToken(data.token);
+      const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/login', { email, password });
+      setSessionTokens(data.token, data.refreshToken);
       setUser(data.user);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Não foi possível entrar.');
@@ -78,8 +81,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role }) => {
     setAuthError(null);
     try {
-      const data = await api.post<{ token: string; user: SessionUser }>('/auth/register', input);
-      setToken(data.token);
+      const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/register', input);
+      setSessionTokens(data.token, data.refreshToken);
       setUser(data.user);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Não foi possível criar a conta.');
@@ -88,7 +91,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
+    const refreshToken = getRefreshToken();
+    api.post('/auth/logout', refreshToken ? { refreshToken } : undefined).catch(() => {});
+    setSessionTokens(null, null);
     setUser(null);
   }, []);
 

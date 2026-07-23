@@ -32,8 +32,12 @@ export function addEvent(disputeId: number, autor: string, texto: string) {
   db.prepare('INSERT INTO dispute_events (dispute_id, autor, texto) VALUES (?, ?, ?)').run(disputeId, autor, texto);
 }
 
-export function resolveDispute(id: number) {
-  db.prepare('UPDATE disputes SET resolved = 1 WHERE id = ?').run(id);
+export function resolveDispute(id: number, resolution = '', resolvedBy: number | null = null) {
+  db.prepare("UPDATE disputes SET resolved = 1, resolution = ?, resolved_by = ?, resolved_at = datetime('now') WHERE id = ?").run(
+    resolution,
+    resolvedBy,
+    id
+  );
 }
 
 export function listOpenDisputesByCedente(cedenteId: number) {
@@ -47,4 +51,17 @@ export function listOpenDisputesByCedente(cedenteId: number) {
        ORDER BY dis.created_at DESC`
     )
     .all(cedenteId) as (DisputeRow & { duplicata_id: string; sacado_nome: string; valor: number })[];
+}
+
+export function listAllOpenDisputes() {
+  return db
+    .prepare(
+      `SELECT dis.*, a.duplicata_id as duplicata_id, d.sacado_nome as sacado_nome, d.cedente_nome as cedente_nome, d.valor as valor
+       FROM disputes dis
+       JOIN aceites a ON a.id = dis.aceite_id
+       JOIN duplicatas d ON d.id = a.duplicata_id
+       WHERE dis.resolved = 0
+       ORDER BY dis.created_at ASC`
+    )
+    .all() as (DisputeRow & { duplicata_id: string; sacado_nome: string; cedente_nome: string; valor: number })[];
 }

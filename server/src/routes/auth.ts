@@ -1,14 +1,36 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { createUser, getSettings, getUserByEmail, markKybDone, updateKybForm, updateSettings } from '../db/users.js';
+import rateLimit from 'express-rate-limit';
+import {
+  createUser,
+  getSettings,
+  getUserByEmail,
+  getUserById,
+  submitKybForReview,
+  updateKybForm,
+  updateSettings,
+} from '../db/users.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
-import { signToken } from '../auth/jwt.js';
+import { generateRefreshToken, hashRefreshToken, signAccessToken } from '../auth/jwt.js';
+import { createRefreshToken, findValidRefreshToken, revokeAllRefreshTokensForUser, revokeRefreshToken } from '../db/refreshTokens.js';
 import { requireAuth } from '../auth/middleware.js';
+import { recordAuditEvent } from '../db/audit.js';
 import { KYB_TIPOS, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import type { UserRow } from '../db/types.js';
 
 export const authRouter = Router();
+
+// Only guards the credential-guessable endpoints — /me, /refresh etc. are hit
+// automatically and often, and rate-limiting those would just break active sessions.
+const bruteForceLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => !!process.env.VITEST,
+  message: { error: 'rate_limited', message: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
+});
 
 const registerSchema = z.object({
   nome: z.string().trim().min(2, 'Informe seu nome completo.'),
@@ -25,7 +47,7 @@ const loginSchema = z.object({
 
 function publicUser(user: UserRow) {
   const settings = getSettings(user);
-  const steps = ONBOARDING_STEPS[user.role];
+  const steps = ONBOARDING_STEPS[user.role as 'investidor' | 'cedente' | 'sacado'] ?? [];
   const onboardingSeen = settings.onboardingSeen;
   return {
     id: user.id,
@@ -37,16 +59,27 @@ function publicUser(user: UserRow) {
     kybDone: !!user.kyb_done,
     kybForm: JSON.parse(user.kyb_form || '{}'),
     kybTipoOptions: KYB_TIPOS,
-    needsKyb: user.role === 'investidor' && !user.kyb_done,
+    kybStatus: user.kyb_status,
+    kybRejectReason: user.kyb_reject_reason,
+    needsKyb: user.role === 'investidor' && (user.kyb_status === 'none' || user.kyb_status === 'rejected'),
+    kybPending: user.role === 'investidor' && user.kyb_status === 'pending',
     showOnboarding: !onboardingSeen,
     onboardingSteps: steps,
-    sessionLabel: user.role === 'sacado' ? 'Sessão Sacado' : user.role === 'cedente' ? 'Sessão Cedente' : 'Conta Investidor',
-    navTabs: ROLE_TABS[user.role],
+    sessionLabel: user.role === 'sacado' ? 'Sessão Sacado' : user.role === 'cedente' ? 'Sessão Cedente' : user.role === 'admin' ? 'Back-office' : 'Conta Investidor',
+    navTabs: ROLE_TABS[user.role as 'investidor' | 'cedente' | 'sacado'] ?? [],
   };
+}
+
+function issueTokens(user: UserRow) {
+  const accessToken = signAccessToken({ sub: user.id, role: user.role });
+  const refreshToken = generateRefreshToken();
+  createRefreshToken(user.id, hashRefreshToken(refreshToken));
+  return { accessToken, refreshToken };
 }
 
 authRouter.post(
   '/register',
+  bruteForceLimiter,
   asyncHandler(async (req, res) => {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -60,13 +93,15 @@ authRouter.post(
     }
     const passwordHash = await hashPassword(password);
     const user = createUser({ email, passwordHash, nome, companyName, role });
-    const token = signToken({ sub: user.id, role: user.role });
-    res.status(201).json({ token, user: publicUser(user) });
+    const { accessToken, refreshToken } = issueTokens(user);
+    recordAuditEvent(user.id, user.company_name, 'user.registered', { role });
+    res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });
   })
 );
 
 authRouter.post(
   '/login',
+  bruteForceLimiter,
   asyncHandler(async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -78,10 +113,46 @@ authRouter.post(
       res.status(401).json({ error: 'invalid_credentials', message: 'E-mail ou senha incorretos.' });
       return;
     }
-    const token = signToken({ sub: user.id, role: user.role });
-    res.json({ token, user: publicUser(user) });
+    const { accessToken, refreshToken } = issueTokens(user);
+    recordAuditEvent(user.id, user.company_name, 'user.login', {});
+    res.json({ token: accessToken, refreshToken, user: publicUser(user) });
   })
 );
+
+const refreshSchema = z.object({ refreshToken: z.string().min(1) });
+
+authRouter.post(
+  '/refresh',
+  asyncHandler(async (req, res) => {
+    const parsed = refreshSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const tokenHash = hashRefreshToken(parsed.data.refreshToken);
+    const record = findValidRefreshToken(tokenHash);
+    if (!record) {
+      res.status(401).json({ error: 'unauthorized', message: 'Sessão expirada — faça login novamente.' });
+      return;
+    }
+    const user = getUserById(record.user_id);
+    if (!user) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+    // Rotate: the old refresh token is single-use, so a leaked-but-already-used token is inert.
+    revokeRefreshToken(tokenHash);
+    const { accessToken, refreshToken } = issueTokens(user);
+    res.json({ token: accessToken, refreshToken });
+  })
+);
+
+authRouter.post('/logout', requireAuth, (req, res) => {
+  const body = z.object({ refreshToken: z.string().optional() }).safeParse(req.body);
+  if (body.success && body.data.refreshToken) revokeRefreshToken(hashRefreshToken(body.data.refreshToken));
+  else revokeAllRefreshTokensForUser(req.user!.id);
+  res.json({ ok: true });
+});
 
 authRouter.get('/me', requireAuth, (req, res) => {
   res.json({ user: publicUser(req.user!) });
@@ -103,8 +174,9 @@ authRouter.post('/kyb', requireAuth, (req, res) => {
   if (parsed.data.cnpj) updateKybForm(userId, 'cnpj', parsed.data.cnpj);
   if (parsed.data.tipo) updateKybForm(userId, 'tipo', parsed.data.tipo);
   if (parsed.data.pl) updateKybForm(userId, 'pl', parsed.data.pl);
-  markKybDone(userId);
-  const refreshed = { ...req.user!, kyb_done: 1 };
+  submitKybForReview(userId);
+  recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj });
+  const refreshed = getUserById(userId)!;
   res.json({ user: publicUser(refreshed) });
 });
 

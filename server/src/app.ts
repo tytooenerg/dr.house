@@ -1,6 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import './db/index.js';
+import { httpLogger, logger } from './lib/logger.js';
+import { captureError } from './lib/sentry.js';
+import { adminRouter } from './routes/admin.js';
 
 import { authRouter } from './routes/auth.js';
 import { dashboardRouter } from './routes/dashboard.js';
@@ -24,8 +31,33 @@ import { uploadsRouter } from './routes/uploads.js';
 
 export const app = express();
 
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // the SPA is served separately by Vite/static hosting, not by this API
+  })
+);
+// Scoped to /api only — static asset requests carry an Origin header too (the built
+// SPA's <script crossorigin> tags trigger CORS mode even when same-origin), and those
+// must never be rejected just because CORS_ORIGINS doesn't happen to list this server's
+// own origin.
+app.use(
+  '/api',
+  cors({
+    origin(origin, callback) {
+      // no Origin header (curl, server-to-server, same-origin) is allowed through
+      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+      else callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
+if (!process.env.VITEST) app.use(httpLogger);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'lastro-api' }));
 
@@ -49,6 +81,16 @@ app.use('/api/account', accountRouter);
 app.use('/api/revenue', revenueRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/uploads', uploadsRouter);
+app.use('/api/admin', adminRouter);
+
+// In production (Docker), this server also serves the built SPA — dev mode uses the
+// Vite dev server + proxy instead, so client/dist won't exist and this is skipped.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDist = process.env.CLIENT_DIST_PATH || path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get(/^(?!\/api|\/ws).*/, (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
 
 app.use((req, res) => {
   res.status(404).json({ error: 'not_found', path: req.path });
@@ -56,6 +98,7 @@ app.use((req, res) => {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
+  logger.error({ err }, 'unhandled request error');
+  captureError(err);
   res.status(500).json({ error: 'internal_error' });
 });

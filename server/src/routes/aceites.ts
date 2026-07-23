@@ -5,6 +5,7 @@ import { listAceitesByCedente, listAceitesBySacadoNome, getAceite, setAceiteStat
 import { getDuplicata } from '../db/duplicatas.js';
 import { addNotification } from '../db/misc.js';
 import { createDispute, getDisputeByAceite } from '../db/disputes.js';
+import { recordAuditEvent } from '../db/audit.js';
 import { fmtBRL } from '../lib/format.js';
 import { COLORS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -87,8 +88,14 @@ aceiteRouter.post(
     }
     if (duplicata.cedente_id) {
       const verb = parsed.data.status === 'aceita' ? 'aceitou' : 'contestou';
-      addNotification(duplicata.cedente_id, `${duplicata.sacado_nome} ${verb} a duplicata ${duplicata.id} (${fmtBRL(duplicata.valor)})`, parsed.data.status === 'aceita' ? COLORS.GREEN : COLORS.RED);
+      addNotification(
+        duplicata.cedente_id,
+        `${duplicata.sacado_nome} ${verb} a duplicata ${duplicata.id} (${fmtBRL(duplicata.valor)})`,
+        parsed.data.status === 'aceita' ? COLORS.GREEN : COLORS.RED,
+        'aceite'
+      );
     }
+    recordAuditEvent(req.user!.id, req.user!.company_name, `aceite.${parsed.data.status}`, { duplicataId: duplicata.id });
     res.json({ aceites: listForUser(req) });
   })
 );

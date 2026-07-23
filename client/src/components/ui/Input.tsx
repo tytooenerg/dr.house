@@ -1,11 +1,12 @@
 import { InputHTMLAttributes, ReactElement, SelectHTMLAttributes, TextareaHTMLAttributes, cloneElement, isValidElement, useId } from 'react';
 
 export function Field({ label, children }: { label: string; children: ReactElement<{ id?: string }> }) {
-  const id = useId();
-  const child = isValidElement(children) ? cloneElement(children, { id: children.props.id ?? id }) : children;
+  const generatedId = useId();
+  const resolvedId = (isValidElement(children) ? children.props.id : undefined) ?? generatedId;
+  const child = isValidElement(children) ? cloneElement(children, { id: resolvedId }) : children;
   return (
     <div>
-      <label htmlFor={id} className="block text-[12.5px] font-bold text-textSecondary mb-1.5">
+      <label htmlFor={resolvedId} className="block text-[12.5px] font-bold text-textSecondary mb-1.5">
         {label}
       </label>
       {child}

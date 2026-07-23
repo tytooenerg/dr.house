@@ -1,5 +1,5 @@
 import { db } from './index.js';
-import { createUser, markKybDone } from './users.js';
+import { createUser, approveKyb } from './users.js';
 import { createDuplicata, dispararLeilao } from './duplicatas.js';
 import { ensureAceite, setAceiteStatus } from './aceites.js';
 import { addLedgerEntry, addNotification, inviteTeamMember } from './misc.js';
@@ -22,7 +22,8 @@ export async function seedIfEmpty() {
   const investidor = createUser({ email: 'investidor@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Kayrós Capital', role: 'investidor' });
   const cedente = createUser({ email: 'cedente@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Fornecedor Lima Ltda', role: 'cedente' });
   const sacado = createUser({ email: 'sacado@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Grupo Atlas Varejo', role: 'sacado' });
-  markKybDone(investidor.id);
+  createUser({ email: 'admin@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' });
+  approveKyb(investidor.id);
 
   // Marketplace offers — other (unregistered) companies' duplicatas available for auction.
   const OFFER_ACEITE_STATUS: Record<number, 'aceita' | 'aguardando' | 'contestada'> = {

@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "workspaces": [
     "client",
-    "server"
+    "server",
+    "e2e"
   ],
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
@@ -12,7 +13,8 @@
     "dev:client": "npm run dev -w client",
     "build": "npm run build -w server && npm run build -w client",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
-    "test": "npm run test -w server"
+    "test": "npm run test -w server && npm run test -w client",
+    "test:e2e": "npm run test -w e2e"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

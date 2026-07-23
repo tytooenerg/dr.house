@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, downloadFile } from '../../lib/api';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
 
@@ -16,22 +17,50 @@ interface HistoricoData {
   retornoAcumuladoFmt: string;
   rentabilidadeMediaFmt: string;
   historico: Historico[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr';
 
 export function HistoricoPage() {
   const [data, setData] = useState<HistoricoData | null>(null);
+  const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    api.get<HistoricoData>('/historico').then(setData);
-  }, []);
+    api.get<HistoricoData>(`/historico?page=${page}&pageSize=10`).then(setData);
+  }, [page]);
 
   const historico = data?.historico ?? [];
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+
+  const exportAs = async (format: 'csv' | 'pdf') => {
+    setExporting(true);
+    try {
+      await downloadFile(`/historico/export.${format}`, `historico.${format}`);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div>
-      <PageHeader title="Carteira & Histórico" subtitle="Suas operações concluídas e retornos obtidos" />
+      <PageHeader
+        title="Carteira & Histórico"
+        subtitle="Suas operações concluídas e retornos obtidos"
+        right={
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={() => exportAs('csv')} disabled={exporting}>
+              {exporting ? 'Exportando…' : 'Exportar CSV'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => exportAs('pdf')} disabled={exporting}>
+              {exporting ? 'Exportando…' : 'Exportar PDF'}
+            </Button>
+          </div>
+        }
+      />
 
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <NavyCard>
@@ -88,6 +117,31 @@ export function HistoricoPage() {
           </div>
         ))}
         {historico.length === 0 && <EmptyState title="Nenhuma operação ainda" hint="Suas operações concluídas vão aparecer aqui" />}
+        {historico.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-border text-[12.5px] text-textSecondary">
+            <span>
+              Página {data?.page} de {totalPages} — {data?.total} operações
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="px-3 py-1.5 rounded-md border border-inputBorder bg-white font-bold disabled:opacity-40 cursor-pointer disabled:cursor-default"
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="px-3 py-1.5 rounded-md border border-inputBorder bg-white font-bold disabled:opacity-40 cursor-pointer disabled:cursor-default"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

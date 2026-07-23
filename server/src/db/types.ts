@@ -1,4 +1,5 @@
-export type Role = 'investidor' | 'cedente' | 'sacado';
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin';
+export type KybStatus = 'none' | 'pending' | 'approved' | 'rejected';
 
 export interface UserSettings {
   onboardingSeen: boolean;
@@ -56,6 +57,8 @@ export interface UserRow {
   role: Role;
   kyb_done: number;
   kyb_form: string;
+  kyb_status: KybStatus;
+  kyb_reject_reason: string;
   settings: string;
   created_at: string;
 }
@@ -95,5 +98,8 @@ export interface DisputeRow {
   motivo: string;
   evidence_status: 'enviando' | 'enviada' | null;
   resolved: number;
+  resolution: string;
+  resolved_by: number | null;
+  resolved_at: string | null;
   created_at: string;
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { createDuplicata } from '../db/duplicatas.js';
 import { ensureAceite } from '../db/aceites.js';
+import { recordAuditEvent } from '../db/audit.js';
 import { fmtBRL, parseBRLNumber } from '../lib/format.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -108,6 +109,7 @@ emitirRouter.post(
       registro,
     });
     ensureAceite(duplicata.id, '10 dias úteis restantes');
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'duplicata.registrada', { duplicataId: duplicata.id, registro });
     res.json({ ok: true, registro, duplicataId: duplicata.id, seguro: parsed.data.seguro });
   })
 );

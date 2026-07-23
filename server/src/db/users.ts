@@ -57,3 +57,19 @@ export function updateKybForm(userId: number, field: 'cnpj' | 'tipo' | 'pl', val
 export function markKybDone(userId: number) {
   db.prepare('UPDATE users SET kyb_done = 1 WHERE id = ?').run(userId);
 }
+
+export function submitKybForReview(userId: number) {
+  db.prepare("UPDATE users SET kyb_status = 'pending', kyb_reject_reason = '' WHERE id = ?").run(userId);
+}
+
+export function approveKyb(userId: number) {
+  db.prepare("UPDATE users SET kyb_status = 'approved', kyb_done = 1, kyb_reject_reason = '' WHERE id = ?").run(userId);
+}
+
+export function rejectKyb(userId: number, reason: string) {
+  db.prepare("UPDATE users SET kyb_status = 'rejected', kyb_done = 0, kyb_reject_reason = ? WHERE id = ?").run(reason, userId);
+}
+
+export function listPendingKyb(): UserRow[] {
+  return db.prepare("SELECT * FROM users WHERE role = 'investidor' AND kyb_status = 'pending' ORDER BY created_at ASC").all() as UserRow[];
+}

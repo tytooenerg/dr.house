@@ -20,6 +20,7 @@ import { DisputaPage } from './pages/app/DisputaPage';
 import { PerfilPage } from './pages/app/PerfilPage';
 import { ContaPage } from './pages/app/ContaPage';
 import { ReceitaPage } from './pages/app/ReceitaPage';
+import { AdminPage } from './pages/app/AdminPage';
 import { DevelopersPage } from './pages/public/DevelopersPage';
 import { PrecosPage } from './pages/public/PrecosPage';
 import { LegalPage } from './pages/public/LegalPage';
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="perfil" element={<Gate tab="perfil"><PerfilPage /></Gate>} />
           <Route path="conta" element={<Gate tab="conta"><ContaPage /></Gate>} />
           <Route path="receita" element={<Gate tab="receita"><ReceitaPage /></Gate>} />
+          <Route path="admin" element={<Gate tab="admin"><AdminPage /></Gate>} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

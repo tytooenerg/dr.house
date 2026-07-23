@@ -95,3 +95,40 @@ describe('GET /api/auth/me', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('POST /api/auth/refresh', () => {
+  it('exchanges a valid refresh token for a new token pair, rotating the old one out', async () => {
+    const email = uniqueEmail();
+    const reg = await request(app).post('/api/auth/register').send({ nome: 'Ana', email, password: 'senha123', companyName: 'Ana Ltda', role: 'cedente' });
+    const oldRefreshToken = reg.body.refreshToken as string;
+    expect(oldRefreshToken).toBeTypeOf('string');
+
+    const res = await request(app).post('/api/auth/refresh').send({ refreshToken: oldRefreshToken });
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeTypeOf('string');
+    expect(res.body.refreshToken).not.toBe(oldRefreshToken);
+
+    // the rotated-out token is single-use
+    const reused = await request(app).post('/api/auth/refresh').send({ refreshToken: oldRefreshToken });
+    expect(reused.status).toBe(401);
+  });
+
+  it('rejects an unknown refresh token', async () => {
+    const res = await request(app).post('/api/auth/refresh').send({ refreshToken: 'not-a-real-refresh-token' });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/auth/logout', () => {
+  it('revokes the refresh token so it can no longer be used', async () => {
+    const email = uniqueEmail();
+    const reg = await request(app).post('/api/auth/register').send({ nome: 'Ana', email, password: 'senha123', companyName: 'Ana Ltda', role: 'cedente' });
+    const { token, refreshToken } = reg.body;
+
+    const logout = await request(app).post('/api/auth/logout').set('Authorization', `Bearer ${token}`).send({ refreshToken });
+    expect(logout.status).toBe(200);
+
+    const res = await request(app).post('/api/auth/refresh').send({ refreshToken });
+    expect(res.status).toBe(401);
+  });
+});

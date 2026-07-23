@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { verifyToken } from './jwt.js';
 import { getUserById } from '../db/users.js';
-import type { UserRow } from '../db/types.js';
+import type { Role, UserRow } from '../db/types.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -31,4 +31,14 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
   req.user = user;
   next();
+}
+
+export function requireRole(...roles: Role[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403).json({ error: 'forbidden', message: 'Você não tem permissão para acessar este recurso.' });
+      return;
+    }
+    next();
+  };
 }
