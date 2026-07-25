@@ -67,6 +67,8 @@ function publicUser(user: UserRow) {
     onboardingSteps: steps,
     sessionLabel: user.role === 'sacado' ? 'Sessão Sacado' : user.role === 'cedente' ? 'Sessão Cedente' : user.role === 'admin' ? 'Back-office' : 'Conta Investidor',
     navTabs: ROLE_TABS[user.role as 'investidor' | 'cedente' | 'sacado'] ?? [],
+    plan: user.plan,
+    subscriptionStatus: user.subscription_status,
   };
 }
 

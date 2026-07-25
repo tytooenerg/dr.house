@@ -22,6 +22,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'dev', label: 'Desenvolvedores', path: '/app/dev', group: 'plataforma' },
   { key: 'conta', label: 'Conta & Liquidação', path: '/app/conta', group: 'plataforma' },
   { key: 'receita', label: 'Modelo de Receita', path: '/app/receita', group: 'plataforma' },
+  { key: 'assinatura', label: 'Assinatura', path: '/app/assinatura', group: 'plataforma' },
   { key: 'perfil', label: 'Perfil & Configurações', path: '/app/perfil', group: 'plataforma' },
   { key: 'admin', label: 'Back-office', path: '/app/admin', group: 'plataforma' },
 ];

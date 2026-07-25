@@ -22,10 +22,11 @@ The client talks to the server exclusively over `/api/*` (proxied by Vite in dev
 - **Real file uploads** — NF-e attachment (with simulated field extraction) and KYB regulatory documents go through a real `multipart/form-data` endpoint (`multer`), stored on disk and tracked in the `uploads` table.
 - **Real notification emails** — `nodemailer`-backed, respecting each user's notification preferences; logs the email instead of sending when `SMTP_HOST` isn't set, so it works out of the box.
 - **CSV/PDF export** — `/api/historico/export.csv` and `.../export.pdf` (via `pdfkit`) for Carteira & Histórico.
+- **Real subscription billing** — three plans (Básico/Pro/Empresarial) backed by Stripe Checkout, the Stripe customer portal, and signature-verified webhooks (`/api/billing/webhook`). Automação de Lances and Comparador de Taxas require Pro; Desenvolvedores requires Empresarial; a Básico cedente is capped at 5 emissões/mês. Without `STRIPE_SECRET_KEY` set, plan changes are simulated instantly (no real charge) so the whole paywall is demoable out of the box.
 - **Validated API** — every mutating endpoint validates its body with Zod and returns structured 400s.
 - **AI assistant** — `/api/chat/ask` calls the Anthropic API when `ANTHROPIC_API_KEY` is set, and falls back to canned answers otherwise so the app works out of the box without a key.
 - **Structured logging + error tracking** — `pino`/`pino-http` request logging, optional Sentry (`SENTRY_DSN`) with a no-op fallback when unset.
-- **Three-tier test suite + CI** — server unit/integration tests (Vitest + Supertest), client component tests (Vitest + React Testing Library), and Playwright E2E tests covering login, the marketplace buy flow, and the full cedente→sacado emitir/aceite lifecycle across two accounts. `.github/workflows/ci.yml` runs all of it — typecheck, all three test tiers, and both builds — on every push and PR.
+- **Three-tier test suite + CI** — server unit/integration tests (Vitest + Supertest, including simulated-mode billing flows and a real Stripe webhook signature-verification test), client component tests (Vitest + React Testing Library), and Playwright E2E tests covering login, the marketplace buy flow, the full cedente→sacado emitir/aceite lifecycle, and the plan-gating→upgrade→unlock flow. `.github/workflows/ci.yml` runs all of it — typecheck, all three test tiers, and both builds — on every push and PR.
 - **Accessibility** — modals trap focus and close on Escape, dropdowns are keyboard-dismissible, form fields use associated `<label>`s (with a correctness fix so an explicitly-`id`'d child still gets the right `htmlFor`), nav uses `aria-current`/`aria-expanded`.
 - **Error boundaries + loading skeletons** on every authenticated page.
 - **Docker** — a multi-stage `Dockerfile` + `docker-compose.yml` (app + optional Redis) that builds and serves the whole app — client and API — from one container.
@@ -48,6 +49,8 @@ On first boot the server seeds four demo accounts (password `demo1234` for all):
 | Sacado | `sacado@lastro.demo` | Grupo Atlas Varejo |
 | Admin (back-office) | `admin@lastro.demo` | Lastro (plataforma) |
 
+The demo investidor starts on the **Pro** plan and the demo cedente on **Empresarial**, so every plan-gated feature (Automação de Lances, Comparador de Taxas, Desenvolvedores) is visible right away. A freshly self-registered account starts on **Básico** instead, so the paywall itself is demoable too — visit **Assinatura** in the sidebar to upgrade (instant/simulated without a Stripe key).
+
 You can also register a brand-new account for any of the three self-service roles from the login screen. New investidor accounts start in KYB `pending`/`none` status and can't bid until an admin approves them from the back-office.
 
 Other useful scripts:
@@ -59,7 +62,7 @@ npm run test         # server tests (Vitest + Supertest) + client tests (Vitest 
 npm run test:e2e     # Playwright E2E tests against a production build (client + server)
 ```
 
-Server-only env vars (all optional — see `server/.env.example`): `JWT_SECRET`, `PORT`, `DB_PATH`, `ANTHROPIC_API_KEY`, `CORS_ORIGINS`, `LOG_LEVEL`, `SENTRY_DSN`, `REDIS_URL`, `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM`.
+Server-only env vars (all optional — see `server/.env.example`): `JWT_SECRET`, `PORT`, `DB_PATH`, `ANTHROPIC_API_KEY`, `CORS_ORIGINS`, `LOG_LEVEL`, `SENTRY_DSN`, `REDIS_URL`, `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM`, `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_PRO`/`STRIPE_PRICE_EMPRESARIAL`.
 
 ## Running with Docker
 
@@ -76,7 +79,7 @@ client/src/
   components/        design-system primitives (Button, Card, Badge, Modal, Gauge, Toggle, Skeleton, ErrorBoundary…) + their component tests
   layout/             app shell: Sidebar, NotificationBell, AiChat, AppShell
   pages/auth/         login/register, KYB modal, onboarding tour
-  pages/app/          the 18 authenticated screens (role-gated), including the admin back-office
+  pages/app/          the 19 authenticated screens (role-gated), including the admin back-office and Assinatura (billing)
   pages/public/       Developers, Preços, Legal, 404
   state/               session context (JWT-backed auth, refresh-aware)
   lib/                 API client (with token-refresh retry), WebSocket hook, misc utilities
@@ -86,24 +89,24 @@ client/test/          Vitest + jsdom setup (RTL auto-cleanup, jest-dom matchers)
 server/src/
   data/seed.ts        static reference/copy data extracted from the design handoff (sacado risk profiles, compliance copy, revenue model, etc.)
   db/                  SQLite connection, versioned migrations + runner, and query helpers per domain (users, duplicatas, aceites, disputes, audit, refresh tokens, misc)
-  auth/                password hashing, JWT sign/verify, requireAuth/requireRole middleware
-  routes/              one Express router per feature area, all Zod-validated (including admin.ts)
-  lib/                 logger (pino), Sentry, mailer, pure formatting/compute helpers
+  auth/                password hashing, JWT sign/verify, requireAuth/requireRole/requirePlan middleware
+  routes/              one Express router per feature area, all Zod-validated (including admin.ts and billing.ts)
+  lib/                 logger (pino), Sentry, mailer, billing (Stripe + plan catalog), pure formatting/compute helpers
   ws.ts                WebSocket server broadcasting live marketplace state (+ optional Redis relay)
 server/scripts/        build-time helpers (copies .sql migrations into dist/)
 server/test/          Vitest + Supertest integration/unit tests
 
 e2e/
   playwright.config.ts builds + boots the app in production mode and runs tests against it
-  tests/                login, marketplace buy flow, cross-account emitir→aceite flow
+  tests/                login, marketplace buy flow, cross-account emitir→aceite flow, plan-gating→upgrade→unlock flow
 ```
 
 ## Roles
 
 Role is chosen once at registration (or via a demo account) and is fixed to that account/company:
 
-- **Investidor/Financiador** — Dashboard, Marketplace, Automação de Lances, Análise de Risco, Carteira & Histórico, Comparador de Taxas, Compliance, Conta & Liquidação, Modelo de Receita, Disputas, Perfil
-- **Empresa (cedente)** — Dashboard, Integrações ERP, Emitir Duplicata, Minhas Duplicatas, Aceite do Sacado (read-only), Análise de Risco, Carteira & Histórico, Compliance, Desenvolvedores, Conta & Liquidação, Modelo de Receita, Disputas, Perfil
+- **Investidor/Financiador** — Dashboard, Marketplace, Automação de Lances (Pro+), Análise de Risco, Carteira & Histórico, Comparador de Taxas (Pro+), Compliance, Conta & Liquidação, Modelo de Receita, Assinatura, Disputas, Perfil
+- **Empresa (cedente)** — Dashboard, Integrações ERP, Emitir Duplicata (5/mês no Básico), Minhas Duplicatas, Aceite do Sacado (read-only), Análise de Risco, Carteira & Histórico, Compliance, Desenvolvedores (Empresarial), Conta & Liquidação, Modelo de Receita, Assinatura, Disputas, Perfil
 - **Empresa (sacado)** — Dashboard, Portal do Sacado (confirmar/contestar), Carteira & Histórico, Conta & Liquidação, Disputas, Perfil
 - **Admin (back-office)** — fila de aprovação de KYB, arbitragem de disputas, trilha de auditoria; não é uma role auto-cadastrável (só existe via seed/criação direta).
 

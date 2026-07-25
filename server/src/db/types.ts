@@ -1,5 +1,7 @@
 export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin';
 export type KybStatus = 'none' | 'pending' | 'approved' | 'rejected';
+export type Plan = 'basico' | 'pro' | 'empresarial';
+export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
 
 export interface UserSettings {
   onboardingSeen: boolean;
@@ -59,6 +61,11 @@ export interface UserRow {
   kyb_form: string;
   kyb_status: KybStatus;
   kyb_reject_reason: string;
+  plan: Plan;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  subscription_status: SubscriptionStatus;
+  plan_current_period_end: string | null;
   settings: string;
   created_at: string;
 }

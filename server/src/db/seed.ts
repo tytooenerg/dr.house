@@ -1,5 +1,5 @@
 import { db } from './index.js';
-import { createUser, approveKyb } from './users.js';
+import { createUser, approveKyb, updateSubscription } from './users.js';
 import { createDuplicata, dispararLeilao } from './duplicatas.js';
 import { ensureAceite, setAceiteStatus } from './aceites.js';
 import { addLedgerEntry, addNotification, inviteTeamMember } from './misc.js';
@@ -24,6 +24,11 @@ export async function seedIfEmpty() {
   const sacado = createUser({ email: 'sacado@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Grupo Atlas Varejo', role: 'sacado' });
   createUser({ email: 'admin@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' });
   approveKyb(investidor.id);
+  // Demo accounts start on the top plans so the full feature set (Automação de Lances,
+  // Comparador, Desenvolvedores) is visible out of the box — a freshly self-registered
+  // account starts on Básico instead, so the paywall itself is also demoable.
+  updateSubscription(investidor.id, { plan: 'pro', subscriptionStatus: 'active_demo' });
+  updateSubscription(cedente.id, { plan: 'empresarial', subscriptionStatus: 'active_demo' });
 
   // Marketplace offers — other (unregistered) companies' duplicatas available for auction.
   const OFFER_ACEITE_STATUS: Record<number, 'aceita' | 'aguardando' | 'contestada'> = {

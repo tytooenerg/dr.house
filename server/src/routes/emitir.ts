@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
-import { createDuplicata } from '../db/duplicatas.js';
+import { countByCedenteThisMonth, createDuplicata } from '../db/duplicatas.js';
 import { ensureAceite } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from '../lib/billing.js';
 import { fmtBRL, parseBRLNumber } from '../lib/format.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -84,6 +85,14 @@ emitirRouter.post(
     const parsed = formSchema.safeParse(req.body);
     if (!parsed.success || !parsed.data.sacado || !parsed.data.valor || !parsed.data.vencimento) {
       res.status(400).json({ error: 'validation_error', message: 'Preencha empresa sacada, valor e vencimento antes de enviar.' });
+      return;
+    }
+    if (!planAtLeast(req.user!.plan, 'pro') && countByCedenteThisMonth(req.user!.id) >= BASICO_MONTHLY_EMIT_LIMIT) {
+      res.status(402).json({
+        error: 'plan_required',
+        requiredPlan: 'pro',
+        message: `Seu plano Básico permite até ${BASICO_MONTHLY_EMIT_LIMIT} emissões por mês. Faça upgrade para o Pro para emitir sem limites.`,
+      });
       return;
     }
     await new Promise((r) => setTimeout(r, 1100));

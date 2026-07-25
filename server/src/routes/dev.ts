@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requirePlan } from '../auth/middleware.js';
 import { getSettings, updateSettings } from '../db/users.js';
 import { addApiLog, listApiLogs } from '../db/misc.js';
 import { fmtRelative } from '../lib/format.js';
@@ -8,7 +8,7 @@ import { PLAYGROUND_ENDPOINTS, PLAYGROUND_FIELD_LABELS, WEBHOOK_EVENTS } from '.
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const devRouter = Router();
-devRouter.use(requireAuth);
+devRouter.use(requireAuth, requirePlan('empresarial'));
 
 function payload(userId: number, settings: ReturnType<typeof getSettings>, playgroundResult: unknown = null, playgroundLoading = false) {
   const ep = PLAYGROUND_ENDPOINTS[settings.playgroundEndpoint];

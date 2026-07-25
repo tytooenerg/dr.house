@@ -21,6 +21,7 @@ import { PerfilPage } from './pages/app/PerfilPage';
 import { ContaPage } from './pages/app/ContaPage';
 import { ReceitaPage } from './pages/app/ReceitaPage';
 import { AdminPage } from './pages/app/AdminPage';
+import { AssinaturaPage } from './pages/app/AssinaturaPage';
 import { DevelopersPage } from './pages/public/DevelopersPage';
 import { PrecosPage } from './pages/public/PrecosPage';
 import { LegalPage } from './pages/public/LegalPage';
@@ -38,15 +39,36 @@ export default function App() {
         <Route path="/app" element={<AppShell />}>
           <Route path="dashboard" element={<Gate tab="dashboard"><DashboardPage /></Gate>} />
           <Route path="marketplace" element={<Gate tab="marketplace"><MarketplacePage /></Gate>} />
-          <Route path="automacao" element={<Gate tab="automacao"><AutomacaoPage /></Gate>} />
-          <Route path="comparador" element={<Gate tab="comparador"><ComparadorPage /></Gate>} />
+          <Route
+            path="automacao"
+            element={
+              <Gate tab="automacao" requiredPlan="pro" feature="Automação de Lances">
+                <AutomacaoPage />
+              </Gate>
+            }
+          />
+          <Route
+            path="comparador"
+            element={
+              <Gate tab="comparador" requiredPlan="pro" feature="Comparador de Taxas">
+                <ComparadorPage />
+              </Gate>
+            }
+          />
           <Route path="minhas" element={<Gate tab="minhas"><MinhasPage /></Gate>} />
           <Route path="risco" element={<Gate tab="risco"><RiscoPage /></Gate>} />
           <Route path="historico" element={<Gate tab="historico"><HistoricoPage /></Gate>} />
           <Route path="erp" element={<Gate tab="erp"><ErpPage /></Gate>} />
           <Route path="emitir" element={<Gate tab="emitir"><EmitirPage /></Gate>} />
           <Route path="compliance" element={<Gate tab="compliance"><CompliancePage /></Gate>} />
-          <Route path="dev" element={<Gate tab="dev"><DevPage /></Gate>} />
+          <Route
+            path="dev"
+            element={
+              <Gate tab="dev" requiredPlan="empresarial" feature="Ambiente de Desenvolvedores">
+                <DevPage />
+              </Gate>
+            }
+          />
           <Route path="aceite" element={<Gate tab="aceite"><AceitePage /></Gate>} />
           <Route path="sacado" element={<Gate tab="sacado"><SacadoPage /></Gate>} />
           <Route path="disputa" element={<Gate tab="disputa"><DisputaPage /></Gate>} />
@@ -54,6 +76,7 @@ export default function App() {
           <Route path="conta" element={<Gate tab="conta"><ContaPage /></Gate>} />
           <Route path="receita" element={<Gate tab="receita"><ReceitaPage /></Gate>} />
           <Route path="admin" element={<Gate tab="admin"><AdminPage /></Gate>} />
+          <Route path="assinatura" element={<Gate tab="assinatura"><AssinaturaPage /></Gate>} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

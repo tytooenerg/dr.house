@@ -1,16 +1,8 @@
-import { test, expect } from './fixtures';
+import { test, expect, dismissOnboardingIfPresent } from './fixtures';
 import type { Page } from '@playwright/test';
 
 function unique() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-async function dismissOnboardingIfPresent(page: Page) {
-  const skipOnboarding = page.getByRole('button', { name: 'Pular' });
-  if (await skipOnboarding.isVisible({ timeout: 15_000 }).catch(() => false)) {
-    await skipOnboarding.click();
-    await expect(skipOnboarding).toBeHidden({ timeout: 5000 }).catch(() => {});
-  }
 }
 
 async function registerAs(page: Page, opts: { roleTitle: string; nome: string; companyName: string; email: string }) {

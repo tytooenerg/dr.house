@@ -10,6 +10,13 @@ export function listByCedente(cedenteId: number): DuplicataRow[] {
   return db.prepare('SELECT * FROM duplicatas WHERE cedente_id = ? ORDER BY created_at DESC').all(cedenteId) as DuplicataRow[];
 }
 
+export function countByCedenteThisMonth(cedenteId: number): number {
+  const row = db
+    .prepare("SELECT COUNT(*) as n FROM duplicatas WHERE cedente_id = ? AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')")
+    .get(cedenteId) as { n: number };
+  return row.n;
+}
+
 export function listMarketplace(): DuplicataRow[] {
   // Include 'vendida' too: a bought offer should still render (as "Comprada") in the
   // marketplace list rather than disappearing the instant someone buys it.

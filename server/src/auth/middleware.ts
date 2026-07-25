@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import { verifyToken } from './jwt.js';
 import { getUserById } from '../db/users.js';
-import type { Role, UserRow } from '../db/types.js';
+import { planAtLeast, PLANS } from '../lib/billing.js';
+import type { Plan, Role, UserRow } from '../db/types.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -37,6 +38,20 @@ export function requireRole(...roles: Role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) {
       res.status(403).json({ error: 'forbidden', message: 'Você não tem permissão para acessar este recurso.' });
+      return;
+    }
+    next();
+  };
+}
+
+export function requirePlan(minPlan: Plan) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !planAtLeast(req.user.plan, minPlan)) {
+      res.status(402).json({
+        error: 'plan_required',
+        requiredPlan: minPlan,
+        message: `Este recurso requer o plano ${PLANS[minPlan].label} ou superior.`,
+      });
       return;
     }
     next();

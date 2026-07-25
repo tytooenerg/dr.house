@@ -1,5 +1,5 @@
 import { db } from './index.js';
-import { defaultSettings, type Role, type UserRow, type UserSettings } from './types.js';
+import { defaultSettings, type Plan, type Role, type SubscriptionStatus, type UserRow, type UserSettings } from './types.js';
 
 export function getUserById(id: number): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
@@ -72,4 +72,28 @@ export function rejectKyb(userId: number, reason: string) {
 
 export function listPendingKyb(): UserRow[] {
   return db.prepare("SELECT * FROM users WHERE role = 'investidor' AND kyb_status = 'pending' ORDER BY created_at ASC").all() as UserRow[];
+}
+
+// --- billing ---
+export function getUserByStripeCustomerId(customerId: string): UserRow | undefined {
+  return db.prepare('SELECT * FROM users WHERE stripe_customer_id = ?').get(customerId) as UserRow | undefined;
+}
+
+export function setStripeCustomerId(userId: number, customerId: string) {
+  db.prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?').run(customerId, userId);
+}
+
+export function updateSubscription(
+  userId: number,
+  patch: { plan?: Plan; subscriptionStatus?: SubscriptionStatus; stripeSubscriptionId?: string | null; currentPeriodEnd?: string | null }
+) {
+  const user = getUserById(userId)!;
+  db.prepare('UPDATE users SET plan = ?, subscription_status = ?, stripe_subscription_id = ?, plan_current_period_end = ? WHERE id = ?').run(
+    patch.plan ?? user.plan,
+    patch.subscriptionStatus ?? user.subscription_status,
+    patch.stripeSubscriptionId !== undefined ? patch.stripeSubscriptionId : user.stripe_subscription_id,
+    patch.currentPeriodEnd !== undefined ? patch.currentPeriodEnd : user.plan_current_period_end,
+    userId
+  );
+  return getUserById(userId)!;
 }

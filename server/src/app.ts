@@ -28,6 +28,7 @@ import { profileRouter } from './routes/profile.js';
 import { accountRouter, revenueRouter } from './routes/account.js';
 import { chatRouter } from './routes/chat.js';
 import { uploadsRouter } from './routes/uploads.js';
+import { billingRouter, handleStripeWebhook } from './routes/billing.js';
 
 export const app = express();
 
@@ -56,6 +57,10 @@ app.use(
     credentials: true,
   })
 );
+// Stripe webhook signature verification needs the exact raw body, so it must be
+// registered with its own raw parser before the global express.json() below.
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+
 app.use(express.json());
 if (!process.env.VITEST) app.use(httpLogger);
 
@@ -82,6 +87,7 @@ app.use('/api/revenue', revenueRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/billing', billingRouter);
 
 // In production (Docker), this server also serves the built SPA — dev mode uses the
 // Vite dev server + proxy instead, so client/dist won't exist and this is skipped.

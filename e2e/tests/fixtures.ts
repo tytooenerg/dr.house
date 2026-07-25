@@ -1,4 +1,12 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
+
+export async function dismissOnboardingIfPresent(page: Page) {
+  const skipOnboarding = page.getByRole('button', { name: 'Pular' });
+  if (await skipOnboarding.isVisible({ timeout: 15_000 }).catch(() => false)) {
+    await skipOnboarding.click();
+    await expect(skipOnboarding).toBeHidden({ timeout: 5000 }).catch(() => {});
+  }
+}
 
 // The app loads Google Fonts from an external CDN. That's irrelevant to what these
 // tests verify, and in network-restricted environments the request can hang instead

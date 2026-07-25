@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requirePlan } from '../auth/middleware.js';
 import { getSettings, updateSettings } from '../db/users.js';
 import { addAutomationActivity, listAutomationActivity } from '../db/misc.js';
 import { fmtRelative } from '../lib/format.js';
 import { AUTO_BID_OFFERS } from '../data/seed.js';
 
 export const automationRouter = Router();
-automationRouter.use(requireAuth);
+automationRouter.use(requireAuth, requirePlan('pro'));
 
 const tickCache = new Map<number, number>();
 

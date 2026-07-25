@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requirePlan } from '../auth/middleware.js';
 import { fmtBRL, parseBRLNumber } from '../lib/format.js';
 import { RATE_CHANNELS } from '../data/seed.js';
 
 export const comparadorRouter = Router();
-comparadorRouter.use(requireAuth);
+comparadorRouter.use(requireAuth, requirePlan('pro'));
 
 const RATE_BANDS: Record<string, [number, number]> = { AA: [1.2, 1.6], A: [1.5, 2.0], B: [2.2, 2.9], C: [3.2, 4.2] };
 

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import { api, getRefreshToken, getToken, setSessionTokens, setUnauthorizedHandler } from '../lib/api';
 
 export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin';
+export type Plan = 'basico' | 'pro' | 'empresarial';
 
 export interface OnboardingStep {
   title: string;
@@ -26,6 +27,8 @@ export interface SessionUser {
   onboardingSteps: OnboardingStep[];
   sessionLabel: string;
   navTabs: string[];
+  plan: Plan;
+  subscriptionStatus: 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
 }
 
 interface SessionContextValue {
