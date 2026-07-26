@@ -31,6 +31,7 @@ import { uploadsRouter } from './routes/uploads.js';
 import { billingRouter, handleStripeWebhook } from './routes/billing.js';
 import { seguradoraRouter } from './routes/seguradora.js';
 import { v1Router } from './routes/v1.js';
+import { openApiSpec } from './data/openapi.js';
 
 export const app = express();
 
@@ -93,6 +94,9 @@ app.use('/api/uploads', uploadsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/seguradora', seguradoraRouter);
+// Public, unauthenticated — registered before the v1Router mount so it never hits
+// requireApiKey — lets partners point Swagger/Postman/codegen at it directly.
+app.get('/api/v1/openapi.json', (_req, res) => res.json(openApiSpec));
 app.use('/api/v1', v1Router);
 
 // In production (Docker), this server also serves the built SPA — dev mode uses the

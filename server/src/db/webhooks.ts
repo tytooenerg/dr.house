@@ -17,3 +17,11 @@ export function listActiveWebhooksForEvent(userId: number, event: string): Webho
 export function deleteWebhook(userId: number, webhookId: number) {
   db.prepare('DELETE FROM webhooks WHERE id = ? AND user_id = ?').run(webhookId, userId);
 }
+
+export function deleteAllWebhooksForUser(userId: number) {
+  db.prepare('DELETE FROM webhooks WHERE user_id = ?').run(userId);
+}
+
+export function getWebhook(userId: number, webhookId: number): WebhookRow | undefined {
+  return db.prepare('SELECT * FROM webhooks WHERE id = ? AND user_id = ?').get(webhookId, userId) as WebhookRow | undefined;
+}

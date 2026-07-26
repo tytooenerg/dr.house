@@ -65,6 +65,7 @@ export interface UserRow {
   insurer_key: string | null;
   settings: string;
   created_at: string;
+  deleted_at: string | null;
 }
 
 export interface DuplicataRow {
@@ -90,6 +91,9 @@ export interface DuplicataRow {
   created_at: string;
 }
 
+export type ApiKeyMode = 'live' | 'test';
+export type ApiKeyScope = 'read_only' | 'read_write';
+
 export interface ApiKeyRow {
   id: number;
   user_id: number;
@@ -97,6 +101,8 @@ export interface ApiKeyRow {
   key_prefix: string;
   label: string;
   revoked: number;
+  mode: ApiKeyMode;
+  scope: ApiKeyScope;
   last_used_at: string | null;
   created_at: string;
 }
@@ -109,6 +115,21 @@ export interface WebhookRow {
   secret: string;
   active: number;
   created_at: string;
+}
+
+export type WebhookDeliveryStatus = 'pending' | 'success' | 'failed';
+
+export interface WebhookDeliveryRow {
+  id: number;
+  webhook_id: number;
+  event: string;
+  payload: string;
+  status: WebhookDeliveryStatus;
+  attempt: number;
+  response_status: number | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AceiteRow {

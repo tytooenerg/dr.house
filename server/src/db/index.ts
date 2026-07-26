@@ -30,6 +30,11 @@ export function resetDbForTests() {
     DELETE FROM aceites;
     DELETE FROM purchases;
     DELETE FROM duplicatas;
+    DELETE FROM webhook_deliveries;
+    DELETE FROM idempotency_keys;
+    DELETE FROM api_key_usage;
+    DELETE FROM webhooks;
+    DELETE FROM api_keys;
     DELETE FROM users;
   `);
 }

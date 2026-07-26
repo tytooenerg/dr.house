@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, downloadFile, ApiError } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
+import { useSession } from '../../state/SessionContext';
 
 interface ProfileData {
   profileForm: { nome: string; email: string; telefone: string };
@@ -20,11 +21,17 @@ const NOTIF_ROWS: { key: keyof ProfileData['notifPrefs']; label: string; hint: s
 ];
 
 export function PerfilPage() {
+  const { logout } = useSession();
   const [data, setData] = useState<ProfileData | null>(null);
   const [saved, setSaved] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteNome, setInviteNome] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     api.get<ProfileData>('/profile').then(setData);
@@ -45,6 +52,29 @@ export function PerfilPage() {
   const save = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  };
+
+  const exportData = async () => {
+    setExporting(true);
+    try {
+      await downloadFile('/account/export', 'lastro-meus-dados.json');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const submitDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await api.post('/account/delete', { password: deletePassword });
+      logout();
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Não foi possível excluir a conta.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const submitInvite = async (e: React.FormEvent) => {
@@ -157,6 +187,36 @@ export function PerfilPage() {
           </div>
         ))}
       </div>
+
+      <Card className="mt-4">
+        <div className="font-bold text-[15px] mb-1">Privacidade e dados (LGPD)</div>
+        <div className="text-textSecondary text-[12.5px] mb-4">Exporte uma cópia de tudo que a Lastro guarda sobre sua conta, ou solicite a exclusão dos seus dados pessoais.</div>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Button size="sm" variant="secondary" disabled={exporting} onClick={exportData}>
+            {exporting ? 'Exportando…' : 'Exportar meus dados'}
+          </Button>
+          <button
+            type="button"
+            onClick={() => setDeleteConfirmOpen((v) => !v)}
+            className="px-3.5 py-2 rounded-lg border border-red text-red bg-white text-[12.5px] font-bold cursor-pointer"
+          >
+            {deleteConfirmOpen ? 'Cancelar' : 'Excluir minha conta'}
+          </button>
+        </div>
+        {deleteConfirmOpen && (
+          <form onSubmit={submitDelete} className="mt-3.5 p-3.5 rounded-lg bg-[#F7E9E7] flex flex-col gap-2.5">
+            <div className="text-[12.5px] text-[#8A3A2E]">
+              Isso apaga seus dados pessoais (nome, e-mail, telefone) e revoga todas as sessões, chaves de API e webhooks. Registros financeiros são
+              mantidos de forma anonimizada, conforme obrigação legal. Confirme sua senha para continuar.
+            </div>
+            <Input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} placeholder="Sua senha" />
+            {deleteError && <div className="text-red text-[12px] font-semibold">{deleteError}</div>}
+            <Button type="submit" variant="danger" disabled={deleting || !deletePassword} className="self-start">
+              {deleting ? 'Excluindo…' : 'Confirmar exclusão definitiva'}
+            </Button>
+          </form>
+        )}
+      </Card>
     </div>
   );
 }

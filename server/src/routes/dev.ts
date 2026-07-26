@@ -5,8 +5,9 @@ import { requireAuth, requirePlan } from '../auth/middleware.js';
 import { getSettings, updateSettings } from '../db/users.js';
 import { addApiLog, listApiLogs } from '../db/misc.js';
 import { generateApiKey } from '../auth/apiKey.js';
-import { createApiKey, listApiKeys, revokeApiKey } from '../db/apiKeys.js';
-import { createWebhook, deleteWebhook, listWebhooks } from '../db/webhooks.js';
+import { createApiKey, getApiKeyUsageThisMonth, listApiKeys, revokeApiKey } from '../db/apiKeys.js';
+import { createWebhook, deleteWebhook, getWebhook, listWebhooks } from '../db/webhooks.js';
+import { listDeliveriesForWebhook } from '../db/webhookDeliveries.js';
 import { fmtRelative } from '../lib/format.js';
 import { PLAYGROUND_ENDPOINTS, PLAYGROUND_FIELD_LABELS, WEBHOOK_EVENTS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -20,7 +21,16 @@ function payload(userId: number, settings: ReturnType<typeof getSettings>, playg
     webhookEvents: WEBHOOK_EVENTS,
     apiKeys: listApiKeys(userId)
       .filter((k) => !k.revoked)
-      .map((k) => ({ id: k.id, prefix: k.key_prefix, label: k.label, createdAt: fmtRelative(k.created_at), lastUsed: k.last_used_at ? fmtRelative(k.last_used_at) : 'nunca usada' })),
+      .map((k) => ({
+        id: k.id,
+        prefix: k.key_prefix,
+        label: k.label,
+        mode: k.mode,
+        scope: k.scope,
+        callsThisMonth: getApiKeyUsageThisMonth(k.id),
+        createdAt: fmtRelative(k.created_at),
+        lastUsed: k.last_used_at ? fmtRelative(k.last_used_at) : 'nunca usada',
+      })),
     webhooks: listWebhooks(userId).map((w) => ({ id: w.id, url: w.url, event: w.event, active: !!w.active })),
     apiLog: listApiLogs(userId).map((r) => ({ status: r.status, method: r.method, path: r.path, time: fmtRelative(r.created_at) })),
     playgroundEndpoint: settings.playgroundEndpoint,
@@ -34,9 +44,21 @@ function payload(userId: number, settings: ReturnType<typeof getSettings>, playg
 
 devRouter.get('/', (req, res) => res.json(payload(req.user!.id, getSettings(req.user!))));
 
+const generateKeySchema = z.object({
+  mode: z.enum(['live', 'test']).optional().default('live'),
+  scope: z.enum(['read_only', 'read_write']).optional().default('read_write'),
+});
+
 devRouter.post('/keys/generate', (req, res) => {
-  const { rawKey, keyHash, keyPrefix } = generateApiKey();
-  createApiKey(req.user!.id, keyHash, keyPrefix, 'Chave de produção');
+  const parsed = generateKeySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const { mode, scope } = parsed.data;
+  const { rawKey, keyHash, keyPrefix } = generateApiKey(mode);
+  const label = mode === 'test' ? 'Chave de teste (sandbox)' : 'Chave de produção';
+  createApiKey(req.user!.id, keyHash, keyPrefix, label, mode, scope);
   res.json({ rawKey, ...payload(req.user!.id, getSettings(req.user!)) });
 });
 
@@ -63,6 +85,24 @@ devRouter.post('/webhooks', (req, res) => {
 devRouter.post('/webhooks/:id/delete', (req, res) => {
   deleteWebhook(req.user!.id, Number(req.params.id));
   res.json(payload(req.user!.id, getSettings(req.user!)));
+});
+
+devRouter.get('/webhooks/:id/deliveries', (req, res) => {
+  const webhookId = Number(req.params.id);
+  if (!getWebhook(req.user!.id, webhookId)) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  const deliveries = listDeliveriesForWebhook(req.user!.id, webhookId).map((d) => ({
+    id: d.id,
+    status: d.status,
+    attempt: d.attempt,
+    responseStatus: d.response_status,
+    error: d.error,
+    createdAt: fmtRelative(d.created_at),
+    updatedAt: fmtRelative(d.updated_at),
+  }));
+  res.json({ deliveries });
 });
 
 const endpointSchema = z.object({ key: z.enum(['emitir', 'consultar', 'lance', 'score', 'webhook']) });

@@ -9,6 +9,9 @@ interface ApiKeyView {
   id: number;
   prefix: string;
   label: string;
+  mode: 'live' | 'test';
+  scope: 'read_only' | 'read_write';
+  callsThisMonth: number;
   createdAt: string;
   lastUsed: string;
 }
@@ -17,6 +20,15 @@ interface WebhookView {
   url: string;
   event: string;
   active: boolean;
+}
+interface DeliveryView {
+  id: number;
+  status: 'pending' | 'success' | 'failed';
+  attempt: number;
+  responseStatus: number | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 interface DevData {
   webhookEvents: string[];
@@ -38,6 +50,10 @@ export function DevPage() {
   const [webhookUrl, setWebhookUrl] = useState('https://webhook.seusistema.com.br/lastro');
   const [webhookEvent, setWebhookEvent] = useState('duplicata.registrada');
   const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
+  const [keyMode, setKeyMode] = useState<'live' | 'test'>('live');
+  const [keyScope, setKeyScope] = useState<'read_write' | 'read_only'>('read_write');
+  const [openDeliveriesFor, setOpenDeliveriesFor] = useState<number | null>(null);
+  const [deliveries, setDeliveries] = useState<DeliveryView[]>([]);
 
   const load = () => api.get<DevData>('/dev').then(setData);
 
@@ -52,7 +68,7 @@ export function DevPage() {
   const send = () => api.post<DevData>('/dev/playground/send').then(setData);
 
   const generateKey = async () => {
-    const res = await api.post<DevData & { rawKey: string }>('/dev/keys/generate');
+    const res = await api.post<DevData & { rawKey: string }>('/dev/keys/generate', { mode: keyMode, scope: keyScope });
     setNewKey(res.rawKey);
     setData(res);
   };
@@ -73,10 +89,24 @@ export function DevPage() {
     setData(res);
   };
   const removeWebhook = (id: number) => api.post<DevData>(`/dev/webhooks/${id}/delete`).then(setData);
+  const toggleDeliveries = async (id: number) => {
+    if (openDeliveriesFor === id) {
+      setOpenDeliveriesFor(null);
+      return;
+    }
+    const res = await api.get<{ deliveries: DeliveryView[] }>(`/dev/webhooks/${id}/deliveries`);
+    setDeliveries(res.deliveries);
+    setOpenDeliveriesFor(id);
+  };
 
   return (
     <div>
       <PageHeader title="Desenvolvedores" subtitle="Chaves de API reais, webhooks assinados e requisições — integre a Lastro ao seu produto" />
+      <div className="mb-4 -mt-2">
+        <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer" className="text-[12.5px] font-bold text-blue">
+          Ver especificação OpenAPI da API (/api/v1/openapi.json) →
+        </a>
+      </div>
 
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1.3fr 1fr' }}>
         <Card>
@@ -98,9 +128,20 @@ export function DevPage() {
             {data.apiKeys.map((k) => (
               <div key={k.id} className="flex items-center gap-2.5 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
                 <div className="flex-1">
-                  <div className="font-mono-num text-[13px]">{k.prefix}••••••••••••••••</div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono-num text-[13px]">{k.prefix}••••••••••••••••</span>
+                    <span
+                      className="text-[10.5px] font-bold px-1.5 py-0.5 rounded"
+                      style={k.mode === 'test' ? { background: '#FBF1E0', color: '#8A5A00' } : { background: '#EAF3EE', color: '#0A5C36' }}
+                    >
+                      {k.mode === 'test' ? 'Sandbox' : 'Produção'}
+                    </span>
+                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">
+                      {k.scope === 'read_only' ? 'Somente leitura' : 'Leitura e escrita'}
+                    </span>
+                  </div>
                   <div className="text-textTertiary text-[11px] mt-0.5">
-                    Criada {k.createdAt} · usada pela última vez: {k.lastUsed}
+                    Criada {k.createdAt} · usada pela última vez: {k.lastUsed} · {k.callsThisMonth} chamada{k.callsThisMonth === 1 ? '' : 's'} este mês
                   </div>
                 </div>
                 <button type="button" onClick={() => revokeKey(k.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none flex-shrink-0">
@@ -109,6 +150,16 @@ export function DevPage() {
               </div>
             ))}
             {data.apiKeys.length === 0 && !newKey && <div className="text-textSecondary text-[12.5px]">Nenhuma chave ativa ainda.</div>}
+          </div>
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <Select value={keyMode} onChange={(e) => setKeyMode(e.target.value as 'live' | 'test')} className="text-[12.5px]">
+              <option value="live">Produção</option>
+              <option value="test">Sandbox (teste)</option>
+            </Select>
+            <Select value={keyScope} onChange={(e) => setKeyScope(e.target.value as 'read_write' | 'read_only')} className="text-[12.5px]">
+              <option value="read_write">Leitura e escrita</option>
+              <option value="read_only">Somente leitura</option>
+            </Select>
           </div>
           <Button size="sm" variant="secondary" onClick={generateKey}>
             Gerar {data.apiKeys.length > 0 ? 'nova chave' : 'chave de produção'}
@@ -133,14 +184,45 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           <div className="font-bold text-[15px] mb-4">Webhooks</div>
           <div className="flex flex-col gap-2 mb-3.5">
             {data.webhooks.map((w) => (
-              <div key={w.id} className="flex items-center justify-between px-3.5 py-3 rounded-[10px] bg-[#F7F8FA]">
-                <div className="min-w-0">
-                  <div className="font-semibold text-[13px] font-mono-num">{w.event}</div>
-                  <div className="text-textSecondary text-[11.5px] mt-0.5 truncate">{w.url}</div>
+              <div key={w.id} className="rounded-[10px] bg-[#F7F8FA] overflow-hidden">
+                <div className="flex items-center justify-between px-3.5 py-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[13px] font-mono-num">{w.event}</div>
+                    <div className="text-textSecondary text-[11.5px] mt-0.5 truncate">{w.url}</div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <button type="button" onClick={() => toggleDeliveries(w.id)} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none">
+                      {openDeliveriesFor === w.id ? 'Ocultar entregas' : 'Ver entregas'}
+                    </button>
+                    <button type="button" onClick={() => removeWebhook(w.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none">
+                      Remover
+                    </button>
+                  </div>
                 </div>
-                <button type="button" onClick={() => removeWebhook(w.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none flex-shrink-0 ml-2">
-                  Remover
-                </button>
+                {openDeliveriesFor === w.id && (
+                  <div className="px-3.5 pb-3 flex flex-col gap-1.5">
+                    {deliveries.length === 0 && <div className="text-textTertiary text-[11.5px]">Nenhuma entrega registrada ainda.</div>}
+                    {deliveries.map((d) => (
+                      <div key={d.id} className="flex items-center gap-2 text-[11.5px] font-mono-num">
+                        <span
+                          className="font-bold px-1.5 py-0.5 rounded"
+                          style={
+                            d.status === 'success'
+                              ? { background: '#EAF3EE', color: '#0A5C36' }
+                              : d.status === 'failed'
+                                ? { background: '#F7E9E7', color: '#B03A2E' }
+                                : { background: '#FBF1E0', color: '#8A5A00' }
+                          }
+                        >
+                          {d.status}
+                        </span>
+                        <span className="text-textSecondary">tentativa {d.attempt}</span>
+                        {d.responseStatus !== null && <span className="text-textSecondary">HTTP {d.responseStatus}</span>}
+                        <span className="text-textTertiary">{d.updatedAt}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {data.webhooks.length === 0 && <div className="text-textSecondary text-[12.5px]">Nenhum webhook registrado ainda.</div>}

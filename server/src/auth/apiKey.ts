@@ -1,21 +1,22 @@
 import crypto from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { findActiveKeyByHash, touchApiKey } from '../db/apiKeys.js';
+import { findActiveKeyByHash, incrementApiKeyUsage, touchApiKey } from '../db/apiKeys.js';
 import { getUserById } from '../db/users.js';
-import type { UserRow } from '../db/types.js';
+import type { ApiKeyMode, ApiKeyRow, UserRow } from '../db/types.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       apiUser?: UserRow;
+      apiKey?: ApiKeyRow;
     }
   }
 }
 
-export function generateApiKey(): { rawKey: string; keyHash: string; keyPrefix: string } {
-  const rawKey = `lastro_live_${crypto.randomBytes(24).toString('hex')}`;
+export function generateApiKey(mode: ApiKeyMode = 'live'): { rawKey: string; keyHash: string; keyPrefix: string } {
+  const rawKey = `lastro_${mode}_${crypto.randomBytes(24).toString('hex')}`;
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
   const keyPrefix = rawKey.slice(0, 20);
   return { rawKey, keyHash, keyPrefix };
@@ -40,7 +41,23 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction) {
     return;
   }
   touchApiKey(record.id);
+  incrementApiKeyUsage(record.id);
   req.apiUser = user;
+  req.apiKey = record;
+  next();
+}
+
+// A read-only key can call every GET in /api/v1 but is blocked from the mutating
+// endpoints — lets a partner hand a reporting/BI key to a team that should never be
+// able to emit duplicatas or decide a sinistro.
+export function requireWriteScope(req: Request, res: Response, next: NextFunction) {
+  if (req.apiKey?.scope === 'read_only') {
+    res.status(403).json({
+      error: 'forbidden',
+      message: 'Esta chave tem escopo somente leitura. Gere uma chave com escopo leitura e escrita para esta operação.',
+    });
+    return;
+  }
   next();
 }
 

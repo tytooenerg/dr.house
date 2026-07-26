@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { db } from './index.js';
 import { defaultSettings, type Plan, type Role, type SubscriptionStatus, type UserRow, type UserSettings } from './types.js';
 
@@ -52,6 +53,15 @@ export function updateProfile(userId: number, patch: { nome?: string; telefone?:
     userId
   );
   return getUserById(userId)!;
+}
+
+// LGPD right-to-erasure: scrubs personal identifiers (email/nome/telefone/password) and
+// marks the account deleted, but keeps the row and its id so financial/audit records that
+// reference it (duplicatas, audit_log, etc.) stay intact for legal/compliance retention.
+export function anonymizeUser(userId: number) {
+  db.prepare(
+    `UPDATE users SET email = ?, nome = 'Usuário removido', telefone = '', password_hash = ?, deleted_at = datetime('now') WHERE id = ?`
+  ).run(`deleted-user-${userId}@lastro.invalid`, crypto.randomBytes(32).toString('hex'), userId);
 }
 
 export function updateKybForm(userId: number, field: 'cnpj' | 'tipo' | 'pl', value: string) {
