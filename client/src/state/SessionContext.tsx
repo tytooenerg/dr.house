@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api, getRefreshToken, getToken, setSessionTokens, setUnauthorizedHandler } from '../lib/api';
 
-export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin';
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora';
 export type Plan = 'basico' | 'pro' | 'empresarial';
 
 export interface OnboardingStep {
@@ -29,6 +29,8 @@ export interface SessionUser {
   navTabs: string[];
   plan: Plan;
   subscriptionStatus: 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
+  insurerKey: string | null;
+  insurerName: string | null;
 }
 
 interface SessionContextValue {
@@ -36,7 +38,7 @@ interface SessionContextValue {
   loading: boolean;
   authError: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role }) => Promise<void>;
+  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   logout: () => void;
   submitKyb: (form: { cnpj: string; tipo: string; pl: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -81,7 +83,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role }) => {
+  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string }) => {
     setAuthError(null);
     try {
       const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/register', input);

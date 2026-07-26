@@ -1,6 +1,7 @@
 import { db } from './index.js';
 import type { DuplicataRow } from './types.js';
 import { SACADOS } from '../data/seed.js';
+import { parseFlexibleDate } from '../lib/format.js';
 
 export function getDuplicata(id: string): DuplicataRow | undefined {
   return db.prepare('SELECT * FROM duplicatas WHERE id = ?').get(id) as DuplicataRow | undefined;
@@ -87,6 +88,24 @@ export function dispararLeilao(id: string, closeAtIso: string) {
 
 export function setInsurer(id: string, insurerKey: string | null) {
   db.prepare('UPDATE duplicatas SET insurer_key = ? WHERE id = ?').run(insurerKey, id);
+}
+
+export function listInsuredByInsurerKey(insurerKey: string): DuplicataRow[] {
+  return db.prepare('SELECT * FROM duplicatas WHERE insurer_key = ? ORDER BY created_at DESC').all(insurerKey) as DuplicataRow[];
+}
+
+// A policy becomes claimable once its vencimento has passed and it was never sold —
+// i.e. the cedente never got paid by the market, which is exactly what the insurance covers.
+export function listClaimableByInsurerKey(insurerKey: string): DuplicataRow[] {
+  const now = Date.now();
+  return db
+    .prepare("SELECT * FROM duplicatas WHERE insurer_key = ? AND sinistro_status = 'none' AND status != 'vendida'")
+    .all(insurerKey)
+    .filter((d) => parseFlexibleDate((d as DuplicataRow).vencimento).getTime() < now) as DuplicataRow[];
+}
+
+export function setSinistroStatus(id: string, status: 'aberto' | 'aprovado' | 'negado', note: string) {
+  db.prepare('UPDATE duplicatas SET sinistro_status = ?, sinistro_note = ? WHERE id = ?').run(status, note, id);
 }
 
 export function isPurchased(duplicataId: string): boolean {

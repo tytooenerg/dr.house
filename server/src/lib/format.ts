@@ -27,6 +27,15 @@ export function toIsoUtc(sqliteTimestamp: string): string {
   return sqliteTimestamp.includes('T') ? sqliteTimestamp : sqliteTimestamp.replace(' ', 'T') + 'Z';
 }
 
+// `vencimento` is stored inconsistently across the codebase — seeded marketplace offers
+// use "DD/MM/YYYY" while dates coming from an <input type="date"> are ISO "YYYY-MM-DD".
+// Handle both rather than assuming one.
+export function parseFlexibleDate(value: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) return new Date(value);
+  const [d, m, y] = value.split('/');
+  return new Date(`${y}-${m}-${d}`);
+}
+
 export function fmtRelative(sqliteTimestamp: string): string {
   const then = new Date(toIsoUtc(sqliteTimestamp)).getTime();
   const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));

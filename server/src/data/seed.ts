@@ -276,8 +276,13 @@ export const CHAT_ANSWERS: Record<string, string> = {
 
 export const KYB_TIPOS = ['Banco comercial', 'Fundo (FIDC)', 'Fintech de crédito', 'Family office'];
 
-export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'admin', { title: string; body: string }[]> = {
+export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora', { title: string; body: string }[]> = {
   admin: [],
+  seguradora: [
+    { title: 'Bem-vinda, parceira', body: 'Você está entrando como Seguradora parceira da Lastro. Vamos te mostrar o essencial.' },
+    { title: 'Acompanhe suas apólices', body: 'Toda duplicata segurada pela sua seguradora aparece com prêmio e status em um só lugar.' },
+    { title: 'Decida sinistros', body: 'Duplicatas vencidas e não pagas viram sinistros — aprove ou negue a indenização diretamente por aqui.' },
+  ],
   investidor: [
     { title: 'Bem-vinda, Marina', body: 'Você está entrando como Investidor/Financiador. Vamos te mostrar o essencial em 3 passos rápidos.' },
     { title: 'Explore o Marketplace', body: 'Veja ofertas com score de risco, status de aceite e seguro disponível — dê lances no leilão ao vivo.' },
@@ -295,8 +300,9 @@ export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'adm
   ],
 };
 
-export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin', string[]> = {
+export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora', string[]> = {
   admin: ['admin', 'perfil'],
+  seguradora: ['seguradora', 'perfil'],
   investidor: ['dashboard', 'marketplace', 'automacao', 'risco', 'historico', 'comparador', 'compliance', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
   cedente: ['dashboard', 'erp', 'emitir', 'minhas', 'aceite', 'risco', 'historico', 'compliance', 'dev', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
   sacado: ['dashboard', 'sacado', 'historico', 'conta', 'disputa', 'perfil'],

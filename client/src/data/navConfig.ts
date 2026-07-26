@@ -25,6 +25,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'assinatura', label: 'Assinatura', path: '/app/assinatura', group: 'plataforma' },
   { key: 'perfil', label: 'Perfil & Configurações', path: '/app/perfil', group: 'plataforma' },
   { key: 'admin', label: 'Back-office', path: '/app/admin', group: 'plataforma' },
+  { key: 'seguradora', label: 'Painel da Seguradora', path: '/app/seguradora', group: 'operacoes' },
 ];
 
 export const GROUP_LABELS: Record<string, string> = {
@@ -38,4 +39,5 @@ export const DEFAULT_TAB_BY_ROLE: Record<string, string> = {
   cedente: 'minhas',
   sacado: 'sacado',
   admin: 'admin',
+  seguradora: 'seguradora',
 };

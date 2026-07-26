@@ -1,8 +1,12 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import { requireAuth, requirePlan } from '../auth/middleware.js';
 import { getSettings, updateSettings } from '../db/users.js';
 import { addApiLog, listApiLogs } from '../db/misc.js';
+import { generateApiKey } from '../auth/apiKey.js';
+import { createApiKey, listApiKeys, revokeApiKey } from '../db/apiKeys.js';
+import { createWebhook, deleteWebhook, listWebhooks } from '../db/webhooks.js';
 import { fmtRelative } from '../lib/format.js';
 import { PLAYGROUND_ENDPOINTS, PLAYGROUND_FIELD_LABELS, WEBHOOK_EVENTS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -13,9 +17,11 @@ devRouter.use(requireAuth, requirePlan('empresarial'));
 function payload(userId: number, settings: ReturnType<typeof getSettings>, playgroundResult: unknown = null, playgroundLoading = false) {
   const ep = PLAYGROUND_ENDPOINTS[settings.playgroundEndpoint];
   return {
-    liveKeyRevealed: settings.liveKeyRevealed,
-    webhookEnabled: settings.webhookEnabled,
     webhookEvents: WEBHOOK_EVENTS,
+    apiKeys: listApiKeys(userId)
+      .filter((k) => !k.revoked)
+      .map((k) => ({ id: k.id, prefix: k.key_prefix, label: k.label, createdAt: fmtRelative(k.created_at), lastUsed: k.last_used_at ? fmtRelative(k.last_used_at) : 'nunca usada' })),
+    webhooks: listWebhooks(userId).map((w) => ({ id: w.id, url: w.url, event: w.event, active: !!w.active })),
     apiLog: listApiLogs(userId).map((r) => ({ status: r.status, method: r.method, path: r.path, time: fmtRelative(r.created_at) })),
     playgroundEndpoint: settings.playgroundEndpoint,
     playgroundEndpoints: Object.entries(PLAYGROUND_ENDPOINTS).map(([key, v]) => ({ key, label: v.label })),
@@ -28,16 +34,35 @@ function payload(userId: number, settings: ReturnType<typeof getSettings>, playg
 
 devRouter.get('/', (req, res) => res.json(payload(req.user!.id, getSettings(req.user!))));
 
-devRouter.post('/key/reveal', (req, res) => {
-  const settings = getSettings(req.user!);
-  const updated = updateSettings(req.user!.id, { liveKeyRevealed: !settings.liveKeyRevealed });
-  res.json(payload(req.user!.id, updated));
+devRouter.post('/keys/generate', (req, res) => {
+  const { rawKey, keyHash, keyPrefix } = generateApiKey();
+  createApiKey(req.user!.id, keyHash, keyPrefix, 'Chave de produção');
+  res.json({ rawKey, ...payload(req.user!.id, getSettings(req.user!)) });
 });
 
-devRouter.post('/webhook/toggle', (req, res) => {
-  const settings = getSettings(req.user!);
-  const updated = updateSettings(req.user!.id, { webhookEnabled: !settings.webhookEnabled });
-  res.json(payload(req.user!.id, updated));
+devRouter.post('/keys/:id/revoke', (req, res) => {
+  revokeApiKey(req.user!.id, Number(req.params.id));
+  res.json(payload(req.user!.id, getSettings(req.user!)));
+});
+
+const webhookSchema = z.object({ url: z.string().trim().url('Informe uma URL válida.'), event: z.enum(WEBHOOK_EVENTS as [string, ...string[]]) });
+
+devRouter.post('/webhooks', (req, res) => {
+  const parsed = webhookSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const secret = `whsec_${crypto.randomBytes(16).toString('hex')}`;
+  createWebhook(req.user!.id, parsed.data.url, parsed.data.event, secret);
+  // The signing secret is only ever shown here, at creation time — same one-time-reveal
+  // pattern as the API key — so the partner can configure signature verification on their end.
+  res.json({ secret, ...payload(req.user!.id, getSettings(req.user!)) });
+});
+
+devRouter.post('/webhooks/:id/delete', (req, res) => {
+  deleteWebhook(req.user!.id, Number(req.params.id));
+  res.json(payload(req.user!.id, getSettings(req.user!)));
 });
 
 const endpointSchema = z.object({ key: z.enum(['emitir', 'consultar', 'lance', 'score', 'webhook']) });

@@ -9,10 +9,18 @@ export function getUserByEmail(email: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim()) as UserRow | undefined;
 }
 
-export function createUser(input: { email: string; passwordHash: string; nome: string; companyName: string; role: Role }): UserRow {
+export function createUser(input: { email: string; passwordHash: string; nome: string; companyName: string; role: Role; insurerKey?: string }): UserRow {
   const info = db
-    .prepare('INSERT INTO users (email, password_hash, nome, company_name, role, settings) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(input.email.toLowerCase().trim(), input.passwordHash, input.nome, input.companyName, input.role, JSON.stringify(defaultSettings()));
+    .prepare('INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(
+      input.email.toLowerCase().trim(),
+      input.passwordHash,
+      input.nome,
+      input.companyName,
+      input.role,
+      input.insurerKey ?? null,
+      JSON.stringify(defaultSettings())
+    );
   return getUserById(Number(info.lastInsertRowid))!;
 }
 

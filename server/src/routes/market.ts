@@ -4,6 +4,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { listMarketplace, getDuplicata, setInsurer, createPurchase, isPurchased } from '../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { buildOfferView } from '../lib/marketCompute.js';
+import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 
 export const marketRouter = Router();
 marketRouter.use(requireAuth);
@@ -52,6 +53,9 @@ marketRouter.post('/:id/buy', (req, res) => {
     return;
   }
   createPurchase(d.id, req.user!.id, d.valor, d.desagio ?? '');
+  if (d.cedente_id) {
+    void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: req.user!.id });
+  }
   res.json({ offers: listMarketplace().map(buildOfferView) });
 });
 

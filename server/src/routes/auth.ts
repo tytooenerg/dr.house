@@ -15,7 +15,7 @@ import { generateRefreshToken, hashRefreshToken, signAccessToken } from '../auth
 import { createRefreshToken, findValidRefreshToken, revokeAllRefreshTokensForUser, revokeRefreshToken } from '../db/refreshTokens.js';
 import { requireAuth } from '../auth/middleware.js';
 import { recordAuditEvent } from '../db/audit.js';
-import { KYB_TIPOS, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
+import { INSURERS, KYB_TIPOS, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import type { UserRow } from '../db/types.js';
 
@@ -37,7 +37,10 @@ const registerSchema = z.object({
   email: z.string().trim().email('E-mail inválido.'),
   password: z.string().min(6, 'A senha precisa ter ao menos 6 caracteres.'),
   companyName: z.string().trim().min(2, 'Informe o nome da empresa.'),
-  role: z.enum(['investidor', 'cedente', 'sacado']),
+  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora']),
+  insurerKey: z
+    .enum(INSURERS.map((i) => i.key) as [string, ...string[]])
+    .optional(),
 });
 
 const loginSchema = z.object({
@@ -47,8 +50,9 @@ const loginSchema = z.object({
 
 function publicUser(user: UserRow) {
   const settings = getSettings(user);
-  const steps = ONBOARDING_STEPS[user.role as 'investidor' | 'cedente' | 'sacado'] ?? [];
+  const steps = ONBOARDING_STEPS[user.role] ?? [];
   const onboardingSeen = settings.onboardingSeen;
+  const insurer = user.insurer_key ? INSURERS.find((i) => i.key === user.insurer_key) : null;
   return {
     id: user.id,
     email: user.email,
@@ -65,10 +69,21 @@ function publicUser(user: UserRow) {
     kybPending: user.role === 'investidor' && user.kyb_status === 'pending',
     showOnboarding: !onboardingSeen,
     onboardingSteps: steps,
-    sessionLabel: user.role === 'sacado' ? 'Sessão Sacado' : user.role === 'cedente' ? 'Sessão Cedente' : user.role === 'admin' ? 'Back-office' : 'Conta Investidor',
-    navTabs: ROLE_TABS[user.role as 'investidor' | 'cedente' | 'sacado'] ?? [],
+    sessionLabel:
+      user.role === 'sacado'
+        ? 'Sessão Sacado'
+        : user.role === 'cedente'
+          ? 'Sessão Cedente'
+          : user.role === 'admin'
+            ? 'Back-office'
+            : user.role === 'seguradora'
+              ? 'Seguradora Parceira'
+              : 'Conta Investidor',
+    navTabs: ROLE_TABS[user.role] ?? [],
     plan: user.plan,
     subscriptionStatus: user.subscription_status,
+    insurerKey: user.insurer_key,
+    insurerName: insurer?.name ?? null,
   };
 }
 
@@ -88,13 +103,17 @@ authRouter.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
-    const { nome, email, password, companyName, role } = parsed.data;
+    const { nome, email, password, companyName, role, insurerKey } = parsed.data;
+    if (role === 'seguradora' && !insurerKey) {
+      res.status(400).json({ error: 'validation_error', message: 'Selecione qual seguradora sua conta representa.' });
+      return;
+    }
     if (getUserByEmail(email)) {
       res.status(409).json({ error: 'email_taken', message: 'Já existe uma conta com este e-mail.' });
       return;
     }
     const passwordHash = await hashPassword(password);
-    const user = createUser({ email, passwordHash, nome, companyName, role });
+    const user = createUser({ email, passwordHash, nome, companyName, role, insurerKey });
     const { accessToken, refreshToken } = issueTokens(user);
     recordAuditEvent(user.id, user.company_name, 'user.registered', { role });
     res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });

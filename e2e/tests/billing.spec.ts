@@ -34,5 +34,5 @@ test('a básico cedente sees an upgrade prompt on Desenvolvedores, then unlocks 
 
   // Now Desenvolvedores should render for real instead of the upgrade prompt.
   await page.goto('/app/dev', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText('Chaves de API', { exact: true })).toBeVisible();
+  await expect(page.getByText('Chave de API', { exact: true })).toBeVisible();
 });

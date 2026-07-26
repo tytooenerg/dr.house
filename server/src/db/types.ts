@@ -1,4 +1,4 @@
-export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin';
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora';
 export type KybStatus = 'none' | 'pending' | 'approved' | 'rejected';
 export type Plan = 'basico' | 'pro' | 'empresarial';
 export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
@@ -16,8 +16,6 @@ export interface UserSettings {
   kycDocsUploaded: boolean;
   kycDocsRejected: boolean;
   kycDocsAttempts: number;
-  liveKeyRevealed: boolean;
-  webhookEnabled: boolean;
   playgroundEndpoint: string;
   playgroundParams: Record<string, string>;
   fidcPL: string;
@@ -37,8 +35,6 @@ export function defaultSettings(): UserSettings {
     kycDocsUploaded: false,
     kycDocsRejected: false,
     kycDocsAttempts: 0,
-    liveKeyRevealed: false,
-    webhookEnabled: true,
     playgroundEndpoint: 'emitir',
     playgroundParams: {
       sacado_cnpj: '12.345.678/0001-90', valor: '84500.00', vencimento: '2026-08-12', seguro: 'true',
@@ -66,6 +62,7 @@ export interface UserRow {
   stripe_subscription_id: string | null;
   subscription_status: SubscriptionStatus;
   plan_current_period_end: string | null;
+  insurer_key: string | null;
   settings: string;
   created_at: string;
 }
@@ -88,6 +85,29 @@ export interface DuplicataRow {
   score: number | null;
   close_at: string | null;
   leilao_started_at: string | null;
+  sinistro_status: 'none' | 'aberto' | 'aprovado' | 'negado';
+  sinistro_note: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyRow {
+  id: number;
+  user_id: number;
+  key_hash: string;
+  key_prefix: string;
+  label: string;
+  revoked: number;
+  last_used_at: string | null;
+  created_at: string;
+}
+
+export interface WebhookRow {
+  id: number;
+  user_id: number;
+  url: string;
+  event: string;
+  secret: string;
+  active: number;
   created_at: string;
 }
 

@@ -22,6 +22,7 @@ import { ContaPage } from './pages/app/ContaPage';
 import { ReceitaPage } from './pages/app/ReceitaPage';
 import { AdminPage } from './pages/app/AdminPage';
 import { AssinaturaPage } from './pages/app/AssinaturaPage';
+import { SeguradoraPage } from './pages/app/SeguradoraPage';
 import { DevelopersPage } from './pages/public/DevelopersPage';
 import { PrecosPage } from './pages/public/PrecosPage';
 import { LegalPage } from './pages/public/LegalPage';
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="receita" element={<Gate tab="receita"><ReceitaPage /></Gate>} />
           <Route path="admin" element={<Gate tab="admin"><AdminPage /></Gate>} />
           <Route path="assinatura" element={<Gate tab="assinatura"><AssinaturaPage /></Gate>} />
+          <Route path="seguradora" element={<Gate tab="seguradora"><SeguradoraPage /></Gate>} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

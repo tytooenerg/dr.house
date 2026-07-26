@@ -1,6 +1,6 @@
 import { db } from './index.js';
 import { createUser, approveKyb, updateSubscription } from './users.js';
-import { createDuplicata, dispararLeilao } from './duplicatas.js';
+import { createDuplicata, dispararLeilao, setInsurer } from './duplicatas.js';
 import { ensureAceite, setAceiteStatus } from './aceites.js';
 import { addLedgerEntry, addNotification, inviteTeamMember } from './misc.js';
 import { hashPassword } from '../auth/password.js';
@@ -23,6 +23,7 @@ export async function seedIfEmpty() {
   const cedente = createUser({ email: 'cedente@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Fornecedor Lima Ltda', role: 'cedente' });
   const sacado = createUser({ email: 'sacado@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Grupo Atlas Varejo', role: 'sacado' });
   createUser({ email: 'admin@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' });
+  createUser({ email: 'seguradora@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Too', companyName: 'Too Seguros', role: 'seguradora', insurerKey: 'too' });
   approveKyb(investidor.id);
   // Demo accounts start on the top plans so the full feature set (Automação de Lances,
   // Comparador, Desenvolvedores) is visible out of the box — a freshly self-registered
@@ -45,13 +46,30 @@ export async function seedIfEmpty() {
       emissao: o.vencimento,
       status: 'aprovada',
       lastroPct: 100,
-      seguro: false,
+      seguro: o.id <= 2,
       desagio: o.desagio,
     });
+    if (o.id <= 2) setInsurer(d.id, 'too');
     dispararLeilao(d.id, new Date(Date.now() + o.countdownSec * 1000).toISOString());
     const aceite = ensureAceite(d.id, 'Aceite confirmado na emissão');
     setAceiteStatus(aceite.id, OFFER_ACEITE_STATUS[o.id] ?? 'aguardando');
   }
+
+  // An overdue, insured, never-sold duplicata so the demo seguradora account has a
+  // real sinistro (claim) waiting to be decided.
+  const overdue = createDuplicata({
+    cedenteId: null,
+    cedenteNome: 'Comércio Vale Verde Ltda',
+    sacadoNome: 'Mercado Bom Retiro',
+    sacadoCnpj: '',
+    valor: 27500,
+    vencimento: '10/01/2026',
+    emissao: '10/12/2025',
+    status: 'aprovada',
+    lastroPct: 100,
+    seguro: true,
+  });
+  setInsurer(overdue.id, 'too');
 
   // Cedente demo account's own issued duplicatas.
   for (const m of MINHAS_RAW) {

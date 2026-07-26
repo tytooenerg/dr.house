@@ -1,6 +1,6 @@
 # Lastro — Plataforma de Duplicatas Escriturais
 
-Marketplace/infraestrutura de duplicatas escriturais que conecta **Empresa Cedente** (emite e antecipa recebíveis), **Empresa Sacado** (confirma/contesta dívidas) e **Investidor/Financiador** (bancos, FIDCs, fundos), com registro escritural (CERC/B3/Núclea), score de risco por IA, seguro sobre o recebível e central de compliance com trilha de auditoria.
+Marketplace/infraestrutura de duplicatas escriturais que conecta **Empresa Cedente** (emite e antecipa recebíveis), **Empresa Sacado** (confirma/contesta dívidas), **Investidor/Financiador** (bancos, FIDCs, fundos, securitizadoras, factorings) e **Seguradora parceira** (apólices e sinistros) numa única infraestrutura — com registro escritural (CERC/B3/Núclea), score de risco por IA, seguro sobre o recebível, central de compliance com trilha de auditoria, e uma API pública versionada (`/api/v1`) para integrações de parceiros.
 
 This repo is a full-stack recreation of the original high-fidelity HTML/JS design handoff (`design_handoff_lastro/`), rebuilt as a real, multi-tenant React + TypeScript SPA backed by an Express + SQLite API — with production-grade security, observability, an admin back-office, and a three-tier test suite (unit, component, E2E).
 
@@ -23,6 +23,9 @@ The client talks to the server exclusively over `/api/*` (proxied by Vite in dev
 - **Real notification emails** — `nodemailer`-backed, respecting each user's notification preferences; logs the email instead of sending when `SMTP_HOST` isn't set, so it works out of the box.
 - **CSV/PDF export** — `/api/historico/export.csv` and `.../export.pdf` (via `pdfkit`) for Carteira & Histórico.
 - **Real subscription billing** — three plans (Básico/Pro/Empresarial) backed by Stripe Checkout, the Stripe customer portal, and signature-verified webhooks (`/api/billing/webhook`). Automação de Lances and Comparador de Taxas require Pro; Desenvolvedores requires Empresarial; a Básico cedente is capped at 5 emissões/mês. Without `STRIPE_SECRET_KEY` set, plan changes are simulated instantly (no real charge) so the whole paywall is demoable out of the box.
+- **Seguradora role** — a fifth account type for insurance partners (linked to one of the three seeded insurers). Its dashboard lists every duplicata it's underwritten (with premium totals) and surfaces **sinistros**: duplicatas that went overdue unsold, which the seguradora approves (indenizes the cedente) or denies, all logged to the audit trail.
+- **Public partner API (`/api/v1`)** — a versioned, API-key-authenticated surface distinct from the internal SPA API: `POST /duplicatas` (emitir), `GET /duplicatas/:id`, `GET /marketplace`. Keys are generated/revoked from the Desenvolvedores screen (shown once, stored only as a SHA-256 hash), rate-limited per key (`API_RATE_LIMIT_PER_MIN`, default 60/min), and CORS-open (unlike the SPA's strict origin allowlist) since partners call it from their own domains.
+- **Real webhook delivery** — partners register a URL + event (`duplicata.registrada`, `pagamento.confirmado`, …) from Desenvolvedores; the server does a genuine signed HTTP POST (HMAC-SHA256 over the body, `X-Lastro-Signature` header) when the event fires — same signing pattern Stripe uses for its own webhooks.
 - **Validated API** — every mutating endpoint validates its body with Zod and returns structured 400s.
 - **AI assistant** — `/api/chat/ask` calls the Anthropic API when `ANTHROPIC_API_KEY` is set, and falls back to canned answers otherwise so the app works out of the box without a key.
 - **Structured logging + error tracking** — `pino`/`pino-http` request logging, optional Sentry (`SENTRY_DSN`) with a no-op fallback when unset.
@@ -48,10 +51,11 @@ On first boot the server seeds four demo accounts (password `demo1234` for all):
 | Cedente | `cedente@lastro.demo` | Fornecedor Lima Ltda |
 | Sacado | `sacado@lastro.demo` | Grupo Atlas Varejo |
 | Admin (back-office) | `admin@lastro.demo` | Lastro (plataforma) |
+| Seguradora | `seguradora@lastro.demo` | Too Seguros |
 
 The demo investidor starts on the **Pro** plan and the demo cedente on **Empresarial**, so every plan-gated feature (Automação de Lances, Comparador de Taxas, Desenvolvedores) is visible right away. A freshly self-registered account starts on **Básico** instead, so the paywall itself is demoable too — visit **Assinatura** in the sidebar to upgrade (instant/simulated without a Stripe key).
 
-You can also register a brand-new account for any of the three self-service roles from the login screen. New investidor accounts start in KYB `pending`/`none` status and can't bid until an admin approves them from the back-office.
+You can also register a brand-new account for any of the four self-service roles (investidor/cedente/sacado/seguradora) from the login screen — seguradora registration also asks which of the three seeded insurers the account represents. New investidor accounts start in KYB `pending`/`none` status and can't bid until an admin approves them from the back-office.
 
 Other useful scripts:
 
@@ -62,7 +66,7 @@ npm run test         # server tests (Vitest + Supertest) + client tests (Vitest 
 npm run test:e2e     # Playwright E2E tests against a production build (client + server)
 ```
 
-Server-only env vars (all optional — see `server/.env.example`): `JWT_SECRET`, `PORT`, `DB_PATH`, `ANTHROPIC_API_KEY`, `CORS_ORIGINS`, `LOG_LEVEL`, `SENTRY_DSN`, `REDIS_URL`, `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM`, `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_PRO`/`STRIPE_PRICE_EMPRESARIAL`.
+Server-only env vars (all optional — see `server/.env.example`): `JWT_SECRET`, `PORT`, `DB_PATH`, `ANTHROPIC_API_KEY`, `CORS_ORIGINS`, `LOG_LEVEL`, `SENTRY_DSN`, `REDIS_URL`, `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM`, `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_PRO`/`STRIPE_PRICE_EMPRESARIAL`, `API_RATE_LIMIT_PER_MIN`.
 
 ## Running with Docker
 
@@ -79,7 +83,7 @@ client/src/
   components/        design-system primitives (Button, Card, Badge, Modal, Gauge, Toggle, Skeleton, ErrorBoundary…) + their component tests
   layout/             app shell: Sidebar, NotificationBell, AiChat, AppShell
   pages/auth/         login/register, KYB modal, onboarding tour
-  pages/app/          the 19 authenticated screens (role-gated), including the admin back-office and Assinatura (billing)
+  pages/app/          the 20 authenticated screens (role-gated), including the admin back-office, Assinatura (billing) and the Seguradora dashboard
   pages/public/       Developers, Preços, Legal, 404
   state/               session context (JWT-backed auth, refresh-aware)
   lib/                 API client (with token-refresh retry), WebSocket hook, misc utilities
@@ -88,17 +92,17 @@ client/test/          Vitest + jsdom setup (RTL auto-cleanup, jest-dom matchers)
 
 server/src/
   data/seed.ts        static reference/copy data extracted from the design handoff (sacado risk profiles, compliance copy, revenue model, etc.)
-  db/                  SQLite connection, versioned migrations + runner, and query helpers per domain (users, duplicatas, aceites, disputes, audit, refresh tokens, misc)
-  auth/                password hashing, JWT sign/verify, requireAuth/requireRole/requirePlan middleware
-  routes/              one Express router per feature area, all Zod-validated (including admin.ts and billing.ts)
-  lib/                 logger (pino), Sentry, mailer, billing (Stripe + plan catalog), pure formatting/compute helpers
+  db/                  SQLite connection, versioned migrations + runner, and query helpers per domain (users, duplicatas, aceites, disputes, audit, refresh tokens, api keys, webhooks, misc)
+  auth/                password hashing, JWT sign/verify, requireAuth/requireRole/requirePlan middleware, requireApiKey + per-key rate limiter
+  routes/              one Express router per feature area, all Zod-validated (including admin.ts, billing.ts, seguradora.ts, and v1.ts — the public partner API)
+  lib/                 logger (pino), Sentry, mailer, billing (Stripe + plan catalog), emitirCore (shared by the SPA route and the partner API), webhookDelivery, pure formatting/compute helpers
   ws.ts                WebSocket server broadcasting live marketplace state (+ optional Redis relay)
 server/scripts/        build-time helpers (copies .sql migrations into dist/)
 server/test/          Vitest + Supertest integration/unit tests
 
 e2e/
   playwright.config.ts builds + boots the app in production mode and runs tests against it
-  tests/                login, marketplace buy flow, cross-account emitir→aceite flow, plan-gating→upgrade→unlock flow
+  tests/                login, marketplace buy flow, cross-account emitir→aceite flow, plan-gating→upgrade→unlock flow, seguradora sinistro flow
 ```
 
 ## Roles
@@ -109,6 +113,7 @@ Role is chosen once at registration (or via a demo account) and is fixed to that
 - **Empresa (cedente)** — Dashboard, Integrações ERP, Emitir Duplicata (5/mês no Básico), Minhas Duplicatas, Aceite do Sacado (read-only), Análise de Risco, Carteira & Histórico, Compliance, Desenvolvedores (Empresarial), Conta & Liquidação, Modelo de Receita, Assinatura, Disputas, Perfil
 - **Empresa (sacado)** — Dashboard, Portal do Sacado (confirmar/contestar), Carteira & Histórico, Conta & Liquidação, Disputas, Perfil
 - **Admin (back-office)** — fila de aprovação de KYB, arbitragem de disputas, trilha de auditoria; não é uma role auto-cadastrável (só existe via seed/criação direta).
+- **Seguradora parceira** — Painel da Seguradora (apólices e sinistros), Perfil. Auto-cadastrável, escolhendo qual das três seguradoras parceiras a conta representa.
 
 A new investidor account is routed through a 3-step KYB (institutional credentialing) modal, including a real document upload, before entering the platform; submitting it puts the account in `pending` status (visible in the platform in read-only "modo consulta" per the design copy) until an admin approves or rejects it from the back-office. A sacado can only see and act on duplicatas whose `sacado_nome` matches their own company name — the cedente sees the same aceites read-only, since only the actual sacado can legally confirm or contest a debt.
 
@@ -123,3 +128,4 @@ These require external commercial contracts or infrastructure this environment c
 - **Real CERC/B3/Núclea registry integration** — `emitir`'s registro number and the "duplicidade" check are simulated; a production deployment would call the real registries' APIs.
 - **Real credit bureau score** — the risk score is a deterministic simulation based on seeded sacado profiles, not a live Serasa/Boa Vista query (that requires a commercial data-sharing agreement).
 - **Real payment rails** — settlement (`conta`/liquidação) is simulated; real Pix/TED transfers would need a banking-as-a-service partner integration.
+- **Registradoras (CERC/B3/Núclea) are not a login role** — that's a deliberate design choice, not a gap: registries are infrastructure Lastro integrates *with*, not accounts that log into Lastro. Banks/FIDCs/securitizadoras/factorings are represented as sub-types of the `investidor` role (the `tipo de instituição` field on KYB) rather than as separate roles, since they all use the exact same buy/fund workflow — only seguradora warranted its own role, because its dashboard and actions (apólices, sinistros) are genuinely different from every other role's.

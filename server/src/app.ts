@@ -29,6 +29,8 @@ import { accountRouter, revenueRouter } from './routes/account.js';
 import { chatRouter } from './routes/chat.js';
 import { uploadsRouter } from './routes/uploads.js';
 import { billingRouter, handleStripeWebhook } from './routes/billing.js';
+import { seguradoraRouter } from './routes/seguradora.js';
+import { v1Router } from './routes/v1.js';
 
 export const app = express();
 
@@ -46,17 +48,19 @@ app.use(
 // SPA's <script crossorigin> tags trigger CORS mode even when same-origin), and those
 // must never be rejected just because CORS_ORIGINS doesn't happen to list this server's
 // own origin.
-app.use(
-  '/api',
-  cors({
-    origin(origin, callback) {
-      // no Origin header (curl, server-to-server, same-origin) is allowed through
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-  })
-);
+const strictCors = cors({
+  origin(origin, callback) {
+    // no Origin header (curl, server-to-server, same-origin) is allowed through
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+});
+// /api/v1/* is the public partner API — authenticated by API key, not cookies/JWT, so
+// it's meant to be called cross-origin from any partner's own domain/server and gets an
+// open CORS policy instead of the SPA-only allowlist.
+const openCors = cors();
+app.use('/api', (req, res, next) => (req.path.startsWith('/v1/') ? openCors(req, res, next) : strictCors(req, res, next)));
 // Stripe webhook signature verification needs the exact raw body, so it must be
 // registered with its own raw parser before the global express.json() below.
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
@@ -88,6 +92,8 @@ app.use('/api/chat', chatRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/billing', billingRouter);
+app.use('/api/seguradora', seguradoraRouter);
+app.use('/api/v1', v1Router);
 
 // In production (Docker), this server also serves the built SPA — dev mode uses the
 // Vite dev server + proxy instead, so client/dist won't exist and this is skipped.

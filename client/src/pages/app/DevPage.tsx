@@ -4,12 +4,24 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
-import { Toggle } from '../../components/ui/Toggle';
 
+interface ApiKeyView {
+  id: number;
+  prefix: string;
+  label: string;
+  createdAt: string;
+  lastUsed: string;
+}
+interface WebhookView {
+  id: number;
+  url: string;
+  event: string;
+  active: boolean;
+}
 interface DevData {
-  liveKeyRevealed: boolean;
-  webhookEnabled: boolean;
   webhookEvents: string[];
+  apiKeys: ApiKeyView[];
+  webhooks: WebhookView[];
   apiLog: { status: string; method: string; path: string; time: string }[];
   playgroundEndpoint: string;
   playgroundEndpoints: { key: string; label: string }[];
@@ -21,7 +33,11 @@ interface DevData {
 
 export function DevPage() {
   const [data, setData] = useState<DevData | null>(null);
+  const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState('https://webhook.seusistema.com.br/lastro');
+  const [webhookEvent, setWebhookEvent] = useState('duplicata.registrada');
+  const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
 
   const load = () => api.get<DevData>('/dev').then(setData);
 
@@ -31,78 +47,128 @@ export function DevPage() {
 
   if (!data) return <PageSkeleton />;
 
-  const toggleReveal = () => api.post<DevData>('/dev/key/reveal').then(setData);
-  const toggleWebhook = () => api.post<DevData>('/dev/webhook/toggle').then(setData);
   const setEndpoint = (key: string) => api.post<DevData>('/dev/playground/endpoint', { key }).then(setData);
   const setFieldValue = (field: string, value: string) => api.post<DevData>('/dev/playground/field', { field, value }).then(setData);
   const send = () => api.post<DevData>('/dev/playground/send').then(setData);
 
+  const generateKey = async () => {
+    const res = await api.post<DevData & { rawKey: string }>('/dev/keys/generate');
+    setNewKey(res.rawKey);
+    setData(res);
+  };
+  const revokeKey = (id: number) => {
+    if (newKey) setNewKey(null);
+    api.post<DevData>(`/dev/keys/${id}/revoke`).then(setData);
+  };
   const copyKey = () => {
-    navigator.clipboard?.writeText('sk_test_51NkQ8xYzLastro9f2a').catch(() => {});
+    if (!newKey) return;
+    navigator.clipboard?.writeText(newKey).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const addWebhook = async () => {
+    const res = await api.post<DevData & { secret: string }>('/dev/webhooks', { url: webhookUrl, event: webhookEvent });
+    setNewWebhookSecret(res.secret);
+    setData(res);
+  };
+  const removeWebhook = (id: number) => api.post<DevData>(`/dev/webhooks/${id}/delete`).then(setData);
+
   return (
     <div>
-      <PageHeader title="Desenvolvedores" subtitle="Chaves de API, webhooks e requisições — integre a Lastro ao seu produto" />
+      <PageHeader title="Desenvolvedores" subtitle="Chaves de API reais, webhooks assinados e requisições — integre a Lastro ao seu produto" />
 
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1.3fr 1fr' }}>
         <Card>
-          <div className="font-bold text-[15px] mb-4">Chaves de API</div>
-          <div className="flex flex-col gap-3">
-            <div>
-              <div className="text-xs font-bold text-textSecondary mb-1.5">Chave de teste</div>
+          <div className="font-bold text-[15px] mb-4">Chave de API</div>
+          {newKey && (
+            <div className="mb-3.5 p-3.5 rounded-lg bg-amberBg text-[12.5px] text-[#8A5A00]">
+              Guarde essa chave agora — por segurança, ela não será mostrada de novo.
+            </div>
+          )}
+          <div className="flex flex-col gap-3 mb-4">
+            {newKey && (
               <div className="flex items-center gap-2.5 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px]">
-                <div className="flex-1">sk_test_51NkQ8xYzLastro9f2a</div>
-                <button type="button" onClick={copyKey} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none">
+                <div className="flex-1 break-all">{newKey}</div>
+                <button type="button" onClick={copyKey} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none flex-shrink-0">
                   {copied ? 'Copiado!' : 'Copiar'}
                 </button>
               </div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-textSecondary mb-1.5">Chave de produção</div>
-              <div className="flex items-center gap-2.5 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px]">
-                <div className="flex-1">{data.liveKeyRevealed ? 'sk_live_51NkQ8xYzLastro7c4d' : '••••••••••••••••••••'}</div>
-                <button type="button" onClick={toggleReveal} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none">
-                  {data.liveKeyRevealed ? 'Ocultar' : 'Revelar'}
+            )}
+            {data.apiKeys.map((k) => (
+              <div key={k.id} className="flex items-center gap-2.5 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+                <div className="flex-1">
+                  <div className="font-mono-num text-[13px]">{k.prefix}••••••••••••••••</div>
+                  <div className="text-textTertiary text-[11px] mt-0.5">
+                    Criada {k.createdAt} · usada pela última vez: {k.lastUsed}
+                  </div>
+                </div>
+                <button type="button" onClick={() => revokeKey(k.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none flex-shrink-0">
+                  Revogar
                 </button>
               </div>
-            </div>
+            ))}
+            {data.apiKeys.length === 0 && !newKey && <div className="text-textSecondary text-[12.5px]">Nenhuma chave ativa ainda.</div>}
           </div>
+          <Button size="sm" variant="secondary" onClick={generateKey}>
+            Gerar {data.apiKeys.length > 0 ? 'nova chave' : 'chave de produção'}
+          </Button>
 
           <div className="h-px bg-[#EEF1F5] my-5" />
 
           <div className="font-bold text-[15px] mb-3.5">Endpoint de exemplo</div>
-          <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12.5px] leading-loose text-[#C7D6FF] overflow-x-auto whitespace-pre">{`POST https://api.lastro.com.br/v1/duplicatas
-Authorization: Bearer sk_test_51NkQ8xYzLastro9f2a
+          <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12.5px] leading-loose text-[#C7D6FF] overflow-x-auto whitespace-pre">{`POST /api/v1/duplicatas
+Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '••••••••••••••••' : 'lastro_live_••••••••••••••••')}
 
 {
-  "sacado_cnpj": "12.345.678/0001-90",
-  "valor": 84500.00,
+  "sacado": "Grupo Atlas Varejo",
+  "cnpj": "12.345.678/0001-90",
+  "valor": "84.500,00",
   "vencimento": "2026-08-12",
   "seguro": true
 }`}</pre>
         </Card>
 
         <Card>
-          <div className="font-bold text-[15px] mb-4">Webhook</div>
-          <div className="flex items-center justify-between px-3.5 py-3 rounded-[10px] bg-[#F7F8FA] mb-3.5">
-            <div>
-              <div className="font-semibold text-[13px]">duplicata.registrada</div>
-              <div className="text-textSecondary text-[11.5px] mt-0.5">webhook.seusistema.com.br/lastro</div>
-            </div>
-            <Toggle on={data.webhookEnabled} onClick={toggleWebhook} size="sm" />
-          </div>
-          <div className="text-xs font-bold text-textSecondary mb-2.5">Eventos disponíveis</div>
-          <div className="flex flex-col gap-2">
-            {data.webhookEvents.map((ev) => (
-              <div key={ev} className="flex items-center gap-2 text-[12.5px] font-mono-num" style={{ color: '#3D4658' }}>
-                <span className="rounded-full bg-blue" style={{ width: 6, height: 6 }} />
-                {ev}
+          <div className="font-bold text-[15px] mb-4">Webhooks</div>
+          <div className="flex flex-col gap-2 mb-3.5">
+            {data.webhooks.map((w) => (
+              <div key={w.id} className="flex items-center justify-between px-3.5 py-3 rounded-[10px] bg-[#F7F8FA]">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[13px] font-mono-num">{w.event}</div>
+                  <div className="text-textSecondary text-[11.5px] mt-0.5 truncate">{w.url}</div>
+                </div>
+                <button type="button" onClick={() => removeWebhook(w.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none flex-shrink-0 ml-2">
+                  Remover
+                </button>
               </div>
             ))}
+            {data.webhooks.length === 0 && <div className="text-textSecondary text-[12.5px]">Nenhum webhook registrado ainda.</div>}
           </div>
+          <div className="flex flex-col gap-2 mb-2.5">
+            <input
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://sua-url.com/webhook"
+              className="w-full px-3 py-2 rounded-md border border-inputBorder font-mono-num text-[12.5px] outline-none"
+            />
+            <Select value={webhookEvent} onChange={(e) => setWebhookEvent(e.target.value)} className="font-mono-num text-[12.5px]">
+              {data.webhookEvents.map((ev) => (
+                <option key={ev} value={ev}>
+                  {ev}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button size="sm" variant="secondary" onClick={addWebhook}>
+            Adicionar webhook
+          </Button>
+          {newWebhookSecret && (
+            <div className="mt-3 p-3 rounded-lg bg-amberBg text-[12px] text-[#8A5A00]">
+              Assinatura para verificar as requisições (guarde agora, não será mostrada de novo):
+              <div className="font-mono-num break-all mt-1">{newWebhookSecret}</div>
+            </div>
+          )}
         </Card>
       </div>
 
