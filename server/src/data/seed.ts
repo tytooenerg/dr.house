@@ -18,6 +18,7 @@ export interface SacadoFactor {
 }
 
 export interface Sacado {
+  cnpj: string;
   score: number;
   rating: Rating;
   trend: 'up' | 'down' | 'stable';
@@ -29,6 +30,7 @@ export interface Sacado {
 
 export const SACADOS: Record<string, Sacado> = {
   'Grupo Atlas Varejo': {
+    cnpj: '12.345.678/0001-90',
     score: 84,
     rating: 'AA',
     trend: 'up',
@@ -43,6 +45,7 @@ export const SACADOS: Record<string, Sacado> = {
     ],
   },
   'Metalúrgica Serrana S.A.': {
+    cnpj: '23.456.789/0001-11',
     score: 61,
     rating: 'B',
     trend: 'down',
@@ -57,6 +60,7 @@ export const SACADOS: Record<string, Sacado> = {
     ],
   },
   'Construtora Vale Norte': {
+    cnpj: '34.567.890/0001-22',
     score: 38,
     rating: 'C',
     trend: 'down',
@@ -71,6 +75,7 @@ export const SACADOS: Record<string, Sacado> = {
     ],
   },
   'Distribuidora Bom Preço': {
+    cnpj: '45.678.901/0001-33',
     score: 76,
     rating: 'A',
     trend: 'stable',

@@ -29,6 +29,16 @@ async function generateKey(token: string) {
   return res.body.rawKey as string;
 }
 
+async function registerAndUpgrade(role: 'sacado' | 'seguradora', companyName: string, extra: Record<string, unknown> = {}) {
+  const email = `${role}-api-${unique()}@example.com`;
+  const reg = await request(app)
+    .post('/api/auth/register')
+    .send({ nome: `${role} API`, email, password: 'senha123', companyName, role, ...extra });
+  const token = reg.body.token as string;
+  await request(app).post('/api/billing/checkout').set('Authorization', `Bearer ${token}`).send({ plan: 'empresarial' });
+  return { token, userId: reg.body.user.id as number };
+}
+
 describe('partner API (api key auth)', () => {
   it('rejects requests with no key and with an invalid key', async () => {
     const noAuth = await request(app).get('/api/v1/marketplace');
@@ -138,5 +148,113 @@ describe('real webhook delivery', () => {
     expect(received.body).toContain('duplicata.registrada');
     const expectedSignature = crypto.createHmac('sha256', secret).update(received.body).digest('hex');
     expect(received.signature).toBe(expectedSignature);
+  });
+});
+
+describe('partner API — aceites', () => {
+  it('lets a sacado key list and confirm a pending aceite', async () => {
+    const sacadoNome = `Grupo Atlas Varejo`;
+    const { token: cedenteToken } = await registerEmpresarialCedente();
+    const { token: sacadoToken } = await registerAndUpgrade('sacado', sacadoNome);
+    const sacadoKey = await generateKey(sacadoToken);
+
+    let duplicataId = '';
+    for (let attempt = 0; attempt < 8 && !duplicataId; attempt++) {
+      const res = await request(app)
+        .post('/api/emitir/submit')
+        .set('Authorization', `Bearer ${cedenteToken}`)
+        .send({ sacado: sacadoNome, cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+      if (res.status === 200) duplicataId = res.body.duplicataId;
+    }
+    expect(duplicataId).not.toBe('');
+
+    const list = await request(app).get('/api/v1/aceites').set('Authorization', `Bearer ${sacadoKey}`);
+    expect(list.status).toBe(200);
+    const aceite = list.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
+    expect(aceite).toBeTruthy();
+    expect(aceite.isPending).toBe(true);
+
+    const decide = await request(app)
+      .post(`/api/v1/aceites/${aceite.id}/status`)
+      .set('Authorization', `Bearer ${sacadoKey}`)
+      .send({ status: 'aceita' });
+    expect(decide.status).toBe(200);
+    const updated = decide.body.aceites.find((a: { id: number }) => a.id === aceite.id);
+    expect(updated.status).toBe('aceita');
+  });
+
+  it('forbids a sacado key from deciding an aceite that belongs to a different sacado', async () => {
+    const { token: cedenteToken } = await registerEmpresarialCedente();
+    const { token: sacadoToken } = await registerAndUpgrade('sacado', `Outro Sacado ${unique()}`);
+    const sacadoKey = await generateKey(sacadoToken);
+
+    let duplicataId = '';
+    for (let attempt = 0; attempt < 8 && !duplicataId; attempt++) {
+      const res = await request(app)
+        .post('/api/emitir/submit')
+        .set('Authorization', `Bearer ${cedenteToken}`)
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+      if (res.status === 200) duplicataId = res.body.duplicataId;
+    }
+    expect(duplicataId).not.toBe('');
+
+    const internalAceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${cedenteToken}`);
+    const target = internalAceites.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
+
+    const decide = await request(app)
+      .post(`/api/v1/aceites/${target.id}/status`)
+      .set('Authorization', `Bearer ${sacadoKey}`)
+      .send({ status: 'aceita' });
+    expect(decide.status).toBe(403);
+  });
+});
+
+describe('partner API — seguradora', () => {
+  it('lets a seguradora key list apólices/sinistros and decide a claim', async () => {
+    const { token } = await registerAndUpgrade('seguradora', `Seguros Parceiro ${unique()}`, { insurerKey: 'too' });
+    const key = await generateKey(token);
+
+    const dashboard = await request(app).get('/api/v1/seguradora').set('Authorization', `Bearer ${key}`);
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.body.insurerName).toBe('Too Seguros');
+    expect(dashboard.body.sinistros.length).toBeGreaterThan(0);
+
+    const sinistro = dashboard.body.sinistros[0];
+    const decide = await request(app)
+      .post(`/api/v1/seguradora/sinistro/${sinistro.id}/decidir`)
+      .set('Authorization', `Bearer ${key}`)
+      .send({ decision: 'aprovado', note: 'Aprovado via API do parceiro.' });
+    expect(decide.status).toBe(200);
+    expect(decide.body.sinistros.some((s: { id: string }) => s.id === sinistro.id)).toBe(false);
+  });
+
+  it('forbids a non-seguradora key from accessing the seguradora endpoint', async () => {
+    const { token } = await registerEmpresarialCedente();
+    const key = await generateKey(token);
+    const res = await request(app).get('/api/v1/seguradora').set('Authorization', `Bearer ${key}`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('partner API — score by CNPJ', () => {
+  it('returns the score for a known sacado CNPJ', async () => {
+    const { token } = await registerEmpresarialCedente();
+    const key = await generateKey(token);
+    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('Grupo Atlas Varejo');
+    expect(res.body.rating).toBe('AA');
+
+    // works with an unformatted (digits-only) CNPJ too
+    const res2 = await request(app).get('/api/v1/sacados/12345678000190/score').set('Authorization', `Bearer ${key}`);
+    expect(res2.status).toBe(200);
+    expect(res2.body.name).toBe('Grupo Atlas Varejo');
+  });
+
+  it('404s for an unknown CNPJ', async () => {
+    const { token } = await registerEmpresarialCedente();
+    const key = await generateKey(token);
+    const res = await request(app).get('/api/v1/sacados/00000000000000/score').set('Authorization', `Bearer ${key}`);
+    expect(res.status).toBe(404);
   });
 });

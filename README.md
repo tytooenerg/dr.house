@@ -24,7 +24,14 @@ The client talks to the server exclusively over `/api/*` (proxied by Vite in dev
 - **CSV/PDF export** — `/api/historico/export.csv` and `.../export.pdf` (via `pdfkit`) for Carteira & Histórico.
 - **Real subscription billing** — three plans (Básico/Pro/Empresarial) backed by Stripe Checkout, the Stripe customer portal, and signature-verified webhooks (`/api/billing/webhook`). Automação de Lances and Comparador de Taxas require Pro; Desenvolvedores requires Empresarial; a Básico cedente is capped at 5 emissões/mês. Without `STRIPE_SECRET_KEY` set, plan changes are simulated instantly (no real charge) so the whole paywall is demoable out of the box.
 - **Seguradora role** — a fifth account type for insurance partners (linked to one of the three seeded insurers). Its dashboard lists every duplicata it's underwritten (with premium totals) and surfaces **sinistros**: duplicatas that went overdue unsold, which the seguradora approves (indenizes the cedente) or denies, all logged to the audit trail.
-- **Public partner API (`/api/v1`)** — a versioned, API-key-authenticated surface distinct from the internal SPA API: `POST /duplicatas` (emitir), `GET /duplicatas/:id`, `GET /marketplace`. Keys are generated/revoked from the Desenvolvedores screen (shown once, stored only as a SHA-256 hash), rate-limited per key (`API_RATE_LIMIT_PER_MIN`, default 60/min), and CORS-open (unlike the SPA's strict origin allowlist) since partners call it from their own domains.
+- **Public partner API (`/api/v1`)** — a versioned, API-key-authenticated surface distinct from the internal SPA API, covering every role that needs to integrate programmatically:
+  - Cedente: `POST /duplicatas` (emitir), `GET /duplicatas/:id`.
+  - Marketplace: `GET /marketplace`.
+  - Sacado: `GET /aceites`, `POST /aceites/:id/status` (confirmar/contestar) — same ownership rules as the SPA's Portal do Sacado.
+  - Seguradora: `GET /seguradora` (apólices + sinistros), `POST /seguradora/sinistro/:duplicataId/decidir` — same claims workflow as the Painel da Seguradora.
+  - Score: `GET /sacados/:cnpj/score` — real-time credit score/rating lookup by CNPJ, for partners deciding whether to buy a receivable before it's listed.
+
+  Each of these shares its business logic (validation, side effects, notifications, audit logging) with the corresponding internal SPA route via a `lib/*Core.ts` module, so the public API and the app are never allowed to drift out of sync. Keys are generated/revoked from the Desenvolvedores screen (shown once, stored only as a SHA-256 hash), rate-limited per key (`API_RATE_LIMIT_PER_MIN`, default 60/min), and CORS-open (unlike the SPA's strict origin allowlist) since partners call it from their own domains.
 - **Real webhook delivery** — partners register a URL + event (`duplicata.registrada`, `pagamento.confirmado`, …) from Desenvolvedores; the server does a genuine signed HTTP POST (HMAC-SHA256 over the body, `X-Lastro-Signature` header) when the event fires — same signing pattern Stripe uses for its own webhooks.
 - **Validated API** — every mutating endpoint validates its body with Zod and returns structured 400s.
 - **AI assistant** — `/api/chat/ask` calls the Anthropic API when `ANTHROPIC_API_KEY` is set, and falls back to canned answers otherwise so the app works out of the box without a key.
@@ -95,7 +102,7 @@ server/src/
   db/                  SQLite connection, versioned migrations + runner, and query helpers per domain (users, duplicatas, aceites, disputes, audit, refresh tokens, api keys, webhooks, misc)
   auth/                password hashing, JWT sign/verify, requireAuth/requireRole/requirePlan middleware, requireApiKey + per-key rate limiter
   routes/              one Express router per feature area, all Zod-validated (including admin.ts, billing.ts, seguradora.ts, and v1.ts — the public partner API)
-  lib/                 logger (pino), Sentry, mailer, billing (Stripe + plan catalog), emitirCore (shared by the SPA route and the partner API), webhookDelivery, pure formatting/compute helpers
+  lib/                 logger (pino), Sentry, mailer, billing (Stripe + plan catalog), webhookDelivery, pure formatting/compute helpers, and the shared *Core modules (emitirCore, aceiteCore, seguradoraCore, riscoCore) reused by both the SPA routes and the public partner API
   ws.ts                WebSocket server broadcasting live marketplace state (+ optional Redis relay)
 server/scripts/        build-time helpers (copies .sql migrations into dist/)
 server/test/          Vitest + Supertest integration/unit tests
@@ -126,6 +133,6 @@ The original design handoff (`.dc.html` files, not part of this app) documents t
 These require external commercial contracts or infrastructure this environment can't provide, so they're deliberately left as clearly-marked simulations rather than half-built integrations:
 
 - **Real CERC/B3/Núclea registry integration** — `emitir`'s registro number and the "duplicidade" check are simulated; a production deployment would call the real registries' APIs.
-- **Real credit bureau score** — the risk score is a deterministic simulation based on seeded sacado profiles, not a live Serasa/Boa Vista query (that requires a commercial data-sharing agreement).
+- **Real credit bureau score** — the risk score (both the in-app Análise de Risco screen and the public `GET /api/v1/sacados/:cnpj/score` endpoint) is a deterministic simulation based on seeded sacado profiles, not a live Serasa/Boa Vista query (that requires a commercial data-sharing agreement).
 - **Real payment rails** — settlement (`conta`/liquidação) is simulated; real Pix/TED transfers would need a banking-as-a-service partner integration.
 - **Registradoras (CERC/B3/Núclea) are not a login role** — that's a deliberate design choice, not a gap: registries are infrastructure Lastro integrates *with*, not accounts that log into Lastro. Banks/FIDCs/securitizadoras/factorings are represented as sub-types of the `investidor` role (the `tipo de instituição` field on KYB) rather than as separate roles, since they all use the exact same buy/fund workflow — only seguradora warranted its own role, because its dashboard and actions (apólices, sinistros) are genuinely different from every other role's.
