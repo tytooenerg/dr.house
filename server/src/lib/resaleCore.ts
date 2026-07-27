@@ -13,6 +13,7 @@ import {
 } from '../db/resaleListings.js';
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { settleResale } from './settlement.js';
 import { fmtBRL, parseFlexibleDate } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
@@ -141,9 +142,10 @@ export function buyResaleListing(user: UserRow, listingId: number): ResaleOutcom
   deactivatePurchase(listing.purchase_id);
   createPurchase(listing.duplicata_id, user.id, listing.asking_valor, desagioPct);
   setListingStatus(listingId, 'vendido');
+  const { fee } = settleResale({ duplicataId: listing.duplicata_id, sacadoNome: duplicata.sacado_nome, buyerId: user.id, sellerId: listing.seller_id, valor: listing.asking_valor });
   addNotification(
     listing.seller_id,
-    `Sua posição na duplicata ${listing.duplicata_id} foi vendida no mercado secundário por ${fmtBRL(listing.asking_valor)}.`,
+    `Sua posição na duplicata ${listing.duplicata_id} foi vendida no mercado secundário por ${fmtBRL(listing.asking_valor)} (líquido de ${fmtBRL(fee)} de taxa de plataforma).`,
     COLORS.GREEN
   );
   recordAuditEvent(user.id, user.company_name, 'resale.comprado', { duplicataId: listing.duplicata_id, listingId, valor: listing.asking_valor });

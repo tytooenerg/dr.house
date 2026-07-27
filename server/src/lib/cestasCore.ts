@@ -3,6 +3,7 @@ import { listMarketplace, isPurchased, createPurchase } from '../db/duplicatas.j
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
+import { settlePurchase } from './settlement.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { SACADOS, type Rating } from '../data/seed.js';
 import type { DuplicataRow, UserRow } from '../db/types.js';
@@ -76,6 +77,7 @@ export function investInBasket(user: UserRow, cestaKey: CestaKey, valorRaw: stri
   for (const d of candidates) {
     if (d.valor > remaining) continue;
     createPurchase(d.id, user.id, d.valor, d.desagio ?? '');
+    settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: user.id, cedenteId: d.cedente_id, valor: d.valor });
     if (d.cedente_id) {
       void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: user.id });
     }

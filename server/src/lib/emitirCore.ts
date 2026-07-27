@@ -4,6 +4,7 @@ import { ensureAceite } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from './billing.js';
+import { platformFee } from './settlement.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
@@ -30,7 +31,6 @@ export function computeEmitirPreview(form: EmitirForm) {
   const emitPremio = form.seguro ? valorNum * 0.006 : 0;
   const band = matched ? RATE_BANDS[matched.rating] ?? RATE_BANDS.A : RATE_BANDS.A;
   const taxaMid = (band[0] + band[1]) / 2;
-  const platformFeePct = totalValor > 1000000 ? 0.0025 : totalValor > 200000 ? 0.003 : 0.0035;
 
   const items = [
     { label: 'Dados do sacado e CNPJ', done: !!(form.sacado && form.cnpj) },
@@ -56,7 +56,7 @@ export function computeEmitirPreview(form: EmitirForm) {
       valorFmt: valorNum ? fmtBRL(valorNum) : '—',
       premioFmt: emitPremio ? fmtBRL(emitPremio) : form.seguro ? 'R$ 0' : 'Não contratado',
       taxaEstimadaFmt: taxaMid.toFixed(1).replace('.', ',') + '% a.m.',
-      plataformaFeeFmt: totalValor ? fmtBRL(totalValor * platformFeePct) : '—',
+      plataformaFeeFmt: totalValor ? fmtBRL(platformFee(totalValor)) : '—',
       totalValor,
     },
     sacadoRecognized: !!matched,

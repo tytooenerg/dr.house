@@ -13,9 +13,16 @@ interface RevenueStream {
   gradFrom: number;
   gradTo: number;
 }
+interface RealFees {
+  totalColetadoFmt: string;
+  totalLiquidacoes: number;
+  faixasFmt: { ateFmt: string; pctFmt: string }[];
+  mediaEfetivaPct: number | null;
+}
 interface RevenueData {
   streams: RevenueStream[];
   totalFmt: string;
+  realFees: RealFees;
 }
 
 export function ReceitaPage() {
@@ -31,6 +38,30 @@ export function ReceitaPage() {
     <div>
       <PageHeader title="Modelo de Receita" subtitle="Todas as fontes de monetização da Lastro, num único lugar" />
 
+      <Card className="mb-4">
+        <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
+          <div>
+            <div className="font-bold text-[15px]">Taxa de plataforma — cobrada de verdade</div>
+            <div className="text-textSecondary text-[12.5px] mt-0.5">Descontada automaticamente na liquidação de cada compra (marketplace, cestas ou mercado secundário)</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[22px] font-extrabold">{data.realFees.totalColetadoFmt}</div>
+            <div className="text-textTertiary text-[11.5px]">{data.realFees.totalLiquidacoes} liquidações até agora</div>
+          </div>
+        </div>
+        <div className="flex gap-2.5 flex-wrap">
+          {data.realFees.faixasFmt.map((f) => (
+            <div key={f.ateFmt} className="flex-1 min-w-[160px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+              <div className="text-textTertiary text-[11px] font-bold">{f.ateFmt}</div>
+              <div className="text-[16px] font-extrabold mt-0.5">{f.pctFmt}</div>
+            </div>
+          ))}
+        </div>
+        {data.realFees.mediaEfetivaPct != null && (
+          <div className="text-textTertiary text-[11.5px] mt-3">Taxa efetiva média sobre o volume total já liquidado: {data.realFees.mediaEfetivaPct}%</div>
+        )}
+      </Card>
+
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1.6fr' }}>
         <NavyCard className="flex flex-col items-center py-6.5">
           <Donut stops={data.streams.map((s) => ({ color: s.color, from: s.gradFrom, to: s.gradTo }))} size={150} innerBg="#0B1F3A">
@@ -41,7 +72,8 @@ export function ReceitaPage() {
         </NavyCard>
 
         <Card>
-          <div className="font-bold text-[15px] mb-4">Participação no faturamento</div>
+          <div className="font-bold text-[15px] mb-1">Participação no faturamento</div>
+          <div className="text-textTertiary text-[11.5px] mb-3.5">Mix projetado de longo prazo — a taxa de plataforma acima já é real, as demais fontes ainda são roadmap</div>
           <div className="flex flex-col gap-2.5">
             {data.streams.map((r) => (
               <div key={r.label} className="flex items-center gap-2.5">
