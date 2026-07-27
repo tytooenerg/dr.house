@@ -83,6 +83,16 @@ The demo investidor starts on the **Pro** plan and the demo cedente on **Empresa
 
 You can also register a brand-new account for any of the four self-service roles (investidor/cedente/sacado/seguradora) from the login screen — seguradora registration also asks which of the three seeded insurers the account represents. New investidor accounts start in KYB `pending`/`none` status and can't bid until an admin approves them from the back-office.
 
+### Investor-demo data (optional)
+
+The base seed above is intentionally minimal (a handful of accounts and offers) so it stays fast and predictable for tests. For live demos or an investor walkthrough, where an empty-looking Transparência/Receita/Dashboard undersells the platform, run:
+
+```bash
+npm run seed:demo --workspace=server
+```
+
+This populates several months of realistic, backdated history — dozens of cedente/investidor accounts, ~60 duplicatas moving through the full lifecycle (registro em registradora real, leilão, aceite/contestação, compra, seguro, revenda no mercado secundário), network risk-signals on CNPJs that never transacted directly, and Desenvolvedores activity (API keys, usage, webhooks, logs) — all computed through the same settlement/fee/commission logic real activity uses, so every number that shows up in the UI (volume emitido, taxas, comissão de seguro) is genuine, not hardcoded. It never runs automatically (only `npm run dev`'s base seed does) and is safe to re-run — it no-ops if it already seeded once against the current `DB_PATH`. New accounts use password `demo1234`, same as the base seed.
+
 Other useful scripts:
 
 ```bash

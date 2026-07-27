@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "tsx src/scripts/migrate.ts"
+    "db:migrate": "tsx src/scripts/migrate.ts",
+    "seed:demo": "tsx src/scripts/seed-investor-demo.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
