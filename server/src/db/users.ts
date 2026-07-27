@@ -14,6 +14,10 @@ export function getUserByReferralCode(code: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE referral_code = ?').get(code.toUpperCase().trim()) as UserRow | undefined;
 }
 
+export function getSeguradoraByInsurerKey(insurerKey: string): UserRow | undefined {
+  return db.prepare("SELECT * FROM users WHERE role = 'seguradora' AND insurer_key = ? ORDER BY id ASC LIMIT 1").get(insurerKey) as UserRow | undefined;
+}
+
 function generateReferralCode(): string {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 }

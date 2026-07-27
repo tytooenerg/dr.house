@@ -1,4 +1,5 @@
 import { addLedgerEntry } from '../db/misc.js';
+import { recordInsuranceSettlement } from '../db/insuranceSettlements.js';
 import { fmtBRL } from './format.js';
 
 // Single source of truth for the platform fee — reused by the Emitir Duplicata preview
@@ -39,6 +40,39 @@ export function settlePurchase(opts: { duplicataId: string; sacadoNome: string; 
     );
   }
   return { fee, net };
+}
+
+// Lastro's cut of the insurance premium — a real distribution commission, not a fee
+// invented out of thin air: the seguradora sets the premium (INSURERS.premioPct), Lastro
+// keeps a slice for originating the policy, and the seguradora gets the rest.
+export const INSURANCE_COMMISSION_PCT = 0.18;
+
+// Real settlement for a seguro contracted on the marketplace (POST /api/market/:id/insure)
+// — the investor protecting their position pays the full premium, the seguradora (if a
+// registered account exists for that insurer_key) receives it net of Lastro's commission.
+// Every settlement is also logged to insurance_settlements for exact revenue reporting,
+// since which insurer is "current" on a duplicata can change after the fact.
+export function settleInsurance(opts: { duplicataId: string; investorId: number; insurerKey: string; insurerUserId: number | null; premio: number }) {
+  const comissao = opts.premio * INSURANCE_COMMISSION_PCT;
+  const repasse = opts.premio - comissao;
+  addLedgerEntry(opts.investorId, today(), `Prêmio de seguro contratado — duplicata ${opts.duplicataId}`, -opts.premio);
+  if (opts.insurerUserId) {
+    addLedgerEntry(
+      opts.insurerUserId,
+      today(),
+      `Prêmio recebido — duplicata ${opts.duplicataId} (líquido de ${Math.round(INSURANCE_COMMISSION_PCT * 100)}% de comissão da Lastro)`,
+      repasse
+    );
+  }
+  recordInsuranceSettlement({
+    duplicataId: opts.duplicataId,
+    investorId: opts.investorId,
+    insurerKey: opts.insurerKey,
+    premio: opts.premio,
+    comissaoLastro: comissao,
+    repasseSeguradora: repasse,
+  });
+  return { comissao, repasse };
 }
 
 // Same fee schedule applies to trades on the mercado secundário — the platform still

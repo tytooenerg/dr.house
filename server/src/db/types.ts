@@ -132,6 +132,17 @@ export interface WebhookRow {
   created_at: string;
 }
 
+export interface InsuranceSettlementRow {
+  id: number;
+  duplicata_id: string;
+  investor_id: number;
+  insurer_key: string;
+  premio: number;
+  comissao_lastro: number;
+  repasse_seguradora: number;
+  created_at: string;
+}
+
 export type WebhookDeliveryStatus = 'pending' | 'success' | 'failed';
 
 export interface WebhookDeliveryRow {

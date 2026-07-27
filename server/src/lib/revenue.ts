@@ -1,6 +1,7 @@
 import { REVENUE_RAW, REV_COLORS } from '../data/seed.js';
 import { db } from '../db/index.js';
-import { platformFee, platformFeePct } from './settlement.js';
+import { platformFee, platformFeePct, INSURANCE_COMMISSION_PCT } from './settlement.js';
+import { sumInsuranceCommission } from '../db/insuranceSettlements.js';
 import { fmtBRL } from './format.js';
 
 export function getRevenueStreams() {
@@ -23,6 +24,7 @@ export function getRevenueStreams() {
     streams,
     totalFmt: 'R$ ' + total.toFixed(1) + 'k/mês',
     realFees: getRealPlatformFees(),
+    realInsuranceCommission: getRealInsuranceCommission(),
   };
 }
 
@@ -43,5 +45,18 @@ function getRealPlatformFees() {
       { ateFmt: 'acima de R$ 1 milhão', pctFmt: (platformFeePct(1_500_000) * 100).toFixed(2).replace('.', ',') + '%' },
     ],
     mediaEfetivaPct: totalVolume > 0 ? +((totalFees / totalVolume) * 100).toFixed(3) : null,
+  };
+}
+
+// A real distribution commission on the insurance premium — computed from
+// insurance_settlements, an exact log of every real POST /api/market/:id/insure that
+// actually moved money (see lib/settlement.ts), not recomputed from mutable current state.
+function getRealInsuranceCommission() {
+  const { totalPremios, totalComissao, totalApolices } = sumInsuranceCommission();
+  return {
+    totalComissaoFmt: fmtBRL(totalComissao),
+    totalPremiosFmt: fmtBRL(totalPremios),
+    totalApolices,
+    comissaoPctFmt: Math.round(INSURANCE_COMMISSION_PCT * 100) + '%',
   };
 }

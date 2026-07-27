@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { listMarketplace, getDuplicata, setInsurer, createPurchase, isPurchased } from '../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
+import { getSeguradoraByInsurerKey } from '../db/users.js';
 import { buildOfferView } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
-import { settlePurchase } from '../lib/settlement.js';
+import { settlePurchase, settleInsurance } from '../lib/settlement.js';
+import { INSURERS } from '../data/seed.js';
 
 export const marketRouter = Router();
 marketRouter.use(requireAuth);
@@ -63,7 +65,16 @@ marketRouter.post('/:id/buy', (req, res) => {
 
 const insureSchema = z.object({ key: z.enum(['too', 'pottencial', 'junto']).nullable() });
 
+// Only an investidor can contract insurance — it's protection on their own position, paid
+// for out of their own ledger, same access rule as buying. Real money moves the moment a
+// *new* insurer key is set (see settleInsurance): switching between two different insurers
+// charges the new premium again; re-submitting the same key or removing insurance doesn't
+// charge or refund — a deliberate simplification, not a real-world proration engine.
 marketRouter.post('/:id/insure', (req, res) => {
+  if (req.user!.role !== 'investidor') {
+    res.status(403).json({ error: 'forbidden', message: 'Apenas contas de investidor podem contratar seguro sobre uma posição.' });
+    return;
+  }
   const parsed = insureSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
@@ -74,6 +85,13 @@ marketRouter.post('/:id/insure', (req, res) => {
     res.status(404).json({ error: 'not_found' });
     return;
   }
-  setInsurer(d.id, parsed.data.key);
+  const newKey = parsed.data.key;
+  setInsurer(d.id, newKey);
+  if (newKey && newKey !== d.insurer_key) {
+    const insurer = INSURERS.find((i) => i.key === newKey)!;
+    const premio = d.valor * (insurer.premioPct / 100);
+    const seguradoraUser = getSeguradoraByInsurerKey(insurer.key);
+    settleInsurance({ duplicataId: d.id, investorId: req.user!.id, insurerKey: insurer.key, insurerUserId: seguradoraUser?.id ?? null, premio });
+  }
   res.json({ offers: listMarketplace().map(buildOfferView) });
 });

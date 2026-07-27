@@ -19,10 +19,17 @@ interface RealFees {
   faixasFmt: { ateFmt: string; pctFmt: string }[];
   mediaEfetivaPct: number | null;
 }
+interface RealInsuranceCommission {
+  totalComissaoFmt: string;
+  totalPremiosFmt: string;
+  totalApolices: number;
+  comissaoPctFmt: string;
+}
 interface RevenueData {
   streams: RevenueStream[];
   totalFmt: string;
   realFees: RealFees;
+  realInsuranceCommission: RealInsuranceCommission;
 }
 
 export function ReceitaPage() {
@@ -60,6 +67,23 @@ export function ReceitaPage() {
         {data.realFees.mediaEfetivaPct != null && (
           <div className="text-textTertiary text-[11.5px] mt-3">Taxa efetiva média sobre o volume total já liquidado: {data.realFees.mediaEfetivaPct}%</div>
         )}
+      </Card>
+
+      <Card className="mb-4">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div>
+            <div className="font-bold text-[15px]">Comissão de seguro — cobrada de verdade</div>
+            <div className="text-textSecondary text-[12.5px] mt-0.5">
+              {data.realInsuranceCommission.comissaoPctFmt} de cada prêmio pago por um investidor ao contratar seguro sobre uma posição — o restante é repassado à seguradora
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[22px] font-extrabold">{data.realInsuranceCommission.totalComissaoFmt}</div>
+            <div className="text-textTertiary text-[11.5px]">
+              {data.realInsuranceCommission.totalApolices} apólice(s) · {data.realInsuranceCommission.totalPremiosFmt} em prêmios
+            </div>
+          </div>
+        </div>
       </Card>
 
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1.6fr' }}>
