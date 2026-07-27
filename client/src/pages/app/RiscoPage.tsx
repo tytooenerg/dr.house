@@ -36,6 +36,8 @@ interface SelectedSacado {
   pd12m: string;
   hasAlerta: boolean;
   alerta: string | null;
+  fonte: 'interno' | 'rede' | 'combinado';
+  sinaisDeRede: { total: number; pontual: number; atraso: number; protesto: number; contestacao: number; confianca: string } | null;
 }
 
 export function RiscoPage() {
@@ -102,6 +104,12 @@ export function RiscoPage() {
             <span className="text-[12.5px] font-bold px-2.5 py-1 rounded-md mt-2" style={{ background: selected.ratingBg, color: selected.ratingColor }}>
               Rating {selected.rating}
             </span>
+            {selected.sinaisDeRede && (
+              <div className="text-[11.5px] text-textTertiary mt-2 text-center">
+                {selected.fonte === 'rede' ? 'Score de rede' : 'Score combinado (interno + rede)'} — {selected.sinaisDeRede.total} sinal(is) de parceiros,
+                confiança {selected.sinaisDeRede.confianca}
+              </div>
+            )}
             <div className="flex items-center gap-1.5 mt-2.5 text-[12.5px] font-semibold" style={{ color: selected.trendColor }}>
               <span>{selected.trendIcon}</span>
               <span>{selected.trendDelta}</span>

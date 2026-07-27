@@ -65,7 +65,7 @@ export const openApiSpec = {
           '402': { description: 'Limite do plano Básico atingido — requer upgrade.' },
           '403': { description: 'Chave não pertence a uma conta cedente, ou é somente-leitura.' },
           '409': { description: 'Idempotency-Key reutilizada com um corpo diferente.' },
-          '502': { description: 'Falha simulada ao registrar na CERC — repita a requisição.' },
+          '502': { description: 'Falha simulada ao registrar na registradora escolhida (B3/CERC/Núclea/Grafeno, roteada automaticamente) — repita a requisição.' },
         },
       },
     },
@@ -137,8 +137,38 @@ export const openApiSpec = {
     '/sacados/{cnpj}/score': {
       get: {
         summary: 'Consultar score de crédito e rating de um sacado pelo CNPJ',
+        description:
+          'Combina o histórico interno da Lastro (se o CNPJ já transacionou na plataforma) com sinais de rede reportados por parceiros — funciona mesmo para um CNPJ que nunca transacionou diretamente na Lastro, desde que algum parceiro já tenha reportado um sinal sobre ele. A resposta traz `fonte` (interno/rede/combinado) e `sinaisDeRede`.',
         parameters: [{ name: 'cnpj', in: 'path', required: true, schema: { type: 'string' }, example: '12.345.678/0001-90' }],
-        responses: { '200': { description: 'Score, rating, fatores e sinais de IA.' }, '404': { description: 'Nenhum histórico para este CNPJ.' } },
+        responses: { '200': { description: 'Score, rating, fatores, sinais de IA e sinais de rede.' }, '404': { description: 'Nenhum histórico (interno ou de rede) para este CNPJ.' } },
+      },
+    },
+    '/sacados/{cnpj}/sinais': {
+      post: {
+        summary: 'Reportar um sinal de comportamento de pagamento para um CNPJ (rede compartilhada de risco)',
+        description:
+          'Qualquer parceiro (banco, FIDC, ERP…) pode contribuir uma observação sobre um sacado — pagamento pontual, atraso, protesto ou contestação — que passa a alimentar o score de rede de todos os parceiros, não só de quem reportou. Requer chave com escopo leitura e escrita.',
+        parameters: [{ name: 'cnpj', in: 'path', required: true, schema: { type: 'string' }, example: '12.345.678/0001-90' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['tipo'],
+                properties: {
+                  tipo: { type: 'string', enum: ['pagamento_pontual', 'atraso', 'protesto', 'contestacao'] },
+                  nota: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Sinal registrado; retorna o score de rede/combinado atualizado.' },
+          '400': { description: 'Erro de validação.' },
+          '403': { description: 'Chave é somente-leitura.' },
+        },
       },
     },
   },

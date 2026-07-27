@@ -91,6 +91,18 @@ export interface DuplicataRow {
   leilao_started_at: string | null;
   sinistro_status: 'none' | 'aberto' | 'aprovado' | 'negado';
   sinistro_note: string | null;
+  registradora: string | null;
+  created_at: string;
+}
+
+export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';
+
+export interface NetworkSignalRow {
+  id: number;
+  cnpj: string;
+  reporter_user_id: number;
+  tipo: NetworkSignalTipo;
+  nota: string | null;
   created_at: string;
 }
 

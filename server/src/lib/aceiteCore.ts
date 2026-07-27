@@ -4,6 +4,7 @@ import { getDuplicata } from '../db/duplicatas.js';
 import { addNotification } from '../db/misc.js';
 import { createDispute, getDisputeByAceite } from '../db/disputes.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { addSignal } from '../db/networkSignals.js';
 import { fmtBRL } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
@@ -89,6 +90,12 @@ export async function decideAceite(user: UserRow, aceiteId: number, decision: Ac
       decision === 'aceita' ? COLORS.GREEN : COLORS.RED,
       'aceite'
     );
+    // A real aceite outcome is exactly the kind of first-party evidence the shared risk
+    // network is meant to aggregate — feeds the same pool partners contribute to via the
+    // public API, seeded by Lastro's own real activity instead of starting empty.
+    if (duplicata.sacado_cnpj) {
+      addSignal(duplicata.sacado_cnpj, duplicata.cedente_id, decision === 'aceita' ? 'pagamento_pontual' : 'contestacao');
+    }
   }
   recordAuditEvent(user.id, user.company_name, `aceite.${decision}`, { duplicataId: duplicata.id });
   return { status: 200, body: { aceites: listAceitesForUser(user) } };

@@ -53,12 +53,13 @@ export function createDuplicata(input: {
   seguro: boolean;
   registro?: string | null;
   desagio?: string | null;
+  registradora?: string | null;
   id?: string;
 }): DuplicataRow {
   const id = input.id ?? nextId('DUP-2026');
   db.prepare(
-    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score)
-     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score)`
+    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, registradora)
+     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @registradora)`
   ).run({
     id,
     cedenteId: input.cedenteId,
@@ -74,6 +75,7 @@ export function createDuplicata(input: {
     registro: input.registro ?? null,
     desagio: input.desagio ?? null,
     score: scoreFor(input.sacadoNome),
+    registradora: input.registradora ?? null,
   });
   return getDuplicata(id)!;
 }

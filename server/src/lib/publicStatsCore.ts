@@ -1,5 +1,6 @@
 import { db } from '../db/index.js';
 import { fmtBRL } from './format.js';
+import { getRegistradora } from './registradoras.js';
 
 // Real aggregates computed live from the database — no fabricated numbers. On a fresh
 // deployment these will be small (or zero); they grow as real usage grows, exactly like
@@ -26,7 +27,17 @@ export function buildPublicStats() {
     .get() as { dias: number | null };
   const tempoMedioLiquidacaoHoras = avgLiquidacao.dias != null ? Math.max(0, Math.round(avgLiquidacao.dias * 24)) : null;
 
+  const porRegistradora = db
+    .prepare("SELECT registradora, COUNT(*) as n FROM duplicatas WHERE registradora IS NOT NULL GROUP BY registradora")
+    .all() as { registradora: string; n: number }[];
+  const registradoras = porRegistradora.map((r) => ({
+    key: r.registradora,
+    nome: getRegistradora(r.registradora)?.name ?? r.registradora,
+    totalDuplicatas: r.n,
+  }));
+
   return {
+    registradoras,
     volumeEmitidoFmt: fmtBRL(volumeEmitido),
     volumeFinanciadoFmt: fmtBRL(volumeFinanciado),
     totalDuplicatas,

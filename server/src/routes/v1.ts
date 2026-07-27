@@ -1,9 +1,12 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { apiKeyRateLimiter, requireApiKey, requireWriteScope } from '../auth/apiKey.js';
 import { emitirFormSchema, submitEmitir } from '../lib/emitirCore.js';
 import { aceiteStatusSchema, decideAceite, listAceitesForUser } from '../lib/aceiteCore.js';
 import { buildSeguradoraPayload, decideSinistro, sinistroDecisionSchema } from '../lib/seguradoraCore.js';
-import { buildRiscoView, findSacadoByCnpj } from '../lib/riscoCore.js';
+import { buildBlendedRiscoView } from '../lib/riscoCore.js';
+import { addSignal } from '../db/networkSignals.js';
+import { getRegistradora } from '../lib/registradoras.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import { getDuplicata, listMarketplace } from '../db/duplicatas.js';
 import { buildOfferView } from '../lib/marketCompute.js';
@@ -56,6 +59,7 @@ v1Router.get('/duplicatas/:id', (req, res) => {
     valorFmt: fmtBRL(d.valor),
     vencimento: d.vencimento,
     registro: d.registro,
+    registradora: getRegistradora(d.registradora)?.name ?? null,
     lastroPct: d.lastro_pct,
     seguro: !!d.seguro,
   });
@@ -121,13 +125,38 @@ v1Router.post(
   })
 );
 
-// Real-time credit score lookup by CNPJ — used by partners (FIDCs, securitizadoras,
-// bancos) to decide whether to buy a receivable before it's even listed on the marketplace.
+// Real-time credit score lookup by CNPJ — blends Lastro's own transaction history (if
+// any) with signals reported by partners (see POST below), so even a CNPJ that never
+// transacted directly on Lastro can get a real score from cross-platform reputation.
 v1Router.get('/sacados/:cnpj/score', (req, res) => {
-  const found = findSacadoByCnpj(req.params.cnpj);
-  if (!found) {
+  const view = buildBlendedRiscoView(req.params.cnpj);
+  if (!view) {
     res.status(404).json({ error: 'not_found', message: 'Nenhum histórico de score encontrado para este CNPJ.' });
     return;
   }
-  res.json(buildRiscoView(found.name, found.sacado));
+  res.json(view);
 });
+
+const sinalSchema = z.object({
+  tipo: z.enum(['pagamento_pontual', 'atraso', 'protesto', 'contestacao']),
+  nota: z.string().trim().max(500).optional(),
+});
+
+// Any partner integrating with the API can report a payment-behavior observation about
+// a CNPJ — this is the shared risk-data network: a bank, FIDC or ERP that saw a sacado
+// pay late (or on time) contributes that signal back into everyone's score, instead of
+// each platform's risk data staying siloed. Read-only keys can't contribute (write scope).
+v1Router.post(
+  '/sacados/:cnpj/sinais',
+  requireWriteScope,
+  (req, res) => {
+    const parsed = sinalSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    addSignal(req.params.cnpj, req.apiUser!.id, parsed.data.tipo, parsed.data.nota);
+    const view = buildBlendedRiscoView(req.params.cnpj);
+    res.json(view);
+  }
+);

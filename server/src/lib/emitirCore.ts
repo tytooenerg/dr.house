@@ -5,6 +5,7 @@ import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from './billing.js';
 import { platformFee } from './settlement.js';
+import { chooseRegistradora } from './registradoras.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
@@ -65,7 +66,7 @@ export function computeEmitirPreview(form: EmitirForm) {
 }
 
 export type EmitirOutcome =
-  | { status: 200; body: { ok: true; registro: string; duplicataId: string; seguro: boolean } }
+  | { status: 200; body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string } }
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 402; body: { error: 'plan_required'; requiredPlan: 'pro'; message: string } }
   | { status: 502; body: { error: 'cerc_unavailable'; message: string } };
@@ -87,15 +88,20 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
       },
     };
   }
+  const valorNum = parseBRLNumber(form.valor);
+  const batchTotal = form.batchValores.reduce((sum, v) => sum + parseBRLNumber(v), 0);
+  // Smart-routed once, before the (simulated) network round-trip, so a failure and a
+  // retry with the same form land on the same registradora — matches how a real
+  // integration would work.
+  const registradora = chooseRegistradora(valorNum + batchTotal);
+
   await new Promise((r) => setTimeout(r, 1100));
   if (Math.random() < 0.12) {
-    return { status: 502, body: { error: 'cerc_unavailable', message: 'Falha ao registrar na CERC — conexão instável. Tente novamente.' } };
+    return { status: 502, body: { error: 'cerc_unavailable', message: `Falha ao registrar na ${registradora.name} — conexão instável. Tente novamente.` } };
   }
 
   const preview = computeEmitirPreview(form);
   const registro = 'ESC-2026-' + Math.floor(Math.random() * 900000 + 100000);
-  const valorNum = parseBRLNumber(form.valor);
-  const batchTotal = form.batchValores.reduce((sum, v) => sum + parseBRLNumber(v), 0);
   const duplicata = createDuplicata({
     cedenteId: user.id,
     cedenteNome: user.company_name,
@@ -108,16 +114,18 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
     lastroPct: preview.lastroChecklist.pct,
     seguro: form.seguro,
     registro,
+    registradora: registradora.key,
   });
   ensureAceite(duplicata.id, '10 dias úteis restantes');
-  recordAuditEvent(user.id, user.company_name, 'duplicata.registrada', { duplicataId: duplicata.id, registro });
+  recordAuditEvent(user.id, user.company_name, 'duplicata.registrada', { duplicataId: duplicata.id, registro, registradora: registradora.key });
   void deliverWebhookEvent(user.id, 'duplicata.registrada', {
     duplicataId: duplicata.id,
     registro,
     sacado: form.sacado,
     valor: valorNum + batchTotal,
     vencimento: form.vencimento,
+    registradora: registradora.key,
   });
 
-  return { status: 200, body: { ok: true, registro, duplicataId: duplicata.id, seguro: form.seguro } };
+  return { status: 200, body: { ok: true, registro, duplicataId: duplicata.id, seguro: form.seguro, registradora: registradora.name } };
 }

@@ -10,6 +10,7 @@ interface Stats {
   totalSacadosDistintos: number;
   taxaInadimplenciaPct: number;
   tempoMedioLiquidacaoHoras: number | null;
+  registradoras: { key: string; nome: string; totalDuplicatas: number }[];
   geradoEm: string;
 }
 
@@ -63,6 +64,19 @@ export function TransparenciaPage() {
                 hint="Entre a emissão e a compra por um investidor"
               />
             </div>
+            {stats.registradoras.length > 0 && (
+              <div className="mb-4">
+                <div className="text-textTertiary text-[12.5px] font-bold uppercase tracking-wide mb-2.5">Registro distribuído entre as 4 registradoras autorizadas pelo BC</div>
+                <div className="flex gap-2.5 flex-wrap">
+                  {stats.registradoras.map((r) => (
+                    <div key={r.key} className="border border-border rounded-lg px-3.5 py-2.5">
+                      <div className="font-bold text-[13.5px]">{r.nome}</div>
+                      <div className="text-textSecondary text-[12px]">{r.totalDuplicatas} duplicata(s)</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="text-textTertiary text-xs">Atualizado em {new Date(stats.geradoEm).toLocaleString('pt-BR')}</div>
           </>
         )}

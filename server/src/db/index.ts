@@ -28,6 +28,7 @@ export function resetDbForTests() {
     DELETE FROM dispute_events;
     DELETE FROM disputes;
     DELETE FROM aceites;
+    DELETE FROM sacado_network_signals;
     DELETE FROM resale_listings;
     DELETE FROM purchases;
     DELETE FROM duplicatas;

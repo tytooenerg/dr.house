@@ -36,6 +36,10 @@ export function parseFlexibleDate(value: string): Date {
   return new Date(`${y}-${m}-${d}`);
 }
 
+export function normalizeCnpj(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
 export function fmtRelative(sqliteTimestamp: string): string {
   const then = new Date(toIsoUtc(sqliteTimestamp)).getTime();
   const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
