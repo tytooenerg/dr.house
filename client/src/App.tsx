@@ -26,6 +26,11 @@ import { SeguradoraPage } from './pages/app/SeguradoraPage';
 import { DevelopersPage } from './pages/public/DevelopersPage';
 import { PrecosPage } from './pages/public/PrecosPage';
 import { LegalPage } from './pages/public/LegalPage';
+import { TransparenciaPage } from './pages/public/TransparenciaPage';
+import { StatusPage } from './pages/public/StatusPage';
+import { EmbedSimuladorPage } from './pages/public/EmbedSimuladorPage';
+import { SecundarioPage } from './pages/app/SecundarioPage';
+import { CestasPage } from './pages/app/CestasPage';
 import { NotFoundPage } from './pages/public/NotFoundPage';
 
 export default function App() {
@@ -36,6 +41,9 @@ export default function App() {
         <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/precos" element={<PrecosPage />} />
         <Route path="/legal" element={<LegalPage />} />
+        <Route path="/transparencia" element={<TransparenciaPage />} />
+        <Route path="/status" element={<StatusPage />} />
+        <Route path="/embed/simulador" element={<EmbedSimuladorPage />} />
 
         <Route path="/app" element={<AppShell />}>
           <Route path="dashboard" element={<Gate tab="dashboard"><DashboardPage /></Gate>} />
@@ -57,19 +65,14 @@ export default function App() {
             }
           />
           <Route path="minhas" element={<Gate tab="minhas"><MinhasPage /></Gate>} />
+          <Route path="secundario" element={<Gate tab="secundario"><SecundarioPage /></Gate>} />
+          <Route path="cestas" element={<Gate tab="cestas"><CestasPage /></Gate>} />
           <Route path="risco" element={<Gate tab="risco"><RiscoPage /></Gate>} />
           <Route path="historico" element={<Gate tab="historico"><HistoricoPage /></Gate>} />
           <Route path="erp" element={<Gate tab="erp"><ErpPage /></Gate>} />
           <Route path="emitir" element={<Gate tab="emitir"><EmitirPage /></Gate>} />
           <Route path="compliance" element={<Gate tab="compliance"><CompliancePage /></Gate>} />
-          <Route
-            path="dev"
-            element={
-              <Gate tab="dev" requiredPlan="empresarial" feature="Ambiente de Desenvolvedores">
-                <DevPage />
-              </Gate>
-            }
-          />
+          <Route path="dev" element={<Gate tab="dev"><DevPage /></Gate>} />
           <Route path="aceite" element={<Gate tab="aceite"><AceitePage /></Gate>} />
           <Route path="sacado" element={<Gate tab="sacado"><SacadoPage /></Gate>} />
           <Route path="disputa" element={<Gate tab="disputa"><DisputaPage /></Gate>} />

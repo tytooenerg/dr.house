@@ -28,6 +28,7 @@ export function resetDbForTests() {
     DELETE FROM dispute_events;
     DELETE FROM disputes;
     DELETE FROM aceites;
+    DELETE FROM resale_listings;
     DELETE FROM purchases;
     DELETE FROM duplicatas;
     DELETE FROM webhook_deliveries;
@@ -35,6 +36,7 @@ export function resetDbForTests() {
     DELETE FROM api_key_usage;
     DELETE FROM webhooks;
     DELETE FROM api_keys;
+    DELETE FROM system_health_checks;
     DELETE FROM users;
   `);
 }

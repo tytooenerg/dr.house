@@ -41,6 +41,7 @@ const registerSchema = z.object({
   insurerKey: z
     .enum(INSURERS.map((i) => i.key) as [string, ...string[]])
     .optional(),
+  referralCode: z.string().trim().optional(),
 });
 
 const loginSchema = z.object({
@@ -103,7 +104,7 @@ authRouter.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
-    const { nome, email, password, companyName, role, insurerKey } = parsed.data;
+    const { nome, email, password, companyName, role, insurerKey, referralCode } = parsed.data;
     if (role === 'seguradora' && !insurerKey) {
       res.status(400).json({ error: 'validation_error', message: 'Selecione qual seguradora sua conta representa.' });
       return;
@@ -113,7 +114,7 @@ authRouter.post(
       return;
     }
     const passwordHash = await hashPassword(password);
-    const user = createUser({ email, passwordHash, nome, companyName, role, insurerKey });
+    const user = createUser({ email, passwordHash, nome, companyName, role, insurerKey, referredByCode: referralCode });
     const { accessToken, refreshToken } = issueTokens(user);
     recordAuditEvent(user.id, user.company_name, 'user.registered', { role });
     res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });

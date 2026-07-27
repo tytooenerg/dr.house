@@ -36,6 +36,10 @@ export function NavIcon({ tab }: { tab: string }) {
       return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor', transform: 'rotate(45deg)' }} />;
     case 'perfil':
       return <div className={base} style={{ width: 9, height: 9, borderRadius: '50%', border: '1.5px solid currentColor' }} />;
+    case 'secundario':
+      return <div className={base} style={{ width: 9, height: 9, borderRadius: '50%', border: '1.5px solid currentColor', borderStyle: 'dashed' }} />;
+    case 'cestas':
+      return <div className={base} style={{ width: 9, height: 7, borderRadius: '0 0 3px 3px', border: '1.5px solid currentColor', borderTop: 'none' }} />;
     case 'seguradora':
       return <div className={base} style={{ width: 9, height: 9, borderRadius: '50% 50% 50% 0', border: '1.5px solid currentColor', transform: 'rotate(-45deg)' }} />;
     default:

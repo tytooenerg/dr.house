@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Select } from '../../components/ui/Input';
@@ -54,6 +54,8 @@ export function DevPage() {
   const [keyScope, setKeyScope] = useState<'read_write' | 'read_only'>('read_write');
   const [openDeliveriesFor, setOpenDeliveriesFor] = useState<number | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryView[]>([]);
+  const [keyError, setKeyError] = useState('');
+  const [webhookError, setWebhookError] = useState('');
 
   const load = () => api.get<DevData>('/dev').then(setData);
 
@@ -68,9 +70,14 @@ export function DevPage() {
   const send = () => api.post<DevData>('/dev/playground/send').then(setData);
 
   const generateKey = async () => {
-    const res = await api.post<DevData & { rawKey: string }>('/dev/keys/generate', { mode: keyMode, scope: keyScope });
-    setNewKey(res.rawKey);
-    setData(res);
+    setKeyError('');
+    try {
+      const res = await api.post<DevData & { rawKey: string }>('/dev/keys/generate', { mode: keyMode, scope: keyScope });
+      setNewKey(res.rawKey);
+      setData(res);
+    } catch (err) {
+      setKeyError(err instanceof ApiError ? err.message : 'Não foi possível gerar a chave.');
+    }
   };
   const revokeKey = (id: number) => {
     if (newKey) setNewKey(null);
@@ -84,9 +91,14 @@ export function DevPage() {
   };
 
   const addWebhook = async () => {
-    const res = await api.post<DevData & { secret: string }>('/dev/webhooks', { url: webhookUrl, event: webhookEvent });
-    setNewWebhookSecret(res.secret);
-    setData(res);
+    setWebhookError('');
+    try {
+      const res = await api.post<DevData & { secret: string }>('/dev/webhooks', { url: webhookUrl, event: webhookEvent });
+      setNewWebhookSecret(res.secret);
+      setData(res);
+    } catch (err) {
+      setWebhookError(err instanceof ApiError ? err.message : 'Não foi possível criar o webhook.');
+    }
   };
   const removeWebhook = (id: number) => api.post<DevData>(`/dev/webhooks/${id}/delete`).then(setData);
   const toggleDeliveries = async (id: number) => {
@@ -164,6 +176,7 @@ export function DevPage() {
           <Button size="sm" variant="secondary" onClick={generateKey}>
             Gerar {data.apiKeys.length > 0 ? 'nova chave' : 'chave de produção'}
           </Button>
+          {keyError && <div className="mt-2 text-[12px] font-semibold text-red">{keyError}</div>}
 
           <div className="h-px bg-[#EEF1F5] my-5" />
 
@@ -245,6 +258,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           <Button size="sm" variant="secondary" onClick={addWebhook}>
             Adicionar webhook
           </Button>
+          {webhookError && <div className="mt-2 text-[12px] font-semibold text-red">{webhookError}</div>}
           {newWebhookSecret && (
             <div className="mt-3 p-3 rounded-lg bg-amberBg text-[12px] text-[#8A5A00]">
               Assinatura para verificar as requisições (guarde agora, não será mostrada de novo):
@@ -253,6 +267,18 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           )}
         </Card>
       </div>
+
+      <Card className="mb-4">
+        <div className="font-bold text-[15px] mb-1">Widget embutível</div>
+        <div className="text-textSecondary text-[12.5px] mb-3.5">
+          Um simulador de antecipação que você pode embutir no seu site — usa o mesmo modelo de taxa da Lastro, sem precisar de chave de API.
+        </div>
+        <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12px] leading-loose text-[#C7D6FF] overflow-x-auto whitespace-pre">{`<iframe
+  src="${window.location.origin}/embed/simulador"
+  width="100%" height="420" style="border:0;border-radius:12px"
+  title="Simulador de antecipação Lastro">
+</iframe>`}</pre>
+      </Card>
 
       <Card className="mb-4">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2.5">

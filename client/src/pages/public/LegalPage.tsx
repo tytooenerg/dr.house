@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { PublicNav, PublicFooter } from './PublicChrome';
 
 const TERMOS = [
@@ -16,8 +17,6 @@ const PRIVACIDADE = [
   { title: '4. Direitos do titular.', text: 'Você pode solicitar acesso, correção, portabilidade ou eliminação de seus dados a qualquer momento pelo canal de contato abaixo, exceto quando a retenção for exigida por obrigação regulatória (ex: trilha de auditoria de operações de crédito).' },
   { title: '5. Segurança.', text: 'Dados são criptografados em trânsito e em repouso, com controle de acesso segregado por papel (cedente, sacado, financiador) e monitoramento contínuo de acesso indevido.' },
 ];
-
-const STATUS_ROWS = ['API de emissão e registro', 'Marketplace e leilão', 'Conexão CERC / B3 / Núclea', 'Score de risco e IA antifraude', 'Liquidação e pagamentos'];
 
 const CONTATOS = [
   { title: 'Comercial e parcerias', desc: 'Bancos, FIDCs e fundos interessados em integrar o marketplace.', email: 'comercial@lastro.com.br' },
@@ -68,22 +67,12 @@ export function LegalPage() {
 
           <div id="status" className="mb-16 scroll-mt-6">
             <div className="text-[34px] font-extrabold tracking-tight mb-2">Status da plataforma</div>
-            <div className="flex items-center gap-2.5 mb-7">
-              <span className="rounded-full bg-green" style={{ width: 9, height: 9 }} />
-              <span className="text-[14.5px] font-bold text-green">Todos os sistemas operacionais</span>
+            <div className="text-[15px] text-[#3D4658] leading-relaxed">
+              Acompanhamos a disponibilidade da plataforma com verificações reais registradas a cada minuto —{' '}
+              <Link to="/status" className="text-blue font-bold">
+                veja o status atual e o histórico de disponibilidade →
+              </Link>
             </div>
-            <div className="border border-border rounded-card overflow-hidden">
-              {STATUS_ROWS.map((r) => (
-                <div key={r} className="flex justify-between items-center px-5.5 py-4.5 border-b border-hairline last:border-b-0">
-                  <div className="font-semibold text-[14.5px]">{r}</div>
-                  <div className="flex items-center gap-2 text-[13px] text-green font-bold">
-                    <span className="rounded-full bg-green" style={{ width: 7, height: 7 }} />
-                    Operacional
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="text-textTertiary text-[13px] mt-4">Sem incidentes nos últimos 90 dias.</div>
           </div>
 
           <div id="contato" className="scroll-mt-6">

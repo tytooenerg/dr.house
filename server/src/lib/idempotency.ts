@@ -40,9 +40,14 @@ export async function withIdempotency<T extends { status: number; body: unknown 
   }
 
   const outcome = await compute();
-  db.prepare(
-    `INSERT INTO idempotency_keys (user_id, key, route, request_hash, response_status, response_body) VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(user_id, key, route) DO NOTHING`
-  ).run(userId, idempotencyKey, route, requestHash, outcome.status, JSON.stringify(outcome.body));
+  // Only successful outcomes are cached — a transient failure (e.g. the simulated CERC
+  // 502) isn't a "this already happened" result, it's exactly the kind of thing a caller
+  // is expected to retry, so the same key must be free to try again until it succeeds.
+  if (outcome.status >= 200 && outcome.status < 300) {
+    db.prepare(
+      `INSERT INTO idempotency_keys (user_id, key, route, request_hash, response_status, response_body) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(user_id, key, route) DO NOTHING`
+    ).run(userId, idempotencyKey, route, requestHash, outcome.status, JSON.stringify(outcome.body));
+  }
   return outcome;
 }

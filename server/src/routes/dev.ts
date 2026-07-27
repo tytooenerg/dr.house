@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { requireAuth, requirePlan } from '../auth/middleware.js';
+import { requireAuth } from '../auth/middleware.js';
+import { planAtLeast } from '../lib/billing.js';
 import { getSettings, updateSettings } from '../db/users.js';
 import { addApiLog, listApiLogs } from '../db/misc.js';
 import { generateApiKey } from '../auth/apiKey.js';
@@ -13,7 +14,10 @@ import { PLAYGROUND_ENDPOINTS, PLAYGROUND_FIELD_LABELS, WEBHOOK_EVENTS } from '.
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const devRouter = Router();
-devRouter.use(requireAuth, requirePlan('empresarial'));
+// Any authenticated account can reach Desenvolvedores and generate a free sandbox
+// (test-mode) key to explore the API — only *live* keys and webhooks are gated behind
+// Empresarial, since those touch real production data/side effects.
+devRouter.use(requireAuth);
 
 function payload(userId: number, settings: ReturnType<typeof getSettings>, playgroundResult: unknown = null, playgroundLoading = false) {
   const ep = PLAYGROUND_ENDPOINTS[settings.playgroundEndpoint];
@@ -56,6 +60,14 @@ devRouter.post('/keys/generate', (req, res) => {
     return;
   }
   const { mode, scope } = parsed.data;
+  if (mode === 'live' && !planAtLeast(req.user!.plan, 'empresarial')) {
+    res.status(402).json({
+      error: 'plan_required',
+      requiredPlan: 'empresarial',
+      message: 'Chaves de produção requerem o plano Empresarial. Gere uma chave sandbox para explorar a API sem custo, ou faça upgrade para ir ao ar.',
+    });
+    return;
+  }
   const { rawKey, keyHash, keyPrefix } = generateApiKey(mode);
   const label = mode === 'test' ? 'Chave de teste (sandbox)' : 'Chave de produção';
   createApiKey(req.user!.id, keyHash, keyPrefix, label, mode, scope);
@@ -70,6 +82,10 @@ devRouter.post('/keys/:id/revoke', (req, res) => {
 const webhookSchema = z.object({ url: z.string().trim().url('Informe uma URL válida.'), event: z.enum(WEBHOOK_EVENTS as [string, ...string[]]) });
 
 devRouter.post('/webhooks', (req, res) => {
+  if (!planAtLeast(req.user!.plan, 'empresarial')) {
+    res.status(402).json({ error: 'plan_required', requiredPlan: 'empresarial', message: 'Webhooks requerem o plano Empresarial.' });
+    return;
+  }
   const parsed = webhookSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });

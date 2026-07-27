@@ -32,6 +32,10 @@ import { billingRouter, handleStripeWebhook } from './routes/billing.js';
 import { seguradoraRouter } from './routes/seguradora.js';
 import { v1Router } from './routes/v1.js';
 import { openApiSpec } from './data/openapi.js';
+import { secundarioRouter } from './routes/secundario.js';
+import { cestasRouter } from './routes/cestas.js';
+import { referralRouter } from './routes/referral.js';
+import { publicRouter } from './routes/public.js';
 
 export const app = express();
 
@@ -61,7 +65,9 @@ const strictCors = cors({
 // it's meant to be called cross-origin from any partner's own domain/server and gets an
 // open CORS policy instead of the SPA-only allowlist.
 const openCors = cors();
-app.use('/api', (req, res, next) => (req.path.startsWith('/v1/') ? openCors(req, res, next) : strictCors(req, res, next)));
+app.use('/api', (req, res, next) =>
+  req.path.startsWith('/v1/') || req.path.startsWith('/public/') ? openCors(req, res, next) : strictCors(req, res, next)
+);
 // Stripe webhook signature verification needs the exact raw body, so it must be
 // registered with its own raw parser before the global express.json() below.
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
@@ -94,6 +100,10 @@ app.use('/api/uploads', uploadsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/billing', billingRouter);
 app.use('/api/seguradora', seguradoraRouter);
+app.use('/api/secundario', secundarioRouter);
+app.use('/api/cestas', cestasRouter);
+app.use('/api/referral', referralRouter);
+app.use('/api/public', publicRouter);
 // Public, unauthenticated — registered before the v1Router mount so it never hits
 // requireApiKey — lets partners point Swagger/Postman/codegen at it directly.
 app.get('/api/v1/openapi.json', (_req, res) => res.json(openApiSpec));

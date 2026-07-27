@@ -77,7 +77,8 @@ export function LoginPage() {
     if (role === 'seguradora' && !insurerKey) return;
     setSubmitting(true);
     try {
-      await register({ nome, email, password, companyName, role, insurerKey: role === 'seguradora' ? insurerKey! : undefined });
+      const referralCode = new URLSearchParams(window.location.search).get('ref') ?? undefined;
+      await register({ nome, email, password, companyName, role, insurerKey: role === 'seguradora' ? insurerKey! : undefined, referralCode });
     } catch {
       // authError is surfaced below
     } finally {

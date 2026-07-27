@@ -10,9 +10,44 @@ export function getUserByEmail(email: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim()) as UserRow | undefined;
 }
 
-export function createUser(input: { email: string; passwordHash: string; nome: string; companyName: string; role: Role; insurerKey?: string }): UserRow {
+export function getUserByReferralCode(code: string): UserRow | undefined {
+  return db.prepare('SELECT * FROM users WHERE referral_code = ?').get(code.toUpperCase().trim()) as UserRow | undefined;
+}
+
+function generateReferralCode(): string {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+function uniqueReferralCode(): string {
+  let code = generateReferralCode();
+  for (let attempts = 0; attempts < 5 && getUserByReferralCode(code); attempts++) code = generateReferralCode();
+  return code;
+}
+
+// Rewards the referrer with one extra monthly emission (see BASICO_MONTHLY_EMIT_LIMIT)
+// the moment their referral completes registration — simple, immediate, no billing wiring needed.
+function bumpReferralBonus(userId: number) {
+  db.prepare('UPDATE users SET referral_bonus_emissions = referral_bonus_emissions + 1 WHERE id = ?').run(userId);
+}
+
+export function listReferrals(userId: number): { nome: string; companyName: string; role: Role; createdAt: string }[] {
+  return db
+    .prepare('SELECT nome, company_name as companyName, role, created_at as createdAt FROM users WHERE referred_by_user_id = ? ORDER BY created_at DESC')
+    .all(userId) as { nome: string; companyName: string; role: Role; createdAt: string }[];
+}
+
+export function createUser(input: {
+  email: string;
+  passwordHash: string;
+  nome: string;
+  companyName: string;
+  role: Role;
+  insurerKey?: string;
+  referredByCode?: string;
+}): UserRow {
+  const referrer = input.referredByCode ? getUserByReferralCode(input.referredByCode) : undefined;
   const info = db
-    .prepare('INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .prepare('INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings, referral_code, referred_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .run(
       input.email.toLowerCase().trim(),
       input.passwordHash,
@@ -20,8 +55,11 @@ export function createUser(input: { email: string; passwordHash: string; nome: s
       input.companyName,
       input.role,
       input.insurerKey ?? null,
-      JSON.stringify(defaultSettings())
+      JSON.stringify(defaultSettings()),
+      uniqueReferralCode(),
+      referrer?.id ?? null
     );
+  if (referrer) bumpReferralBonus(referrer.id);
   return getUserById(Number(info.lastInsertRowid))!;
 }
 

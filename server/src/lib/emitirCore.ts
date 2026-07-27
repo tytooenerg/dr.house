@@ -76,13 +76,14 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
   if (!form.sacado || !form.valor || !form.vencimento) {
     return { status: 400, body: { error: 'validation_error', message: 'Preencha empresa sacada, valor e vencimento antes de enviar.' } };
   }
-  if (!planAtLeast(user.plan, 'pro') && countByCedenteThisMonth(user.id) >= BASICO_MONTHLY_EMIT_LIMIT) {
+  const monthlyLimit = BASICO_MONTHLY_EMIT_LIMIT + user.referral_bonus_emissions;
+  if (!planAtLeast(user.plan, 'pro') && countByCedenteThisMonth(user.id) >= monthlyLimit) {
     return {
       status: 402,
       body: {
         error: 'plan_required',
         requiredPlan: 'pro',
-        message: `Seu plano Básico permite até ${BASICO_MONTHLY_EMIT_LIMIT} emissões por mês. Faça upgrade para o Pro para emitir sem limites.`,
+        message: `Seu plano Básico permite até ${monthlyLimit} emissões por mês${user.referral_bonus_emissions > 0 ? ' (incluindo bônus de indicação)' : ''}. Faça upgrade para o Pro para emitir sem limites, ou indique outra empresa para ganhar mais emissões.`,
       },
     };
   }

@@ -38,7 +38,7 @@ interface SessionContextValue {
   loading: boolean;
   authError: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
+  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => Promise<void>;
   logout: () => void;
   submitKyb: (form: { cnpj: string; tipo: string; pl: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -83,7 +83,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string }) => {
+  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => {
     setAuthError(null);
     try {
       const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/register', input);

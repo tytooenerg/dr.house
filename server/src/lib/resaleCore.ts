@@ -1,0 +1,151 @@
+import { z } from 'zod';
+import { getDuplicata, createPurchase, listPurchasesByInvestor } from '../db/duplicatas.js';
+import {
+  createListing,
+  deactivatePurchase,
+  getActivePurchaseByDuplicata,
+  getListing,
+  getListingForPurchase,
+  getPurchaseById,
+  listActiveListings,
+  listListingsBySeller,
+  setListingStatus,
+} from '../db/resaleListings.js';
+import { addNotification } from '../db/misc.js';
+import { recordAuditEvent } from '../db/audit.js';
+import { fmtBRL, parseFlexibleDate } from './format.js';
+import { COLORS } from '../data/seed.js';
+import type { UserRow } from '../db/types.js';
+
+export const createListingSchema = z.object({
+  purchaseId: z.number().int().positive(),
+  askingValor: z.string().trim(),
+});
+
+export const buyListingSchema = z.object({ listingId: z.number().int().positive() });
+
+function parseValor(raw: string): number {
+  return Number(raw.replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+function daysUntil(vencimento: string): number {
+  return Math.max(0, Math.round((parseFlexibleDate(vencimento).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+}
+
+export function viewResaleMarket() {
+  return listActiveListings().map((l) => ({
+    id: l.id,
+    duplicataId: l.duplicata_id,
+    sacado: l.sacado_nome,
+    cedente: l.cedente_nome,
+    score: l.score,
+    vencimento: l.vencimento,
+    diasRestantes: daysUntil(l.vencimento),
+    valorOriginalFmt: fmtBRL(l.original_valor),
+    precoFmt: fmtBRL(l.asking_valor),
+    variacaoPct: l.original_valor > 0 ? +(((l.asking_valor - l.original_valor) / l.original_valor) * 100).toFixed(2) : 0,
+  }));
+}
+
+// Positions this investor currently holds that are still tradeable (active, not yet
+// vencida, not already listed) — what the "revender" form on the client offers to sell.
+export function viewMyResalablePositions(userId: number) {
+  const result: { purchaseId: number; duplicataId: string; sacado: string; valorPagoFmt: string; vencimento: string; diasRestantes: number }[] = [];
+  for (const purchase of listPurchasesByInvestor(userId)) {
+    if (!purchase.active) continue;
+    const duplicata = getDuplicata(purchase.duplicata_id);
+    if (!duplicata) continue;
+    if (parseFlexibleDate(duplicata.vencimento).getTime() <= Date.now()) continue;
+    if (getListingForPurchase(purchase.id)) continue;
+    result.push({
+      purchaseId: purchase.id,
+      duplicataId: duplicata.id,
+      sacado: duplicata.sacado_nome,
+      valorPagoFmt: fmtBRL(purchase.valor),
+      vencimento: duplicata.vencimento,
+      diasRestantes: daysUntil(duplicata.vencimento),
+    });
+  }
+  return result;
+}
+
+export function viewMyListings(userId: number) {
+  return listListingsBySeller(userId).map((l) => ({ id: l.id, duplicataId: l.duplicata_id, precoFmt: fmtBRL(l.asking_valor), status: l.status }));
+}
+
+export type ResaleOutcome<T> =
+  | { status: 200; body: T }
+  | { status: 400; body: { error: 'validation_error'; message: string } }
+  | { status: 403; body: { error: 'forbidden' | 'kyb_required'; message: string } }
+  | { status: 404; body: { error: 'not_found'; message: string } }
+  | { status: 409; body: { error: string; message: string } };
+
+// A resale listing is only valid while the position hasn't matured yet — once vencimento
+// passes the receivable should have been paid out, not traded.
+export function createResaleListing(user: UserRow, purchaseId: number, askingValorRaw: string): ResaleOutcome<{ listingId: number; market: ReturnType<typeof viewResaleMarket> }> {
+  const purchase = getPurchaseById(purchaseId);
+  if (!purchase || purchase.investor_id !== user.id || !purchase.active) {
+    return { status: 404, body: { error: 'not_found', message: 'Posição não encontrada ou não pertence a você.' } };
+  }
+  const duplicata = getDuplicata(purchase.duplicata_id);
+  if (!duplicata || parseFlexibleDate(duplicata.vencimento).getTime() < Date.now()) {
+    return { status: 409, body: { error: 'expired', message: 'Esta duplicata já venceu e não pode mais ser revendida.' } };
+  }
+  if (getListingForPurchase(purchaseId)) {
+    return { status: 409, body: { error: 'already_listed', message: 'Você já tem um anúncio ativo para esta posição.' } };
+  }
+  const askingValor = parseValor(askingValorRaw);
+  if (askingValor <= 0) {
+    return { status: 400, body: { error: 'validation_error', message: 'Informe um preço de venda válido.' } };
+  }
+  const listing = createListing(purchaseId, purchase.duplicata_id, user.id, askingValor);
+  recordAuditEvent(user.id, user.company_name, 'resale.listado', { duplicataId: purchase.duplicata_id, askingValor });
+  return { status: 200, body: { listingId: listing.id, market: viewResaleMarket() } };
+}
+
+export function cancelResaleListing(user: UserRow, listingId: number): ResaleOutcome<{ ok: true }> {
+  const listing = getListing(listingId);
+  if (!listing || listing.seller_id !== user.id || listing.status !== 'ativo') {
+    return { status: 404, body: { error: 'not_found', message: 'Anúncio não encontrado.' } };
+  }
+  setListingStatus(listingId, 'cancelado');
+  return { status: 200, body: { ok: true } };
+}
+
+// Buying a resale listing closes out the seller's position (their original purchase row is
+// deactivated, its economics stay in history) and opens a brand new active purchase for the
+// buyer at the agreed resale price — same mechanism the primary marketplace buy uses.
+export function buyResaleListing(user: UserRow, listingId: number): ResaleOutcome<{ market: ReturnType<typeof viewResaleMarket> }> {
+  if (user.role !== 'investidor') {
+    return { status: 403, body: { error: 'forbidden', message: 'Apenas contas de investidor podem comprar no mercado secundário.' } };
+  }
+  if (user.kyb_status !== 'approved') {
+    return { status: 403, body: { error: 'kyb_required', message: 'Seu credenciamento institucional ainda está em análise.' } };
+  }
+  const listing = getListing(listingId);
+  if (!listing || listing.status !== 'ativo') {
+    return { status: 404, body: { error: 'not_found', message: 'Anúncio não encontrado ou já vendido.' } };
+  }
+  if (listing.seller_id === user.id) {
+    return { status: 409, body: { error: 'own_listing', message: 'Você não pode comprar seu próprio anúncio.' } };
+  }
+  const duplicata = getDuplicata(listing.duplicata_id);
+  if (!duplicata || parseFlexibleDate(duplicata.vencimento).getTime() < Date.now()) {
+    return { status: 409, body: { error: 'expired', message: 'Esta duplicata já venceu.' } };
+  }
+  const existingActive = getActivePurchaseByDuplicata(listing.duplicata_id);
+  if (!existingActive || existingActive.id !== listing.purchase_id) {
+    return { status: 409, body: { error: 'stale_listing', message: 'Esta posição já mudou de mãos — atualize a página.' } };
+  }
+  const desagioPct = duplicata.valor > 0 ? (((duplicata.valor - listing.asking_valor) / duplicata.valor) * 100).toFixed(1).replace('.', ',') + '%' : '0%';
+  deactivatePurchase(listing.purchase_id);
+  createPurchase(listing.duplicata_id, user.id, listing.asking_valor, desagioPct);
+  setListingStatus(listingId, 'vendido');
+  addNotification(
+    listing.seller_id,
+    `Sua posição na duplicata ${listing.duplicata_id} foi vendida no mercado secundário por ${fmtBRL(listing.asking_valor)}.`,
+    COLORS.GREEN
+  );
+  recordAuditEvent(user.id, user.company_name, 'resale.comprado', { duplicataId: listing.duplicata_id, listingId, valor: listing.asking_valor });
+  return { status: 200, body: { market: viewResaleMarket() } };
+}

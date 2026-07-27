@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Logo } from '../../components/Logo';
 
-export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'legal' }) {
+export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'legal' | 'transparencia' | 'status' }) {
   return (
     <div className="flex items-center justify-between px-14 py-5 border-b border-hairline">
       <div className="flex items-center gap-9">
@@ -9,9 +9,17 @@ export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'lega
           <Logo size={24} />
         </Link>
         <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-[#3D4658]">
-          <span className={active === 'developers' ? 'text-navy' : ''}>Desenvolvedores</span>
+          <Link to="/developers" className={active === 'developers' ? 'text-navy' : 'text-[#3D4658]'}>
+            Desenvolvedores
+          </Link>
           <Link to="/precos" className={active === 'precos' ? 'text-navy' : 'text-[#3D4658]'}>
             Preços
+          </Link>
+          <Link to="/transparencia" className={active === 'transparencia' ? 'text-navy' : 'text-[#3D4658]'}>
+            Transparência
+          </Link>
+          <Link to="/status" className={active === 'status' ? 'text-navy' : 'text-[#3D4658]'}>
+            Status
           </Link>
           <Link to="/legal" className={active === 'legal' ? 'text-navy' : 'text-[#3D4658]'}>
             Legal
@@ -42,7 +50,7 @@ export function PublicFooter() {
           <Link to="/legal#privacidade" className="text-textSecondary">
             Privacidade
           </Link>
-          <Link to="/legal#status" className="text-textSecondary">
+          <Link to="/status" className="text-textSecondary">
             Status
           </Link>
           <Link to="/legal#contato" className="text-textSecondary">

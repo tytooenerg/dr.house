@@ -71,15 +71,30 @@ describe('plan gating', () => {
     expect(allowed.status).toBe(200);
   });
 
-  it('blocks the Desenvolvedores API for Pro but allows it on Empresarial', async () => {
+  it('lets any plan reach Desenvolvedores and generate a sandbox key, but blocks live keys and webhooks below Empresarial', async () => {
     const { token } = await registerCedente();
     await request(app).post('/api/billing/checkout').set('Authorization', `Bearer ${token}`).send({ plan: 'pro' });
-    const stillBlocked = await request(app).get('/api/dev').set('Authorization', `Bearer ${token}`);
-    expect(stillBlocked.status).toBe(402);
+
+    const dashboard = await request(app).get('/api/dev').set('Authorization', `Bearer ${token}`);
+    expect(dashboard.status).toBe(200);
+
+    const sandboxKey = await request(app).post('/api/dev/keys/generate').set('Authorization', `Bearer ${token}`).send({ mode: 'test' });
+    expect(sandboxKey.status).toBe(200);
+    expect(sandboxKey.body.rawKey.startsWith('lastro_test_')).toBe(true);
+
+    const liveKeyBlocked = await request(app).post('/api/dev/keys/generate').set('Authorization', `Bearer ${token}`).send({ mode: 'live' });
+    expect(liveKeyBlocked.status).toBe(402);
+
+    const webhookBlocked = await request(app)
+      .post('/api/dev/webhooks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ url: 'https://example.com/hook', event: 'duplicata.registrada' });
+    expect(webhookBlocked.status).toBe(402);
 
     await request(app).post('/api/billing/checkout').set('Authorization', `Bearer ${token}`).send({ plan: 'empresarial' });
-    const allowed = await request(app).get('/api/dev').set('Authorization', `Bearer ${token}`);
-    expect(allowed.status).toBe(200);
+    const liveKeyAllowed = await request(app).post('/api/dev/keys/generate').set('Authorization', `Bearer ${token}`).send({ mode: 'live' });
+    expect(liveKeyAllowed.status).toBe(200);
+    expect(liveKeyAllowed.body.rawKey.startsWith('lastro_live_')).toBe(true);
   });
 
   it('caps a básico cedente at 5 duplicata emissions per month, and Pro removes the cap', async () => {

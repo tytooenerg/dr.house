@@ -66,6 +66,9 @@ export interface UserRow {
   settings: string;
   created_at: string;
   deleted_at: string | null;
+  referral_code: string | null;
+  referred_by_user_id: number | null;
+  referral_bonus_emissions: number;
 }
 
 export interface DuplicataRow {
@@ -137,6 +140,23 @@ export interface AceiteRow {
   duplicata_id: string;
   status: 'aguardando' | 'aceita' | 'contestada';
   prazo_label: string;
+  created_at: string;
+}
+
+export interface ResaleListingRow {
+  id: number;
+  purchase_id: number;
+  duplicata_id: string;
+  seller_id: number;
+  asking_valor: number;
+  status: 'ativo' | 'vendido' | 'cancelado';
+  created_at: string;
+}
+
+export interface SystemHealthCheckRow {
+  id: number;
+  status: 'ok' | 'degraded';
+  latency_ms: number;
   created_at: string;
 }
 

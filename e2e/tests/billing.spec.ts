@@ -4,7 +4,7 @@ function unique() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-test('a básico cedente sees an upgrade prompt on Desenvolvedores, then unlocks it after upgrading to Empresarial', async ({ page }) => {
+test('a básico cedente can generate a sandbox key on Desenvolvedores, but live keys require upgrading to Empresarial', async ({ page }) => {
   const suffix = unique();
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -18,21 +18,24 @@ test('a básico cedente sees an upgrade prompt on Desenvolvedores, then unlocks 
   await dismissOnboardingIfPresent(page);
   await expect(page).toHaveURL(/\/app\//, { timeout: 15_000 });
 
-  // Desenvolvedores (dev) is cedente-accessible but gated behind Empresarial — a fresh
-  // account is on Básico, so it should show the upgrade prompt instead of the real page.
+  // Desenvolvedores is reachable on any plan now (free sandbox tier) — a fresh Básico
+  // account can generate a sandbox key, but a live key still requires Empresarial.
   await page.goto('/app/dev', { waitUntil: 'domcontentloaded' });
   await dismissOnboardingIfPresent(page);
-  await expect(page.getByText('Ambiente de Desenvolvedores é um recurso Empresarial')).toBeVisible();
+  await expect(page.getByText('Chave de API', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Ver planos' }).click();
-  await expect(page).toHaveURL(/\/app\/assinatura/);
+  await page.getByRole('button', { name: /Gerar chave de produção/ }).click();
+  await expect(page.getByText('Chaves de produção requerem o plano Empresarial')).toBeVisible();
+
+  await page.goto('/app/assinatura', { waitUntil: 'domcontentloaded' });
   await expect(page.getByText('Modo demo — Stripe não configurado')).toBeVisible();
 
   const empresarialCard = page.getByText('Empresarial', { exact: true }).locator('..');
   await empresarialCard.getByRole('button', { name: 'Fazer upgrade' }).click();
   await expect(page.getByText(/Plano empresarial ativado/)).toBeVisible({ timeout: 10_000 });
 
-  // Now Desenvolvedores should render for real instead of the upgrade prompt.
+  // Now a live key can be generated for real.
   await page.goto('/app/dev', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText('Chave de API', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Gerar chave de produção/ }).click();
+  await expect(page.getByText('Guarde essa chave agora')).toBeVisible();
 });

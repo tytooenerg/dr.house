@@ -131,6 +131,7 @@ export interface PurchaseRow {
   valor: number;
   taxa: string;
   retorno: number;
+  active: number;
   created_at: string;
 }
 

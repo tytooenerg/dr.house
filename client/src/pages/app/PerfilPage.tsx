@@ -13,6 +13,13 @@ interface ProfileData {
   teamMembers: { nome: string; email: string; papel: string }[];
 }
 
+interface ReferralData {
+  code: string;
+  link: string;
+  bonusEmissoesMensais: number;
+  indicados: { nome: string; companyName: string; role: string; createdAt: string }[];
+}
+
 const NOTIF_ROWS: { key: keyof ProfileData['notifPrefs']; label: string; hint: string }[] = [
   { key: 'leilao', label: 'Leilões em andamento', hint: 'Encerramento e lances concorrentes' },
   { key: 'aceite', label: 'Aceite de duplicatas', hint: 'Quando um sacado confirma ou contesta' },
@@ -32,9 +39,12 @@ export function PerfilPage() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [referral, setReferral] = useState<ReferralData | null>(null);
+  const [copiedRef, setCopiedRef] = useState(false);
 
   useEffect(() => {
     api.get<ProfileData>('/profile').then(setData);
+    api.get<ReferralData>('/referral').then(setReferral);
   }, []);
 
   if (!data) return <PageSkeleton />;
@@ -75,6 +85,13 @@ export function PerfilPage() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const copyReferralLink = () => {
+    if (!referral) return;
+    navigator.clipboard?.writeText(`${window.location.origin}${referral.link}`).catch(() => {});
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 1500);
   };
 
   const submitInvite = async (e: React.FormEvent) => {
@@ -187,6 +204,36 @@ export function PerfilPage() {
           </div>
         ))}
       </div>
+
+      {referral && (
+        <Card className="mt-4">
+          <div className="font-bold text-[15px] mb-1">Indique e ganhe</div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">
+            Cada empresa que se cadastrar com seu link ganha você +1 emissão mensal extra no plano Básico.
+            {referral.bonusEmissoesMensais > 0 && <span className="font-bold text-green"> Você já tem +{referral.bonusEmissoesMensais} de bônus.</span>}
+          </div>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex-1 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px] truncate">
+              {window.location.origin}
+              {referral.link}
+            </div>
+            <Button size="sm" variant="secondary" onClick={copyReferralLink}>
+              {copiedRef ? 'Copiado!' : 'Copiar link'}
+            </Button>
+          </div>
+          {referral.indicados.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {referral.indicados.map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-[12.5px]">
+                  <span className="font-semibold">{r.companyName}</span>
+                  <span className="text-textTertiary">{r.role}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {referral.indicados.length === 0 && <div className="text-textTertiary text-[12px]">Ninguém se cadastrou com seu link ainda.</div>}
+        </Card>
+      )}
 
       <Card className="mt-4">
         <div className="font-bold text-[15px] mb-1">Privacidade e dados (LGPD)</div>
