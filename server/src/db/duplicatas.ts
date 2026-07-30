@@ -54,12 +54,13 @@ export function createDuplicata(input: {
   registro?: string | null;
   desagio?: string | null;
   registradora?: string | null;
+  nfeChave?: string | null;
   id?: string;
 }): DuplicataRow {
   const id = input.id ?? nextId('DUP-2026');
   db.prepare(
-    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, registradora)
-     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @registradora)`
+    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, registradora, nfe_chave)
+     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @registradora, @nfeChave)`
   ).run({
     id,
     cedenteId: input.cedenteId,
@@ -76,8 +77,23 @@ export function createDuplicata(input: {
     desagio: input.desagio ?? null,
     score: scoreFor(input.sacadoNome),
     registradora: input.registradora ?? null,
+    nfeChave: input.nfeChave || null,
   });
   return getDuplicata(id)!;
+}
+
+export function findDuplicataByNfeChave(chave: string): DuplicataRow | undefined {
+  return db.prepare('SELECT * FROM duplicatas WHERE nfe_chave = ?').get(chave) as DuplicataRow | undefined;
+}
+
+// Baseline for anomaly detection: average valor of this sacado's prior duplicatas,
+// excluding the brand-new one being evaluated. Requires a minimal history to be
+// meaningful — a single prior data point isn't a real baseline.
+export function sacadoValorStats(sacadoCnpj: string): { avg: number; n: number } {
+  const row = db
+    .prepare("SELECT AVG(valor) as avg, COUNT(*) as n FROM duplicatas WHERE sacado_cnpj = ? AND sacado_cnpj != ''")
+    .get(sacadoCnpj) as { avg: number | null; n: number };
+  return { avg: row.avg ?? 0, n: row.n };
 }
 
 export function setStatus(id: string, status: string) {
@@ -134,6 +150,7 @@ export interface PurchaseRow {
   taxa: string;
   retorno: number;
   active: number;
+  com_regresso: number;
   created_at: string;
 }
 

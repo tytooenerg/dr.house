@@ -15,14 +15,19 @@ export const PLANS: Record<Plan, PlanDef> = {
     key: 'basico',
     label: 'Básico',
     priceFmt: 'Grátis',
-    features: ['Marketplace e emissão de duplicatas', 'Até 5 duplicatas emitidas por mês (cedente)', 'Dashboard e Carteira & Histórico'],
+    features: [
+      'Marketplace e emissão de duplicatas',
+      'Até 5 duplicatas emitidas por mês (cedente)',
+      'Dashboard e Carteira & Histórico',
+      'Comparador de Taxas',
+    ],
   },
   pro: {
     key: 'pro',
     label: 'Pro',
     priceFmt: 'R$ 299/mês',
     priceIdEnv: 'STRIPE_PRICE_PRO',
-    features: ['Tudo do Básico', 'Emissões ilimitadas', 'Automação de Lances', 'Comparador de Taxas'],
+    features: ['Tudo do Básico', 'Emissões ilimitadas', 'Automação de Lances'],
   },
   empresarial: {
     key: 'empresarial',

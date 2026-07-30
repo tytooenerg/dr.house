@@ -12,6 +12,8 @@ interface Aceite {
   statusLabel: string;
   statusBg: string;
   statusColor: string;
+  slaDiasRestantes: number | null;
+  slaVencido: boolean;
 }
 
 const COLS = '1.1fr 1.3fr 0.9fr 1.2fr 1.3fr';
@@ -44,9 +46,16 @@ export function AceitePage() {
             <div className="font-semibold">{a.sacado}</div>
             <div className="font-mono-num">{a.valorFmt}</div>
             <div className="text-textSecondary text-[13px]">{a.prazo}</div>
-            <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md w-fit" style={{ background: a.statusBg, color: a.statusColor }}>
-              {a.statusLabel}
-            </span>
+            <div className="flex flex-col gap-1 items-start">
+              <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md w-fit" style={{ background: a.statusBg, color: a.statusColor }}>
+                {a.statusLabel}
+              </span>
+              {a.slaDiasRestantes !== null && (
+                <span className="text-[11px] font-semibold" style={{ color: a.slaVencido ? '#B3261E' : '#8A5A00' }}>
+                  {a.slaVencido ? 'Prazo legal vencido' : `${a.slaDiasRestantes}d restantes`}
+                </span>
+              )}
+            </div>
           </div>
         ))}
         {aceites.length === 0 && <EmptyState title="Nenhuma duplicata aguardando manifestação" hint="Novas duplicatas emitidas para você vão aparecer aqui" />}

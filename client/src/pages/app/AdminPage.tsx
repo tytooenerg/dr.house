@@ -11,6 +11,8 @@ interface PendingKyb {
   companyName: string;
   kybForm: { cnpj?: string; tipo?: string; pl?: string };
   submittedAt: string;
+  pldStatus: 'clear' | 'flagged';
+  pldMatchNote: string;
 }
 
 interface AdminDispute {
@@ -111,6 +113,12 @@ export function AdminPage() {
                 </div>
                 <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Aguardando análise — {p.submittedAt}</span>
               </div>
+              {p.pldStatus === 'flagged' && (
+                <div className="rounded-[10px] px-4 py-3 mb-3 text-[12.5px]" style={{ background: '#F7E9E7', color: '#B3261E' }}>
+                  <b>PLD/FT — possível correspondência (lista de demonstração)</b>
+                  <div className="mt-0.5">{p.pldMatchNote}</div>
+                </div>
+              )}
               <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                 <div className="text-[13px]">
                   <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">CNPJ</div>

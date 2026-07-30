@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requirePlan } from '../auth/middleware.js';
+import { requireAuth } from '../auth/middleware.js';
 import { fmtBRL, parseBRLNumber } from '../lib/format.js';
 import { RATE_CHANNELS } from '../data/seed.js';
 
+// Available on every plan, including Básico — the compliance/pain-point analysis found
+// that gating price transparency behind a paid plan hits hardest exactly the small
+// cedentes the market research says are most exposed to opaque factoring rates.
 export const comparadorRouter = Router();
-comparadorRouter.use(requireAuth, requirePlan('pro'));
+comparadorRouter.use(requireAuth);
 
 const RATE_BANDS: Record<string, [number, number]> = { AA: [1.2, 1.6], A: [1.5, 2.0], B: [2.2, 2.9], C: [3.2, 4.2] };
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { listAceitesByCedente, listAceitesBySacadoNome, getAceite, setAceiteStatus } from '../db/aceites.js';
+import { listAceitesByCedente, listAceitesBySacadoNome, getAceite, setAceiteStatus, aceiteSlaStatus } from '../db/aceites.js';
 import { getDuplicata } from '../db/duplicatas.js';
 import { addNotification } from '../db/misc.js';
 import { createDispute, getDisputeByAceite } from '../db/disputes.js';
@@ -19,10 +19,20 @@ export const aceiteStatusSchema = z.object({ status: z.enum(['aceita', 'contesta
 export type AceiteStatusInput = z.infer<typeof aceiteStatusSchema>;
 
 function view(
-  a: { id: number; duplicata_id: string; status: keyof typeof STATUS_META; prazo_label: string; valor: number; sacado_nome?: string; cedente_nome?: string },
+  a: {
+    id: number;
+    duplicata_id: string;
+    status: keyof typeof STATUS_META;
+    prazo_label: string;
+    prazo_limite: string | null;
+    valor: number;
+    sacado_nome?: string;
+    cedente_nome?: string;
+  },
   editable: boolean
 ) {
   const meta = STATUS_META[a.status];
+  const sla = aceiteSlaStatus(a);
   return {
     id: a.id,
     duplicataId: a.duplicata_id,
@@ -36,6 +46,8 @@ function view(
     editable,
     sacado: a.sacado_nome,
     cedente: a.cedente_nome,
+    slaDiasRestantes: sla.diasRestantes,
+    slaVencido: sla.vencido,
   };
 }
 

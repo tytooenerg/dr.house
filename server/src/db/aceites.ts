@@ -1,11 +1,28 @@
 import { db } from './index.js';
+import { toIsoUtc } from '../lib/format.js';
 import type { AceiteRow } from './types.js';
+
+// Legal aceite window: the sacado has up to 15 days to accept a duplicata escritural
+// (or 10 to refuse it) before its validity is at risk — the same deadline already
+// documented in the Compliance screen's financiador requirements, now actually enforced
+// as a computed field instead of just descriptive copy.
+const ACEITE_PRAZO_DIAS = 15;
 
 export function ensureAceite(duplicataId: string, prazoLabel: string): AceiteRow {
   const existing = db.prepare('SELECT * FROM aceites WHERE duplicata_id = ?').get(duplicataId) as AceiteRow | undefined;
   if (existing) return existing;
-  db.prepare('INSERT INTO aceites (duplicata_id, prazo_label) VALUES (?, ?)').run(duplicataId, prazoLabel);
+  db.prepare(`INSERT INTO aceites (duplicata_id, prazo_label, prazo_limite) VALUES (?, ?, datetime('now', '+${ACEITE_PRAZO_DIAS} days'))`).run(
+    duplicataId,
+    prazoLabel
+  );
   return db.prepare('SELECT * FROM aceites WHERE duplicata_id = ?').get(duplicataId) as AceiteRow;
+}
+
+export function aceiteSlaStatus(row: Pick<AceiteRow, 'status' | 'prazo_limite'>): { diasRestantes: number | null; vencido: boolean } {
+  if (row.status !== 'aguardando' || !row.prazo_limite) return { diasRestantes: null, vencido: false };
+  const msRestantes = new Date(toIsoUtc(row.prazo_limite)).getTime() - Date.now();
+  const diasRestantes = Math.ceil(msRestantes / 86_400_000);
+  return { diasRestantes, vencido: diasRestantes < 0 };
 }
 
 export function getAceite(id: number): AceiteRow | undefined {

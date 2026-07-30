@@ -17,6 +17,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { INSURERS, KYB_TIPOS, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { runPldScreening } from '../lib/pldScreening.js';
 import type { UserRow } from '../db/types.js';
 
 export const authRouter = Router();
@@ -85,6 +86,7 @@ function publicUser(user: UserRow) {
     subscriptionStatus: user.subscription_status,
     insurerKey: user.insurer_key,
     insurerName: insurer?.name ?? null,
+    pldStatus: user.pld_status,
   };
 }
 
@@ -198,6 +200,7 @@ authRouter.post('/kyb', requireAuth, (req, res) => {
   if (parsed.data.pl) updateKybForm(userId, 'pl', parsed.data.pl);
   submitKybForReview(userId);
   recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj });
+  runPldScreening(userId, req.user!.company_name, parsed.data.cnpj);
   const refreshed = getUserById(userId)!;
   res.json({ user: publicUser(refreshed) });
 });

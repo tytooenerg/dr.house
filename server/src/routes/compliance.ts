@@ -2,8 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { getSettings, updateSettings } from '../db/users.js';
-import { AUDIT_LOG, CRONOGRAMA, CONTRACT_FLAGS, FINANCIADOR_REQS, FRAUD_FLAGS, TRUST_BRIDGE } from '../data/seed.js';
-import { fmtBRL, parseBRLNumber } from '../lib/format.js';
+import { db } from '../db/index.js';
+import { AUDIT_LOG, CRONOGRAMA, CONTRACT_FLAGS, FINANCIADOR_REQS, TRUST_BRIDGE } from '../data/seed.js';
+import { REGISTRADORAS } from '../lib/registradoras.js';
+import { checkDuplicidade } from '../lib/dupCheck.js';
+import { computeFraudFlags } from '../lib/fraudDetection.js';
+import { computeProvisioning } from '../lib/provisioning.js';
+import { fmtBRL, parseBRLNumber, fmtRelative } from '../lib/format.js';
 
 export const complianceRouter = Router();
 complianceRouter.use(requireAuth);
@@ -13,6 +18,17 @@ function fidcPayload(pl: string) {
   return { fidcPL: pl, fidcOriginacaoFmt: fmtBRL(num * 2.2), fidcSpreadLabel: '1,8% a.m.' };
 }
 
+// Real interoperability status per registradora: when it last actually processed a
+// duplicata on Lastro, instead of a decorative fixed countdown.
+function interopStatus() {
+  return REGISTRADORAS.map((r) => {
+    const last = db
+      .prepare('SELECT created_at FROM duplicatas WHERE registradora = ? ORDER BY created_at DESC LIMIT 1')
+      .get(r.key) as { created_at: string } | undefined;
+    return { name: r.name, lastCheck: last ? fmtRelative(last.created_at) : 'sem operações ainda' };
+  });
+}
+
 complianceRouter.get('/', (req, res) => {
   const settings = getSettings(req.user!);
   res.json({
@@ -20,13 +36,9 @@ complianceRouter.get('/', (req, res) => {
     financiadorReqs: FINANCIADOR_REQS,
     cronograma: CRONOGRAMA,
     auditLog: AUDIT_LOG,
-    fraudFlags: FRAUD_FLAGS,
+    fraudFlags: computeFraudFlags(),
     contractFlags: CONTRACT_FLAGS,
-    interop: [
-      { name: 'CERC', lastCheck: 40 },
-      { name: 'B3', lastCheck: 12 },
-      { name: 'Núclea', lastCheck: 3 },
-    ],
+    interop: interopStatus(),
     ...fidcPayload(settings.fidcPL),
   });
 });
@@ -43,7 +55,34 @@ complianceRouter.post('/fidc', (req, res) => {
   res.json(fidcPayload(parsed.data.value));
 });
 
+// Real check against Lastro's own book (see lib/dupCheck.ts) — does not reach the
+// actual CERC/B3/Núclea registries, which requires a real registry API integration.
 complianceRouter.post('/dup-check', (req, res) => {
   const query = typeof req.body.query === 'string' ? req.body.query : '';
-  res.json({ dupQuery: query, dupChecked: true });
+  const result = checkDuplicidade(query);
+  res.json({ dupQuery: query, dupChecked: true, ...result });
 });
+
+complianceRouter.get('/provisionamento', (req, res) => {
+  const { rows, summary } = computeProvisioning(req.user!.id);
+  res.json({
+    rows: rows.map((r) => ({ ...r, estagioLabel: { estagio_1: 'Estágio 1', estagio_2: 'Estágio 2', estagio_3: 'Estágio 3' }[r.estagio] })),
+    summary,
+  });
+});
+
+complianceRouter.get('/provisionamento/export.csv', (req, res) => {
+  const { rows } = computeProvisioning(req.user!.id);
+  const header = 'Duplicata,Sacado,Valor,Vencimento,DiasAtraso,Estagio';
+  const lines = rows.map((r) => [r.duplicataId, csvEscape(r.sacadoNome), r.valorFmt, r.vencimento, r.diasAtraso, r.estagio].join(','));
+  const csv = [header, ...lines].join('\r\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="provisionamento.csv"');
+  res.send(csv);
+});
+
+function csvEscape(value: string | number): string {
+  const s = String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+

@@ -69,6 +69,8 @@ export interface UserRow {
   referral_code: string | null;
   referred_by_user_id: number | null;
   referral_bonus_emissions: number;
+  pld_status: 'clear' | 'flagged';
+  pld_match_note: string;
 }
 
 export interface DuplicataRow {
@@ -92,6 +94,7 @@ export interface DuplicataRow {
   sinistro_status: 'none' | 'aberto' | 'aprovado' | 'negado';
   sinistro_note: string | null;
   registradora: string | null;
+  nfe_chave: string | null;
   created_at: string;
 }
 
@@ -163,6 +166,20 @@ export interface AceiteRow {
   duplicata_id: string;
   status: 'aguardando' | 'aceita' | 'contestada';
   prazo_label: string;
+  prazo_limite: string | null;
+  created_at: string;
+}
+
+export type ComplianceAlertType = 'nfe_duplicidade' | 'valor_anomalo' | 'pld_screening';
+export type ComplianceAlertSeverity = 'info' | 'atencao' | 'critico';
+
+export interface ComplianceAlertRow {
+  id: number;
+  type: ComplianceAlertType;
+  severity: ComplianceAlertSeverity;
+  message: string;
+  user_id: number | null;
+  duplicata_id: string | null;
   created_at: string;
 }
 

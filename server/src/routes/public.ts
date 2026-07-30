@@ -55,6 +55,7 @@ publicRouter.post('/simular', simulateLimiter, (req, res) => {
     vencimento: parsed.data.vencimento,
     seguro: false,
     nfAnexada: false,
+    nfeChave: '',
     batchValores: [],
   });
   res.json({

@@ -12,6 +12,7 @@ interface EmitForm {
   valor: string;
   vencimento: string;
   seguro: boolean;
+  nfeChave: string;
 }
 interface BatchRow {
   id: string;
@@ -35,7 +36,7 @@ function fmtBRL(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 
-const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', seguro: false };
+const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', seguro: false, nfeChave: '' };
 
 export function EmitirPage() {
   const [form, setForm] = useState<EmitForm>(EMPTY_FORM);
@@ -72,6 +73,7 @@ export function EmitirPage() {
           valor: f.valor || extracted.valor,
           vencimento: f.vencimento || extracted.vencimento,
           seguro: f.seguro,
+          nfeChave: f.nfeChave,
         }));
       }
     } catch (err) {
@@ -152,6 +154,9 @@ export function EmitirPage() {
           </Field>
           <Field label="CNPJ do sacado">
             <Input placeholder="00.000.000/0001-00" value={form.cnpj} onChange={(e) => setField('cnpj', e.target.value)} />
+          </Field>
+          <Field label="Chave de acesso da NF-e (opcional — 44 dígitos)">
+            <Input placeholder="Previne duplicidade: a mesma nota não pode lastrear duas duplicatas" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
           </Field>
           <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <Field label="Valor (R$)">

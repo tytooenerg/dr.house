@@ -134,6 +134,10 @@ export function listPendingKyb(): UserRow[] {
   return db.prepare("SELECT * FROM users WHERE role = 'investidor' AND kyb_status = 'pending' ORDER BY created_at ASC").all() as UserRow[];
 }
 
+export function setPldStatus(userId: number, status: 'clear' | 'flagged', note: string) {
+  db.prepare('UPDATE users SET pld_status = ?, pld_match_note = ? WHERE id = ?').run(status, note, userId);
+}
+
 // --- billing ---
 export function getUserByStripeCustomerId(customerId: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE stripe_customer_id = ?').get(customerId) as UserRow | undefined;

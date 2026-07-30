@@ -56,14 +56,7 @@ export default function App() {
               </Gate>
             }
           />
-          <Route
-            path="comparador"
-            element={
-              <Gate tab="comparador" requiredPlan="pro" feature="Comparador de Taxas">
-                <ComparadorPage />
-              </Gate>
-            }
-          />
+          <Route path="comparador" element={<Gate tab="comparador"><ComparadorPage /></Gate>} />
           <Route path="minhas" element={<Gate tab="minhas"><MinhasPage /></Gate>} />
           <Route path="secundario" element={<Gate tab="secundario"><SecundarioPage /></Gate>} />
           <Route path="cestas" element={<Gate tab="cestas"><CestasPage /></Gate>} />

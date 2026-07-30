@@ -22,6 +22,8 @@ adminRouter.get('/kyb', (_req, res) => {
     companyName: u.company_name,
     kybForm: JSON.parse(u.kyb_form || '{}'),
     submittedAt: fmtRelative(u.created_at),
+    pldStatus: u.pld_status,
+    pldMatchNote: u.pld_match_note,
   }));
   res.json({ pending });
 });

@@ -1,9 +1,33 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, downloadFile } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+
+interface DupGroup {
+  valorFmt: string;
+  vencimento: string;
+  ocorrencias: { id: string; cedenteNome: string; registradora: string | null }[];
+  duplicidadeSuspeita: boolean;
+}
+
+interface DupCheckResponse {
+  dupQuery: string;
+  dupChecked: boolean;
+  duplicidadeEncontrada: boolean;
+  matches: DupGroup[];
+}
+
+interface ProvisioningRow {
+  duplicataId: string;
+  sacadoNome: string;
+  valorFmt: string;
+  vencimento: string;
+  diasAtraso: number;
+  estagio: 'estagio_1' | 'estagio_2' | 'estagio_3';
+  estagioLabel: string;
+}
 
 interface ComplianceData {
   trustBridge: { parte: string; veSobreo: string }[];
@@ -12,9 +36,7 @@ interface ComplianceData {
   auditLog: { timestamp: string; ator: string; acao: string }[];
   fraudFlags: { text: string; color: string }[];
   contractFlags: { text: string; color: string }[];
-  dupQuery: string;
-  dupChecked: boolean;
-  interop: { name: string; lastCheck: number }[];
+  interop: { name: string; lastCheck: string }[];
   fidcPL: string;
   fidcOriginacaoFmt: string;
   fidcSpreadLabel: string;
@@ -23,21 +45,23 @@ interface ComplianceData {
 export function CompliancePage() {
   const [data, setData] = useState<ComplianceData | null>(null);
   const [dupQuery, setDupQuery] = useState('');
+  const [dupResult, setDupResult] = useState<DupCheckResponse | null>(null);
   const [fidcPL, setFidcPL] = useState('5.000.000');
+  const [provisioning, setProvisioning] = useState<{ rows: ProvisioningRow[]; summary: Record<string, number> } | null>(null);
 
   useEffect(() => {
     api.get<ComplianceData>('/compliance').then((d) => {
       setData(d);
-      setDupQuery(d.dupQuery);
       setFidcPL(d.fidcPL);
     });
+    api.get<{ rows: ProvisioningRow[]; summary: Record<string, number> }>('/compliance/provisionamento').then(setProvisioning);
   }, []);
 
   if (!data) return <PageSkeleton />;
 
   const runDupCheck = async () => {
-    const d = await api.post<{ dupQuery: string; dupChecked: boolean }>('/compliance/dup-check', { query: dupQuery });
-    setData((s) => (s ? { ...s, dupChecked: d.dupChecked } : s));
+    const d = await api.post<DupCheckResponse>('/compliance/dup-check', { query: dupQuery });
+    setDupResult(d);
   };
 
   const updateFidc = async (value: string) => {
@@ -73,12 +97,12 @@ export function CompliancePage() {
                 <span className="rounded-full bg-green" style={{ width: 8, height: 8 }} />
                 <span className="font-bold text-[13.5px]">{r.name}</span>
               </div>
-              <div className="text-textSecondary text-xs leading-snug">Sincronização em tempo real · última verificação há {r.lastCheck}s</div>
+              <div className="text-textSecondary text-xs leading-snug">Roteamento inteligente ativo · última operação: {r.lastCheck}</div>
             </div>
           ))}
         </div>
-        <div className="mt-3.5 px-3.5 py-3 rounded-lg bg-greenBg text-[12.5px] text-green font-semibold">
-          Nenhum evento de cessão simultânea detectado — titularidade consistente entre as três registradoras
+        <div className="mt-3.5 px-3.5 py-3 rounded-lg text-[12.5px]" style={{ background: '#FBF1E0', color: '#8A5A00' }}>
+          O roteamento entre registradoras é real; a consulta cruzada de duplicidade contra as APIs oficiais da CERC/B3/Núclea ainda depende de integração comercial — hoje a verificação abaixo cobre apenas a base da própria Lastro.
         </div>
       </Card>
 
@@ -140,17 +164,38 @@ export function CompliancePage() {
       </Card>
 
       <Card className="mb-4">
-        <div className="font-bold text-[15px] mb-3.5">Verificação de duplicidade</div>
+        <div className="font-bold text-[15px] mb-1">Verificação de duplicidade</div>
+        <div className="text-textSecondary text-[12.5px] mb-3.5">Consulta real contra a base de duplicatas da própria Lastro (CNPJ do sacado, chave de NF-e ou nº da duplicata)</div>
         <div className="flex gap-2.5 max-w-[520px]">
-          <Input placeholder="CNPJ do sacado ou nº da duplicata" value={dupQuery} onChange={(e) => setDupQuery(e.target.value)} />
-          <Button onClick={runDupCheck}>Consultar registradoras</Button>
+          <Input placeholder="CNPJ do sacado, chave de NF-e ou nº da duplicata" value={dupQuery} onChange={(e) => setDupQuery(e.target.value)} />
+          <Button onClick={runDupCheck}>Consultar</Button>
         </div>
-        {data.dupChecked && (
+        {dupResult && dupResult.matches.length === 0 && (
           <div className="mt-4 p-4 rounded-[10px] bg-greenBg" style={{ border: '1px solid #CFE6D9' }}>
-            <div className="font-bold text-[13.5px] text-green">Nenhuma duplicidade encontrada</div>
-            <div className="text-[12.5px] mt-1" style={{ color: '#3D6B54' }}>
-              Consultado em tempo real: CERC ✓ · B3 ✓ · Núclea ✓ — titularidade única confirmada
-            </div>
+            <div className="font-bold text-[13.5px] text-green">Nenhum registro encontrado para esta consulta</div>
+          </div>
+        )}
+        {dupResult && dupResult.matches.length > 0 && (
+          <div className="mt-4 flex flex-col gap-2.5">
+            {dupResult.matches.map((m, i) => (
+              <div
+                key={i}
+                className="p-4 rounded-[10px]"
+                style={m.duplicidadeSuspeita ? { background: '#F7E9E7', border: '1px solid #E7C6C1' } : { background: '#F7F8FA' }}
+              >
+                <div className="font-bold text-[13.5px]" style={{ color: m.duplicidadeSuspeita ? '#B3261E' : undefined }}>
+                  {m.duplicidadeSuspeita ? 'Possível duplicidade — ' : ''}
+                  {m.valorFmt} · vencimento {m.vencimento} · {m.ocorrencias.length} registro{m.ocorrencias.length > 1 ? 's' : ''}
+                </div>
+                <div className="text-[12.5px] mt-1.5 flex flex-col gap-0.5" style={{ color: m.duplicidadeSuspeita ? '#8A3A32' : undefined }}>
+                  {m.ocorrencias.map((o) => (
+                    <div key={o.id}>
+                      {o.id} — {o.cedenteNome} {o.registradora ? `(${o.registradora})` : ''}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </Card>
@@ -158,10 +203,9 @@ export function CompliancePage() {
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <Card>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-chip text-blue">IA</span>
             <div className="font-bold text-[14.5px]">Detecção de fraude</div>
           </div>
-          <div className="text-textSecondary text-[12.5px] mb-3.5">Varredura contínua em busca de valores incompatíveis, sacados recém-criados e reuso de NF-e</div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">Calculado em tempo real a partir das duplicatas emitidas: valores fora do padrão histórico do sacado e tentativas de reuso de NF-e</div>
           <div className="flex flex-col gap-2">
             {data.fraudFlags.map((fl, i) => (
               <div key={i} className="flex items-center gap-2 text-[12.5px]">
@@ -173,10 +217,12 @@ export function CompliancePage() {
         </Card>
         <Card>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-chip text-blue">IA</span>
+            <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-chip text-blue">Simulado</span>
             <div className="font-bold text-[14.5px]">Leitura de contratos</div>
           </div>
-          <div className="text-textSecondary text-[12.5px] mb-3.5">Análise automática de contratos de cessão em busca de cláusulas incompatíveis com a duplicata escritural</div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">
+            Análise automática de contratos de cessão em busca de cláusulas incompatíveis com a duplicata escritural — ainda uma demonstração; depende de um fluxo real de upload/leitura de contrato ainda não construído
+          </div>
           <div className="flex flex-col gap-2">
             {data.contractFlags.map((cf, i) => (
               <div key={i} className="flex items-center gap-2 text-[12.5px]">
@@ -187,6 +233,36 @@ export function CompliancePage() {
           </div>
         </Card>
       </div>
+
+      {provisioning && (
+        <Card className="mb-4">
+          <div className="font-bold text-[15px] mb-1">Provisionamento por estágio de risco (Res. CMN 4.966)</div>
+          <div className="text-textSecondary text-[12.5px] mb-4">Suas posições compradas e ainda ativas, classificadas por dias de atraso desde o vencimento</div>
+          <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            {([
+              ['estagio_1', 'Estágio 1 — em dia (até 30d)', '#0A5C36'],
+              ['estagio_2', 'Estágio 2 — atraso 31–90d', '#B8790A'],
+              ['estagio_3', 'Estágio 3 — atraso > 90d', '#B03A2E'],
+            ] as [string, string, string][]).map(([key, label, color]) => (
+              <div key={key} className="p-4 rounded-[10px] bg-bg">
+                <div className="text-textSecondary text-xs mb-1">{label}</div>
+                <div className="text-xl font-extrabold" style={{ color }}>
+                  {provisioning.summary[key] ?? 0}
+                </div>
+              </div>
+            ))}
+          </div>
+          {provisioning.rows.length > 0 && (
+            <button
+              type="button"
+              onClick={() => downloadFile('/compliance/provisionamento/export.csv', 'provisionamento.csv')}
+              className="text-blue text-[12.5px] font-bold bg-transparent border-none cursor-pointer p-0"
+            >
+              Exportar CSV para o modelo de provisionamento
+            </button>
+          )}
+        </Card>
+      )}
 
       <div className="bg-white border border-border rounded-card overflow-hidden">
         <div className="px-5 py-4.5 font-bold text-[15px] border-b border-border">Trilha de auditoria</div>

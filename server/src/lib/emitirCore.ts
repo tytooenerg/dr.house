@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { countByCedenteThisMonth, createDuplicata } from '../db/duplicatas.js';
+import { countByCedenteThisMonth, createDuplicata, findDuplicataByNfeChave, sacadoValorStats } from '../db/duplicatas.js';
 import { ensureAceite } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { createComplianceAlert } from '../db/complianceAlerts.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from './billing.js';
 import { platformFee } from './settlement.js';
@@ -17,6 +18,7 @@ export const emitirFormSchema = z.object({
   vencimento: z.string().trim(),
   seguro: z.boolean().optional().default(false),
   nfAnexada: z.boolean().optional().default(false),
+  nfeChave: z.string().trim().optional().default(''),
   batchValores: z.array(z.string()).optional().default([]),
 });
 
@@ -69,13 +71,39 @@ export type EmitirOutcome =
   | { status: 200; body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string } }
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 402; body: { error: 'plan_required'; requiredPlan: 'pro'; message: string } }
+  | { status: 409; body: { error: 'nfe_duplicidade'; message: string } }
   | { status: 502; body: { error: 'cerc_unavailable'; message: string } };
+
+const NFE_CHAVE_RE = /^\d{44}$/;
 
 // Shared by the internal /api/emitir/submit route (used by the SPA) and the public
 // /api/v1/duplicatas partner endpoint — same business rules and side effects either way.
 export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<EmitirOutcome> {
   if (!form.sacado || !form.valor || !form.vencimento) {
     return { status: 400, body: { error: 'validation_error', message: 'Preencha empresa sacada, valor e vencimento antes de enviar.' } };
+  }
+  const nfeChave = form.nfeChave.replace(/\D/g, '');
+  if (nfeChave && !NFE_CHAVE_RE.test(nfeChave)) {
+    return { status: 400, body: { error: 'validation_error', message: 'Chave de acesso da NF-e inválida — deve ter 44 dígitos.' } };
+  }
+  // Prevents the same NF-e from backing two different duplicatas inside Lastro's own
+  // book — the most basic form of the "duplicidade" fraud the market flags as its
+  // biggest concern when buying duplicatas from an unfamiliar originator.
+  if (nfeChave) {
+    const existing = findDuplicataByNfeChave(nfeChave);
+    if (existing) {
+      createComplianceAlert({
+        type: 'nfe_duplicidade',
+        severity: 'critico',
+        message: `Tentativa de reemitir NF-e já vinculada à duplicata ${existing.id} (bloqueada)`,
+        userId: user.id,
+        duplicataId: existing.id,
+      });
+      return {
+        status: 409,
+        body: { error: 'nfe_duplicidade', message: `Esta NF-e já está vinculada à duplicata ${existing.id} — possível duplicidade.` },
+      };
+    }
   }
   const monthlyLimit = BASICO_MONTHLY_EMIT_LIMIT + user.referral_bonus_emissions;
   if (!planAtLeast(user.plan, 'pro') && countByCedenteThisMonth(user.id) >= monthlyLimit) {
@@ -90,6 +118,18 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
   }
   const valorNum = parseBRLNumber(form.valor);
   const batchTotal = form.batchValores.reduce((sum, v) => sum + parseBRLNumber(v), 0);
+  const totalValorForAlert = valorNum + batchTotal;
+  if (form.cnpj) {
+    const stats = sacadoValorStats(form.cnpj);
+    if (stats.n >= 3 && totalValorForAlert > stats.avg * 3) {
+      createComplianceAlert({
+        type: 'valor_anomalo',
+        severity: 'atencao',
+        message: `Duplicata de ${fmtBRL(totalValorForAlert)} para ${form.sacado} — 3x acima da média histórica (${fmtBRL(stats.avg)})`,
+        userId: user.id,
+      });
+    }
+  }
   // Smart-routed once, before the (simulated) network round-trip, so a failure and a
   // retry with the same form land on the same registradora — matches how a real
   // integration would work.
@@ -115,6 +155,7 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
     seguro: form.seguro,
     registro,
     registradora: registradora.key,
+    nfeChave: nfeChave || null,
   });
   ensureAceite(duplicata.id, '10 dias úteis restantes');
   recordAuditEvent(user.id, user.company_name, 'duplicata.registrada', { duplicataId: duplicata.id, registro, registradora: registradora.key });

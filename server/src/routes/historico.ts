@@ -14,6 +14,7 @@ function rows(req: import('express').Request) {
     investidoFmt: fmtBRL(p.valor),
     retornoFmt: '+' + fmtBRL(p.retorno),
     status: 'Concluída',
+    comRegresso: !!p.com_regresso,
   }));
 }
 
@@ -40,8 +41,10 @@ historicoRouter.get('/', (req, res) => {
 
 historicoRouter.get('/export.csv', (req, res) => {
   const all = rows(req);
-  const header = 'Data,Empresa,Investido,Retorno,Status';
-  const lines = all.map((r) => [r.data, csvEscape(r.empresa), csvEscape(r.investidoFmt), csvEscape(r.retornoFmt), r.status].join(','));
+  const header = 'Data,Empresa,Investido,Retorno,Status,ComRegresso';
+  const lines = all.map((r) =>
+    [r.data, csvEscape(r.empresa), csvEscape(r.investidoFmt), csvEscape(r.retornoFmt), r.status, r.comRegresso ? 'Sim' : 'Não'].join(',')
+  );
   const csv = [header, ...lines].join('\r\n');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="historico.csv"');

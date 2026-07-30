@@ -11,6 +11,7 @@ interface Historico {
   investidoFmt: string;
   retornoFmt: string;
   status: string;
+  comRegresso: boolean;
 }
 interface HistoricoData {
   totalInvestidoFmt: string;
@@ -22,7 +23,7 @@ interface HistoricoData {
   total: number;
 }
 
-const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr';
+const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
 
 export function HistoricoPage() {
   const [data, setData] = useState<HistoricoData | null>(null);
@@ -106,6 +107,7 @@ export function HistoricoPage() {
           <div>Investido</div>
           <div>Retorno</div>
           <div>Status</div>
+          <div>Coobrigação</div>
         </div>
         {historico.map((h, i) => (
           <div key={i} className="grid gap-3 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" style={{ gridTemplateColumns: COLS }}>
@@ -114,6 +116,13 @@ export function HistoricoPage() {
             <div className="font-mono-num">{h.investidoFmt}</div>
             <div className="font-mono-num text-green font-bold">{h.retornoFmt}</div>
             <span className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-greenBg text-green w-fit">{h.status}</span>
+            <span
+              className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md w-fit"
+              style={h.comRegresso ? { background: '#EEF3FF', color: '#1E5EFF' } : { background: '#F0F2F5', color: '#5B6472' }}
+              title="Res. BCB 540/2025 — aquisição com regresso: o cedente permanece coobrigado pela duplicata"
+            >
+              {h.comRegresso ? 'Com regresso' : 'Sem regresso'}
+            </span>
           </div>
         ))}
         {historico.length === 0 && <EmptyState title="Nenhuma operação ainda" hint="Suas operações concluídas vão aparecer aqui" />}

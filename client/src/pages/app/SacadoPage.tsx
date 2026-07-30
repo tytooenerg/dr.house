@@ -13,6 +13,8 @@ interface Aceite {
   isPending: boolean;
   isProcessing?: boolean;
   cedente?: string;
+  slaDiasRestantes: number | null;
+  slaVencido: boolean;
 }
 
 export function SacadoPage() {
@@ -56,6 +58,14 @@ export function SacadoPage() {
               <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: a.statusBg, color: a.statusColor }}>
                 {a.statusLabel}
               </span>
+              {a.isPending && a.slaDiasRestantes !== null && (
+                <span
+                  className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
+                  style={a.slaVencido ? { background: '#F7E9E7', color: '#B3261E' } : { background: '#FBF1E0', color: '#8A5A00' }}
+                >
+                  {a.slaVencido ? 'Prazo legal de aceite vencido' : `Vence em ${a.slaDiasRestantes} dia${a.slaDiasRestantes === 1 ? '' : 's'} (prazo legal)`}
+                </span>
+              )}
               {a.isProcessing && <div className="text-[12.5px] font-bold text-textSecondary">Processando…</div>}
               {!a.isProcessing && a.isPending && (
                 <div className="flex gap-2">

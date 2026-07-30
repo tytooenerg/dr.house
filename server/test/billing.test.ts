@@ -60,14 +60,20 @@ describe('POST /api/billing/checkout (simulated mode)', () => {
 });
 
 describe('plan gating', () => {
-  it('blocks Comparador de Taxas on the básico plan and unblocks it after upgrading to Pro', async () => {
+  it('lets the básico plan reach Comparador de Taxas — price transparency should not be paywalled', async () => {
     const { token } = await registerCedente();
-    const blocked = await request(app).post('/api/comparador/estimate').set('Authorization', `Bearer ${token}`).send({});
+    const res = await request(app).post('/api/comparador/estimate').set('Authorization', `Bearer ${token}`).send({});
+    expect(res.status).toBe(200);
+  });
+
+  it('still blocks Automação de Lances on the básico plan and unblocks it after upgrading to Pro', async () => {
+    const { token } = await registerCedente();
+    const blocked = await request(app).get('/api/automacao').set('Authorization', `Bearer ${token}`);
     expect(blocked.status).toBe(402);
     expect(blocked.body.error).toBe('plan_required');
 
     await request(app).post('/api/billing/checkout').set('Authorization', `Bearer ${token}`).send({ plan: 'pro' });
-    const allowed = await request(app).post('/api/comparador/estimate').set('Authorization', `Bearer ${token}`).send({});
+    const allowed = await request(app).get('/api/automacao').set('Authorization', `Bearer ${token}`);
     expect(allowed.status).toBe(200);
   });
 
