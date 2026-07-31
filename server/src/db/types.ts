@@ -6,13 +6,18 @@ export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' 
 export interface UserSettings {
   onboardingSeen: boolean;
   notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean };
+  // WhatsApp/SMS is opt-in and separate from email prefs — a real deployment pays per
+  // message (Twilio), so it shouldn't default to on the way free email notifications do.
+  notifyViaWhatsapp: boolean;
   autoBidEnabled: boolean;
   autoBidRules: { scoreMin: string; taxaMax: string; exposicaoSacado: string; exposicaoMensal: string };
   diversification: { AA: number; A: number; B: number; C: number };
   sectorDiversification: { varejo: number; industria: number; construcao: number; servicos: number };
   erpConnections: { sap: boolean; totvs: boolean; omie: boolean; whitelabel: boolean };
+  omieCredentials: { appKey: string; appSecret: string } | null;
   settlementSpeed: 'd0' | 'd1';
   kycBankConnected: boolean;
+  pixChave: string | null;
   kycDocsUploaded: boolean;
   kycDocsRejected: boolean;
   kycDocsAttempts: number;
@@ -25,13 +30,16 @@ export function defaultSettings(): UserSettings {
   return {
     onboardingSeen: false,
     notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false },
+    notifyViaWhatsapp: false,
     autoBidEnabled: false,
     autoBidRules: { scoreMin: 'A', taxaMax: '2.5', exposicaoSacado: '150.000', exposicaoMensal: '2.000.000' },
     diversification: { AA: 20, A: 35, B: 30, C: 15 },
     sectorDiversification: { varejo: 30, industria: 25, construcao: 20, servicos: 25 },
     erpConnections: { sap: false, totvs: false, omie: false, whitelabel: false },
+    omieCredentials: null,
     settlementSpeed: 'd1',
     kycBankConnected: false,
+    pixChave: null,
     kycDocsUploaded: false,
     kycDocsRejected: false,
     kycDocsAttempts: 0,
@@ -167,6 +175,7 @@ export interface AceiteRow {
   status: 'aguardando' | 'aceita' | 'contestada';
   prazo_label: string;
   prazo_limite: string | null;
+  reminder_sent: number;
   created_at: string;
 }
 

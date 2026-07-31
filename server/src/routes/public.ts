@@ -4,12 +4,33 @@ import rateLimit from 'express-rate-limit';
 import { buildPublicStats } from '../lib/publicStatsCore.js';
 import { computeUptimePct, listRecentHealthChecks } from '../db/systemHealth.js';
 import { computeEmitirPreview } from '../lib/emitirCore.js';
-import { fmtRelative } from '../lib/format.js';
+import { fmtRelative, fmtBRL } from '../lib/format.js';
+import { parseWebhookPixRecebido } from '../lib/paymentRail.js';
+import { getPixCharge, concludePixCharge } from '../db/pix.js';
+import { addLedgerEntry } from '../db/misc.js';
+import { logger } from '../lib/logger.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
 // the embeddable rate simulator widget — all meant to be called from outside the app
 // (a partner's own site, an anonymous visitor) so none of them require login.
 export const publicRouter = Router();
+
+// Real PSP webhook target for "pix recebido" notifications (BACEN standard shape,
+// see lib/paymentRail.ts). Anti-spoofing for a real deployment is mTLS on the registered
+// webhook URL, not a header signature — configure that at the PSP/infra level once a real
+// PIX_PSP_* contract exists. Always 200s so a legitimately-signed retry isn't triggered by
+// an unrelated/already-processed txid.
+publicRouter.post('/pix-webhook', (req, res) => {
+  const recebidos = parseWebhookPixRecebido(req.body);
+  for (const r of recebidos) {
+    const charge = getPixCharge(r.txid);
+    if (!charge || charge.status !== 'ativa') continue;
+    concludePixCharge(charge.txid, r.endToEndId);
+    addLedgerEntry(charge.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via Pix confirmado — ${fmtBRL(charge.valor)}`, charge.valor);
+    logger.info({ txid: charge.txid, userId: charge.user_id }, '[pix] depósito confirmado via webhook');
+  }
+  res.status(200).json({ received: recebidos.length });
+});
 
 publicRouter.get('/stats', (_req, res) => {
   res.json(buildPublicStats());

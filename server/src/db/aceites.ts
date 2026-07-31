@@ -56,3 +56,30 @@ export function listAceitesBySacadoNome(sacadoNome: string): (AceiteRow & { valo
 export function setAceiteStatus(id: number, status: 'aceita' | 'aguardando' | 'contestada') {
   db.prepare('UPDATE aceites SET status = ? WHERE id = ?').run(status, id);
 }
+
+export interface AceiteAguardandoComContato extends AceiteRow {
+  sacado_nome: string;
+  valor: number;
+  sacado_user_id: number | null;
+  sacado_telefone: string | null;
+}
+
+// Feeds lib/aceiteReminder.ts's background job — every still-open aceite that hasn't been
+// reminded yet, with the sacado's own account (if they've registered) so the reminder can
+// actually be sent to a phone number. Deadline filtering (which of these are close enough
+// to warrant a reminder) is computed in JS via aceiteSlaStatus, same as everywhere else.
+export function listAguardandoSemLembrete(): AceiteAguardandoComContato[] {
+  return db
+    .prepare(
+      `SELECT a.*, d.sacado_nome as sacado_nome, d.valor as valor, u.id as sacado_user_id, u.telefone as sacado_telefone
+       FROM aceites a
+       JOIN duplicatas d ON d.id = a.duplicata_id
+       LEFT JOIN users u ON u.role = 'sacado' AND lower(u.company_name) = lower(d.sacado_nome)
+       WHERE a.status = 'aguardando' AND a.reminder_sent = 0 AND a.prazo_limite IS NOT NULL`
+    )
+    .all() as AceiteAguardandoComContato[];
+}
+
+export function markReminderSent(id: number) {
+  db.prepare('UPDATE aceites SET reminder_sent = 1 WHERE id = ?').run(id);
+}

@@ -6,8 +6,9 @@ import { createComplianceAlert } from '../db/complianceAlerts.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from './billing.js';
 import { platformFee } from './settlement.js';
-import { chooseRegistradora } from './registradoras.js';
+import { chooseRegistradora, registrarNaRegistradora } from './registradoras.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
+import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
 
@@ -135,13 +136,27 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
   // integration would work.
   const registradora = chooseRegistradora(valorNum + batchTotal);
 
-  await new Promise((r) => setTimeout(r, 1100));
-  if (Math.random() < 0.12) {
+  const preview = computeEmitirPreview(form);
+  let registro: string;
+  try {
+    // Real HTTP round-trip when REGISTRADORA_<X>_API_URL/KEY is configured for the chosen
+    // registradora; otherwise the same simulated delay + registro-number generation this
+    // always did (see lib/registradoras.ts).
+    const result = await registrarNaRegistradora({
+      registradoraKey: registradora.key,
+      duplicataId: `dup_pending_${Date.now()}`,
+      valor: valorNum + batchTotal,
+      sacadoCnpj: form.cnpj,
+      vencimento: form.vencimento,
+    });
+    registro = result.registro;
+    if (!result.simulado) {
+      logger.info({ registradora: registradora.key, registro }, '[emitir] registro real confirmado pela registradora');
+    }
+  } catch (err) {
+    logger.warn({ err, registradora: registradora.key }, '[emitir] falha ao registrar na registradora');
     return { status: 502, body: { error: 'cerc_unavailable', message: `Falha ao registrar na ${registradora.name} — conexão instável. Tente novamente.` } };
   }
-
-  const preview = computeEmitirPreview(form);
-  const registro = 'ESC-2026-' + Math.floor(Math.random() * 900000 + 100000);
   const duplicata = createDuplicata({
     cedenteId: user.id,
     cedenteNome: user.company_name,

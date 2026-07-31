@@ -13,6 +13,9 @@ import { verifyPassword } from '../auth/password.js';
 import { fmtBRL } from '../lib/format.js';
 import { getRevenueStreams } from '../lib/revenue.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { pixEnabled, criarCobranca, enviarPix } from '../lib/paymentRail.js';
+import { createPixCharge, getPixCharge, concludePixCharge, listPixChargesByUser, recordPixPayout } from '../db/pix.js';
+import { randomUUID } from 'node:crypto';
 
 export const accountRouter = Router();
 accountRouter.use(requireAuth);
@@ -26,6 +29,10 @@ function extratoView(userId: number) {
     saldo -= r.valor;
   }
   return withRunningBalance;
+}
+
+function saldoDisponivel(userId: number): number {
+  return listLedger(userId).reduce((sum, r) => sum + r.valor, 0);
 }
 
 function payload(req: import('express').Request) {
@@ -42,14 +49,22 @@ function payload(req: import('express').Request) {
       },
       { label: 'Verificação antifraude (KYC)', status: 'Em análise', bg: '#FBF1E0', color: '#B8790A', action: null },
       {
-        label: 'Conta bancária para liquidação',
-        status: settings.kycBankConnected ? 'Concluído' : 'Pendente',
-        bg: settings.kycBankConnected ? '#EAF3EE' : '#F0F2F5',
-        color: settings.kycBankConnected ? '#0A5C36' : '#5B6472',
-        action: settings.kycBankConnected ? null : { label: 'Conectar conta', key: 'bank' },
+        label: 'Chave Pix para liquidação',
+        status: settings.pixChave ? 'Concluído' : 'Pendente',
+        bg: settings.pixChave ? '#EAF3EE' : '#F0F2F5',
+        color: settings.pixChave ? '#0A5C36' : '#5B6472',
+        action: settings.pixChave ? null : { label: 'Cadastrar chave Pix', key: 'bank' },
       },
     ],
-    bankAccountDisplay: settings.kycBankConnected ? 'Banco Itaú Unibanco · Ag 1234 · CC 00045-6 ✓' : 'Nenhuma conta conectada — conclua o KYC acima',
+    pixEnabled,
+    pixChave: settings.pixChave,
+    bankAccountDisplay: settings.pixChave
+      ? `Chave Pix cadastrada: ${settings.pixChave} ${pixEnabled ? '· PSP real conectado' : '· modo simulado (configure PIX_PSP_* para operar com dinheiro real)'}`
+      : 'Nenhuma chave Pix cadastrada — cadastre uma acima para depositar e sacar',
+    saldoDisponivelFmt: fmtBRL(saldoDisponivel(req.user!.id)),
+    pixCharges: listPixChargesByUser(req.user!.id)
+      .slice(0, 10)
+      .map((c) => ({ txid: c.txid, valorFmt: fmtBRL(c.valor), status: c.status, simulado: !!c.simulado, brcode: c.brcode })),
     settlementSpeed: settings.settlementSpeed,
     extrato: extratoView(req.user!.id),
   };
@@ -57,11 +72,105 @@ function payload(req: import('express').Request) {
 
 accountRouter.get('/', (req, res) => res.json(payload(req)));
 
+const pixKeySchema = z.object({ chave: z.string().trim().min(3).max(140) });
+
 accountRouter.post('/kyc/bank', (req, res) => {
-  updateSettings(req.user!.id, { kycBankConnected: true });
-  addLedgerEntry(req.user!.id, new Date().toLocaleDateString('pt-BR'), 'Conta bancária conectada para liquidação', 0);
+  const parsed = pixKeySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  updateSettings(req.user!.id, { pixChave: parsed.data.chave, kycBankConnected: true });
+  addLedgerEntry(req.user!.id, new Date().toLocaleDateString('pt-BR'), 'Chave Pix cadastrada para liquidação', 0);
   res.json(payload(req));
 });
+
+const depositSchema = z.object({ valor: z.number().positive().max(10_000_000) });
+
+// Creates a real Pix cobrança (or a clearly-labeled simulated one — see lib/paymentRail.ts)
+// for the investor/cedente to fund their platform balance. Crediting the ledger happens
+// only when the PSP confirms payment via the webhook below (or, in simulated mode, via
+// the confirm-simulado endpoint) — never optimistically at creation time.
+accountRouter.post(
+  '/deposit',
+  asyncHandler(async (req, res) => {
+    const parsed = depositSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const txid = randomUUID().replace(/-/g, '').slice(0, 32);
+    let cnpj: string | undefined;
+    try {
+      cnpj = JSON.parse(req.user!.kyb_form || '{}').cnpj;
+    } catch {
+      cnpj = undefined;
+    }
+    const cobranca = await criarCobranca({
+      txid,
+      valor: parsed.data.valor,
+      devedorNome: req.user!.company_name,
+      devedorCnpj: cnpj,
+      descricao: `Depósito Lastro — ${req.user!.company_name}`,
+    });
+    createPixCharge({ txid: cobranca.txid, userId: req.user!.id, valor: parsed.data.valor, simulado: cobranca.simulado, brcode: cobranca.brcode });
+    res.json({ txid: cobranca.txid, simulado: cobranca.simulado, brcode: cobranca.brcode, ...payload(req) });
+  })
+);
+
+// Demo/dev-only: simulates the PSP webhook confirming payment, since there's no real PSP
+// to actually pay the cobrança against when PIX_PSP_* isn't configured. Refuses to run
+// once a real PSP is configured — real deposits are only ever confirmed by the webhook.
+accountRouter.post('/deposit/:txid/confirm-simulado', (req, res) => {
+  if (pixEnabled) {
+    res.status(409).json({ error: 'pix_real_configured', message: 'PSP real configurado — confirme pagando o QR code; não há confirmação simulada.' });
+    return;
+  }
+  const charge = getPixCharge(req.params.txid);
+  if (!charge || charge.user_id !== req.user!.id) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  if (charge.status !== 'ativa') {
+    res.status(409).json({ error: 'already_settled' });
+    return;
+  }
+  concludePixCharge(charge.txid, null);
+  addLedgerEntry(req.user!.id, new Date().toLocaleDateString('pt-BR'), `Depósito via Pix confirmado (simulado) — ${fmtBRL(charge.valor)}`, charge.valor);
+  res.json(payload(req));
+});
+
+const withdrawSchema = z.object({ valor: z.number().positive().max(10_000_000) });
+
+accountRouter.post(
+  '/withdraw',
+  asyncHandler(async (req, res) => {
+    const parsed = withdrawSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const settings = getSettings(req.user!);
+    if (!settings.pixChave) {
+      res.status(409).json({ error: 'no_pix_key', message: 'Cadastre uma chave Pix antes de sacar.' });
+      return;
+    }
+    const disponivel = saldoDisponivel(req.user!.id);
+    if (parsed.data.valor > disponivel) {
+      res.status(409).json({ error: 'insufficient_balance', message: `Saldo disponível: ${fmtBRL(disponivel)}` });
+      return;
+    }
+    const payout = await enviarPix({ chaveDestino: settings.pixChave, valor: parsed.data.valor, descricao: `Saque Lastro — ${req.user!.company_name}` });
+    recordPixPayout({ userId: req.user!.id, valor: parsed.data.valor, chaveDestino: settings.pixChave, simulado: payout.simulado, endToEndId: payout.endToEndId });
+    addLedgerEntry(
+      req.user!.id,
+      new Date().toLocaleDateString('pt-BR'),
+      `Saque via Pix para ${settings.pixChave}${payout.simulado ? ' (simulado)' : ''}`,
+      -parsed.data.valor
+    );
+    res.json(payload(req));
+  })
+);
 
 accountRouter.post('/kyc/docs', (req, res) => {
   const settings = getSettings(req.user!);

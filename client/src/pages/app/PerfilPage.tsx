@@ -10,6 +10,8 @@ import { useSession } from '../../state/SessionContext';
 interface ProfileData {
   profileForm: { nome: string; email: string; telefone: string };
   notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean };
+  notifyViaWhatsapp: boolean;
+  whatsappEnabled: boolean;
   teamMembers: { nome: string; email: string; papel: string }[];
 }
 
@@ -56,6 +58,11 @@ export function PerfilPage() {
 
   const toggleNotif = async (key: string) => {
     const d = await api.post<ProfileData>('/profile/notif-pref', { key });
+    setData(d);
+  };
+
+  const toggleWhatsapp = async () => {
+    const d = await api.post<ProfileData>('/profile/notify-whatsapp-toggle');
     setData(d);
   };
 
@@ -139,6 +146,15 @@ export function PerfilPage() {
                 <Toggle on={data.notifPrefs[row.key]} onClick={() => toggleNotif(row.key)} />
               </div>
             ))}
+            <div className="flex items-center justify-between pt-2 border-t border-hairline">
+              <div>
+                <div className="font-semibold text-[13.5px]">Também via WhatsApp</div>
+                <div className="text-textTertiary text-xs mt-0.5">
+                  {data.whatsappEnabled ? 'Envia as mesmas notificações para o telefone cadastrado' : 'Modo simulado — nenhum TWILIO_* configurado no servidor'}
+                </div>
+              </div>
+              <Toggle on={data.notifyViaWhatsapp} onClick={toggleWhatsapp} />
+            </div>
           </div>
         </Card>
       </div>

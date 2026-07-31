@@ -1,6 +1,8 @@
 import { db } from './index.js';
 import { getSettings, getUserById } from './users.js';
 import { sendEmail } from '../lib/mailer.js';
+import { sendWhatsapp } from '../lib/smsNotifier.js';
+import { logger } from '../lib/logger.js';
 
 // --- notifications ---
 // `category` is optional — pass it only for real events the user can toggle in
@@ -10,8 +12,11 @@ export function addNotification(userId: number, text: string, color: string, cat
   if (!category) return;
   const user = getUserById(userId);
   if (!user) return;
-  const prefs = getSettings(user).notifPrefs;
-  if (prefs[category]) sendEmail(user.email, 'Lastro — nova atualização na sua conta', text);
+  const settings = getSettings(user);
+  if (settings.notifPrefs[category]) sendEmail(user.email, 'Lastro — nova atualização na sua conta', text);
+  if (settings.notifyViaWhatsapp && user.telefone) {
+    sendWhatsapp(user.telefone, `Lastro: ${text}`).catch((err) => logger.warn({ err, userId }, '[whatsapp] falha ao notificar'));
+  }
 }
 
 export function listNotifications(userId: number, limit = 20) {

@@ -335,17 +335,5 @@ export const API_LOG_SEED = [
   { status: '200', method: 'GET', path: '/v1/sacados/score', time: 'há 3 h' },
 ];
 
-export const AUTO_BID_OFFERS = [
-  { sacado: 'Grupo Atlas Varejo', score: 'AA', setor: 'Varejo' },
-  { sacado: 'Distribuidora Bom Preço', score: 'A', setor: 'Varejo' },
-  { sacado: 'Metalúrgica Serrana S.A.', score: 'B', setor: 'Indústria' },
-  { sacado: 'Construtora Vale Norte', score: 'C', setor: 'Construção' },
-  { sacado: 'Aços Regional', score: 'A', setor: 'Indústria' },
-  { sacado: 'Grupo Nortis Serviços', score: 'B', setor: 'Serviços' },
-];
-
-export const AUTO_BID_ACTIVITY_SEED = [
-  { text: 'Automação aplicada — lance de 1,9% enviado em Grupo Atlas Varejo (score AA), dentro do parâmetro', color: COLORS.GREEN, time: 'há 12 min' },
-  { text: 'Oferta de Construtora Vale Norte ignorada — score C abaixo do mínimo configurado (A)', color: '#5B6472', time: 'há 34 min' },
-  { text: 'Automação aplicada — lance de 2,3% enviado em Distribuidora Bom Preço (score A), dentro do parâmetro', color: COLORS.GREEN, time: 'há 1 h' },
-];
+// Automação de Lances now evaluates real open marketplace offers (server/src/routes/automation.ts)
+// instead of drawing from a static demo list — the array that used to live here is gone.

@@ -1,5 +1,7 @@
 import { db } from '../db/index.js';
 import { fmtBRL } from './format.js';
+import { checkDuplicidadeNaRegistradora, registradoraConfigured, type RegistradoraKey } from './registradoras.js';
+import { logger } from './logger.js';
 import type { DuplicataRow } from '../db/types.js';
 
 export interface DupGroup {
@@ -7,6 +9,9 @@ export interface DupGroup {
   vencimento: string;
   ocorrencias: { id: string; cedenteNome: string; registradora: string | null }[];
   duplicidadeSuspeita: boolean;
+  // null = no registradora configured for this group to check against; the UI must not
+  // read that as "confirmed clean" — only a real registry response can say that.
+  confirmadoNaRegistradora: boolean | null;
 }
 
 export interface DupCheckResult {
@@ -17,10 +22,13 @@ export interface DupCheckResult {
 
 // Real check against Lastro's own database — the same-amount-and-due-date pattern
 // registered by more than one distinct cedente is the classic double-financing fraud
-// this exists to catch. This does NOT reach CERC/B3/Núclea's own registries directly
-// (that requires the real registry API integration tracked as a known gap); it only
-// guarantees no duplicidade within Lastro's own book.
-export function checkDuplicidade(query: string): DupCheckResult {
+// this exists to catch. Additionally, for each match whose registradora has real API
+// credentials configured (REGISTRADORA_*_API_URL/KEY — see lib/registradoras.ts), it also
+// asks that registradora's own book directly instead of trusting Lastro's copy alone.
+// Without any registradora configured, this still only guarantees no duplicidade within
+// Lastro's own book — that limitation is now explicit per-match via confirmadoNaRegistradora
+// instead of a blanket code comment.
+export async function checkDuplicidade(query: string): Promise<DupCheckResult> {
   const trimmed = query.trim();
   if (!trimmed) return { queryType: 'vazio', duplicidadeEncontrada: false, matches: [] };
 
@@ -54,12 +62,27 @@ export function checkDuplicidade(query: string): DupCheckResult {
     groups.set(key, arr);
   }
 
-  const matches: DupGroup[] = [...groups.values()].map((group) => ({
-    valorFmt: fmtBRL(group[0].valor),
-    vencimento: group[0].vencimento,
-    ocorrencias: group.map((g) => ({ id: g.id, cedenteNome: g.cedente_nome, registradora: g.registradora })),
-    duplicidadeSuspeita: new Set(group.map((g) => g.cedente_id)).size > 1,
-  }));
+  const matches: DupGroup[] = await Promise.all(
+    [...groups.values()].map(async (group) => {
+      const registradoraKey = group[0].registradora as RegistradoraKey | null;
+      let confirmadoNaRegistradora: boolean | null = null;
+      if (registradoraKey && registradoraConfigured(registradoraKey)) {
+        try {
+          const result = await checkDuplicidadeNaRegistradora(registradoraKey, group[0].sacado_cnpj, group[0].valor, group[0].vencimento);
+          confirmadoNaRegistradora = result?.duplicidadeEncontrada ?? null;
+        } catch (err) {
+          logger.warn({ err, registradoraKey }, '[dupCheck] falha ao consultar duplicidade na registradora');
+        }
+      }
+      return {
+        valorFmt: fmtBRL(group[0].valor),
+        vencimento: group[0].vencimento,
+        ocorrencias: group.map((g) => ({ id: g.id, cedenteNome: g.cedente_nome, registradora: g.registradora })),
+        duplicidadeSuspeita: new Set(group.map((g) => g.cedente_id)).size > 1 || confirmadoNaRegistradora === true,
+        confirmadoNaRegistradora,
+      };
+    })
+  );
 
   return { queryType, duplicidadeEncontrada: matches.some((m) => m.duplicidadeSuspeita), matches };
 }

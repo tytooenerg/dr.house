@@ -18,15 +18,31 @@ interface ExtratoRow {
   isPositive: boolean;
   saldoFmt: string;
 }
+interface PixCharge {
+  txid: string;
+  valorFmt: string;
+  status: 'ativa' | 'concluida' | 'expirada';
+  simulado: boolean;
+  brcode: string | null;
+}
 interface AccountData {
   kycChecklist: KycItem[];
   bankAccountDisplay: string;
+  pixEnabled: boolean;
+  pixChave: string | null;
+  saldoDisponivelFmt: string;
+  pixCharges: PixCharge[];
   settlementSpeed: 'd0' | 'd1';
   extrato: ExtratoRow[];
 }
 
 export function ContaPage() {
   const [data, setData] = useState<AccountData | null>(null);
+  const [pixKeyInput, setPixKeyInput] = useState('');
+  const [depositValor, setDepositValor] = useState('');
+  const [withdrawValor, setWithdrawValor] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = () => api.get<AccountData>('/account').then(setData);
 
@@ -37,14 +53,66 @@ export function ContaPage() {
   if (!data) return <PageSkeleton />;
 
   const runAction = async (key: string) => {
-    if (key === 'bank') await api.post('/account/kyc/bank');
-    if (key === 'docs') await api.post('/account/kyc/docs');
-    load();
+    if (key === 'docs') {
+      await api.post('/account/kyc/docs');
+      load();
+    }
   };
 
   const setSpeed = async (speed: 'd0' | 'd1') => {
     const d = await api.post<AccountData>('/account/settlement-speed', { speed });
     setData(d);
+  };
+
+  const saveChave = async () => {
+    if (!pixKeyInput.trim()) return;
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>('/account/kyc/bank', { chave: pixKeyInput.trim() });
+      setData(d);
+      setPixKeyInput('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const gerarDeposito = async () => {
+    const valor = Number(depositValor.replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setBusy(true);
+    try {
+      const res = await api.post<AccountData & { txid: string; simulado: boolean; brcode: string | null }>('/account/deposit', { valor });
+      setData(res);
+      setDepositValor('');
+      setNotice(res.simulado ? 'Cobrança criada em modo simulado — confirme abaixo para creditar o saldo.' : 'Cobrança Pix criada — pague o código copia-e-cola gerado.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmarSimulado = async (txid: string) => {
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>(`/account/deposit/${txid}/confirm-simulado`);
+      setData(d);
+      setNotice(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sacar = async () => {
+    const valor = Number(withdrawValor.replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>('/account/withdraw', { valor });
+      setData(d);
+      setWithdrawValor('');
+      setNotice('Saque solicitado via Pix.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -74,8 +142,21 @@ export function ContaPage() {
         </Card>
 
         <Card>
-          <div className="font-bold text-[15px] mb-4">Conta bancária para liquidação</div>
+          <div className="font-bold text-[15px] mb-4">Conta Pix para liquidação</div>
           <div className="p-3.5 rounded-[10px] bg-[#F7F8FA] text-[13.5px] font-semibold mb-4">{data.bankAccountDisplay}</div>
+          {!data.pixChave && (
+            <div className="flex gap-2 mb-4">
+              <input
+                value={pixKeyInput}
+                onChange={(e) => setPixKeyInput(e.target.value)}
+                placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
+                className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+              />
+              <Button variant="primary" disabled={busy || !pixKeyInput.trim()} onClick={saveChave}>
+                Salvar
+              </Button>
+            </div>
+          )}
           <div className="font-bold text-[13px] mb-2.5">Velocidade de liquidação</div>
           <div className="flex gap-2">
             <Button variant={data.settlementSpeed === 'd0' ? 'primary' : 'secondary'} className="flex-1" onClick={() => setSpeed('d0')}>
@@ -85,6 +166,71 @@ export function ContaPage() {
               D+1 (custo menor)
             </Button>
           </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-bold text-[15px]">Depositar via Pix</div>
+            <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
+          </div>
+          {!data.pixEnabled && (
+            <div className="text-[12px] text-textSecondary mb-3">
+              Modo simulado — nenhum PSP real configurado (PIX_PSP_*). O depósito precisa ser confirmado manualmente abaixo.
+            </div>
+          )}
+          <div className="flex gap-2 mb-4">
+            <input
+              value={depositValor}
+              onChange={(e) => setDepositValor(e.target.value)}
+              placeholder="Valor (R$)"
+              inputMode="decimal"
+              className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+            />
+            <Button variant="primary" disabled={busy || !depositValor} onClick={gerarDeposito}>
+              Gerar cobrança
+            </Button>
+          </div>
+          {notice && <div className="text-[12.5px] font-semibold text-blue mb-3">{notice}</div>}
+          {data.pixCharges
+            .filter((c) => c.status === 'ativa')
+            .map((c) => (
+              <div key={c.txid} className="flex items-center justify-between gap-2 p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+                <div>
+                  <div className="font-semibold">{c.valorFmt}</div>
+                  {c.brcode ? <div className="break-all text-[10.5px] text-textSecondary">{c.brcode}</div> : <div className="text-textSecondary">Aguardando pagamento (simulado)</div>}
+                </div>
+                {c.simulado && (
+                  <button type="button" onClick={() => confirmarSimulado(c.txid)} className="px-2.5 py-1.5 rounded-md border-none bg-green text-white text-[11px] font-bold cursor-pointer whitespace-nowrap">
+                    Confirmar (simulado)
+                  </button>
+                )}
+              </div>
+            ))}
+        </Card>
+
+        <Card>
+          <div className="font-bold text-[15px] mb-4">Sacar via Pix</div>
+          {!data.pixChave ? (
+            <div className="text-[13px] text-textSecondary">Cadastre uma chave Pix ao lado para poder sacar.</div>
+          ) : (
+            <>
+              <div className="text-[12.5px] text-textSecondary mb-3">Enviado para {data.pixChave}{!data.pixEnabled && ' (simulado)'}</div>
+              <div className="flex gap-2">
+                <input
+                  value={withdrawValor}
+                  onChange={(e) => setWithdrawValor(e.target.value)}
+                  placeholder="Valor (R$)"
+                  inputMode="decimal"
+                  className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+                />
+                <Button variant="primary" disabled={busy || !withdrawValor} onClick={sacar}>
+                  Sacar
+                </Button>
+              </div>
+            </>
+          )}
         </Card>
       </div>
 

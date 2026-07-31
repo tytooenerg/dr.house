@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../auth/middleware.js';
 import { SACADOS } from '../data/seed.js';
 import { buildBlendedRiscoView, buildRiscoView, findSacadoByName } from '../lib/riscoCore.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const riscoRouter = Router();
 riscoRouter.use(requireAuth);
@@ -16,16 +17,20 @@ riscoRouter.get('/search', (req, res) => {
   res.json({ suggestions });
 });
 
-riscoRouter.get('/:name', (req, res) => {
-  const name = decodeURIComponent(req.params.name);
-  const found = findSacadoByName(name);
-  if (!found) {
-    res.status(404).json({ error: 'not_found' });
-    return;
-  }
-  // Blend in cross-platform network signals when this sacado's CNPJ has any — same
-  // scoring model the public partner API uses, so the internal risk screen benefits
-  // from the shared signal network too, not just external callers.
-  const blended = found.sacado.cnpj ? buildBlendedRiscoView(found.sacado.cnpj) : null;
-  res.json(blended ?? buildRiscoView(found.name, found.sacado));
-});
+riscoRouter.get(
+  '/:name',
+  asyncHandler(async (req, res) => {
+    const name = decodeURIComponent(req.params.name);
+    const found = findSacadoByName(name);
+    if (!found) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    // Blend in cross-platform network signals + a real bureau score (if configured) when
+    // this sacado's CNPJ has any — same scoring model the public partner API uses, so the
+    // internal risk screen benefits from the shared signal network too, not just external
+    // callers.
+    const blended = found.sacado.cnpj ? await buildBlendedRiscoView(found.sacado.cnpj) : null;
+    res.json(blended ?? buildRiscoView(found.name, found.sacado));
+  })
+);

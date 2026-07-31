@@ -10,6 +10,7 @@ interface DupGroup {
   vencimento: string;
   ocorrencias: { id: string; cedenteNome: string; registradora: string | null }[];
   duplicidadeSuspeita: boolean;
+  confirmadoNaRegistradora: boolean | null;
 }
 
 interface DupCheckResponse {
@@ -186,6 +187,13 @@ export function CompliancePage() {
                 <div className="font-bold text-[13.5px]" style={{ color: m.duplicidadeSuspeita ? '#B3261E' : undefined }}>
                   {m.duplicidadeSuspeita ? 'Possível duplicidade — ' : ''}
                   {m.valorFmt} · vencimento {m.vencimento} · {m.ocorrencias.length} registro{m.ocorrencias.length > 1 ? 's' : ''}
+                </div>
+                <div className="text-[11px] font-semibold mt-1 text-textSecondary">
+                  {m.confirmadoNaRegistradora === null
+                    ? 'Verificado apenas na base da Lastro — registradora não configurada para checagem direta'
+                    : m.confirmadoNaRegistradora
+                      ? 'Duplicidade confirmada diretamente na registradora'
+                      : 'Confirmado como não-duplicado diretamente na registradora'}
                 </div>
                 <div className="text-[12.5px] mt-1.5 flex flex-col gap-0.5" style={{ color: m.duplicidadeSuspeita ? '#8A3A32' : undefined }}>
                   {m.ocorrencias.map((o) => (

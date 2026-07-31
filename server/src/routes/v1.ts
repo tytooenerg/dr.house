@@ -128,14 +128,17 @@ v1Router.post(
 // Real-time credit score lookup by CNPJ — blends Lastro's own transaction history (if
 // any) with signals reported by partners (see POST below), so even a CNPJ that never
 // transacted directly on Lastro can get a real score from cross-platform reputation.
-v1Router.get('/sacados/:cnpj/score', (req, res) => {
-  const view = buildBlendedRiscoView(req.params.cnpj);
-  if (!view) {
-    res.status(404).json({ error: 'not_found', message: 'Nenhum histórico de score encontrado para este CNPJ.' });
-    return;
-  }
-  res.json(view);
-});
+v1Router.get(
+  '/sacados/:cnpj/score',
+  asyncHandler(async (req, res) => {
+    const view = await buildBlendedRiscoView(req.params.cnpj);
+    if (!view) {
+      res.status(404).json({ error: 'not_found', message: 'Nenhum histórico de score encontrado para este CNPJ.' });
+      return;
+    }
+    res.json(view);
+  })
+);
 
 const sinalSchema = z.object({
   tipo: z.enum(['pagamento_pontual', 'atraso', 'protesto', 'contestacao']),
@@ -149,14 +152,14 @@ const sinalSchema = z.object({
 v1Router.post(
   '/sacados/:cnpj/sinais',
   requireWriteScope,
-  (req, res) => {
+  asyncHandler(async (req, res) => {
     const parsed = sinalSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
     addSignal(req.params.cnpj, req.apiUser!.id, parsed.data.tipo, parsed.data.nota);
-    const view = buildBlendedRiscoView(req.params.cnpj);
+    const view = await buildBlendedRiscoView(req.params.cnpj);
     res.json(view);
-  }
+  })
 );

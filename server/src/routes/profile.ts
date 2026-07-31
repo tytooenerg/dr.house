@@ -4,6 +4,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { getSettings, updateProfile, updateSettings } from '../db/users.js';
 import { inviteTeamMember, listTeam } from '../db/misc.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { twilioEnabled } from '../lib/smsNotifier.js';
 
 export const profileRouter = Router();
 profileRouter.use(requireAuth);
@@ -13,6 +14,8 @@ function payloadForUser(user: import('../db/types.js').UserRow) {
   return {
     profileForm: { nome: user.nome, email: user.email, telefone: user.telefone },
     notifPrefs: settings.notifPrefs,
+    notifyViaWhatsapp: settings.notifyViaWhatsapp,
+    whatsappEnabled: twilioEnabled,
     teamMembers: listTeam(user.id),
   };
 }
@@ -52,6 +55,12 @@ profileRouter.post('/notif-pref', (req, res) => {
   }
   const settings = getSettings(req.user!);
   updateSettings(req.user!.id, { notifPrefs: { ...settings.notifPrefs, [parsed.data.key]: !settings.notifPrefs[parsed.data.key] } });
+  res.json(payload(req));
+});
+
+profileRouter.post('/notify-whatsapp-toggle', (req, res) => {
+  const settings = getSettings(req.user!);
+  updateSettings(req.user!.id, { notifyViaWhatsapp: !settings.notifyViaWhatsapp });
   res.json(payload(req));
 });
 

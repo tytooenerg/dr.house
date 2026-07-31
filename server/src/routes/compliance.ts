@@ -9,6 +9,7 @@ import { checkDuplicidade } from '../lib/dupCheck.js';
 import { computeFraudFlags } from '../lib/fraudDetection.js';
 import { computeProvisioning } from '../lib/provisioning.js';
 import { fmtBRL, parseBRLNumber, fmtRelative } from '../lib/format.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const complianceRouter = Router();
 complianceRouter.use(requireAuth);
@@ -55,13 +56,17 @@ complianceRouter.post('/fidc', (req, res) => {
   res.json(fidcPayload(parsed.data.value));
 });
 
-// Real check against Lastro's own book (see lib/dupCheck.ts) — does not reach the
-// actual CERC/B3/Núclea registries, which requires a real registry API integration.
-complianceRouter.post('/dup-check', (req, res) => {
-  const query = typeof req.body.query === 'string' ? req.body.query : '';
-  const result = checkDuplicidade(query);
-  res.json({ dupQuery: query, dupChecked: true, ...result });
-});
+// Real check against Lastro's own book, plus a real check against whichever registradora
+// each match was actually registered with when that registradora has API credentials
+// configured (see lib/dupCheck.ts and lib/registradoras.ts).
+complianceRouter.post(
+  '/dup-check',
+  asyncHandler(async (req, res) => {
+    const query = typeof req.body.query === 'string' ? req.body.query : '';
+    const result = await checkDuplicidade(query);
+    res.json({ dupQuery: query, dupChecked: true, ...result });
+  })
+);
 
 complianceRouter.get('/provisionamento', (req, res) => {
   const { rows, summary } = computeProvisioning(req.user!.id);

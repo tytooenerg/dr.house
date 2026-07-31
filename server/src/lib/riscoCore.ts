@@ -1,6 +1,8 @@
 import { COLORS, SACADOS, type Rating, type Sacado, type SacadoFactor } from '../data/seed.js';
 import { normalizeCnpj, ratingColors, scoreColorFor } from './format.js';
 import { summarizeSignals, type SignalSummary } from '../db/networkSignals.js';
+import { consultarBureau } from './creditBureau.js';
+import { logger } from './logger.js';
 
 const AI_SIGNALS: Record<number, { text: string; color: string }[]> = {
   1: [
@@ -62,6 +64,7 @@ export interface RiscoView {
   alerta: string | null;
   fonte: 'interno' | 'rede' | 'combinado';
   sinaisDeRede: SinaisDeRedeView | null;
+  bureau: { score: number; fonte: string } | null;
 }
 
 // Shared by the internal /api/risco/:name route (used by the SPA) and the public
@@ -99,6 +102,7 @@ export function buildRiscoView(name: string, s: Sacado): RiscoView {
     alerta: s.alerta,
     fonte: 'interno',
     sinaisDeRede: null,
+    bureau: null,
   };
 }
 
@@ -145,7 +149,44 @@ function networkView(summary: SignalSummary): SinaisDeRedeView | null {
 // CNPJ matches one) with cross-platform network signals reported by API partners. A CNPJ
 // with only network signals (never transacted on Lastro) still gets a real score; a CNPJ
 // with both gets the internal score nudged by the network's confidence-weighted evidence.
-export function buildBlendedRiscoView(cnpj: string): RiscoView | null {
+export async function buildBlendedRiscoView(cnpj: string): Promise<RiscoView | null> {
+  const view = buildBlendedRiscoViewSync(cnpj);
+  if (!view) return null;
+  return applyBureauBlend(view, cnpj);
+}
+
+// A real bureau score (Serasa/Boa Vista/Quod — see lib/creditBureau.ts) is combined the
+// same way network signals are: a fixed weight nudging whatever internal/network score
+// was already computed, never fully replacing it. No-op when BUREAU_API_URL/KEY isn't
+// configured, so this only changes behavior once you actually have a bureau contract.
+const BUREAU_WEIGHT = 0.3;
+
+async function applyBureauBlend(view: RiscoView, cnpj: string): Promise<RiscoView> {
+  let bureau: { score: number; fonte: string } | null = null;
+  try {
+    bureau = await consultarBureau(cnpj);
+  } catch (err) {
+    logger.warn({ err }, '[risco] falha ao consultar bureau de crédito externo');
+  }
+  if (!bureau) return view;
+
+  const blendedScore = Math.round(view.score * (1 - BUREAU_WEIGHT) + bureau.score * BUREAU_WEIGHT);
+  const rating = ratingFromScore(blendedScore);
+  return {
+    ...view,
+    score: blendedScore,
+    rating,
+    scoreColor: scoreColorFor(blendedScore),
+    ratingBg: ratingColors(rating).bg,
+    ratingColor: ratingColors(rating).color,
+    gaugeScore: blendedScore,
+    pd12m: PD12M_BY_RATING[rating],
+    factors: [...view.factors, { label: `Score externo (${bureau.fonte})`, value: `${bureau.score}`, barPct: `${bureau.score}%`, barColor: scoreColorFor(bureau.score) }],
+    bureau,
+  };
+}
+
+function buildBlendedRiscoViewSync(cnpj: string): RiscoView | null {
   const internal = findSacadoByCnpj(cnpj);
   const rede = networkView(summarizeSignals(cnpj));
 
@@ -190,6 +231,7 @@ export function buildBlendedRiscoView(cnpj: string): RiscoView | null {
       alerta,
       fonte: 'rede',
       sinaisDeRede: rede,
+      bureau: null,
     };
   }
 
@@ -218,5 +260,6 @@ export function buildBlendedRiscoView(cnpj: string): RiscoView | null {
     ],
     fonte: 'combinado',
     sinaisDeRede: rede,
+    bureau: null,
   };
 }

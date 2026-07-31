@@ -188,22 +188,26 @@ const kybSchema = z.object({
   pl: z.string().trim().optional().default(''),
 });
 
-authRouter.post('/kyb', requireAuth, (req, res) => {
-  const parsed = kybSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
-    return;
-  }
-  const userId = req.user!.id;
-  if (parsed.data.cnpj) updateKybForm(userId, 'cnpj', parsed.data.cnpj);
-  if (parsed.data.tipo) updateKybForm(userId, 'tipo', parsed.data.tipo);
-  if (parsed.data.pl) updateKybForm(userId, 'pl', parsed.data.pl);
-  submitKybForReview(userId);
-  recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj });
-  runPldScreening(userId, req.user!.company_name, parsed.data.cnpj);
-  const refreshed = getUserById(userId)!;
-  res.json({ user: publicUser(refreshed) });
-});
+authRouter.post(
+  '/kyb',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = kybSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const userId = req.user!.id;
+    if (parsed.data.cnpj) updateKybForm(userId, 'cnpj', parsed.data.cnpj);
+    if (parsed.data.tipo) updateKybForm(userId, 'tipo', parsed.data.tipo);
+    if (parsed.data.pl) updateKybForm(userId, 'pl', parsed.data.pl);
+    submitKybForReview(userId);
+    recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj });
+    await runPldScreening(userId, req.user!.company_name, parsed.data.cnpj);
+    const refreshed = getUserById(userId)!;
+    res.json({ user: publicUser(refreshed) });
+  })
+);
 
 authRouter.post('/onboarding/complete', requireAuth, (req, res) => {
   updateSettings(req.user!.id, { onboardingSeen: true });
