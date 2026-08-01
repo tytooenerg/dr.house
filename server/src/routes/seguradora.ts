@@ -1,12 +1,30 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { buildSeguradoraPayload, decideSinistro, sinistroDecisionSchema } from '../lib/seguradoraCore.js';
+import { triageSinistro } from '../lib/sinistroCopilot.js';
+import { getDuplicata } from '../db/duplicatas.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const seguradoraRouter = Router();
 seguradoraRouter.use(requireAuth, requireRole('seguradora'));
 
 seguradoraRouter.get('/', (req, res) => res.json(buildSeguradoraPayload(req.user!)));
+
+// Copilot: flags inconsistencies for the seguradora to review before approving/denying —
+// never decides automatically. Returns null (not a fabricated assessment) when
+// ANTHROPIC_API_KEY isn't set.
+seguradoraRouter.get(
+  '/sinistro/:duplicataId/ai-triagem',
+  asyncHandler(async (req, res) => {
+    const duplicata = getDuplicata(req.params.duplicataId);
+    if (!duplicata || duplicata.insurer_key !== req.user!.insurer_key) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const assessment = await triageSinistro(duplicata);
+    res.json({ assessment });
+  })
+);
 
 seguradoraRouter.post(
   '/sinistro/:duplicataId/decidir',

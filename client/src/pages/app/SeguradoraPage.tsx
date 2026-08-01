@@ -36,6 +36,8 @@ export function SeguradoraPage() {
   const [data, setData] = useState<SeguradoraData | null>(null);
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [aiById, setAiById] = useState<Record<string, { assessment: string; reasoning: string } | null>>({});
+  const [loadingAiId, setLoadingAiId] = useState<string | null>(null);
 
   const load = () => api.get<SeguradoraData>('/seguradora').then(setData);
 
@@ -52,6 +54,16 @@ export function SeguradoraPage() {
       setData(updated);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const generateAiTriagem = async (id: string) => {
+    setLoadingAiId(id);
+    try {
+      const res = await api.get<{ assessment: { assessment: string; reasoning: string } | null }>(`/seguradora/sinistro/${id}/ai-triagem`);
+      setAiById((prev) => ({ ...prev, [id]: res.assessment }));
+    } finally {
+      setLoadingAiId(null);
     }
   };
 
@@ -90,6 +102,20 @@ export function SeguradoraPage() {
               </div>
               <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Sinistro aberto</span>
             </div>
+            {aiById[s.id] === undefined ? (
+              <Button size="sm" variant="secondary" className="mb-3" disabled={loadingAiId === s.id} onClick={() => generateAiTriagem(s.id)}>
+                {loadingAiId === s.id ? 'Analisando…' : 'Gerar triagem da IA (sugestão, não decide sozinha)'}
+              </Button>
+            ) : aiById[s.id] ? (
+              <div className="rounded-[10px] px-4 py-3.5 mb-3 bg-chip text-[13px]">
+                <div className="font-bold text-blue mb-1">
+                  IA: {aiById[s.id]!.assessment === 'ok' ? 'sem inconsistências encontradas' : aiById[s.id]!.assessment === 'atencao' ? 'atenção' : 'crítico'}
+                </div>
+                <div className="text-textSecondary">{aiById[s.id]!.reasoning}</div>
+              </div>
+            ) : (
+              <div className="text-[12.5px] text-textSecondary mb-3">Triagem indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>
+            )}
             <div className="flex items-center gap-2.5 flex-wrap">
               <input
                 className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[13px]"

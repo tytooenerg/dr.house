@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth/middleware.js';
 import { SACADOS } from '../data/seed.js';
-import { buildBlendedRiscoView, buildRiscoView, findSacadoByName } from '../lib/riscoCore.js';
+import { buildBlendedRiscoView, buildRiscoView, findSacadoByName, applyAiNarrative } from '../lib/riscoCore.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const riscoRouter = Router();
@@ -31,6 +31,6 @@ riscoRouter.get(
     // internal risk screen benefits from the shared signal network too, not just external
     // callers.
     const blended = found.sacado.cnpj ? await buildBlendedRiscoView(found.sacado.cnpj) : null;
-    res.json(blended ?? buildRiscoView(found.name, found.sacado));
+    res.json(blended ?? (await applyAiNarrative(buildRiscoView(found.name, found.sacado))));
   })
 );

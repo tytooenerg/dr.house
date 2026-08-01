@@ -44,6 +44,8 @@ export function AdminPage() {
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [noteById, setNoteById] = useState<Record<number, string>>({});
+  const [aiSummaryById, setAiSummaryById] = useState<Record<number, { recommendation: string; reasoning: string } | null>>({});
+  const [loadingAiId, setLoadingAiId] = useState<number | null>(null);
 
   const loadKyb = () => api.get<{ pending: PendingKyb[] }>('/admin/kyb').then((d) => setPending(d.pending));
   const loadDisputes = () => api.get<{ disputes: AdminDispute[] }>('/admin/disputes').then((d) => setDisputes(d.disputes));
@@ -76,6 +78,16 @@ export function AdminPage() {
     await api.post(`/admin/disputes/${id}/resolve`, { decision, note });
     loadDisputes();
     loadAudit();
+  };
+
+  const generateAiSummary = async (id: number) => {
+    setLoadingAiId(id);
+    try {
+      const res = await api.get<{ summary: { recommendation: string; reasoning: string } | null }>(`/admin/disputes/${id}/ai-summary`);
+      setAiSummaryById((prev) => ({ ...prev, [id]: res.summary }));
+    } finally {
+      setLoadingAiId(null);
+    }
   };
 
   return (
@@ -189,6 +201,20 @@ export function AdminPage() {
                   </div>
                 ))}
               </div>
+              {aiSummaryById[d.id] === undefined ? (
+                <Button size="sm" variant="secondary" className="mb-3.5" disabled={loadingAiId === d.id} onClick={() => generateAiSummary(d.id)}>
+                  {loadingAiId === d.id ? 'Analisando…' : 'Gerar análise da IA (sugestão, não decide sozinha)'}
+                </Button>
+              ) : aiSummaryById[d.id] ? (
+                <div className="rounded-[10px] px-4 py-3.5 mb-3.5 bg-chip text-[13px]">
+                  <div className="font-bold text-blue mb-1">
+                    IA sugere: {aiSummaryById[d.id]!.recommendation === 'cedente' ? 'favor do cedente' : aiSummaryById[d.id]!.recommendation === 'sacado' ? 'favor do sacado' : 'inconclusivo — precisa de mais evidência'}
+                  </div>
+                  <div className="text-textSecondary">{aiSummaryById[d.id]!.reasoning}</div>
+                </div>
+              ) : (
+                <div className="text-[12.5px] text-textSecondary mb-3.5">Análise indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>
+              )}
               <div className="flex items-center gap-2.5 flex-wrap">
                 <input
                   className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[13px]"

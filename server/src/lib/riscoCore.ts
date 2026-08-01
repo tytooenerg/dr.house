@@ -2,6 +2,7 @@ import { COLORS, SACADOS, type Rating, type Sacado, type SacadoFactor } from '..
 import { normalizeCnpj, ratingColors, scoreColorFor } from './format.js';
 import { summarizeSignals, type SignalSummary } from '../db/networkSignals.js';
 import { consultarBureau } from './creditBureau.js';
+import { askClaude, claudeEnabled, extractJson } from './claude.js';
 import { logger } from './logger.js';
 
 const AI_SIGNALS: Record<number, { text: string; color: string }[]> = {
@@ -152,7 +153,8 @@ function networkView(summary: SignalSummary): SinaisDeRedeView | null {
 export async function buildBlendedRiscoView(cnpj: string): Promise<RiscoView | null> {
   const view = buildBlendedRiscoViewSync(cnpj);
   if (!view) return null;
-  return applyBureauBlend(view, cnpj);
+  const withBureau = await applyBureauBlend(view, cnpj);
+  return applyAiNarrative(withBureau);
 }
 
 // A real bureau score (Serasa/Boa Vista/Quod — see lib/creditBureau.ts) is combined the
@@ -185,6 +187,49 @@ async function applyBureauBlend(view: RiscoView, cnpj: string): Promise<RiscoVie
     bureau,
   };
 }
+
+const AI_SIGNAL_SYSTEM = `Você é um analista de crédito que resume o perfil de risco de uma empresa sacada (devedora de duplicatas) para um investidor decidir se compra a operação. Com base nos dados reais fornecidos (nunca invente fatos que não estão nos dados), escreva de 2 a 4 observações curtas e objetivas, em português, sobre tendência de pagamento, concentração/exposição e qualquer sinal de alerta real presente nos dados.
+Responda APENAS com um JSON válido no formato exato:
+{"signals": [{"text": "observação objetiva, 1 frase", "severity": "ok"|"atencao"|"critico"}]}
+Não mencione "notícias públicas" nem invente fontes externas que não foram fornecidas — baseie-se só nos dados dados a seguir.`;
+
+const SEVERITY_TO_COLOR: Record<'ok' | 'atencao' | 'critico', string> = { ok: COLORS.GREEN, atencao: COLORS.AMBER, critico: COLORS.RED };
+
+// Replaces the static AI_SIGNALS canned copy (same 3 fixed lines per stage, regardless of
+// which sacado) with a real Claude-generated read of this specific sacado's actual score,
+// rating, factors, network signals and bureau data (when present). Falls back to the
+// original canned text — not a fabricated narrative — when ANTHROPIC_API_KEY isn't set or
+// the call fails, so behavior without a key is unchanged from before this feature existed.
+async function applyAiNarrative(view: RiscoView): Promise<RiscoView> {
+  if (!claudeEnabled) return view;
+  try {
+    const context = [
+      `Sacado: ${view.name}`,
+      `Score: ${view.score} (rating ${view.rating})`,
+      `Tendência: ${view.trendDelta}`,
+      `Probabilidade de default 12m: ${view.pd12m}`,
+      `Fatores conhecidos: ${view.factors.map((f) => `${f.label} = ${f.value}`).join('; ')}`,
+      view.sinaisDeRede ? `Sinais de rede reportados por parceiros: ${JSON.stringify(view.sinaisDeRede)}` : null,
+      view.bureau ? `Score de bureau externo: ${view.bureau.score} (fonte: ${view.bureau.fonte})` : null,
+      view.alerta ? `Alerta ativo: ${view.alerta}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const text = await askClaude(AI_SIGNAL_SYSTEM, context, 400);
+    if (!text) return view;
+    const parsed = extractJson<{ signals: { text: string; severity: 'ok' | 'atencao' | 'critico' }[] }>(text);
+    if (!parsed || !Array.isArray(parsed.signals) || parsed.signals.length === 0) return view;
+    return { ...view, aiSignals: parsed.signals.slice(0, 4).map((s) => ({ text: s.text, color: SEVERITY_TO_COLOR[s.severity] || COLORS.AMBER })) };
+  } catch (err) {
+    logger.warn({ err }, '[risco] falha ao gerar narrativa de IA — mantendo texto padrão');
+    return view;
+  }
+}
+
+// Exported so risco.ts can apply the same real narrative to the internal-only fallback
+// path (buildRiscoView without any network/bureau blend), not just the blended view.
+export { applyAiNarrative };
 
 function buildBlendedRiscoViewSync(cnpj: string): RiscoView | null {
   const internal = findSacadoByCnpj(cnpj);

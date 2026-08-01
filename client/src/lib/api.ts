@@ -125,7 +125,14 @@ export async function downloadFile(path: string, filename: string): Promise<void
   URL.revokeObjectURL(url);
 }
 
-export async function uploadFile(kind: string, file: File): Promise<{ upload: { id: number; filename: string }; extracted: Record<string, string> | null }> {
+export async function uploadFile(
+  kind: string,
+  file: File
+): Promise<{
+  upload: { id: number; filename: string };
+  extracted: Record<string, string> | null;
+  analysis: { text: string; severity: 'ok' | 'atencao' | 'critico' }[] | null;
+}> {
   const token = getToken();
   const form = new FormData();
   form.append('kind', kind);

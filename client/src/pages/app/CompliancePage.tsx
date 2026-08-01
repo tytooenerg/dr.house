@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { api, downloadFile } from '../../lib/api';
+import { useEffect, useRef, useState } from 'react';
+import { api, downloadFile, uploadFile } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -37,6 +37,8 @@ interface ComplianceData {
   auditLog: { timestamp: string; ator: string; acao: string }[];
   fraudFlags: { text: string; color: string }[];
   contractFlags: { text: string; color: string }[];
+  contractFlagsReal: boolean;
+  contractAnalyzedFilename: string | null;
   interop: { name: string; lastCheck: string }[];
   fidcPL: string;
   fidcOriginacaoFmt: string;
@@ -49,6 +51,9 @@ export function CompliancePage() {
   const [dupResult, setDupResult] = useState<DupCheckResponse | null>(null);
   const [fidcPL, setFidcPL] = useState('5.000.000');
   const [provisioning, setProvisioning] = useState<{ rows: ProvisioningRow[]; summary: Record<string, number> } | null>(null);
+  const [analyzingContract, setAnalyzingContract] = useState(false);
+  const [contractError, setContractError] = useState<string | null>(null);
+  const contractFileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get<ComplianceData>('/compliance').then((d) => {
@@ -69,6 +74,33 @@ export function CompliancePage() {
     setFidcPL(value);
     const d = await api.post<{ fidcOriginacaoFmt: string; fidcSpreadLabel: string }>('/compliance/fidc', { value });
     setData((s) => (s ? { ...s, fidcOriginacaoFmt: d.fidcOriginacaoFmt, fidcSpreadLabel: d.fidcSpreadLabel } : s));
+  };
+
+  const uploadContract = async (file: File) => {
+    setAnalyzingContract(true);
+    setContractError(null);
+    try {
+      const res = await uploadFile('contrato_cessao', file);
+      if (!res.analysis) {
+        setContractError('Não foi possível analisar o contrato agora (ANTHROPIC_API_KEY não configurada ou análise indisponível).');
+        return;
+      }
+      const SEVERITY_COLOR: Record<string, string> = { ok: '#0A5C36', atencao: '#B8790A', critico: '#B03A2E' };
+      setData((s) =>
+        s
+          ? {
+              ...s,
+              contractFlags: res.analysis!.map((f) => ({ text: f.text, color: SEVERITY_COLOR[f.severity] || '#5B6472' })),
+              contractFlagsReal: true,
+              contractAnalyzedFilename: file.name,
+            }
+          : s
+      );
+    } catch {
+      setContractError('Falha ao enviar o contrato.');
+    } finally {
+      setAnalyzingContract(false);
+    }
   };
 
   return (
@@ -225,13 +257,15 @@ export function CompliancePage() {
         </Card>
         <Card>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-chip text-blue">Simulado</span>
+            {!data.contractFlagsReal && <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-chip text-blue">Simulado</span>}
             <div className="font-bold text-[14.5px]">Leitura de contratos</div>
           </div>
           <div className="text-textSecondary text-[12.5px] mb-3.5">
-            Análise automática de contratos de cessão em busca de cláusulas incompatíveis com a duplicata escritural — ainda uma demonstração; depende de um fluxo real de upload/leitura de contrato ainda não construído
+            {data.contractFlagsReal
+              ? `Análise real via IA do contrato enviado (${data.contractAnalyzedFilename}) — cláusulas incompatíveis com a duplicata escritural.`
+              : 'Envie um contrato de cessão para uma análise real via IA em busca de cláusulas incompatíveis com a duplicata escritural — os itens abaixo são apenas um exemplo até o primeiro envio.'}
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 mb-3.5">
             {data.contractFlags.map((cf, i) => (
               <div key={i} className="flex items-center gap-2 text-[12.5px]">
                 <span className="rounded-full flex-shrink-0" style={{ width: 6, height: 6, background: cf.color }} />
@@ -239,6 +273,21 @@ export function CompliancePage() {
               </div>
             ))}
           </div>
+          <input
+            ref={contractFileInput}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) uploadContract(file);
+              e.target.value = '';
+            }}
+          />
+          <Button variant="secondary" disabled={analyzingContract} onClick={() => contractFileInput.current?.click()}>
+            {analyzingContract ? 'Analisando…' : 'Enviar contrato de cessão (PDF)'}
+          </Button>
+          {contractError && <div className="text-[11.5px] text-red-600 mt-2">{contractError}</div>}
         </Card>
       </div>
 

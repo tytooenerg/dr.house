@@ -10,6 +10,24 @@ import { computeFraudFlags } from '../lib/fraudDetection.js';
 import { computeProvisioning } from '../lib/provisioning.js';
 import { fmtBRL, parseBRLNumber, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { getLatestContractAnalysis } from '../db/contractAnalyses.js';
+import { COLORS } from '../data/seed.js';
+
+const SEVERITY_COLOR: Record<'ok' | 'atencao' | 'critico', string> = { ok: COLORS.GREEN, atencao: COLORS.AMBER, critico: COLORS.RED };
+
+// Real analysis (lib/contractAnalysis.ts, triggered from POST /api/uploads with
+// kind=contrato_cessao) when the cedente has uploaded a contract; the static demo copy
+// otherwise, clearly marked as such by contractFlagsReal so the UI can show/hide the
+// "Simulado" badge accordingly.
+function contractFlagsPayload(userId: number) {
+  const latest = getLatestContractAnalysis(userId);
+  if (!latest) return { contractFlags: CONTRACT_FLAGS, contractFlagsReal: false, contractAnalyzedFilename: null };
+  return {
+    contractFlags: latest.flags.map((f) => ({ text: f.text, color: SEVERITY_COLOR[f.severity] })),
+    contractFlagsReal: true,
+    contractAnalyzedFilename: latest.filename,
+  };
+}
 
 export const complianceRouter = Router();
 complianceRouter.use(requireAuth);
@@ -38,7 +56,7 @@ complianceRouter.get('/', (req, res) => {
     cronograma: CRONOGRAMA,
     auditLog: AUDIT_LOG,
     fraudFlags: computeFraudFlags(),
-    contractFlags: CONTRACT_FLAGS,
+    ...contractFlagsPayload(req.user!.id),
     interop: interopStatus(),
     ...fidcPayload(settings.fidcPL),
   });

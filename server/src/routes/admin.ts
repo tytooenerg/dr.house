@@ -10,6 +10,7 @@ import { recordAuditEvent, listAuditLog, verifyAuditChain } from '../db/audit.js
 import { COLORS } from '../data/seed.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { summarizeDispute } from '../lib/disputeCopilot.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -67,6 +68,29 @@ adminRouter.get('/disputes', (_req, res) => {
   }));
   res.json({ disputes });
 });
+
+// Copilot: summarizes the dispute + suggests a verdict for the admin to review before
+// deciding — never applied automatically. Returns null (not a fabricated recommendation)
+// when ANTHROPIC_API_KEY isn't set.
+adminRouter.get(
+  '/disputes/:id/ai-summary',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    const dispute = getDispute(id);
+    if (!dispute) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const all = listAllOpenDisputes().find((d) => d.id === id);
+    if (!all) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const timeline = listEvents(id).map((e) => ({ autor: e.autor, texto: e.texto, quando: fmtRelative(e.created_at) }));
+    const summary = await summarizeDispute({ motivo: all.motivo, sacado: all.sacado_nome, cedente: all.cedente_nome, valorFmt: fmtBRL(all.valor), timeline });
+    res.json({ summary });
+  })
+);
 
 const arbitrateSchema = z.object({ decision: z.enum(['cedente', 'sacado']), note: z.string().trim().min(1) });
 

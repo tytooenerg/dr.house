@@ -1,5 +1,6 @@
 import { db } from './index.js';
 import { screenAgainstLiveFeed, screenAgainstPaidProvider } from '../lib/sanctionsFeed.js';
+import { isPlausiblySameEntity } from '../lib/pldSecondOpinion.js';
 
 export interface SanctionsMatch {
   nome: string;
@@ -24,14 +25,27 @@ export async function screenEntity(nome: string, cnpj: string): Promise<Sanction
   const trimmedNome = nome.trim();
   if (!trimmedNome) return null;
 
+  // A paid PLD provider is an authoritative external decision, not a naive match we
+  // computed ourselves — it isn't second-guessed here the way the substring matches below
+  // are.
   const providerHit = await screenAgainstPaidProvider(trimmedNome, cnpj);
   if (providerHit) return { nome: providerHit.nome, tipo: 'sancao', fonte: 'provedor_pld' };
 
+  // OFAC and the demo table are matched by plain substring (see lib/sanctionsFeed.ts) —
+  // good recall, weak precision — so a real hit goes through a Claude second opinion
+  // before actually flagging the account (see lib/pldSecondOpinion.ts). Unconfigured or on
+  // failure, isPlausiblySameEntity defaults to true, so behavior is unchanged from before
+  // this feature existed.
   const liveHit = await screenAgainstLiveFeed(trimmedNome);
-  if (liveHit) return { nome: liveHit.nome, tipo: 'sancao', fonte: 'ofac' };
+  if (liveHit && (await isPlausiblySameEntity(trimmedNome, liveHit.nome, 'OFAC SDN'))) {
+    return { nome: liveHit.nome, tipo: 'sancao', fonte: 'ofac' };
+  }
 
   const rows = db.prepare('SELECT nome, tipo FROM sanctions_watchlist_demo').all() as { nome: string; tipo: 'sancao' | 'pep' }[];
   const needle = trimmedNome.toLowerCase();
   const demoHit = rows.find((r) => r.nome.toLowerCase().includes(needle) || needle.includes(r.nome.toLowerCase().split(' (')[0]));
-  return demoHit ? { ...demoHit, fonte: 'demonstracao' } : null;
+  if (demoHit && (await isPlausiblySameEntity(trimmedNome, demoHit.nome, 'watchlist de demonstração'))) {
+    return { ...demoHit, fonte: 'demonstracao' };
+  }
+  return null;
 }
