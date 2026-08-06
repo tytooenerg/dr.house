@@ -34,7 +34,19 @@ interface AuditEntry {
   quando: string;
 }
 
-type Tab = 'kyb' | 'disputas' | 'auditoria';
+interface ComplianceQueueItem {
+  duplicataId: string;
+  sacado: string;
+  cedente: string;
+  valorFmt: string;
+  vencimento: string;
+  score: number;
+  breakdown: { fator: string; pontos: number; detalhe: string }[];
+  reasoning: string;
+  quando: string;
+}
+
+type Tab = 'kyb' | 'disputas' | 'compliance' | 'auditoria';
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>('kyb');
@@ -46,16 +58,28 @@ export function AdminPage() {
   const [noteById, setNoteById] = useState<Record<number, string>>({});
   const [aiSummaryById, setAiSummaryById] = useState<Record<number, { recommendation: string; reasoning: string } | null>>({});
   const [loadingAiId, setLoadingAiId] = useState<number | null>(null);
+  const [complianceQueue, setComplianceQueue] = useState<ComplianceQueueItem[]>([]);
+  const [complianceNoteById, setComplianceNoteById] = useState<Record<string, string>>({});
 
   const loadKyb = () => api.get<{ pending: PendingKyb[] }>('/admin/kyb').then((d) => setPending(d.pending));
   const loadDisputes = () => api.get<{ disputes: AdminDispute[] }>('/admin/disputes').then((d) => setDisputes(d.disputes));
   const loadAudit = () => api.get<{ entries: AuditEntry[]; chain: { valid: boolean; brokenAt: number | null } }>('/admin/audit').then(setAudit);
+  const loadCompliance = () => api.get<{ pending: ComplianceQueueItem[] }>('/admin/compliance-queue').then((d) => setComplianceQueue(d.pending));
 
   useEffect(() => {
     loadKyb();
     loadDisputes();
     loadAudit();
+    loadCompliance();
   }, []);
+
+  const decideCompliance = async (duplicataId: string, decision: 'liberado' | 'rejeitado') => {
+    const note = complianceNoteById[duplicataId]?.trim();
+    if (!note) return;
+    await api.post(`/admin/compliance-queue/${duplicataId}/decidir`, { decision, note });
+    loadCompliance();
+    loadAudit();
+  };
 
   const approve = async (userId: number) => {
     await api.post(`/admin/kyb/${userId}/approve`);
@@ -98,6 +122,7 @@ export function AdminPage() {
         {([
           ['kyb', `Fila de KYB (${pending.length})`],
           ['disputas', `Disputas (${disputes.length})`],
+          ['compliance', `Compliance (${complianceQueue.length})`],
           ['auditoria', 'Auditoria'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -234,6 +259,62 @@ export function AdminPage() {
           {disputes.length === 0 && (
             <div className="bg-white border border-border rounded-card">
               <EmptyState title="Nenhuma disputa em aberto" hint="Disputas escaladas pelo cedente aparecem aqui para arbitragem" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'compliance' && (
+        <div className="flex flex-col gap-4">
+          <div className="text-textSecondary text-[12.5px]">
+            Duplicatas suspensas automaticamente pelo Compliance AI Engine (nota de risco ≥ 80/100) antes de chegar ao marketplace. Nenhuma é bloqueada
+            para sempre sem revisão — libere ou rejeite abaixo.
+          </div>
+          {complianceQueue.map((c) => (
+            <div key={c.duplicataId} className="bg-white rounded-card p-6" style={{ border: '1px solid #E9CFCB' }}>
+              <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
+                <div>
+                  <div className="font-mono-num font-bold text-[13px] text-textSecondary">{c.duplicataId}</div>
+                  <div className="font-bold text-[16px] mt-1">
+                    {c.cedente} → {c.sacado} — {c.valorFmt}
+                  </div>
+                  <div className="text-textSecondary text-[12.5px] mt-1">Vencimento {c.vencimento} · suspensa {c.quando}</div>
+                </div>
+                <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Nota de risco: {c.score}/100</span>
+              </div>
+              <div className="flex flex-col gap-1.5 mb-3">
+                {c.breakdown.map((b, i) => (
+                  <div key={i} className="text-[12.5px] text-textSecondary">
+                    <b className="text-textPrimary">
+                      {b.fator} (+{b.pontos})
+                    </b>{' '}
+                    — {b.detalhe}
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-[10px] px-4 py-3.5 mb-3.5 bg-chip text-[13px]">
+                <div className="font-bold text-blue mb-1">Explicação da IA</div>
+                <div className="text-textSecondary">{c.reasoning}</div>
+              </div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <input
+                  className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+                  placeholder="Nota da decisão de revisão"
+                  value={complianceNoteById[c.duplicataId] ?? ''}
+                  onChange={(e) => setComplianceNoteById((prev) => ({ ...prev, [c.duplicataId]: e.target.value }))}
+                />
+                <Button size="sm" variant="success" onClick={() => decideCompliance(c.duplicataId, 'liberado')}>
+                  Liberar para leilão
+                </Button>
+                <Button size="sm" variant="danger" onClick={() => decideCompliance(c.duplicataId, 'rejeitado')}>
+                  Rejeitar
+                </Button>
+              </div>
+            </div>
+          ))}
+          {complianceQueue.length === 0 && (
+            <div className="bg-white border border-border rounded-card">
+              <EmptyState title="Nenhuma duplicata em revisão de compliance" hint="Duplicatas com nota de risco alta aparecem aqui automaticamente" />
             </div>
           )}
         </div>

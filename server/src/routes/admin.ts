@@ -4,13 +4,14 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { approveKyb, listPendingKyb, rejectKyb } from '../db/users.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
-import { getDuplicata } from '../db/duplicatas.js';
+import { getDuplicata, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent, listAuditLog, verifyAuditChain } from '../db/audit.js';
 import { COLORS } from '../data/seed.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { summarizeDispute } from '../lib/disputeCopilot.js';
+import { listPendingComplianceReview, resolveComplianceReview, type ComplianceBreakdownItem } from '../db/complianceEngine.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -119,6 +120,57 @@ adminRouter.post(
       }
     }
     recordAuditEvent(req.user!.id, req.user!.company_name, 'dispute.resolved', { disputeId: id, decision: parsed.data.decision });
+    res.json({ ok: true });
+  })
+);
+
+// Compliance AI Engine queue — duplicatas the engine suspended (score >= threshold, see
+// lib/complianceEngine.ts) instead of letting reach the marketplace automatically. Always
+// a human decides here: liberar (back to 'aprovada', cedente can then disparar leilão
+// normally) or rejeitar (terminal, cedente is notified) — never an automatic block.
+adminRouter.get('/compliance-queue', (_req, res) => {
+  const pending = listPendingComplianceReview().map((r) => ({
+    duplicataId: r.duplicata_id,
+    sacado: r.sacado_nome,
+    cedente: r.cedente_nome,
+    valorFmt: fmtBRL(r.valor),
+    vencimento: r.vencimento,
+    score: r.score,
+    breakdown: JSON.parse(r.breakdown_json) as ComplianceBreakdownItem[],
+    reasoning: r.reasoning,
+    quando: fmtRelative(r.created_at),
+  }));
+  res.json({ pending });
+});
+
+const complianceReviewSchema = z.object({ decision: z.enum(['liberado', 'rejeitado']), note: z.string().trim().min(1) });
+
+adminRouter.post(
+  '/compliance-queue/:duplicataId/decidir',
+  asyncHandler(async (req, res) => {
+    const parsed = complianceReviewSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const duplicata = getDuplicata(req.params.duplicataId);
+    if (!duplicata || duplicata.status !== 'suspensa_compliance') {
+      res.status(404).json({ error: 'not_found', message: 'Duplicata não encontrada ou já revisada.' });
+      return;
+    }
+    resolveComplianceReview(duplicata.id, parsed.data.decision, parsed.data.note, req.user!.id);
+    setDuplicataStatus(duplicata.id, parsed.data.decision === 'liberado' ? 'aprovada' : 'rejeitada');
+    if (duplicata.cedente_id) {
+      const msg =
+        parsed.data.decision === 'liberado'
+          ? `Sua duplicata ${duplicata.id} passou pela revisão de compliance e está liberada para leilão.`
+          : `Sua duplicata ${duplicata.id} foi rejeitada na revisão de compliance: ${parsed.data.note}`;
+      addNotification(duplicata.cedente_id, msg, parsed.data.decision === 'liberado' ? COLORS.GREEN : COLORS.RED, 'disputa');
+    }
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'duplicata.compliance_revisada', {
+      duplicataId: duplicata.id,
+      decision: parsed.data.decision,
+    });
     res.json({ ok: true });
   })
 );

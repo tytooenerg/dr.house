@@ -103,6 +103,7 @@ export interface DuplicataRow {
   sinistro_note: string | null;
   registradora: string | null;
   nfe_chave: string | null;
+  compliance_score: number | null;
   created_at: string;
 }
 

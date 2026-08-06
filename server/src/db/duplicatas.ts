@@ -100,6 +100,10 @@ export function setStatus(id: string, status: string) {
   db.prepare('UPDATE duplicatas SET status = ? WHERE id = ?').run(status, id);
 }
 
+export function setComplianceScore(id: string, score: number) {
+  db.prepare('UPDATE duplicatas SET compliance_score = ? WHERE id = ?').run(score, id);
+}
+
 export function dispararLeilao(id: string, closeAtIso: string) {
   db.prepare("UPDATE duplicatas SET status = 'no_mercado', close_at = ?, leilao_started_at = ? WHERE id = ?").run(closeAtIso, new Date().toISOString(), id);
 }

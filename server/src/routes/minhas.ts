@@ -13,6 +13,8 @@ const STATUS_META: Record<string, { bg: string; color: string; label: string }> 
   paga: { bg: '#EAF3EE', color: COLORS.GREEN, label: 'Paga' },
   aprovada: { bg: '#EAF3EE', color: COLORS.GREEN, label: 'Aprovada' },
   vendida: { bg: '#E9EEFB', color: COLORS.BLUE, label: 'Vendida' },
+  suspensa_compliance: { bg: '#F7E9E7', color: COLORS.RED, label: 'Em revisão de compliance' },
+  rejeitada: { bg: '#F7E9E7', color: COLORS.RED, label: 'Rejeitada na revisão' },
 };
 
 function view(d: ReturnType<typeof getDuplicata>) {

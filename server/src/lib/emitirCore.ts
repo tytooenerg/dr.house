@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { countByCedenteThisMonth, createDuplicata, findDuplicataByNfeChave, sacadoValorStats } from '../db/duplicatas.js';
+import { countByCedenteThisMonth, createDuplicata, findDuplicataByNfeChave, sacadoValorStats, setStatus, setComplianceScore } from '../db/duplicatas.js';
+import { runComplianceEngine } from './complianceEngine.js';
+import { recordComplianceResult } from '../db/complianceEngine.js';
 import { ensureAceite } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { createComplianceAlert } from '../db/complianceAlerts.js';
@@ -69,7 +71,7 @@ export function computeEmitirPreview(form: EmitirForm) {
 }
 
 export type EmitirOutcome =
-  | { status: 200; body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string } }
+  | { status: 200; body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string; complianceSuspensa: boolean } }
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 402; body: { error: 'plan_required'; requiredPlan: 'pro'; message: string } }
   | { status: 409; body: { error: 'nfe_duplicidade'; message: string } }
@@ -183,5 +185,41 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
     registradora: registradora.key,
   });
 
-  return { status: 200, body: { ok: true, registro, duplicataId: duplicata.id, seguro: form.seguro, registradora: registradora.name } };
+  // Compliance AI Engine — real, deterministic 0-100 score combining duplicidade, PLD,
+  // valor anômalo and score do sacado (see lib/complianceEngine.ts). A score at/above the
+  // threshold suspends the duplicata for human review instead of letting it reach
+  // 'aprovada'/the marketplace — never an automatic permanent block.
+  let suspended = false;
+  try {
+    const outcome = await runComplianceEngine({
+      duplicataId: duplicata.id,
+      sacadoNome: form.sacado,
+      sacadoCnpj: form.cnpj,
+      valor: valorNum + batchTotal,
+      vencimento: form.vencimento,
+      cedenteId: user.id,
+      cedente: user,
+    });
+    setComplianceScore(duplicata.id, outcome.score);
+    recordComplianceResult({ duplicataId: duplicata.id, score: outcome.score, breakdown: outcome.breakdown, reasoning: outcome.reasoning, decision: outcome.decision });
+    if (outcome.decision === 'suspenso_para_revisao') {
+      setStatus(duplicata.id, 'suspensa_compliance');
+      suspended = true;
+      recordAuditEvent(user.id, user.company_name, 'duplicata.compliance_suspensa', { duplicataId: duplicata.id, score: outcome.score });
+    }
+  } catch (err) {
+    logger.warn({ err, duplicataId: duplicata.id }, '[compliance-engine] falha ao pontuar a duplicata — seguindo sem suspensão automática');
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      registro,
+      duplicataId: duplicata.id,
+      seguro: form.seguro,
+      registradora: registradora.name,
+      complianceSuspensa: suspended,
+    },
+  };
 }
