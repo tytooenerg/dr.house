@@ -32,6 +32,7 @@ export function resetDbForTests() {
     DELETE FROM sacado_network_signals;
     DELETE FROM resale_listings;
     DELETE FROM purchases;
+    DELETE FROM legal_documents;
     DELETE FROM duplicatas;
     DELETE FROM webhook_deliveries;
     DELETE FROM idempotency_keys;
@@ -40,6 +41,7 @@ export function resetDbForTests() {
     DELETE FROM api_keys;
     DELETE FROM system_health_checks;
     DELETE FROM claude_usage;
+    DELETE FROM regulatory_notes;
     DELETE FROM users;
   `);
 }

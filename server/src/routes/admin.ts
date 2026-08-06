@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { approveKyb, listPendingKyb, rejectKyb } from '../db/users.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
-import { getDuplicata, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
+import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent, listAuditLog, verifyAuditChain } from '../db/audit.js';
 import { COLORS } from '../data/seed.js';
@@ -15,6 +15,17 @@ import { listPendingComplianceReview, resolveComplianceReview, type ComplianceBr
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { getClaudeUsageSummary } from '../db/claudeUsage.js';
 import { getSuspendThreshold, setSuspendThreshold, DEFAULT_SUSPEND_THRESHOLD } from '../lib/complianceEngine.js';
+import { checkCollectionEligibility, generateCollectionDraft, LEGAL_DRAFT_DISCLAIMER, type CollectionDocType } from '../lib/legalCollection.js';
+import { generateLegalDraft, type LegalDraftType } from '../lib/legalDraftGenerator.js';
+import { analyzeRegulatoryText } from '../lib/regulatoryMonitor.js';
+import {
+  recordLegalDocument,
+  listLegalDocumentsByDuplicata,
+  listGeneralLegalDocuments,
+  getLegalDocument,
+  markLegalDocumentReviewed,
+} from '../db/legalDocuments.js';
+import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } from '../db/regulatoryNotes.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -211,6 +222,187 @@ adminRouter.put(
     setSuspendThreshold(parsed.data.threshold, req.user!.id);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'compliance.threshold_updated', { threshold: parsed.data.threshold });
     res.json({ threshold: parsed.data.threshold });
+  })
+);
+
+// --- Jurídico: cobrança jurídica -------------------------------------------------------
+// A duplicata escritural is a título executivo extrajudicial (Lei 5.474/68 art. 15 c/c
+// CPC art. 784, I) — a real ação de execução can be filed directly against an
+// inadimplente sacado. This surfaces overdue duplicatas eligible for that escalation and
+// drafts the documents it needs (lib/legalCollection.ts). Every draft is explicitly a
+// draft — LEGAL_DRAFT_DISCLAIMER is attached deterministically to every response and
+// stored copy, never left to the LLM to remember — and nothing here files, sends or
+// protocols anything; an advogado inscrito na OAB must review and sign first.
+const COLLECTION_DOC_TYPES: CollectionDocType[] = ['notificacao_cobranca', 'minuta_protesto', 'peticao_execucao'];
+
+adminRouter.get('/juridico/cobranca', (_req, res) => {
+  const overdue = listOverdueDuplicatas().map((d) => {
+    const eligibility = checkCollectionEligibility(d);
+    return {
+      duplicataId: d.id,
+      sacado: d.sacado_nome,
+      cedente: d.cedente_nome,
+      valorFmt: fmtBRL(d.valor),
+      vencimento: d.vencimento,
+      eligible: eligibility.eligible,
+      reason: eligibility.reason ?? null,
+      diasEmAtraso: eligibility.diasEmAtraso,
+      documentos: listLegalDocumentsByDuplicata(d.id).map((doc) => ({
+        id: doc.id,
+        type: doc.type,
+        content: doc.content,
+        reviewed: !!doc.reviewed,
+        quando: fmtRelative(doc.created_at),
+      })),
+    };
+  });
+  res.json({ overdue, disclaimer: LEGAL_DRAFT_DISCLAIMER });
+});
+
+adminRouter.post(
+  '/juridico/cobranca/:duplicataId/:tipo',
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    const tipo = req.params.tipo as CollectionDocType;
+    if (!COLLECTION_DOC_TYPES.includes(tipo)) {
+      res.status(400).json({ error: 'validation_error', message: 'Tipo de documento inválido.' });
+      return;
+    }
+    const duplicata = getDuplicata(req.params.duplicataId);
+    if (!duplicata) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const eligibility = checkCollectionEligibility(duplicata);
+    if (!eligibility.eligible) {
+      res.status(409).json({ error: 'not_eligible', message: eligibility.reason });
+      return;
+    }
+    const draft = await generateCollectionDraft(duplicata, tipo, req.user!.id);
+    if (!draft) {
+      res.status(503).json({ error: 'ai_unavailable', message: 'IA indisponível no momento (ANTHROPIC_API_KEY não configurada ou a chamada falhou).' });
+      return;
+    }
+    const content = `${draft}\n\n---\n${LEGAL_DRAFT_DISCLAIMER}`;
+    const doc = recordLegalDocument({ type: tipo, duplicataId: duplicata.id, content, generatedBy: req.user!.id });
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.cobranca_gerada', { duplicataId: duplicata.id, tipo });
+    res.status(201).json({ id: doc.id, type: doc.type, content: doc.content, reviewed: false });
+  })
+);
+
+// --- Jurídico: minutas gerais -----------------------------------------------------------
+const LEGAL_DRAFT_TYPES: LegalDraftType[] = ['resposta_lgpd', 'termos_atualizacao', 'notificacao_padrao'];
+const legalDraftSchema = z.object({ type: z.enum(['resposta_lgpd', 'termos_atualizacao', 'notificacao_padrao']), context: z.string().trim().min(5) });
+
+adminRouter.get('/juridico/minutas', (_req, res) => {
+  const documentos = listGeneralLegalDocuments().map((doc) => ({
+    id: doc.id,
+    type: doc.type,
+    content: doc.content,
+    reviewed: !!doc.reviewed,
+    quando: fmtRelative(doc.created_at),
+  }));
+  res.json({ documentos, disclaimer: LEGAL_DRAFT_DISCLAIMER });
+});
+
+adminRouter.post(
+  '/juridico/minutas',
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = legalDraftSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    if (!LEGAL_DRAFT_TYPES.includes(parsed.data.type)) {
+      res.status(400).json({ error: 'validation_error', message: 'Tipo de minuta inválido.' });
+      return;
+    }
+    const draft = await generateLegalDraft(parsed.data.type, parsed.data.context, req.user!.id);
+    if (!draft) {
+      res.status(503).json({ error: 'ai_unavailable', message: 'IA indisponível no momento (ANTHROPIC_API_KEY não configurada ou a chamada falhou).' });
+      return;
+    }
+    const content = `${draft}\n\n---\n${LEGAL_DRAFT_DISCLAIMER}`;
+    const doc = recordLegalDocument({ type: parsed.data.type, content, generatedBy: req.user!.id });
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.minuta_gerada', { tipo: parsed.data.type });
+    res.status(201).json({ id: doc.id, type: doc.type, content: doc.content, reviewed: false });
+  })
+);
+
+adminRouter.post(
+  '/juridico/documentos/:id/revisar',
+  asyncHandler(async (req, res) => {
+    const doc = getLegalDocument(Number(req.params.id));
+    if (!doc) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    markLegalDocumentReviewed(doc.id, req.user!.id);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.documento_revisado', { documentId: doc.id, type: doc.type });
+    res.json({ ok: true });
+  })
+);
+
+// --- Jurídico: monitor regulatório -------------------------------------------------------
+// An admin pastes the real normative text (resolução, circular etc.); Claude summarizes
+// it and flags impact areas for the admin to decide what, if anything, needs to change.
+// Nothing here polls BACEN/CVM/COAF automatically — see lib/regulatoryMonitor.ts.
+const regulatorySchema = z.object({ title: z.string().trim().min(3), sourceText: z.string().trim().min(20) });
+
+adminRouter.get('/juridico/regulatorio', (_req, res) => {
+  const notes = listRegulatoryNotes().map((n) => ({
+    id: n.id,
+    title: n.title,
+    summary: n.summary,
+    impactAreas: JSON.parse(n.impact_areas_json) as string[],
+    recommendedActions: n.recommended_actions,
+    acknowledged: !!n.acknowledged,
+    quando: fmtRelative(n.created_at),
+  }));
+  res.json({ notes });
+});
+
+adminRouter.post(
+  '/juridico/regulatorio',
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = regulatorySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const analysis = await analyzeRegulatoryText(parsed.data.title, parsed.data.sourceText, req.user!.id);
+    if (!analysis) {
+      res.status(503).json({ error: 'ai_unavailable', message: 'IA indisponível no momento (ANTHROPIC_API_KEY não configurada ou a chamada falhou).' });
+      return;
+    }
+    const note = recordRegulatoryNote({
+      title: parsed.data.title,
+      sourceText: parsed.data.sourceText,
+      summary: analysis.summary,
+      impactAreas: analysis.impactAreas,
+      recommendedActions: analysis.recommendedActions,
+      submittedBy: req.user!.id,
+    });
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.normativo_analisado', { noteId: note.id, title: parsed.data.title });
+    res.status(201).json({
+      id: note.id,
+      title: note.title,
+      summary: note.summary,
+      impactAreas: analysis.impactAreas,
+      recommendedActions: note.recommended_actions,
+      acknowledged: false,
+    });
+  })
+);
+
+adminRouter.post(
+  '/juridico/regulatorio/:id/reconhecer',
+  asyncHandler(async (req, res) => {
+    acknowledgeRegulatoryNote(Number(req.params.id), req.user!.id);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.normativo_reconhecido', { noteId: Number(req.params.id) });
+    res.json({ ok: true });
   })
 );
 

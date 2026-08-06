@@ -130,6 +130,17 @@ export function setSinistroStatus(id: string, status: 'aberto' | 'aprovado' | 'n
   db.prepare('UPDATE duplicatas SET sinistro_status = ?, sinistro_note = ? WHERE id = ?').run(status, note, id);
 }
 
+// Candidates for cobrança jurídica (lib/legalCollection.ts) — vencimento already passed
+// and the duplicata is still a live position (not rejected/suspended/pending-analysis).
+// Final eligibility (aceite confirmado, sem disputa aberta) is checked per-item by
+// checkCollectionEligibility, same JS-filter pattern as listClaimableByInsurerKey.
+export function listOverdueDuplicatas(): DuplicataRow[] {
+  const now = Date.now();
+  return (db.prepare("SELECT * FROM duplicatas WHERE status IN ('aprovada', 'vendida')").all() as DuplicataRow[]).filter(
+    (d) => parseFlexibleDate(d.vencimento).getTime() < now
+  );
+}
+
 export function isPurchased(duplicataId: string): boolean {
   const row = db.prepare('SELECT COUNT(*) as n FROM purchases WHERE duplicata_id = ?').get(duplicataId) as { n: number };
   return row.n > 0;

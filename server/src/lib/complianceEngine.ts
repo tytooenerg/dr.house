@@ -3,6 +3,7 @@ import { sacadoValorStats } from '../db/duplicatas.js';
 import { getIntSetting, setPlatformSetting } from '../db/platformSettings.js';
 import { findSacadoByCnpj } from './riscoCore.js';
 import { askClaude, claudeEnabled } from './claude.js';
+import { screenJudicialRecords } from './judicialRecords.js';
 import { fmtBRL } from './format.js';
 import { logger } from './logger.js';
 import type { ComplianceBreakdownItem } from '../db/complianceEngine.js';
@@ -103,6 +104,25 @@ export async function runComplianceEngine(opts: {
   cedente: UserRow;
 }): Promise<ComplianceEngineOutcome> {
   const breakdown = computeDeterministicScore(opts);
+
+  // Real-when-configured judicial history check (lib/judicialRecords.ts) — a real
+  // commercial provider's data about open execuções/falência against this sacado's CNPJ,
+  // when configured. A no-op (no factor added, nothing suspended for this reason) when
+  // JUDICIAL_RECORDS_API_URL/KEY isn't set — this only strengthens the score, it never
+  // makes it possible to fail this check silently.
+  if (opts.sacadoCnpj) {
+    try {
+      const judicial = await screenJudicialRecords(opts.sacadoCnpj);
+      if (judicial?.hasBankruptcyOrRecovery) {
+        breakdown.push({ fator: 'Histórico judicial', pontos: 30, detalhe: 'Sacado com processo de falência/recuperação judicial identificado pelo provedor de histórico judicial' });
+      } else if (judicial?.hasExecutions) {
+        breakdown.push({ fator: 'Histórico judicial', pontos: 15, detalhe: `Sacado com ${judicial.processCount} processo(s) de execução identificado(s) pelo provedor de histórico judicial` });
+      }
+    } catch (err) {
+      logger.warn({ err, duplicataId: opts.duplicataId }, '[compliance-engine] falha ao consultar histórico judicial — seguindo sem esse fator');
+    }
+  }
+
   const score = Math.min(100, breakdown.reduce((sum, b) => sum + b.pontos, 0));
   const decision: ComplianceEngineOutcome['decision'] = score >= getSuspendThreshold() ? 'suspenso_para_revisao' : 'auto_aprovado';
 
