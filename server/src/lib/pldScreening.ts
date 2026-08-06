@@ -8,7 +8,7 @@ import { recordAuditEvent } from '../db/audit.js';
 // is set (see lib/sanctionsFeed.ts), plus the labeled demonstration watchlist as a
 // fallback/supplement — see db/sanctions.ts for exactly which source flagged a given hit.
 export async function runPldScreening(userId: number, companyName: string, cnpj: string) {
-  const match = await screenEntity(companyName, cnpj);
+  const match = await screenEntity(companyName, cnpj, userId);
   if (!match) {
     setPldStatus(userId, 'clear', '');
     return { flagged: false as const };

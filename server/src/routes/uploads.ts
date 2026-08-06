@@ -10,6 +10,7 @@ import { extractNfeFields } from '../lib/nfeExtraction.js';
 import { analyzeContract } from '../lib/contractAnalysis.js';
 import { recordContractAnalysis } from '../db/contractAnalyses.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadDir = path.resolve(__dirname, '../../uploads');
@@ -42,6 +43,7 @@ uploadsRouter.use(requireAuth);
 
 uploadsRouter.post(
   '/',
+  aiFeatureLimiter,
   asyncHandler(async (req, res) => {
     await new Promise<void>((resolve, reject) => {
       upload.single('file')(req, res, (err) => (err ? reject(err) : resolve()));
@@ -62,14 +64,14 @@ uploadsRouter.post(
     // uploaded file instead of always returning the same hardcoded sample. Returns null
     // (not a fabricated guess) when ANTHROPIC_API_KEY isn't set or extraction fails, so
     // the cedente just fills the form manually as before.
-    const extracted = kind === 'nfe' ? await extractNfeFields(req.file.path, req.file.mimetype) : null;
+    const extracted = kind === 'nfe' ? await extractNfeFields(req.file.path, req.file.mimetype, req.user!.id) : null;
 
     // Real contract clause analysis (lib/contractAnalysis.ts) — replaces the static
     // CONTRACT_FLAGS demo copy on Compliance's "Leitura de contratos" card. Persisted so
     // the Compliance screen can show it again on reload, not just in this response.
     let analysis = null;
     if (kind === 'contrato_cessao') {
-      analysis = await analyzeContract(req.file.path, req.file.mimetype);
+      analysis = await analyzeContract(req.file.path, req.file.mimetype, req.user!.id);
       if (analysis) recordContractAnalysis(req.user!.id, record.id, req.file.originalname, analysis);
     }
 

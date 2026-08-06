@@ -14,7 +14,7 @@ export interface SanctionsMatch {
 // fallback so onboarding is still exercised with zero configuration. Neither the paid
 // provider nor OFAC carry Brazilian CNPJ data reliably, so CNPJ-exact-match only ever
 // comes from the demo table.
-export async function screenEntity(nome: string, cnpj: string): Promise<SanctionsMatch | null> {
+export async function screenEntity(nome: string, cnpj: string, userId?: number): Promise<SanctionsMatch | null> {
   const cnpjDigits = cnpj.replace(/\D/g, '');
   if (cnpjDigits) {
     const byCnpj = db.prepare('SELECT nome, tipo FROM sanctions_watchlist_demo WHERE cnpj = ?').get(cnpjDigits) as
@@ -37,14 +37,14 @@ export async function screenEntity(nome: string, cnpj: string): Promise<Sanction
   // failure, isPlausiblySameEntity defaults to true, so behavior is unchanged from before
   // this feature existed.
   const liveHit = await screenAgainstLiveFeed(trimmedNome);
-  if (liveHit && (await isPlausiblySameEntity(trimmedNome, liveHit.nome, 'OFAC SDN'))) {
+  if (liveHit && (await isPlausiblySameEntity(trimmedNome, liveHit.nome, 'OFAC SDN', userId))) {
     return { nome: liveHit.nome, tipo: 'sancao', fonte: 'ofac' };
   }
 
   const rows = db.prepare('SELECT nome, tipo FROM sanctions_watchlist_demo').all() as { nome: string; tipo: 'sancao' | 'pep' }[];
   const needle = trimmedNome.toLowerCase();
   const demoHit = rows.find((r) => r.nome.toLowerCase().includes(needle) || needle.includes(r.nome.toLowerCase().split(' (')[0]));
-  if (demoHit && (await isPlausiblySameEntity(trimmedNome, demoHit.nome, 'watchlist de demonstração'))) {
+  if (demoHit && (await isPlausiblySameEntity(trimmedNome, demoHit.nome, 'watchlist de demonstração', userId))) {
     return { ...demoHit, fonte: 'demonstracao' };
   }
   return null;

@@ -3,6 +3,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { SACADOS } from '../data/seed.js';
 import { buildBlendedRiscoView, buildRiscoView, findSacadoByName, applyAiNarrative } from '../lib/riscoCore.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 
 export const riscoRouter = Router();
 riscoRouter.use(requireAuth);
@@ -19,6 +20,7 @@ riscoRouter.get('/search', (req, res) => {
 
 riscoRouter.get(
   '/:name',
+  aiFeatureLimiter,
   asyncHandler(async (req, res) => {
     const name = decodeURIComponent(req.params.name);
     const found = findSacadoByName(name);
@@ -30,7 +32,7 @@ riscoRouter.get(
     // this sacado's CNPJ has any — same scoring model the public partner API uses, so the
     // internal risk screen benefits from the shared signal network too, not just external
     // callers.
-    const blended = found.sacado.cnpj ? await buildBlendedRiscoView(found.sacado.cnpj) : null;
-    res.json(blended ?? (await applyAiNarrative(buildRiscoView(found.name, found.sacado))));
+    const blended = found.sacado.cnpj ? await buildBlendedRiscoView(found.sacado.cnpj, req.user!.id) : null;
+    res.json(blended ?? (await applyAiNarrative(buildRiscoView(found.name, found.sacado), req.user!.id)));
   })
 );

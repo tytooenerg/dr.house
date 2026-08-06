@@ -1,11 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from './logger.js';
+import { recordClaudeUsage } from '../db/claudeUsage.js';
 
 // Single shared Anthropic client for every AI-assisted feature in the app (chat, NF-e
 // extraction, contract analysis, risk narrative, dispute/sinistro copilots, PLD second
-// opinion) — same honest pattern as every other adapter here: real when configured,
-// clearly-logged fallback when not, gated by the same ANTHROPIC_API_KEY chat.ts already
-// used.
+// opinion, Compliance AI Engine reasoning) — same honest pattern as every other adapter
+// here: real when configured, clearly-logged fallback when not, gated by the same
+// ANTHROPIC_API_KEY chat.ts already used.
 const apiKey = process.env.ANTHROPIC_API_KEY;
 export const claudeEnabled = !!apiKey;
 const client = apiKey ? new Anthropic({ apiKey }) : null;
@@ -14,7 +15,29 @@ const MODEL = 'claude-sonnet-5';
 if (claudeEnabled) logger.info('[claude] ANTHROPIC_API_KEY configurado — recursos assistidos por IA reais habilitados');
 else logger.info('[claude] ANTHROPIC_API_KEY não configurado — recursos assistidos por IA usarão fallback estático');
 
-export async function askClaude(system: string, userMessage: string, maxTokens = 500): Promise<string | null> {
+// Every call site identifies which feature it is (so admin/ai-usage can break down spend)
+// and, where cheaply available, which user triggered it — see db/claudeUsage.ts.
+export interface ClaudeCallMeta {
+  feature: string;
+  userId?: number;
+}
+
+function logUsage(meta: ClaudeCallMeta, usage: Anthropic.Usage | undefined, ok: boolean) {
+  try {
+    recordClaudeUsage({
+      feature: meta.feature,
+      userId: meta.userId ?? null,
+      inputTokens: usage?.input_tokens ?? 0,
+      outputTokens: usage?.output_tokens ?? 0,
+      ok,
+    });
+  } catch (err) {
+    // Metering must never break the actual feature — just log and move on.
+    logger.warn({ err }, '[claude] falha ao registrar uso/custo');
+  }
+}
+
+export async function askClaude(system: string, userMessage: string, maxTokens: number, meta: ClaudeCallMeta): Promise<string | null> {
   if (!client) return null;
   try {
     const message = await client.messages.create({
@@ -23,9 +46,11 @@ export async function askClaude(system: string, userMessage: string, maxTokens =
       system,
       messages: [{ role: 'user', content: userMessage }],
     });
+    logUsage(meta, message.usage, true);
     return message.content.find((b) => b.type === 'text')?.text ?? null;
   } catch (err) {
     logger.warn({ err }, '[claude] chamada de texto falhou');
+    logUsage(meta, undefined, false);
     return null;
   }
 }
@@ -35,7 +60,13 @@ export type DocumentInput = { buffer: Buffer; mimeType: string };
 // Vision/document call — images go in as `image` blocks, PDFs as `document` blocks
 // (both real Claude Messages API content types), plain text/XML is just inlined as text
 // since Claude reads structured markup directly without needing a vision pass.
-export async function askClaudeWithDocument(system: string, instruction: string, doc: DocumentInput, maxTokens = 500): Promise<string | null> {
+export async function askClaudeWithDocument(
+  system: string,
+  instruction: string,
+  doc: DocumentInput,
+  maxTokens: number,
+  meta: ClaudeCallMeta
+): Promise<string | null> {
   if (!client) return null;
   try {
     const content: Anthropic.MessageParam['content'] =
@@ -57,9 +88,11 @@ export async function askClaudeWithDocument(system: string, instruction: string,
       system,
       messages: [{ role: 'user', content }],
     });
+    logUsage(meta, message.usage, true);
     return message.content.find((b) => b.type === 'text')?.text ?? null;
   } catch (err) {
     logger.warn({ err }, '[claude] chamada com documento falhou');
+    logUsage(meta, undefined, false);
     return null;
   }
 }

@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { verifyToken } from './jwt.js';
 import { getUserById } from '../db/users.js';
+import { isTeamMembershipRevoked } from '../db/misc.js';
 import { planAtLeast, PLANS } from '../lib/billing.js';
 import type { Plan, Role, UserRow } from '../db/types.js';
 
@@ -11,6 +12,45 @@ declare global {
       user?: UserRow;
     }
   }
+}
+
+// A team-member account (users.team_owner_id set — see routes/auth.ts
+// POST /team-invite/accept) is meant to view the owner's Dashboard/Minhas
+// Duplicatas/Histórico/Receita, never to act on the owner's behalf. Every GET outside
+// this allowlist is refused, and every non-GET request is refused unless it's the small
+// set of self-service actions (own profile, own notifications, logout, own 2FA) below —
+// enforced centrally here since requireAuth is the one chokepoint every protected route
+// already goes through.
+const TEAM_MEMBER_READ_PREFIXES = [
+  '/api/dashboard',
+  '/api/minhas',
+  '/api/historico',
+  '/api/revenue',
+  '/api/profile',
+  '/api/notifications',
+  '/api/auth/me',
+  '/api/auth/2fa',
+];
+const TEAM_MEMBER_WRITE_PATHS = [
+  '/api/profile/field',
+  '/api/profile/notif-pref',
+  '/api/profile/notify-whatsapp-toggle',
+  '/api/notifications/read',
+  '/api/auth/logout',
+  '/api/auth/2fa/setup',
+  '/api/auth/2fa/confirm',
+  '/api/auth/2fa/disable',
+];
+
+function enforceTeamMemberScope(req: Request, res: Response): boolean {
+  if (!req.user?.team_owner_id) return true; // not a team-member account — unrestricted
+  const fullPath = req.baseUrl + req.path;
+  const allowed = req.method === 'GET' ? TEAM_MEMBER_READ_PREFIXES.some((p) => fullPath.startsWith(p)) : TEAM_MEMBER_WRITE_PATHS.includes(fullPath);
+  if (!allowed) {
+    res.status(403).json({ error: 'forbidden', message: 'Contas de equipe têm acesso somente leitura a Dashboard, Minhas Duplicatas, Histórico e Receita.' });
+    return false;
+  }
+  return true;
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -30,7 +70,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     res.status(401).json({ error: 'unauthorized', message: 'Conta não encontrada.' });
     return;
   }
+  if (user.team_owner_id && isTeamMembershipRevoked(user.id)) {
+    res.status(401).json({ error: 'unauthorized', message: 'Seu acesso de equipe foi revogado.' });
+    return;
+  }
   req.user = user;
+  if (!enforceTeamMemberScope(req, res)) return;
   next();
 }
 

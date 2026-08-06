@@ -1,5 +1,6 @@
 import { db } from '../db/index.js';
 import { sacadoValorStats } from '../db/duplicatas.js';
+import { getIntSetting, setPlatformSetting } from '../db/platformSettings.js';
 import { findSacadoByCnpj } from './riscoCore.js';
 import { askClaude, claudeEnabled } from './claude.js';
 import { fmtBRL } from './format.js';
@@ -14,7 +15,20 @@ import type { UserRow } from '../db/types.js';
 // compliance-critical score needs to be reproducible with or without an API key.
 // Claude's only role here is generating the human-readable reasoning a reviewer sees;
 // it never changes the score or the suspend/approve decision itself.
-export const SUSPEND_THRESHOLD = 80;
+const SUSPEND_THRESHOLD_KEY = 'compliance_suspend_threshold';
+export const DEFAULT_SUSPEND_THRESHOLD = 80;
+
+// Admin-configurable (see routes/admin.ts PUT /compliance-threshold) instead of a
+// hardcoded constant, so an admin can tighten/loosen the auto-suspend bar without a code
+// deploy as false-positive/negative rates become clearer in production. Read fresh on
+// every call rather than cached, since a change should apply to the very next emissão.
+export function getSuspendThreshold(): number {
+  return getIntSetting(SUSPEND_THRESHOLD_KEY, DEFAULT_SUSPEND_THRESHOLD);
+}
+
+export function setSuspendThreshold(value: number, updatedBy?: number) {
+  setPlatformSetting(SUSPEND_THRESHOLD_KEY, String(value), updatedBy);
+}
 
 export interface ComplianceEngineOutcome {
   score: number;
@@ -90,7 +104,7 @@ export async function runComplianceEngine(opts: {
 }): Promise<ComplianceEngineOutcome> {
   const breakdown = computeDeterministicScore(opts);
   const score = Math.min(100, breakdown.reduce((sum, b) => sum + b.pontos, 0));
-  const decision: ComplianceEngineOutcome['decision'] = score >= SUSPEND_THRESHOLD ? 'suspenso_para_revisao' : 'auto_aprovado';
+  const decision: ComplianceEngineOutcome['decision'] = score >= getSuspendThreshold() ? 'suspenso_para_revisao' : 'auto_aprovado';
 
   let reasoning: string;
   if (breakdown.length === 0) {
@@ -98,7 +112,7 @@ export async function runComplianceEngine(opts: {
   } else {
     const factList = breakdown.map((b) => `${b.fator} (+${b.pontos}): ${b.detalhe}`).join('\n');
     const generated = claudeEnabled
-      ? await askClaude(REASONING_SYSTEM, `Nota final: ${score}/100.\nFatores:\n${factList}`, 300).catch((err) => {
+      ? await askClaude(REASONING_SYSTEM, `Nota final: ${score}/100.\nFatores:\n${factList}`, 300, { feature: 'compliance_engine', userId: opts.cedenteId }).catch((err) => {
           logger.warn({ err }, '[compliance-engine] falha ao gerar explicação via Claude');
           return null;
         })

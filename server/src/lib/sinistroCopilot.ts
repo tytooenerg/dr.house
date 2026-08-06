@@ -19,7 +19,7 @@ export interface SinistroAssessment {
   reasoning: string;
 }
 
-export async function triageSinistro(duplicata: DuplicataRow): Promise<SinistroAssessment | null> {
+export async function triageSinistro(duplicata: DuplicataRow, userId?: number): Promise<SinistroAssessment | null> {
   if (!claudeEnabled) return null;
   try {
     const aceite = getAceiteByDuplicata(duplicata.id);
@@ -37,7 +37,7 @@ export async function triageSinistro(duplicata: DuplicataRow): Promise<SinistroA
       dispute ? `Disputa registrada: motivo "${dispute.motivo}", resolvida: ${dispute.resolved ? 'sim' : 'não'}` : 'Nenhuma disputa registrada',
     ].join('\n');
 
-    const text = await askClaude(SYSTEM, context, 350);
+    const text = await askClaude(SYSTEM, context, 350, { feature: 'sinistro_copilot', userId });
     if (!text) return null;
     const parsed = extractJson<SinistroAssessment>(text);
     if (!parsed || !['ok', 'atencao', 'critico'].includes(parsed.assessment)) {

@@ -4,6 +4,7 @@ import { buildSeguradoraPayload, decideSinistro, sinistroDecisionSchema } from '
 import { triageSinistro } from '../lib/sinistroCopilot.js';
 import { getDuplicata } from '../db/duplicatas.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 
 export const seguradoraRouter = Router();
 seguradoraRouter.use(requireAuth, requireRole('seguradora'));
@@ -15,13 +16,14 @@ seguradoraRouter.get('/', (req, res) => res.json(buildSeguradoraPayload(req.user
 // ANTHROPIC_API_KEY isn't set.
 seguradoraRouter.get(
   '/sinistro/:duplicataId/ai-triagem',
+  aiFeatureLimiter,
   asyncHandler(async (req, res) => {
     const duplicata = getDuplicata(req.params.duplicataId);
     if (!duplicata || duplicata.insurer_key !== req.user!.insurer_key) {
       res.status(404).json({ error: 'not_found' });
       return;
     }
-    const assessment = await triageSinistro(duplicata);
+    const assessment = await triageSinistro(duplicata, req.user!.id);
     res.json({ assessment });
   })
 );

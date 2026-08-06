@@ -21,7 +21,31 @@ export function signAccessToken(payload: TokenPayload): string {
 
 export function verifyToken(token: string): TokenPayload | null {
   try {
-    return jwt.verify(token, SECRET) as unknown as TokenPayload;
+    const decoded = jwt.verify(token, SECRET) as Record<string, unknown>;
+    // A 2FA challenge token (see below) is signed with the same secret but carries `typ`
+    // and no `role` — reject it here so it can never be used as a real access token
+    // (i.e. so knowing only the password, without the TOTP code, is never enough).
+    if (decoded.typ) return null;
+    return decoded as unknown as TokenPayload;
+  } catch {
+    return null;
+  }
+}
+
+const CHALLENGE_TYPE = '2fa_challenge';
+
+// Issued right after a correct email+password when the account has 2FA enabled — proves
+// "this request already passed step 1" without granting any actual API access. Exchanged
+// for real tokens by POST /auth/2fa/verify-login once the TOTP/recovery code checks out.
+export function signChallengeToken(userId: number): string {
+  return jwt.sign({ sub: userId, typ: CHALLENGE_TYPE }, SECRET, { expiresIn: '5m' });
+}
+
+export function verifyChallengeToken(token: string): number | null {
+  try {
+    const decoded = jwt.verify(token, SECRET) as Record<string, unknown>;
+    if (decoded.typ !== CHALLENGE_TYPE || typeof decoded.sub !== 'number') return null;
+    return decoded.sub;
   } catch {
     return null;
   }

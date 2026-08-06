@@ -12,6 +12,9 @@ import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { summarizeDispute } from '../lib/disputeCopilot.js';
 import { listPendingComplianceReview, resolveComplianceReview, type ComplianceBreakdownItem } from '../db/complianceEngine.js';
+import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
+import { getClaudeUsageSummary } from '../db/claudeUsage.js';
+import { getSuspendThreshold, setSuspendThreshold, DEFAULT_SUSPEND_THRESHOLD } from '../lib/complianceEngine.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -75,6 +78,7 @@ adminRouter.get('/disputes', (_req, res) => {
 // when ANTHROPIC_API_KEY isn't set.
 adminRouter.get(
   '/disputes/:id/ai-summary',
+  aiFeatureLimiter,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     const dispute = getDispute(id);
@@ -88,7 +92,7 @@ adminRouter.get(
       return;
     }
     const timeline = listEvents(id).map((e) => ({ autor: e.autor, texto: e.texto, quando: fmtRelative(e.created_at) }));
-    const summary = await summarizeDispute({ motivo: all.motivo, sacado: all.sacado_nome, cedente: all.cedente_nome, valorFmt: fmtBRL(all.valor), timeline });
+    const summary = await summarizeDispute({ motivo: all.motivo, sacado: all.sacado_nome, cedente: all.cedente_nome, valorFmt: fmtBRL(all.valor), timeline }, req.user!.id);
     res.json({ summary });
   })
 );
@@ -172,6 +176,41 @@ adminRouter.post(
       decision: parsed.data.decision,
     });
     res.json({ ok: true });
+  })
+);
+
+// Cost/abuse visibility for every Claude-calling feature (see lib/claude.ts, which logs
+// one row per real API call with the token counts the API itself returned). The cost
+// figure is an estimate off a configurable per-token rate (db/claudeUsage.ts) — useful to
+// spot a feature/user driving unexpected spend, not a substitute for the Anthropic
+// console's actual invoice.
+adminRouter.get('/ai-usage', (_req, res) => {
+  res.json(getClaudeUsageSummary());
+});
+
+// Compliance AI Engine's auto-suspend bar (see lib/complianceEngine.ts) — admin-tunable
+// instead of a hardcoded constant, so it can be tightened/loosened as real false
+// positive/negative rates become clear, without a code deploy. Only ever changes where the
+// line for "suspend for human review" sits; suspended items still always need a human
+// liberar/rejeitar decision (see /compliance-queue above) — this never makes the decision
+// itself automatic.
+adminRouter.get('/compliance-threshold', (_req, res) => {
+  res.json({ threshold: getSuspendThreshold(), default: DEFAULT_SUSPEND_THRESHOLD });
+});
+
+const thresholdSchema = z.object({ threshold: z.number().int().min(1).max(100) });
+
+adminRouter.put(
+  '/compliance-threshold',
+  asyncHandler(async (req, res) => {
+    const parsed = thresholdSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    setSuspendThreshold(parsed.data.threshold, req.user!.id);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'compliance.threshold_updated', { threshold: parsed.data.threshold });
+    res.json({ threshold: parsed.data.threshold });
   })
 );
 

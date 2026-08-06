@@ -39,6 +39,7 @@ export function resetDbForTests() {
     DELETE FROM webhooks;
     DELETE FROM api_keys;
     DELETE FROM system_health_checks;
+    DELETE FROM claude_usage;
     DELETE FROM users;
   `);
 }

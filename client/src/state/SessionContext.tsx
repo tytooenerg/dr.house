@@ -31,14 +31,17 @@ export interface SessionUser {
   subscriptionStatus: 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
   insurerKey: string | null;
   insurerName: string | null;
+  isTeamMember: boolean;
 }
 
 interface SessionContextValue {
   user: SessionUser | null;
   loading: boolean;
   authError: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ twoFactorRequired: boolean; challengeToken?: string }>;
+  verifyTwoFactor: (challengeToken: string, code: string) => Promise<void>;
   register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => Promise<void>;
+  acceptTeamInvite: (input: { token: string; nome?: string; password: string }) => Promise<void>;
   logout: () => void;
   submitKyb: (form: { cnpj: string; tipo: string; pl: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -74,11 +77,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setAuthError(null);
     try {
-      const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/login', { email, password });
+      const data = await api.post<{ token?: string; refreshToken?: string; user?: SessionUser; twoFactorRequired?: boolean; challengeToken?: string }>(
+        '/auth/login',
+        { email, password }
+      );
+      if (data.twoFactorRequired) return { twoFactorRequired: true, challengeToken: data.challengeToken };
+      setSessionTokens(data.token!, data.refreshToken!);
+      setUser(data.user!);
+      return { twoFactorRequired: false };
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível entrar.');
+      throw err;
+    }
+  }, []);
+
+  const verifyTwoFactor = useCallback(async (challengeToken: string, code: string) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/2fa/verify-login', { challengeToken, code });
       setSessionTokens(data.token, data.refreshToken);
       setUser(data.user);
     } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Não foi possível entrar.');
+      setAuthError(err instanceof Error ? err.message : 'Código inválido.');
       throw err;
     }
   }, []);
@@ -91,6 +111,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Não foi possível criar a conta.');
+      throw err;
+    }
+  }, []);
+
+  const acceptTeamInvite = useCallback(async (input: { token: string; nome?: string; password: string }) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/team-invite/accept', input);
+      setSessionTokens(data.token, data.refreshToken);
+      setUser(data.user);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível aceitar o convite.');
       throw err;
     }
   }, []);
@@ -112,7 +144,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setUser((u) => (u ? { ...u, showOnboarding: false } : u));
   }, []);
 
-  const value: SessionContextValue = { user, loading, authError, login, register, logout, submitKyb, completeOnboarding, refresh };
+  const value: SessionContextValue = { user, loading, authError, login, verifyTwoFactor, register, acceptTeamInvite, logout, submitKyb, completeOnboarding, refresh };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

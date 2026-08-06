@@ -150,11 +150,11 @@ function networkView(summary: SignalSummary): SinaisDeRedeView | null {
 // CNPJ matches one) with cross-platform network signals reported by API partners. A CNPJ
 // with only network signals (never transacted on Lastro) still gets a real score; a CNPJ
 // with both gets the internal score nudged by the network's confidence-weighted evidence.
-export async function buildBlendedRiscoView(cnpj: string): Promise<RiscoView | null> {
+export async function buildBlendedRiscoView(cnpj: string, userId?: number): Promise<RiscoView | null> {
   const view = buildBlendedRiscoViewSync(cnpj);
   if (!view) return null;
   const withBureau = await applyBureauBlend(view, cnpj);
-  return applyAiNarrative(withBureau);
+  return applyAiNarrative(withBureau, userId);
 }
 
 // A real bureau score (Serasa/Boa Vista/Quod — see lib/creditBureau.ts) is combined the
@@ -200,7 +200,7 @@ const SEVERITY_TO_COLOR: Record<'ok' | 'atencao' | 'critico', string> = { ok: CO
 // rating, factors, network signals and bureau data (when present). Falls back to the
 // original canned text — not a fabricated narrative — when ANTHROPIC_API_KEY isn't set or
 // the call fails, so behavior without a key is unchanged from before this feature existed.
-async function applyAiNarrative(view: RiscoView): Promise<RiscoView> {
+async function applyAiNarrative(view: RiscoView, userId?: number): Promise<RiscoView> {
   if (!claudeEnabled) return view;
   try {
     const context = [
@@ -216,7 +216,7 @@ async function applyAiNarrative(view: RiscoView): Promise<RiscoView> {
       .filter(Boolean)
       .join('\n');
 
-    const text = await askClaude(AI_SIGNAL_SYSTEM, context, 400);
+    const text = await askClaude(AI_SIGNAL_SYSTEM, context, 400, { feature: 'risco_narrative', userId });
     if (!text) return view;
     const parsed = extractJson<{ signals: { text: string; severity: 'ok' | 'atencao' | 'critico' }[] }>(text);
     if (!parsed || !Array.isArray(parsed.signals) || parsed.signals.length === 0) return view;

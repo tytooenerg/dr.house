@@ -15,11 +15,11 @@ Responda APENAS com um JSON válido no formato exato:
 {"sameEntity": true|false, "reasoning": "justificativa objetiva em português, 1 frase"}
 Marque "sameEntity": false apenas quando os nomes coincidirem por um trecho genérico/comum (um sobrenome isolado, uma palavra genérica do ramo) sem outros elementos correspondentes — na dúvida real, prefira true (falso positivo é mais seguro que falso negativo em triagem de sanções).`;
 
-export async function isPlausiblySameEntity(queriedName: string, matchedName: string, matchSource: string): Promise<boolean> {
+export async function isPlausiblySameEntity(queriedName: string, matchedName: string, matchSource: string, userId?: number): Promise<boolean> {
   if (!claudeEnabled) return true; // no second opinion available — keep the original match standing
   try {
     const context = `Nome consultado: "${queriedName}"\nNome encontrado na lista (${matchSource}): "${matchedName}"`;
-    const text = await askClaude(SYSTEM, context, 200);
+    const text = await askClaude(SYSTEM, context, 200, { feature: 'pld_second_opinion', userId });
     if (!text) return true;
     const parsed = extractJson<{ sameEntity: boolean; reasoning: string }>(text);
     if (!parsed) return true;

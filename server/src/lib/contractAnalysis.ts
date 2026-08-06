@@ -13,7 +13,7 @@ Responda APENAS com um JSON válido no formato exato:
 {"flags": [{"text": "descrição objetiva do achado, em português, 1 frase", "severity": "ok"|"atencao"|"critico"}]}
 Inclua pelo menos uma entrada "ok" se nenhuma cláusula problemática for encontrada. Máximo 6 entradas. Nunca invente cláusulas que não estão no texto.`;
 
-export async function analyzeContract(filePath: string, mimeType: string): Promise<ContractFlag[] | null> {
+export async function analyzeContract(filePath: string, mimeType: string, userId?: number): Promise<ContractFlag[] | null> {
   if (!claudeEnabled) return null;
   try {
     const buffer = fs.readFileSync(filePath);
@@ -21,7 +21,8 @@ export async function analyzeContract(filePath: string, mimeType: string): Promi
       SYSTEM,
       'Analise este contrato de cessão e responda apenas com o JSON de flags pedido.',
       { buffer, mimeType },
-      600
+      600,
+      { feature: 'contract_analysis', userId }
     );
     if (!text) return null;
     const parsed = extractJson<{ flags: ContractFlag[] }>(text);

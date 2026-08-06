@@ -16,13 +16,16 @@ export interface DisputeRecommendation {
   reasoning: string;
 }
 
-export async function summarizeDispute(opts: {
-  motivo: string;
-  sacado: string;
-  cedente: string;
-  valorFmt: string;
-  timeline: { autor: string; texto: string; quando: string }[];
-}): Promise<DisputeRecommendation | null> {
+export async function summarizeDispute(
+  opts: {
+    motivo: string;
+    sacado: string;
+    cedente: string;
+    valorFmt: string;
+    timeline: { autor: string; texto: string; quando: string }[];
+  },
+  userId?: number
+): Promise<DisputeRecommendation | null> {
   if (!claudeEnabled) return null;
   const context = [
     `Cedente: ${opts.cedente}`,
@@ -33,7 +36,7 @@ export async function summarizeDispute(opts: {
     ...opts.timeline.map((e) => `- [${e.quando}] ${e.autor}: ${e.texto}`),
   ].join('\n');
   try {
-    const text = await askClaude(SYSTEM, context, 400);
+    const text = await askClaude(SYSTEM, context, 400, { feature: 'dispute_copilot', userId });
     if (!text) return null;
     const parsed = extractJson<DisputeRecommendation>(text);
     if (!parsed || !['cedente', 'sacado', 'inconclusivo'].includes(parsed.recommendation)) {

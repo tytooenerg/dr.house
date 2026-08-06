@@ -19,7 +19,7 @@ export interface NfeExtracted {
   vencimento: string | null;
 }
 
-export async function extractNfeFields(filePath: string, mimeType: string): Promise<NfeExtracted | null> {
+export async function extractNfeFields(filePath: string, mimeType: string, userId?: number): Promise<NfeExtracted | null> {
   if (!claudeEnabled) return null;
   try {
     const buffer = fs.readFileSync(filePath);
@@ -27,7 +27,8 @@ export async function extractNfeFields(filePath: string, mimeType: string): Prom
       SYSTEM,
       'Extraia sacado, CNPJ, valor e vencimento desta NF-e e responda apenas com o JSON pedido.',
       { buffer, mimeType },
-      300
+      300,
+      { feature: 'nfe_extraction', userId }
     );
     if (!text) return null;
     const parsed = extractJson<NfeExtracted>(text);

@@ -3,6 +3,7 @@ import { SessionProvider } from './state/SessionContext';
 import { AppShell } from './layout/AppShell';
 import { Gate } from './components/Gate';
 import { LoginPage } from './pages/auth/LoginPage';
+import { TeamInviteAcceptPage } from './pages/auth/TeamInviteAcceptPage';
 import { DashboardPage } from './pages/app/DashboardPage';
 import { MarketplacePage } from './pages/app/MarketplacePage';
 import { AutomacaoPage } from './pages/app/AutomacaoPage';
@@ -38,6 +39,7 @@ export default function App() {
     <SessionProvider>
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route path="/convite-equipe" element={<TeamInviteAcceptPage />} />
         <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/precos" element={<PrecosPage />} />
         <Route path="/legal" element={<LegalPage />} />

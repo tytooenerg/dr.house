@@ -34,13 +34,15 @@ function RoleShape({ shape }: { shape: 'circle' | 'square' | 'diamond' | 'triang
 }
 
 export function LoginPage() {
-  const { user, loading, login, register, authError } = useSession();
+  const { user, loading, login, verifyTwoFactor, register, authError } = useSession();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [submitting, setSubmitting] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -63,7 +65,21 @@ export function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await login(loginEmail, loginPassword);
+      const result = await login(loginEmail, loginPassword);
+      if (result.twoFactorRequired && result.challengeToken) setChallengeToken(result.challengeToken);
+    } catch {
+      // authError is surfaced below
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!challengeToken) return;
+    setSubmitting(true);
+    try {
+      await verifyTwoFactor(challengeToken, twoFactorCode.trim());
     } catch {
       // authError is surfaced below
     } finally {
@@ -90,6 +106,49 @@ export function LoginPage() {
     return (
       <div className="w-full min-h-screen bg-bg">
         <KybModal />
+      </div>
+    );
+  }
+
+  if (challengeToken) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-bg p-6">
+        <div className="w-full max-w-[420px] bg-white border border-border rounded-2xl p-9">
+          <div className="flex items-center gap-2.5 mb-7">
+            <Logo />
+          </div>
+          <form onSubmit={handleVerifyTwoFactor}>
+            <div className="text-xl font-extrabold mb-1">Verificação em duas etapas</div>
+            <div className="text-textSecondary text-[13.5px] mb-6">Digite o código de 6 dígitos do seu app autenticador, ou um código de recuperação.</div>
+            <div className="mb-5">
+              <Field label="Código">
+                <Input
+                  autoFocus
+                  required
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  maxLength={11}
+                />
+              </Field>
+            </div>
+            {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
+            <Button type="submit" className="w-full" disabled={submitting || !twoFactorCode.trim()}>
+              {submitting ? 'Verificando…' : 'Confirmar'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setChallengeToken(null);
+                setTwoFactorCode('');
+              }}
+              className="mt-3 w-full text-center text-textSecondary text-[12.5px] font-semibold bg-transparent border-none cursor-pointer"
+            >
+              Voltar
+            </button>
+          </form>
+        </div>
       </div>
     );
   }

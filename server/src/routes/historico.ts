@@ -2,13 +2,14 @@ import { Router } from 'express';
 import PDFDocument from 'pdfkit';
 import { requireAuth } from '../auth/middleware.js';
 import { listPurchasesByInvestor } from '../db/duplicatas.js';
+import { effectiveOwnerId } from '../db/users.js';
 import { fmtBRL, toIsoUtc } from '../lib/format.js';
 
 export const historicoRouter = Router();
 historicoRouter.use(requireAuth);
 
 function rows(req: import('express').Request) {
-  return listPurchasesByInvestor(req.user!.id).map((p) => ({
+  return listPurchasesByInvestor(effectiveOwnerId(req.user!)).map((p) => ({
     data: new Date(toIsoUtc(p.created_at)).toLocaleDateString('pt-BR'),
     empresa: p.sacado_nome,
     investidoFmt: fmtBRL(p.valor),
@@ -19,7 +20,7 @@ function rows(req: import('express').Request) {
 }
 
 historicoRouter.get('/', (req, res) => {
-  const purchases = listPurchasesByInvestor(req.user!.id);
+  const purchases = listPurchasesByInvestor(effectiveOwnerId(req.user!));
   const totalInvestido = purchases.reduce((sum, p) => sum + p.valor, 0);
   const totalRetorno = purchases.reduce((sum, p) => sum + p.retorno, 0);
   const rentMedia = totalInvestido > 0 ? (totalRetorno / totalInvestido) * 100 : 0;

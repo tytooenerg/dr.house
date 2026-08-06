@@ -91,7 +91,7 @@ export function Sidebar() {
         <div className="w-[34px] h-[34px] rounded-full bg-blue text-white flex items-center justify-center font-bold text-[13px]">{initials}</div>
         <div className="flex-1 min-w-0">
           <div className="text-white text-[13px] font-semibold truncate">{user.nome}</div>
-          <div className="text-[#8B97AC] text-[11.5px]">{user.sessionLabel}</div>
+          <div className="text-[#8B97AC] text-[11.5px]">{user.sessionLabel}{user.isTeamMember ? ' · somente leitura' : ''}</div>
         </div>
         <button type="button" className="bg-transparent border-none text-[#8B97AC] text-[11.5px] font-bold cursor-pointer" onClick={handleLogout}>
           Sair

@@ -79,6 +79,9 @@ export interface UserRow {
   referral_bonus_emissions: number;
   pld_status: 'clear' | 'flagged';
   pld_match_note: string;
+  team_owner_id: number | null;
+  totp_secret: string | null;
+  totp_enabled: number;
 }
 
 export interface DuplicataRow {

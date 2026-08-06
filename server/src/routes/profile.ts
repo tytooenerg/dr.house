@@ -2,9 +2,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { getSettings, updateProfile, updateSettings } from '../db/users.js';
-import { inviteTeamMember, listTeam } from '../db/misc.js';
+import { inviteTeamMember, listTeam, revokeTeamMember } from '../db/misc.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { twilioEnabled } from '../lib/smsNotifier.js';
+import { sendEmail } from '../lib/mailer.js';
+import { recordAuditEvent } from '../db/audit.js';
+
+// Base URL the SPA is actually served from — used to build the accept-invite link
+// mailed to the invitee. Defaults to the Vite dev server since that's how this app is
+// normally run locally.
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
 export const profileRouter = Router();
 profileRouter.use(requireAuth);
@@ -66,12 +73,32 @@ profileRouter.post('/notify-whatsapp-toggle', (req, res) => {
 
 const inviteSchema = z.object({ nome: z.string().trim().min(2), email: z.string().trim().email() });
 
+// Real invite: a single-use token is generated (db/misc.ts only ever stores its hash),
+// mailed to the invitee as an accept link, and returned in the response too so the owner
+// can copy/share it directly when SMTP isn't configured — same "logged instead of sent,
+// but still usable" pattern every other notification in this app follows.
 profileRouter.post('/team/invite', (req, res) => {
   const parsed = inviteSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
     return;
   }
-  inviteTeamMember(req.user!.id, parsed.data.nome, parsed.data.email);
-  res.json(payload(req));
+  const { token } = inviteTeamMember(req.user!.id, parsed.data.nome, parsed.data.email);
+  const inviteUrl = `${APP_URL}/convite-equipe?token=${token}`;
+  sendEmail(
+    parsed.data.email,
+    `${req.user!.company_name} convidou você para a Lastro`,
+    `${req.user!.nome} convidou você para acessar a conta de ${req.user!.company_name} na Lastro (acesso somente leitura a Dashboard, Minhas Duplicatas, Histórico e Receita).\n\nAceite o convite e crie sua senha: ${inviteUrl}\n\nEste link expira em 7 dias.`
+  );
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'team.invited', { email: parsed.data.email });
+  res.json({ ...payload(req), inviteUrl });
 });
+
+profileRouter.post(
+  '/team/:id/revoke',
+  asyncHandler(async (req, res) => {
+    revokeTeamMember(req.user!.id, Number(req.params.id));
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'team.revoked', { teamMemberId: Number(req.params.id) });
+    res.json(payload(req));
+  })
+);

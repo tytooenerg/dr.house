@@ -48,10 +48,13 @@ export function createUser(input: {
   role: Role;
   insurerKey?: string;
   referredByCode?: string;
+  teamOwnerId?: number;
 }): UserRow {
   const referrer = input.referredByCode ? getUserByReferralCode(input.referredByCode) : undefined;
   const info = db
-    .prepare('INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings, referral_code, referred_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .prepare(
+      'INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings, referral_code, referred_by_user_id, team_owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
     .run(
       input.email.toLowerCase().trim(),
       input.passwordHash,
@@ -61,10 +64,19 @@ export function createUser(input: {
       input.insurerKey ?? null,
       JSON.stringify(defaultSettings()),
       uniqueReferralCode(),
-      referrer?.id ?? null
+      referrer?.id ?? null,
+      input.teamOwnerId ?? null
     );
   if (referrer) bumpReferralBonus(referrer.id);
   return getUserById(Number(info.lastInsertRowid))!;
+}
+
+// A team member account (users.team_owner_id set) has no business data of its own — every
+// read that should show "your operations" needs to resolve to the owner's id instead.
+// Regular accounts (team_owner_id null) are unaffected. See also auth/middleware.ts,
+// which enforces that team member accounts can only ever read, never write, that data.
+export function effectiveOwnerId(user: UserRow): number {
+  return user.team_owner_id ?? user.id;
 }
 
 export function getSettings(user: UserRow): UserSettings {

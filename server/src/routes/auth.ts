@@ -9,15 +9,20 @@ import {
   submitKybForReview,
   updateKybForm,
   updateSettings,
+  approveKyb,
 } from '../db/users.js';
+import { acceptTeamInvite, findTeamInviteByToken } from '../db/misc.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
-import { generateRefreshToken, hashRefreshToken, signAccessToken } from '../auth/jwt.js';
+import { generateRefreshToken, hashRefreshToken, signAccessToken, signChallengeToken, verifyChallengeToken } from '../auth/jwt.js';
 import { createRefreshToken, findValidRefreshToken, revokeAllRefreshTokensForUser, revokeRefreshToken } from '../db/refreshTokens.js';
 import { requireAuth } from '../auth/middleware.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { INSURERS, KYB_TIPOS, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { runPldScreening } from '../lib/pldScreening.js';
+import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
+import { generateTotpSecret, verifyTotp, otpauthUrl, generateRecoveryCode } from '../lib/totp.js';
+import { setTotpSecret, enableTotp, disableTotp, storeRecoveryCodes, consumeRecoveryCode, countRemainingRecoveryCodes } from '../db/twoFactor.js';
 import type { UserRow } from '../db/types.js';
 
 export const authRouter = Router();
@@ -50,11 +55,17 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Informe sua senha.'),
 });
 
+// Mirrors the read-only route scope enforced server-side in auth/middleware.ts — a team
+// member's nav only ever shows tabs they can actually open, instead of the owner's full
+// nav with most of it 403ing on click.
+const TEAM_MEMBER_ALLOWED_TABS = ['dashboard', 'minhas', 'historico', 'receita', 'perfil'];
+
 function publicUser(user: UserRow) {
   const settings = getSettings(user);
   const steps = ONBOARDING_STEPS[user.role] ?? [];
   const onboardingSeen = settings.onboardingSeen;
   const insurer = user.insurer_key ? INSURERS.find((i) => i.key === user.insurer_key) : null;
+  const roleTabs = ROLE_TABS[user.role] ?? [];
   return {
     id: user.id,
     email: user.email,
@@ -81,7 +92,9 @@ function publicUser(user: UserRow) {
             : user.role === 'seguradora'
               ? 'Seguradora Parceira'
               : 'Conta Investidor',
-    navTabs: ROLE_TABS[user.role] ?? [],
+    navTabs: user.team_owner_id ? roleTabs.filter((t) => TEAM_MEMBER_ALLOWED_TABS.includes(t)) : roleTabs,
+    isTeamMember: !!user.team_owner_id,
+    totpEnabled: !!user.totp_enabled,
     plan: user.plan,
     subscriptionStatus: user.subscription_status,
     insurerKey: user.insurer_key,
@@ -137,8 +150,50 @@ authRouter.post(
       res.status(401).json({ error: 'invalid_credentials', message: 'E-mail ou senha incorretos.' });
       return;
     }
+    // 2FA: password alone isn't enough — hand back a short-lived challenge token instead
+    // of real session tokens, exchanged for them by POST /2fa/verify-login once the
+    // TOTP/recovery code checks out (see auth/jwt.ts signChallengeToken).
+    if (user.totp_enabled) {
+      res.json({ twoFactorRequired: true, challengeToken: signChallengeToken(user.id) });
+      return;
+    }
     const { accessToken, refreshToken } = issueTokens(user);
     recordAuditEvent(user.id, user.company_name, 'user.login', {});
+    res.json({ token: accessToken, refreshToken, user: publicUser(user) });
+  })
+);
+
+const twoFactorVerifySchema = z.object({ challengeToken: z.string().trim().min(10), code: z.string().trim().min(6).max(11) });
+
+// Public — the client isn't authenticated yet at this point (it only has the short-lived
+// challenge token from /login, not a real session). Guarded by the same brute-force
+// limiter as login since the TOTP code space is small enough to matter.
+authRouter.post(
+  '/2fa/verify-login',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = twoFactorVerifySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const userId = verifyChallengeToken(parsed.data.challengeToken);
+    if (!userId) {
+      res.status(401).json({ error: 'unauthorized', message: 'Sessão de verificação expirada — faça login novamente.' });
+      return;
+    }
+    const user = getUserById(userId);
+    if (!user || !user.totp_enabled || !user.totp_secret) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+    const ok = verifyTotp(user.totp_secret, parsed.data.code) || consumeRecoveryCode(user.id, parsed.data.code);
+    if (!ok) {
+      res.status(401).json({ error: 'invalid_code', message: 'Código inválido — verifique o app autenticador ou use um código de recuperação.' });
+      return;
+    }
+    const { accessToken, refreshToken } = issueTokens(user);
+    recordAuditEvent(user.id, user.company_name, 'user.login_2fa', {});
     res.json({ token: accessToken, refreshToken, user: publicUser(user) });
   })
 );
@@ -191,6 +246,7 @@ const kybSchema = z.object({
 authRouter.post(
   '/kyb',
   requireAuth,
+  aiFeatureLimiter,
   asyncHandler(async (req, res) => {
     const parsed = kybSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -213,3 +269,120 @@ authRouter.post('/onboarding/complete', requireAuth, (req, res) => {
   updateSettings(req.user!.id, { onboardingSeen: true });
   res.json({ ok: true });
 });
+
+// Generates a new secret and returns it for the user to add to their authenticator app —
+// totp_enabled stays 0 until /2fa/confirm proves they actually captured it, so an
+// abandoned setup never locks the account out of normal password-only login.
+authRouter.post('/2fa/setup', requireAuth, (req, res) => {
+  const secret = generateTotpSecret();
+  setTotpSecret(req.user!.id, secret);
+  res.json({ secret, otpauthUrl: otpauthUrl(secret, req.user!.email) });
+});
+
+const confirm2faSchema = z.object({ code: z.string().trim().length(6) });
+
+authRouter.post('/2fa/confirm', requireAuth, (req, res) => {
+  const parsed = confirm2faSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const user = req.user!;
+  if (!user.totp_secret) {
+    res.status(409).json({ error: 'not_started', message: 'Inicie a configuração em /2fa/setup antes de confirmar.' });
+    return;
+  }
+  if (!verifyTotp(user.totp_secret, parsed.data.code)) {
+    res.status(400).json({ error: 'invalid_code', message: 'Código inválido — verifique o horário do seu dispositivo e tente novamente.' });
+    return;
+  }
+  enableTotp(user.id);
+  // Recovery codes are shown exactly once, right here — only their hash is ever stored
+  // (db/twoFactor.ts), same as every other secret this app handles.
+  const recoveryCodes = Array.from({ length: 8 }, () => generateRecoveryCode());
+  storeRecoveryCodes(user.id, recoveryCodes);
+  recordAuditEvent(user.id, user.company_name, '2fa.enabled', {});
+  res.json({ ok: true, recoveryCodes });
+});
+
+const disable2faSchema = z.object({ password: z.string().min(1, 'Informe sua senha para confirmar.') });
+
+authRouter.post(
+  '/2fa/disable',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const parsed = disable2faSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const ok = await verifyPassword(parsed.data.password, req.user!.password_hash);
+    if (!ok) {
+      res.status(401).json({ error: 'invalid_password', message: 'Senha incorreta.' });
+      return;
+    }
+    disableTotp(req.user!.id);
+    recordAuditEvent(req.user!.id, req.user!.company_name, '2fa.disabled', {});
+    res.json({ ok: true });
+  })
+);
+
+authRouter.get('/2fa/status', requireAuth, (req, res) => {
+  res.json({
+    enabled: !!req.user!.totp_enabled,
+    remainingRecoveryCodes: req.user!.totp_enabled ? countRemainingRecoveryCodes(req.user!.id) : 0,
+  });
+});
+
+const teamInviteAcceptSchema = z.object({
+  token: z.string().trim().min(10),
+  nome: z.string().trim().min(2).optional(),
+  password: z.string().min(6, 'A senha precisa ter ao menos 6 caracteres.'),
+});
+
+// Public — the invitee doesn't have an account yet. Guarded by the same brute-force
+// limiter as login/register since the token itself is the only credential here (see
+// db/misc.ts inviteTeamMember, which only ever stores its hash).
+authRouter.post(
+  '/team-invite/accept',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = teamInviteAcceptSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const invite = findTeamInviteByToken(parsed.data.token);
+    if (!invite || (invite.invite_expires_at && new Date(invite.invite_expires_at) < new Date())) {
+      res.status(400).json({ error: 'invalid_invite', message: 'Convite inválido ou expirado — peça um novo convite.' });
+      return;
+    }
+    const owner = getUserById(invite.owner_id);
+    if (!owner) {
+      res.status(400).json({ error: 'invalid_invite', message: 'Convite inválido.' });
+      return;
+    }
+    if (getUserByEmail(invite.email)) {
+      res.status(409).json({ error: 'email_taken', message: 'Já existe uma conta com este e-mail. Faça login normalmente.' });
+      return;
+    }
+    const passwordHash = await hashPassword(parsed.data.password);
+    const user = createUser({
+      email: invite.email,
+      passwordHash,
+      nome: parsed.data.nome?.trim() || invite.nome,
+      companyName: owner.company_name,
+      role: owner.role,
+      insurerKey: owner.insurer_key ?? undefined,
+      teamOwnerId: owner.id,
+    });
+    // The member represents the same company as the owner — if the owner already cleared
+    // KYB, the member shouldn't hit that wall again on an account that can't act on
+    // anything but reads anyway (see auth/middleware.ts's team-member scope).
+    if (owner.role === 'investidor' && owner.kyb_status === 'approved') approveKyb(user.id);
+    acceptTeamInvite(invite.id, user.id);
+    recordAuditEvent(owner.id, owner.company_name, 'team.invite_accepted', { memberEmail: invite.email });
+    const { accessToken, refreshToken } = issueTokens(user);
+    res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });
+  })
+);

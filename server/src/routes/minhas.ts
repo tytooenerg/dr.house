@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth/middleware.js';
 import { listByCedente, getDuplicata, dispararLeilao } from '../db/duplicatas.js';
+import { effectiveOwnerId } from '../db/users.js';
 import { fmtBRL } from '../lib/format.js';
 import { COLORS } from '../data/seed.js';
 
@@ -40,7 +41,7 @@ minhasRouter.get('/', (req, res) => {
     res.status(403).json({ error: 'forbidden' });
     return;
   }
-  const duplicatas = listByCedente(req.user!.id).map(view);
+  const duplicatas = listByCedente(effectiveOwnerId(req.user!)).map(view);
   res.json({ duplicatas });
 });
 

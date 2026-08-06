@@ -131,7 +131,7 @@ v1Router.post(
 v1Router.get(
   '/sacados/:cnpj/score',
   asyncHandler(async (req, res) => {
-    const view = await buildBlendedRiscoView(req.params.cnpj);
+    const view = await buildBlendedRiscoView(req.params.cnpj, req.apiUser!.id);
     if (!view) {
       res.status(404).json({ error: 'not_found', message: 'Nenhum histórico de score encontrado para este CNPJ.' });
       return;
@@ -159,7 +159,7 @@ v1Router.post(
       return;
     }
     addSignal(req.params.cnpj, req.apiUser!.id, parsed.data.tipo, parsed.data.nota);
-    const view = await buildBlendedRiscoView(req.params.cnpj);
+    const view = await buildBlendedRiscoView(req.params.cnpj, req.apiUser!.id);
     res.json(view);
   })
 );

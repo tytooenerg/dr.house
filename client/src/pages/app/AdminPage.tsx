@@ -46,7 +46,28 @@ interface ComplianceQueueItem {
   quando: string;
 }
 
-type Tab = 'kyb' | 'disputas' | 'compliance' | 'auditoria';
+interface AiUsageSummary {
+  totalCalls: number;
+  failedCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalEstimatedCostUsd: number;
+  byFeature: { feature: string; calls: number; inputTokens: number; outputTokens: number; estimatedCostUsd: number }[];
+  last30Days: { date: string; calls: number; estimatedCostUsd: number }[];
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  chat: 'Assistente (chat)',
+  nfe_extraction: 'Extração de NF-e',
+  contract_analysis: 'Leitura de contratos',
+  risco_narrative: 'Narrativa de risco',
+  dispute_copilot: 'Copiloto de disputas',
+  sinistro_copilot: 'Copiloto de sinistro',
+  pld_second_opinion: 'Segunda opinião PLD',
+  compliance_engine: 'Compliance AI Engine',
+};
+
+type Tab = 'kyb' | 'disputas' | 'compliance' | 'ia' | 'auditoria';
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>('kyb');
@@ -60,18 +81,43 @@ export function AdminPage() {
   const [loadingAiId, setLoadingAiId] = useState<number | null>(null);
   const [complianceQueue, setComplianceQueue] = useState<ComplianceQueueItem[]>([]);
   const [complianceNoteById, setComplianceNoteById] = useState<Record<string, string>>({});
+  const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null);
+  const [threshold, setThreshold] = useState<{ threshold: number; default: number } | null>(null);
+  const [thresholdInput, setThresholdInput] = useState('');
+  const [savingThreshold, setSavingThreshold] = useState(false);
 
   const loadKyb = () => api.get<{ pending: PendingKyb[] }>('/admin/kyb').then((d) => setPending(d.pending));
   const loadDisputes = () => api.get<{ disputes: AdminDispute[] }>('/admin/disputes').then((d) => setDisputes(d.disputes));
   const loadAudit = () => api.get<{ entries: AuditEntry[]; chain: { valid: boolean; brokenAt: number | null } }>('/admin/audit').then(setAudit);
   const loadCompliance = () => api.get<{ pending: ComplianceQueueItem[] }>('/admin/compliance-queue').then((d) => setComplianceQueue(d.pending));
+  const loadAiUsage = () => api.get<AiUsageSummary>('/admin/ai-usage').then(setAiUsage);
+  const loadThreshold = () =>
+    api.get<{ threshold: number; default: number }>('/admin/compliance-threshold').then((d) => {
+      setThreshold(d);
+      setThresholdInput(String(d.threshold));
+    });
 
   useEffect(() => {
     loadKyb();
     loadDisputes();
     loadAudit();
     loadCompliance();
+    loadAiUsage();
+    loadThreshold();
   }, []);
+
+  const saveThreshold = async () => {
+    const n = Number(thresholdInput);
+    if (!Number.isInteger(n) || n < 1 || n > 100) return;
+    setSavingThreshold(true);
+    try {
+      await api.put('/admin/compliance-threshold', { threshold: n });
+      await loadThreshold();
+      await loadAudit();
+    } finally {
+      setSavingThreshold(false);
+    }
+  };
 
   const decideCompliance = async (duplicataId: string, decision: 'liberado' | 'rejeitado') => {
     const note = complianceNoteById[duplicataId]?.trim();
@@ -123,6 +169,7 @@ export function AdminPage() {
           ['kyb', `Fila de KYB (${pending.length})`],
           ['disputas', `Disputas (${disputes.length})`],
           ['compliance', `Compliance (${complianceQueue.length})`],
+          ['ia', 'Uso de IA'],
           ['auditoria', 'Auditoria'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -267,9 +314,31 @@ export function AdminPage() {
       {tab === 'compliance' && (
         <div className="flex flex-col gap-4">
           <div className="text-textSecondary text-[12.5px]">
-            Duplicatas suspensas automaticamente pelo Compliance AI Engine (nota de risco ≥ 80/100) antes de chegar ao marketplace. Nenhuma é bloqueada
-            para sempre sem revisão — libere ou rejeite abaixo.
+            Duplicatas suspensas automaticamente pelo Compliance AI Engine (nota de risco ≥ {threshold?.threshold ?? 80}/100) antes de chegar ao
+            marketplace. Nenhuma é bloqueada para sempre sem revisão — libere ou rejeite abaixo.
           </div>
+
+          <div className="bg-white border border-border rounded-card p-5">
+            <div className="font-bold text-[14px] mb-1">Nota de corte para suspensão automática</div>
+            <div className="text-textSecondary text-[12.5px] mb-3">
+              Duplicatas com nota igual ou acima deste valor vão para a fila de revisão humana em vez de seguir direto para o marketplace. Padrão:{' '}
+              {threshold?.default ?? 80}.
+            </div>
+            <div className="flex items-center gap-2.5">
+              <input
+                type="number"
+                min={1}
+                max={100}
+                className="w-24 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+                value={thresholdInput}
+                onChange={(e) => setThresholdInput(e.target.value)}
+              />
+              <Button size="sm" variant="secondary" disabled={savingThreshold || Number(thresholdInput) === threshold?.threshold} onClick={saveThreshold}>
+                {savingThreshold ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+
           {complianceQueue.map((c) => (
             <div key={c.duplicataId} className="bg-white rounded-card p-6" style={{ border: '1px solid #E9CFCB' }}>
               <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
@@ -316,6 +385,56 @@ export function AdminPage() {
             <div className="bg-white border border-border rounded-card">
               <EmptyState title="Nenhuma duplicata em revisão de compliance" hint="Duplicatas com nota de risco alta aparecem aqui automaticamente" />
             </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'ia' && (
+        <div className="flex flex-col gap-4">
+          <div className="text-textSecondary text-[12.5px]">
+            Custo é uma estimativa (taxa por token configurável no servidor) a partir dos tokens reais que a API da Anthropic retornou em cada chamada —
+            útil para identificar qual recurso está gerando mais gasto, não é uma fatura. Cada rota que chama a IA também tem limite de 30 chamadas por
+            usuário a cada 15 minutos.
+          </div>
+          {aiUsage && (
+            <>
+              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                <div className="bg-white border border-border rounded-card p-4">
+                  <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Chamadas totais</div>
+                  <div className="text-[22px] font-bold">{aiUsage.totalCalls}</div>
+                  {aiUsage.failedCalls > 0 && <div className="text-[11.5px] text-red mt-0.5">{aiUsage.failedCalls} com falha</div>}
+                </div>
+                <div className="bg-white border border-border rounded-card p-4">
+                  <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Tokens de entrada</div>
+                  <div className="text-[22px] font-bold">{aiUsage.totalInputTokens.toLocaleString('pt-BR')}</div>
+                </div>
+                <div className="bg-white border border-border rounded-card p-4">
+                  <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Tokens de saída</div>
+                  <div className="text-[22px] font-bold">{aiUsage.totalOutputTokens.toLocaleString('pt-BR')}</div>
+                </div>
+                <div className="bg-white border border-border rounded-card p-4">
+                  <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Custo estimado</div>
+                  <div className="text-[22px] font-bold">US$ {aiUsage.totalEstimatedCostUsd.toFixed(2)}</div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-border rounded-card overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-border font-bold text-[14px]">Por recurso</div>
+                {aiUsage.byFeature.map((f) => (
+                  <div key={f.feature} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+                    <div className="font-bold">{FEATURE_LABELS[f.feature] ?? f.feature}</div>
+                    <div className="text-textSecondary flex items-center gap-4">
+                      <span>{f.calls} chamadas</span>
+                      <span>
+                        {f.inputTokens.toLocaleString('pt-BR')} / {f.outputTokens.toLocaleString('pt-BR')} tok
+                      </span>
+                      <span className="font-mono-num font-bold text-textPrimary">US$ {f.estimatedCostUsd.toFixed(3)}</span>
+                    </div>
+                  </div>
+                ))}
+                {aiUsage.byFeature.length === 0 && <EmptyState title="Nenhuma chamada de IA registrada ainda" hint="Cada recurso assistido por IA aparece aqui após a primeira chamada" />}
+              </div>
+            </>
           )}
         </div>
       )}

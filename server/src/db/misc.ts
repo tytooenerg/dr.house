@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { db } from './index.js';
 import { getSettings, getUserById } from './users.js';
 import { sendEmail } from '../lib/mailer.js';
@@ -39,17 +40,76 @@ export function hasUnread(userId: number): boolean {
 }
 
 // --- team members ---
+// Real invite flow: a random token is generated here, only its SHA-256 hash is ever
+// stored (mirrors how refresh tokens are stored — see auth/jwt.ts hashRefreshToken), and
+// the raw token is returned once to the caller so it can be emailed/shown, never
+// persisted in cleartext. Accepting the invite (auth.ts POST /team-invite/accept) creates
+// a real login-capable account with users.team_owner_id = ownerId, and the platform
+// enforces read-only access for those accounts centrally (auth/middleware.ts).
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function hashInviteToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+export interface TeamMemberRow {
+  id: number;
+  owner_id: number;
+  nome: string;
+  email: string;
+  papel: string;
+  status: 'pending' | 'active' | 'revoked';
+  invite_token_hash: string | null;
+  invite_expires_at: string | null;
+  user_id: number | null;
+  accepted_at: string | null;
+  created_at: string;
+}
+
 export function listTeam(ownerId: number) {
-  return db.prepare('SELECT * FROM team_members WHERE owner_id = ? ORDER BY id ASC').all(ownerId) as {
+  return db.prepare('SELECT id, nome, email, papel, status, created_at FROM team_members WHERE owner_id = ? ORDER BY id ASC').all(ownerId) as {
     id: number;
     nome: string;
     email: string;
     papel: string;
+    status: 'pending' | 'active' | 'revoked';
+    created_at: string;
   }[];
 }
 
-export function inviteTeamMember(ownerId: number, nome: string, email: string) {
-  db.prepare('INSERT INTO team_members (owner_id, nome, email, papel) VALUES (?, ?, ?, ?)').run(ownerId, nome, email, 'Somente leitura');
+export function inviteTeamMember(ownerId: number, nome: string, email: string): { id: number; token: string } {
+  const token = crypto.randomBytes(24).toString('hex');
+  const tokenHash = hashInviteToken(token);
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
+  const info = db
+    .prepare(
+      `INSERT INTO team_members (owner_id, nome, email, papel, status, invite_token_hash, invite_expires_at)
+       VALUES (?, ?, ?, 'Somente leitura', 'pending', ?, ?)`
+    )
+    .run(ownerId, nome, email, tokenHash, expiresAt);
+  return { id: Number(info.lastInsertRowid), token };
+}
+
+export function findTeamInviteByToken(token: string): TeamMemberRow | undefined {
+  return db.prepare('SELECT * FROM team_members WHERE invite_token_hash = ? AND status = ?').get(hashInviteToken(token), 'pending') as
+    | TeamMemberRow
+    | undefined;
+}
+
+export function acceptTeamInvite(inviteId: number, userId: number) {
+  db.prepare("UPDATE team_members SET status = 'active', user_id = ?, accepted_at = datetime('now') WHERE id = ?").run(userId, inviteId);
+}
+
+export function revokeTeamMember(ownerId: number, memberId: number) {
+  db.prepare("UPDATE team_members SET status = 'revoked' WHERE id = ? AND owner_id = ?").run(memberId, ownerId);
+}
+
+// Checked on every request from a team-member account (auth/middleware.ts) so a revoked
+// invite locks the account out immediately, not just once its current access token
+// happens to expire.
+export function isTeamMembershipRevoked(userId: number): boolean {
+  const row = db.prepare("SELECT 1 FROM team_members WHERE user_id = ? AND status = 'revoked'").get(userId);
+  return !!row;
 }
 
 // --- ledger ---
