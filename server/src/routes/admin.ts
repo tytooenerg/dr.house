@@ -30,6 +30,13 @@ import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordReco
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
 import { runBackup, listBackups, backupEnabled } from '../lib/backup.js';
 import { listPendingTedDeposits, getTedDeposit, concludeTedDeposit } from '../db/ted.js';
+import {
+  listSuspiciousActivityReports,
+  getSuspiciousActivityReport,
+  dismissSuspiciousActivityReport,
+  markSuspiciousActivityReported,
+} from '../db/suspiciousActivity.js';
+import { runSuspiciousActivityScan, getStructuringThreshold, setStructuringThreshold } from '../lib/suspiciousActivityMonitor.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -527,6 +534,91 @@ adminRouter.post('/ted/:referencia/confirmar', (req, res) => {
   recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.ted_confirmado', { referencia: deposito.referencia, valor: deposito.valor });
   res.json({ ok: true });
 });
+
+// Automated suspicious-activity monitoring (lib/suspiciousActivityMonitor.ts) — real,
+// deterministic detection (fracionamento, entrada/saída rápida); real submission to
+// COAF requires a licensed institution's SISCOAP credentials this repo can't have, so an
+// admin either dismisses a flagged report or records that they reported it externally.
+adminRouter.get('/pld/suspeitas', (req, res) => {
+  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+  const reports = listSuspiciousActivityReports(status as 'aberto' | 'descartado' | 'reportado_coaf' | undefined).map((r) => ({
+    id: r.id,
+    empresa: r.company_name,
+    email: r.email,
+    tipo: r.tipo,
+    severidade: r.severidade,
+    descricao: r.descricao,
+    status: r.status,
+    externalReference: r.external_reference,
+    quando: fmtRelative(r.created_at),
+  }));
+  res.json({ reports, threshold: getStructuringThreshold() });
+});
+
+adminRouter.post('/pld/suspeitas/scan', (req, res) => {
+  const result = runSuspiciousActivityScan();
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.sar_scan_manual', result);
+  res.json({ ok: true, ...result });
+});
+
+const sarThresholdSchema = z.object({ threshold: z.number().positive().max(10_000_000) });
+
+adminRouter.put(
+  '/pld/suspeitas/threshold',
+  asyncHandler(async (req, res) => {
+    const parsed = sarThresholdSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    setStructuringThreshold(parsed.data.threshold, req.user!.id);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.sar_threshold_updated', { threshold: parsed.data.threshold });
+    res.json({ threshold: getStructuringThreshold() });
+  })
+);
+
+const sarNoteSchema = z.object({ note: z.string().trim().max(500).optional() });
+
+adminRouter.post('/pld/suspeitas/:id/descartar', (req, res) => {
+  const report = getSuspiciousActivityReport(Number(req.params.id));
+  if (!report) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  if (report.status !== 'aberto') {
+    res.status(409).json({ error: 'already_reviewed' });
+    return;
+  }
+  const parsed = sarNoteSchema.safeParse(req.body ?? {});
+  dismissSuspiciousActivityReport(report.id, req.user!.id, parsed.success ? parsed.data.note : undefined);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.sar_descartado', { reportId: report.id });
+  res.json({ ok: true });
+});
+
+const sarReportSchema = z.object({ externalReference: z.string().trim().min(1).max(120), note: z.string().trim().max(500).optional() });
+
+adminRouter.post(
+  '/pld/suspeitas/:id/reportar',
+  asyncHandler(async (req, res) => {
+    const report = getSuspiciousActivityReport(Number(req.params.id));
+    if (!report) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    if (report.status !== 'aberto') {
+      res.status(409).json({ error: 'already_reviewed' });
+      return;
+    }
+    const parsed = sarReportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    markSuspiciousActivityReported(report.id, req.user!.id, parsed.data.externalReference, parsed.data.note);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.sar_reportado_coaf', { reportId: report.id, externalReference: parsed.data.externalReference });
+    res.json({ ok: true });
+  })
+);
 
 adminRouter.get('/backups', (_req, res) => {
   const backups = listBackups().map((b) => ({ ...b, quando: fmtRelative(b.createdAt) }));

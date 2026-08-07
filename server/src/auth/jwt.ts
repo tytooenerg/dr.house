@@ -51,6 +51,55 @@ export function verifyChallengeToken(token: string): number | null {
   }
 }
 
+const GOOGLE_OAUTH_STATE_TYPE = 'google_oauth_state';
+
+// CSRF protection for the Google OAuth redirect round-trip — stateless (no server-side
+// session store needed) since the state itself is a signed, short-lived JWT the callback
+// verifies came from us, carrying only a nonce and an optional referral code to preserve
+// across the redirect to Google and back.
+export function signGoogleOAuthState(referralCode?: string): string {
+  return jwt.sign({ typ: GOOGLE_OAUTH_STATE_TYPE, nonce: crypto.randomBytes(8).toString('hex'), ref: referralCode ?? null }, SECRET, { expiresIn: '10m' });
+}
+
+export function verifyGoogleOAuthState(token: string): { referralCode: string | null } | null {
+  try {
+    const decoded = jwt.verify(token, SECRET) as Record<string, unknown>;
+    if (decoded.typ !== GOOGLE_OAUTH_STATE_TYPE) return null;
+    return { referralCode: typeof decoded.ref === 'string' ? decoded.ref : null };
+  } catch {
+    return null;
+  }
+}
+
+const GOOGLE_SIGNUP_TYPE = 'google_signup';
+
+// Issued after a real Google OAuth exchange for an email Lastro has never seen — proves
+// "Google already verified this person owns this email" without creating an account yet,
+// since role/companyName still need to be collected (see completar-cadastro-google on the
+// client). Exchanged for a real account by POST /auth/google/complete-signup.
+export function signGoogleSignupToken(input: { email: string; nome: string; googleSub: string; referralCode?: string | null }): string {
+  return jwt.sign({ typ: GOOGLE_SIGNUP_TYPE, email: input.email, nome: input.nome, googleSub: input.googleSub, ref: input.referralCode ?? null }, SECRET, {
+    expiresIn: '30m',
+  });
+}
+
+export interface GoogleSignupTokenPayload {
+  email: string;
+  nome: string;
+  googleSub: string;
+  referralCode: string | null;
+}
+
+export function verifyGoogleSignupToken(token: string): GoogleSignupTokenPayload | null {
+  try {
+    const decoded = jwt.verify(token, SECRET) as Record<string, unknown>;
+    if (decoded.typ !== GOOGLE_SIGNUP_TYPE || typeof decoded.email !== 'string' || typeof decoded.googleSub !== 'string') return null;
+    return { email: decoded.email, nome: typeof decoded.nome === 'string' ? decoded.nome : '', googleSub: decoded.googleSub, referralCode: typeof decoded.ref === 'string' ? decoded.ref : null };
+  } catch {
+    return null;
+  }
+}
+
 export function generateRefreshToken(): string {
   return crypto.randomBytes(48).toString('hex');
 }

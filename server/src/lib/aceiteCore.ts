@@ -51,14 +51,15 @@ function view(
   };
 }
 
-// Shared by the internal /api/aceites route (used by the SPA) and the public
-// /api/v1/aceites partner endpoints — same visibility rules either way.
-export function listAceitesForUser(user: UserRow) {
+// Shared by the internal /api/aceites route (used by the SPA, always sandbox=false) and
+// the public /api/v1/aceites partner endpoints (sandbox = calling key's mode === 'test')
+// — same visibility rules either way, just scoped to a different data plane.
+export function listAceitesForUser(user: UserRow, sandbox = false) {
   if (user.role === 'cedente') {
-    return listAceitesByCedente(user.id).map((a) => view(a, false));
+    return listAceitesByCedente(user.id, sandbox).map((a) => view(a, false));
   }
   if (user.role === 'sacado') {
-    return listAceitesBySacadoNome(user.company_name).map((a) => view(a, true));
+    return listAceitesBySacadoNome(user.company_name, sandbox).map((a) => view(a, true));
   }
   return [];
 }
@@ -69,9 +70,12 @@ export type DecideAceiteOutcome =
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 404; body: { error: 'not_found' } };
 
-// Shared by the internal POST /api/aceites/:id/status route and the public
-// /api/v1/aceites/:id partner endpoint — same business rules and side effects either way.
-export async function decideAceite(user: UserRow, aceiteId: number, decision: AceiteStatusInput['status']): Promise<DecideAceiteOutcome> {
+// Shared by the internal POST /api/aceites/:id/status route (sandbox=false) and the
+// public /api/v1/aceites/:id partner endpoint (sandbox = calling key's mode === 'test')
+// — same business rules and side effects either way. A cross-mode id (a live key hitting
+// a sandbox aceite's id, or vice versa) 404s exactly like /v1/duplicatas/:id, rather than
+// leaking whether the id exists in the other data plane.
+export async function decideAceite(user: UserRow, aceiteId: number, decision: AceiteStatusInput['status'], sandbox = false): Promise<DecideAceiteOutcome> {
   if (user.role !== 'sacado') {
     return { status: 403, body: { error: 'forbidden', message: 'Somente o sacado pode confirmar ou contestar uma duplicata.' } };
   }
@@ -83,7 +87,10 @@ export async function decideAceite(user: UserRow, aceiteId: number, decision: Ac
     return { status: 404, body: { error: 'not_found' } };
   }
   const duplicata = getDuplicata(aceite.duplicata_id);
-  if (!duplicata || duplicata.sacado_nome.toLowerCase() !== user.company_name.toLowerCase()) {
+  if (!duplicata || !!duplicata.sandbox !== sandbox) {
+    return { status: 404, body: { error: 'not_found' } };
+  }
+  if (duplicata.sacado_nome.toLowerCase() !== user.company_name.toLowerCase()) {
     return { status: 403, body: { error: 'forbidden', message: 'Esta duplicata não pertence à sua empresa.' } };
   }
   await new Promise((r) => setTimeout(r, 700));
@@ -110,5 +117,5 @@ export async function decideAceite(user: UserRow, aceiteId: number, decision: Ac
     }
   }
   recordAuditEvent(user.id, user.company_name, `aceite.${decision}`, { duplicataId: duplicata.id });
-  return { status: 200, body: { aceites: listAceitesForUser(user) } };
+  return { status: 200, body: { aceites: listAceitesForUser(user, sandbox) } };
 }

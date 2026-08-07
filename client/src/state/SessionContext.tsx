@@ -42,6 +42,8 @@ interface SessionContextValue {
   verifyTwoFactor: (challengeToken: string, code: string) => Promise<void>;
   register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => Promise<void>;
   acceptTeamInvite: (input: { token: string; nome?: string; password: string }) => Promise<void>;
+  loginWithTokens: (token: string, refreshToken: string) => Promise<void>;
+  completeGoogleSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   logout: () => void;
   submitKyb: (form: { cnpj: string; tipo: string; pl: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -127,6 +129,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Used by the /oauth/callback page after a real Google OAuth redirect round-trip — the
+  // server already issued real session tokens (login, or an existing-email account
+  // linked); this just adopts them into the SPA the same way login()/register() do.
+  const loginWithTokens = useCallback(async (token: string, refreshToken: string) => {
+    setSessionTokens(token, refreshToken);
+    await refresh();
+  }, [refresh]);
+
+  const completeGoogleSignup = useCallback(async (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/google/complete-signup', input);
+      setSessionTokens(data.token, data.refreshToken);
+      setUser(data.user);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível concluir o cadastro.');
+      throw err;
+    }
+  }, []);
+
   const logout = useCallback(() => {
     const refreshToken = getRefreshToken();
     api.post('/auth/logout', refreshToken ? { refreshToken } : undefined).catch(() => {});
@@ -144,7 +166,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setUser((u) => (u ? { ...u, showOnboarding: false } : u));
   }, []);
 
-  const value: SessionContextValue = { user, loading, authError, login, verifyTwoFactor, register, acceptTeamInvite, logout, submitKyb, completeOnboarding, refresh };
+  const value: SessionContextValue = {
+    user,
+    loading,
+    authError,
+    login,
+    verifyTwoFactor,
+    register,
+    acceptTeamInvite,
+    loginWithTokens,
+    completeGoogleSignup,
+    logout,
+    submitKyb,
+    completeOnboarding,
+    refresh,
+  };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

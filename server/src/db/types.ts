@@ -101,6 +101,8 @@ export interface UserRow {
   team_owner_id: number | null;
   totp_secret: string | null;
   totp_enabled: number;
+  google_sub: string | null;
+  auth_provider: 'password' | 'google';
 }
 
 export interface DuplicataRow {

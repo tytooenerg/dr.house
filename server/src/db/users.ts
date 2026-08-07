@@ -14,6 +14,14 @@ export function getUserByReferralCode(code: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE referral_code = ?').get(code.toUpperCase().trim()) as UserRow | undefined;
 }
 
+export function getUserByGoogleSub(googleSub: string): UserRow | undefined {
+  return db.prepare('SELECT * FROM users WHERE google_sub = ?').get(googleSub) as UserRow | undefined;
+}
+
+export function linkGoogleAccount(userId: number, googleSub: string) {
+  db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(googleSub, userId);
+}
+
 export function getSeguradoraByInsurerKey(insurerKey: string): UserRow | undefined {
   return db.prepare("SELECT * FROM users WHERE role = 'seguradora' AND insurer_key = ? ORDER BY id ASC LIMIT 1").get(insurerKey) as UserRow | undefined;
 }
@@ -49,11 +57,12 @@ export function createUser(input: {
   insurerKey?: string;
   referredByCode?: string;
   teamOwnerId?: number;
+  googleSub?: string;
 }): UserRow {
   const referrer = input.referredByCode ? getUserByReferralCode(input.referredByCode) : undefined;
   const info = db
     .prepare(
-      'INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings, referral_code, referred_by_user_id, team_owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings, referral_code, referred_by_user_id, team_owner_id, google_sub, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
     .run(
       input.email.toLowerCase().trim(),
@@ -65,7 +74,9 @@ export function createUser(input: {
       JSON.stringify(defaultSettings()),
       uniqueReferralCode(),
       referrer?.id ?? null,
-      input.teamOwnerId ?? null
+      input.teamOwnerId ?? null,
+      input.googleSub ?? null,
+      input.googleSub ? 'google' : 'password'
     );
   if (referrer) bumpReferralBonus(referrer.id);
   return getUserById(Number(info.lastInsertRowid))!;

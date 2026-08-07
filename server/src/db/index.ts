@@ -48,6 +48,7 @@ export function resetDbForTests() {
     DELETE FROM boletos;
     DELETE FROM ted_payouts;
     DELETE FROM ted_deposits;
+    DELETE FROM suspicious_activity_reports;
     DELETE FROM users;
   `);
 }

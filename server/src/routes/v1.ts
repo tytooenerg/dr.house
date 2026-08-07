@@ -76,9 +76,10 @@ v1Router.get('/marketplace', (req, res) => {
 });
 
 // Sacado-facing aceite endpoints — a sacado's ERP can list pending aceites and
-// confirm/contest them programmatically, mirroring /api/aceites for the SPA.
+// confirm/contest them programmatically, mirroring /api/aceites for the SPA. A
+// test-mode key only ever sees/acts on its own seeded sandbox aceites (lib/sandboxData.ts).
 v1Router.get('/aceites', (req, res) => {
-  res.json({ aceites: listAceitesForUser(req.apiUser!) });
+  res.json({ aceites: listAceitesForUser(req.apiUser!, req.apiKey!.mode === 'test') });
 });
 
 v1Router.post(
@@ -90,8 +91,9 @@ v1Router.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
+    const sandbox = req.apiKey!.mode === 'test';
     const outcome = await withIdempotency(req.apiUser!.id, 'POST /v1/aceites/:id/status', idempotencyHeader(req), req.body, () =>
-      decideAceite(req.apiUser!, Number(req.params.id), parsed.data.status)
+      decideAceite(req.apiUser!, Number(req.params.id), parsed.data.status, sandbox)
     );
     res.status(outcome.status).json(outcome.body);
   })

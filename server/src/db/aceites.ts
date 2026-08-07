@@ -33,24 +33,28 @@ export function getAceiteByDuplicata(duplicataId: string): AceiteRow | undefined
   return db.prepare('SELECT * FROM aceites WHERE duplicata_id = ?').get(duplicataId) as AceiteRow | undefined;
 }
 
-export function listAceitesByCedente(cedenteId: number): (AceiteRow & { sacado_nome: string; valor: number })[] {
+// `sandbox` scopes to the same live/test data plane as db/duplicatas.ts: internal SPA
+// callers never pass it (always sandbox=0, i.e. real data only); the v1 partner API
+// passes the calling key's mode so a test-mode key only ever sees its own seeded
+// sandbox aceites, never real ones (and vice versa) — see lib/sandboxData.ts.
+export function listAceitesByCedente(cedenteId: number, sandbox = false): (AceiteRow & { sacado_nome: string; valor: number })[] {
   return db
     .prepare(
       `SELECT a.*, d.sacado_nome as sacado_nome, d.valor as valor FROM aceites a
        JOIN duplicatas d ON d.id = a.duplicata_id
-       WHERE d.cedente_id = ? ORDER BY a.created_at DESC`
+       WHERE d.cedente_id = ? AND d.sandbox = ? ORDER BY a.created_at DESC`
     )
-    .all(cedenteId) as (AceiteRow & { sacado_nome: string; valor: number })[];
+    .all(cedenteId, sandbox ? 1 : 0) as (AceiteRow & { sacado_nome: string; valor: number })[];
 }
 
-export function listAceitesBySacadoNome(sacadoNome: string): (AceiteRow & { valor: number; cedente_nome: string })[] {
+export function listAceitesBySacadoNome(sacadoNome: string, sandbox = false): (AceiteRow & { valor: number; cedente_nome: string })[] {
   return db
     .prepare(
       `SELECT a.*, d.valor as valor, d.cedente_nome as cedente_nome FROM aceites a
        JOIN duplicatas d ON d.id = a.duplicata_id
-       WHERE lower(d.sacado_nome) = lower(?) ORDER BY a.created_at DESC`
+       WHERE lower(d.sacado_nome) = lower(?) AND d.sandbox = ? ORDER BY a.created_at DESC`
     )
-    .all(sacadoNome) as (AceiteRow & { valor: number; cedente_nome: string })[];
+    .all(sacadoNome, sandbox ? 1 : 0) as (AceiteRow & { valor: number; cedente_nome: string })[];
 }
 
 export function setAceiteStatus(id: number, status: 'aceita' | 'aguardando' | 'contestada') {
@@ -78,7 +82,7 @@ export function listAguardandoSemLembrete(): AceiteAguardandoComContato[] {
        FROM aceites a
        JOIN duplicatas d ON d.id = a.duplicata_id
        LEFT JOIN users u ON u.role = 'sacado' AND lower(u.company_name) = lower(d.sacado_nome)
-       WHERE a.status = 'aguardando' AND a.reminder_sent = 0 AND a.prazo_limite IS NOT NULL`
+       WHERE a.status = 'aguardando' AND a.reminder_sent = 0 AND a.prazo_limite IS NOT NULL AND d.sandbox = 0`
     )
     .all() as AceiteAguardandoComContato[];
 }

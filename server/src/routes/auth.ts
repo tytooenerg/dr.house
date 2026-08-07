@@ -6,6 +6,8 @@ import {
   getSettings,
   getUserByEmail,
   getUserById,
+  getUserByGoogleSub,
+  linkGoogleAccount,
   submitKybForReview,
   updateKybForm,
   updateSettings,
@@ -13,7 +15,19 @@ import {
 } from '../db/users.js';
 import { acceptTeamInvite, findTeamInviteByToken } from '../db/misc.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
-import { generateRefreshToken, hashRefreshToken, signAccessToken, signChallengeToken, verifyChallengeToken } from '../auth/jwt.js';
+import {
+  generateRefreshToken,
+  hashRefreshToken,
+  signAccessToken,
+  signChallengeToken,
+  verifyChallengeToken,
+  signGoogleOAuthState,
+  verifyGoogleOAuthState,
+  signGoogleSignupToken,
+  verifyGoogleSignupToken,
+} from '../auth/jwt.js';
+import { googleOAuthEnabled, buildGoogleAuthUrl, exchangeCodeForProfile } from '../lib/googleOAuth.js';
+import crypto from 'node:crypto';
 import { createRefreshToken, findValidRefreshToken, revokeAllRefreshTokensForUser, revokeRefreshToken } from '../db/refreshTokens.js';
 import { requireAuth } from '../auth/middleware.js';
 import { recordAuditEvent } from '../db/audit.js';
@@ -23,6 +37,7 @@ import { runPldScreening } from '../lib/pldScreening.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { generateTotpSecret, verifyTotp, otpauthUrl, generateRecoveryCode } from '../lib/totp.js';
 import { setTotpSecret, enableTotp, disableTotp, storeRecoveryCodes, consumeRecoveryCode, countRemainingRecoveryCodes } from '../db/twoFactor.js';
+import { logger } from '../lib/logger.js';
 import type { UserRow } from '../db/types.js';
 
 export const authRouter = Router();
@@ -224,6 +239,136 @@ authRouter.post(
     revokeRefreshToken(tokenHash);
     const { accessToken, refreshToken } = issueTokens(user);
     res.json({ token: accessToken, refreshToken });
+  })
+);
+
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+
+function googleRedirectUri(req: import('express').Request): string {
+  return process.env.GOOGLE_OAUTH_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+}
+
+// Public — lets the client decide whether to show "Continuar com Google" at all, since
+// there's deliberately no simulated fallback for a third-party identity check.
+authRouter.get('/google/config', (_req, res) => {
+  res.json({ enabled: googleOAuthEnabled });
+});
+
+authRouter.get('/google/start', (req, res) => {
+  if (!googleOAuthEnabled) {
+    res.status(404).json({ error: 'not_configured', message: 'Login com Google não está configurado neste ambiente.' });
+    return;
+  }
+  const referralCode = typeof req.query.ref === 'string' ? req.query.ref : undefined;
+  const state = signGoogleOAuthState(referralCode);
+  res.redirect(302, buildGoogleAuthUrl(state, googleRedirectUri(req)));
+});
+
+authRouter.get(
+  '/google/callback',
+  asyncHandler(async (req, res) => {
+    if (!googleOAuthEnabled) {
+      res.redirect(302, `${APP_URL}/?googleError=nao_configurado`);
+      return;
+    }
+    const code = typeof req.query.code === 'string' ? req.query.code : null;
+    const stateToken = typeof req.query.state === 'string' ? req.query.state : null;
+    const state = stateToken ? verifyGoogleOAuthState(stateToken) : null;
+    if (!code || !state) {
+      res.redirect(302, `${APP_URL}/?googleError=sessao_invalida`);
+      return;
+    }
+    let profile;
+    try {
+      profile = await exchangeCodeForProfile(code, googleRedirectUri(req));
+    } catch (err) {
+      logger.error({ err }, '[google-oauth] falha ao trocar código pelo perfil');
+      res.redirect(302, `${APP_URL}/?googleError=falha_google`);
+      return;
+    }
+    if (!profile.emailVerified) {
+      res.redirect(302, `${APP_URL}/?googleError=email_nao_verificado`);
+      return;
+    }
+
+    const byGoogleSub = getUserByGoogleSub(profile.sub);
+    if (byGoogleSub) {
+      const { accessToken, refreshToken } = issueTokens(byGoogleSub);
+      recordAuditEvent(byGoogleSub.id, byGoogleSub.company_name, 'user.login_google', {});
+      res.redirect(302, `${APP_URL}/oauth/callback?token=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}`);
+      return;
+    }
+
+    const byEmail = getUserByEmail(profile.email);
+    if (byEmail) {
+      // Account linking: the same verified email already has a password-based Lastro
+      // account — attach this Google identity to it rather than creating a duplicate.
+      linkGoogleAccount(byEmail.id, profile.sub);
+      const { accessToken, refreshToken } = issueTokens(byEmail);
+      recordAuditEvent(byEmail.id, byEmail.company_name, 'user.google_linked', {});
+      res.redirect(302, `${APP_URL}/oauth/callback?token=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}`);
+      return;
+    }
+
+    // Brand new email — can't create the account yet (role/companyName still needed), so
+    // hand the client a short-lived, Google-verified signup token instead.
+    const signupToken = signGoogleSignupToken({ email: profile.email, nome: profile.name, googleSub: profile.sub, referralCode: state.referralCode });
+    res.redirect(
+      302,
+      `${APP_URL}/completar-cadastro-google?signupToken=${encodeURIComponent(signupToken)}&nome=${encodeURIComponent(profile.name)}&email=${encodeURIComponent(profile.email)}`
+    );
+  })
+);
+
+const completeGoogleSignupSchema = z.object({
+  signupToken: z.string().trim().min(10),
+  companyName: z.string().trim().min(2, 'Informe o nome da empresa.'),
+  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora']),
+  insurerKey: z.enum(INSURERS.map((i) => i.key) as [string, ...string[]]).optional(),
+});
+
+authRouter.post(
+  '/google/complete-signup',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = completeGoogleSignupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const { companyName, role, insurerKey } = parsed.data;
+    if (role === 'seguradora' && !insurerKey) {
+      res.status(400).json({ error: 'validation_error', message: 'Selecione qual seguradora sua conta representa.' });
+      return;
+    }
+    const payload = verifyGoogleSignupToken(parsed.data.signupToken);
+    if (!payload) {
+      res.status(401).json({ error: 'unauthorized', message: 'Sessão de cadastro via Google expirada — tente novamente.' });
+      return;
+    }
+    // The token itself proves Google already verified this email; re-check it hasn't
+    // been claimed (by a normal registration or a concurrent Google signup) meanwhile.
+    if (getUserByEmail(payload.email) || getUserByGoogleSub(payload.googleSub)) {
+      res.status(409).json({ error: 'email_taken', message: 'Já existe uma conta com este e-mail.' });
+      return;
+    }
+    // Google-only accounts still get a real password_hash — a random, never-revealed
+    // value bcrypt-hashed the normal way, so verifyPassword can never match it. Avoids
+    // relaxing password_hash to nullable across every other read of that column.
+    const randomPasswordHash = await hashPassword(crypto.randomBytes(24).toString('hex'));
+    const user = createUser({
+      email: payload.email,
+      passwordHash: randomPasswordHash,
+      nome: payload.nome || companyName,
+      companyName,
+      role,
+      insurerKey,
+      referredByCode: payload.referralCode ?? undefined,
+      googleSub: payload.googleSub,
+    });
+    const { accessToken, refreshToken } = issueTokens(user);
+    recordAuditEvent(user.id, user.company_name, 'user.registered_google', { role });
+    res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });
   })
 );
 

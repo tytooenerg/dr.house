@@ -4,6 +4,8 @@ import { AppShell } from './layout/AppShell';
 import { Gate } from './components/Gate';
 import { LoginPage } from './pages/auth/LoginPage';
 import { TeamInviteAcceptPage } from './pages/auth/TeamInviteAcceptPage';
+import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
+import { CompleteGoogleSignupPage } from './pages/auth/CompleteGoogleSignupPage';
 import { DashboardPage } from './pages/app/DashboardPage';
 import { MarketplacePage } from './pages/app/MarketplacePage';
 import { AutomacaoPage } from './pages/app/AutomacaoPage';
@@ -40,6 +42,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/convite-equipe" element={<TeamInviteAcceptPage />} />
+        <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+        <Route path="/completar-cadastro-google" element={<CompleteGoogleSignupPage />} />
         <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/precos" element={<PrecosPage />} />
         <Route path="/legal" element={<LegalPage />} />

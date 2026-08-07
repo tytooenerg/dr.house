@@ -40,6 +40,10 @@ export function resolveDispute(id: number, resolution = '', resolvedBy: number |
   );
 }
 
+// Disputes have no v1 partner-API surface (internal SPA + admin only), so unlike
+// aceites/duplicatas these always operate on the live data plane — a dispute raised
+// against a sandbox aceite (created by a test-mode key contesting its own seeded data)
+// never leaks into a real cedente's Disputas screen or the admin arbitration queue.
 export function listOpenDisputesByCedente(cedenteId: number) {
   return db
     .prepare(
@@ -47,7 +51,7 @@ export function listOpenDisputesByCedente(cedenteId: number) {
        FROM disputes dis
        JOIN aceites a ON a.id = dis.aceite_id
        JOIN duplicatas d ON d.id = a.duplicata_id
-       WHERE d.cedente_id = ? AND dis.resolved = 0
+       WHERE d.cedente_id = ? AND d.sandbox = 0 AND dis.resolved = 0
        ORDER BY dis.created_at DESC`
     )
     .all(cedenteId) as (DisputeRow & { duplicata_id: string; sacado_nome: string; valor: number })[];
@@ -60,7 +64,7 @@ export function listAllOpenDisputes() {
        FROM disputes dis
        JOIN aceites a ON a.id = dis.aceite_id
        JOIN duplicatas d ON d.id = a.duplicata_id
-       WHERE dis.resolved = 0
+       WHERE dis.resolved = 0 AND d.sandbox = 0
        ORDER BY dis.created_at ASC`
     )
     .all() as (DisputeRow & { duplicata_id: string; sacado_nome: string; cedente_nome: string; valor: number })[];

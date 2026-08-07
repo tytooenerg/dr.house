@@ -6,6 +6,7 @@ import { startHealthMonitor } from './lib/healthMonitor.js';
 import { startAceiteReminderJob } from './lib/aceiteReminder.js';
 import { startAutoEmitJob } from './lib/autoEmitJob.js';
 import { startBackupJob } from './lib/backup.js';
+import { startSuspiciousActivityJob } from './lib/suspiciousActivityMonitor.js';
 import { logger } from './lib/logger.js';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -18,6 +19,7 @@ async function main() {
   startAceiteReminderJob();
   startAutoEmitJob();
   startBackupJob();
+  startSuspiciousActivityJob();
   server.listen(PORT, () => {
     logger.info(`Lastro API listening on http://localhost:${PORT} (WebSocket at /ws/market)`);
   });
