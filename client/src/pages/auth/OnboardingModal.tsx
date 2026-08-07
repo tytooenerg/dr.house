@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ModalOverlay } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { useSession } from '../../state/SessionContext';
@@ -6,8 +6,17 @@ import { useSession } from '../../state/SessionContext';
 export function OnboardingModal() {
   const { user, completeOnboarding } = useSession();
   const [step, setStep] = useState(0);
-  if (!user) return null;
-  const steps = user.onboardingSteps;
+  const steps = user?.onboardingSteps ?? [];
+  const hasSteps = steps.length > 0;
+
+  // Some roles (e.g. admin) have no onboarding steps by design — nothing to show,
+  // so skip straight past it instead of indexing into an empty array. Runs as an
+  // effect, not during render, since completeOnboarding updates session state.
+  useEffect(() => {
+    if (user && !hasSteps) completeOnboarding();
+  }, [user, hasSteps, completeOnboarding]);
+
+  if (!user || !hasSteps) return null;
   const isLast = step >= steps.length - 1;
   const current = steps[step] ?? steps[0];
 
