@@ -387,6 +387,14 @@ const kybSchema = z.object({
   cnpj: z.string().trim().min(1).optional().default(''),
   tipo: z.enum(KYB_TIPOS as [string, ...string[]]).optional(),
   pl: z.string().trim().optional().default(''),
+  // Non-resident investor (INR) fields — see lib/foreignInvestorCompliance.ts. CNPJ
+  // doesn't apply to a foreign entity, so naoResidente=true swaps it for a foreign tax ID
+  // on the client; taxIdEstrangeiro is screened against sanctions lists the same way cnpj
+  // would be, just without the Brazilian-format check.
+  naoResidente: z.boolean().optional().default(false),
+  paisDomicilio: z.string().trim().max(80).optional().default(''),
+  taxIdEstrangeiro: z.string().trim().max(60).optional().default(''),
+  representanteLegal: z.string().trim().max(140).optional().default(''),
 });
 
 authRouter.post(
@@ -403,9 +411,14 @@ authRouter.post(
     if (parsed.data.cnpj) updateKybForm(userId, 'cnpj', parsed.data.cnpj);
     if (parsed.data.tipo) updateKybForm(userId, 'tipo', parsed.data.tipo);
     if (parsed.data.pl) updateKybForm(userId, 'pl', parsed.data.pl);
+    updateKybForm(userId, 'naoResidente', parsed.data.naoResidente ? '1' : '');
+    if (parsed.data.paisDomicilio) updateKybForm(userId, 'paisDomicilio', parsed.data.paisDomicilio);
+    if (parsed.data.taxIdEstrangeiro) updateKybForm(userId, 'taxIdEstrangeiro', parsed.data.taxIdEstrangeiro);
+    if (parsed.data.representanteLegal) updateKybForm(userId, 'representanteLegal', parsed.data.representanteLegal);
     submitKybForReview(userId);
-    recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj });
-    await runPldScreening(userId, req.user!.company_name, parsed.data.cnpj);
+    recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj, naoResidente: parsed.data.naoResidente });
+    const screeningId = parsed.data.naoResidente ? parsed.data.taxIdEstrangeiro : parsed.data.cnpj;
+    await runPldScreening(userId, req.user!.company_name, screeningId);
     const refreshed = getUserById(userId)!;
     res.json({ user: publicUser(refreshed) });
   })

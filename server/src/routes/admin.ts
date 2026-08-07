@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../auth/middleware.js';
-import { approveKyb, listPendingKyb, rejectKyb } from '../db/users.js';
+import { approveKyb, listPendingKyb, rejectKyb, getUserById } from '../db/users.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
@@ -37,21 +37,27 @@ import {
   markSuspiciousActivityReported,
 } from '../db/suspiciousActivity.js';
 import { runSuspiciousActivityScan, getStructuringThreshold, setStructuringThreshold } from '../lib/suspiciousActivityMonitor.js';
+import { generateAndRecordEligibility } from '../lib/foreignInvestorCompliance.js';
+import { listForeignInvestorScreeningsByUser } from '../db/foreignInvestorScreenings.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
 
 adminRouter.get('/kyb', (_req, res) => {
-  const pending = listPendingKyb().map((u) => ({
-    id: u.id,
-    nome: u.nome,
-    email: u.email,
-    companyName: u.company_name,
-    kybForm: JSON.parse(u.kyb_form || '{}'),
-    submittedAt: fmtRelative(u.created_at),
-    pldStatus: u.pld_status,
-    pldMatchNote: u.pld_match_note,
-  }));
+  const pending = listPendingKyb().map((u) => {
+    const kybForm = JSON.parse(u.kyb_form || '{}');
+    return {
+      id: u.id,
+      nome: u.nome,
+      email: u.email,
+      companyName: u.company_name,
+      kybForm,
+      naoResidente: !!kybForm.naoResidente,
+      submittedAt: fmtRelative(u.created_at),
+      pldStatus: u.pld_status,
+      pldMatchNote: u.pld_match_note,
+    };
+  });
   res.json({ pending });
 });
 
@@ -79,6 +85,51 @@ adminRouter.post(
     rejectKyb(userId, parsed.data.reason);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'kyb.rejected', { targetUserId: userId, reason: parsed.data.reason });
     res.json({ ok: true });
+  })
+);
+
+// Foreign investor (INR) eligibility memo — on-demand, admin-triggered, deterministic
+// (see lib/foreignInvestorCompliance.ts). Generating one doesn't approve or reject the
+// KYB by itself; it's a compliance record the admin reviews alongside the normal
+// approve/reject decision above.
+adminRouter.get('/kyb/:userId/elegibilidade-estrangeiro', (req, res) => {
+  const screenings = listForeignInvestorScreeningsByUser(Number(req.params.userId)).map((s) => ({
+    id: s.id,
+    paisDomicilio: s.pais_domicilio,
+    jurisdicaoFavorecida: !!s.jurisdicao_favorecida,
+    classificacao: s.classificacao_investidor,
+    representanteLegal: s.representante_legal,
+    pldStatus: s.pld_status,
+    pldDetail: s.pld_detail,
+    memo: s.memo,
+    quando: fmtRelative(s.created_at),
+  }));
+  res.json({ screenings });
+});
+
+adminRouter.post(
+  '/kyb/:userId/elegibilidade-estrangeiro/gerar',
+  asyncHandler(async (req, res) => {
+    const userId = Number(req.params.userId);
+    const target = getUserById(userId);
+    if (!target) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const row = await generateAndRecordEligibility(target, req.user!.id);
+    res.json({
+      screening: {
+        id: row.id,
+        paisDomicilio: row.pais_domicilio,
+        jurisdicaoFavorecida: !!row.jurisdicao_favorecida,
+        classificacao: row.classificacao_investidor,
+        representanteLegal: row.representante_legal,
+        pldStatus: row.pld_status,
+        pldDetail: row.pld_detail,
+        memo: row.memo,
+        quando: fmtRelative(row.created_at),
+      },
+    });
   })
 );
 

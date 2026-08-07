@@ -9,10 +9,23 @@ interface PendingKyb {
   nome: string;
   email: string;
   companyName: string;
-  kybForm: { cnpj?: string; tipo?: string; pl?: string };
+  kybForm: { cnpj?: string; tipo?: string; pl?: string; paisDomicilio?: string; taxIdEstrangeiro?: string; representanteLegal?: string };
+  naoResidente: boolean;
   submittedAt: string;
   pldStatus: 'clear' | 'flagged';
   pldMatchNote: string;
+}
+
+interface ForeignInvestorScreening {
+  id: number;
+  paisDomicilio: string;
+  jurisdicaoFavorecida: boolean;
+  classificacao: 'profissional' | 'qualificado' | 'nao_classificado';
+  representanteLegal: string;
+  pldStatus: 'clear' | 'flagged';
+  pldDetail: string;
+  memo: string;
+  quando: string;
 }
 
 interface AdminDispute {
@@ -212,6 +225,8 @@ export function AdminPage() {
   const [scanningSar, setScanningSar] = useState(false);
   const [sarActionId, setSarActionId] = useState<number | null>(null);
   const [sarExternalRefById, setSarExternalRefById] = useState<Record<number, string>>({});
+  const [foreignScreeningsById, setForeignScreeningsById] = useState<Record<number, ForeignInvestorScreening[]>>({});
+  const [generatingMemoId, setGeneratingMemoId] = useState<number | null>(null);
 
   const loadKyb = () => api.get<{ pending: PendingKyb[] }>('/admin/kyb').then((d) => setPending(d.pending));
   const loadDisputes = () => api.get<{ disputes: AdminDispute[] }>('/admin/disputes').then((d) => setDisputes(d.disputes));
@@ -265,6 +280,13 @@ export function AdminPage() {
     loadTedPendentes();
     loadSar();
   }, []);
+
+  useEffect(() => {
+    for (const p of pending) {
+      if (p.naoResidente && !(p.id in foreignScreeningsById)) loadForeignScreenings(p.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending]);
 
   const saveSarThreshold = async () => {
     const n = Number(sarThresholdInput);
@@ -469,6 +491,22 @@ export function AdminPage() {
     loadAudit();
   };
 
+  const loadForeignScreenings = (userId: number) =>
+    api.get<{ screenings: ForeignInvestorScreening[] }>(`/admin/kyb/${userId}/elegibilidade-estrangeiro`).then((d) => {
+      setForeignScreeningsById((prev) => ({ ...prev, [userId]: d.screenings }));
+    });
+
+  const generateForeignMemo = async (userId: number) => {
+    setGeneratingMemoId(userId);
+    try {
+      await api.post(`/admin/kyb/${userId}/elegibilidade-estrangeiro/gerar`);
+      await loadForeignScreenings(userId);
+      await loadAudit();
+    } finally {
+      setGeneratingMemoId(null);
+    }
+  };
+
   const arbitrate = async (id: number, decision: 'cedente' | 'sacado') => {
     const note = noteById[id]?.trim();
     if (!note) return;
@@ -523,7 +561,14 @@ export function AdminPage() {
                     {p.nome} · {p.email}
                   </div>
                 </div>
-                <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Aguardando análise — {p.submittedAt}</span>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {p.naoResidente && (
+                    <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md" style={{ background: '#E9EEFB', color: '#1E5EFF' }}>
+                      Investidor não residente
+                    </span>
+                  )}
+                  <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Aguardando análise — {p.submittedAt}</span>
+                </div>
               </div>
               {p.pldStatus === 'flagged' && (
                 <div className="rounded-[10px] px-4 py-3 mb-3 text-[12.5px]" style={{ background: '#F7E9E7', color: '#B3261E' }}>
@@ -531,20 +576,84 @@ export function AdminPage() {
                   <div className="mt-0.5">{p.pldMatchNote}</div>
                 </div>
               )}
-              <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                <div className="text-[13px]">
-                  <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">CNPJ</div>
-                  {p.kybForm.cnpj || '—'}
+              {p.naoResidente ? (
+                <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  <div className="text-[13px]">
+                    <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">País de domicílio</div>
+                    {p.kybForm.paisDomicilio || '—'}
+                  </div>
+                  <div className="text-[13px]">
+                    <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">ID fiscal estrangeiro</div>
+                    {p.kybForm.taxIdEstrangeiro || '—'}
+                  </div>
+                  <div className="text-[13px]">
+                    <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Representante no Brasil</div>
+                    {p.kybForm.representanteLegal || '—'}
+                  </div>
                 </div>
-                <div className="text-[13px]">
-                  <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Tipo</div>
-                  {p.kybForm.tipo || '—'}
+              ) : (
+                <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  <div className="text-[13px]">
+                    <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">CNPJ</div>
+                    {p.kybForm.cnpj || '—'}
+                  </div>
+                  <div className="text-[13px]">
+                    <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Tipo</div>
+                    {p.kybForm.tipo || '—'}
+                  </div>
+                  <div className="text-[13px]">
+                    <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">PL para alocação</div>
+                    R$ {p.kybForm.pl || '—'}
+                  </div>
                 </div>
-                <div className="text-[13px]">
-                  <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">PL para alocação</div>
-                  R$ {p.kybForm.pl || '—'}
+              )}
+
+              {p.naoResidente && (
+                <div className="rounded-[10px] p-4 mb-4 bg-bg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-bold text-[13px]">Memorando de elegibilidade — investidor não residente</div>
+                    <Button size="sm" variant="secondary" disabled={generatingMemoId === p.id} onClick={() => generateForeignMemo(p.id)}>
+                      {generatingMemoId === p.id ? 'Gerando…' : 'Gerar memorando'}
+                    </Button>
+                  </div>
+                  {(foreignScreeningsById[p.id] ?? []).length === 0 ? (
+                    <div className="text-[12.5px] text-textSecondary">Nenhum memorando gerado ainda para este investidor.</div>
+                  ) : (
+                    <div className="flex flex-col gap-2.5">
+                      {foreignScreeningsById[p.id].slice(0, 3).map((s) => (
+                        <div key={s.id} className="bg-white border border-border rounded-[10px] p-3.5">
+                          <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className="text-[11px] font-bold px-2.5 py-1 rounded-md"
+                                style={
+                                  s.classificacao === 'profissional' ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#F0F2F5', color: '#5B6472' }
+                                }
+                              >
+                                {s.classificacao === 'profissional' ? 'Investidor profissional' : 'Não classificado'}
+                              </span>
+                              <span
+                                className="text-[11px] font-bold px-2.5 py-1 rounded-md"
+                                style={s.jurisdicaoFavorecida ? { background: '#F7E9E7', color: '#B03A2E' } : { background: '#EAF3EE', color: '#0A5C36' }}
+                              >
+                                {s.jurisdicaoFavorecida ? 'Jurisdição de tributação favorecida' : 'IRRF zero elegível (sujeito a confirmação jurídica)'}
+                              </span>
+                              <span
+                                className="text-[11px] font-bold px-2.5 py-1 rounded-md"
+                                style={s.pldStatus === 'flagged' ? { background: '#F7E9E7', color: '#B03A2E' } : { background: '#EAF3EE', color: '#0A5C36' }}
+                              >
+                                PLD: {s.pldStatus === 'flagged' ? 'correspondência encontrada' : 'sem correspondência'}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-textTertiary">{s.quando}</span>
+                          </div>
+                          <pre className="text-[11.5px] text-textSecondary whitespace-pre-wrap font-sans leading-relaxed">{s.memo}</pre>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {rejectingId === p.id ? (
                 <div className="flex items-center gap-2.5 flex-wrap">

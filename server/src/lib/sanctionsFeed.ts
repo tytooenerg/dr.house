@@ -7,13 +7,16 @@ import { logger } from './logger.js';
 // SANCTIONS_LIVE_FEED purely to keep local dev/CI fast and network-independent — not
 // because of cost or access.
 //
-// A production deployment targeting Brazilian PLD/FT obligations specifically (Circular
-// BCB 3.978/2020, COAF) would also want the UN Security Council Consolidated List and,
-// ideally, a licensed COAF/CVM feed — those are natural next steps, not implemented here
+// Also screens the UN Security Council Consolidated List (below) — unlike OFAC/EU, UN
+// sanctions are directly, self-executingly binding in Brazil regardless of any foreign
+// counterparty (Lei 13.810/2019 art. 4/7), so this one isn't just "nice to have" once
+// SANCTIONS_LIVE_FEED is on. A production deployment would also want the EU consolidated
+// list and, ideally, a licensed COAF/CVM feed — natural next steps, not implemented here
 // to keep this adapter's XML/format-parsing surface small and reliable.
 
 const liveFeedEnabled = process.env.SANCTIONS_LIVE_FEED === 'true';
 const SDN_CSV_URL = process.env.OFAC_SDN_CSV_URL || 'https://www.treasury.gov/ofac/downloads/sdn.csv';
+const UN_SC_XML_URL = process.env.UN_SC_XML_URL || 'https://scsanctions.un.org/resources/xml/en/consolidated.xml';
 
 export interface SdnEntry {
   nome: string;
@@ -89,6 +92,58 @@ async function getEntries(): Promise<SdnEntry[]> {
   }
 }
 
+let unCache: { entries: SdnEntry[]; fetchedAt: number } | null = null;
+
+function tagText(block: string, tag: string): string {
+  const m = block.match(new RegExp(`<${tag}>([^<]*)</${tag}>`, 'i'));
+  return m ? m[1].trim() : '';
+}
+
+// The UN Secretariat's Consolidated List XML groups individuals under <INDIVIDUAL> (name
+// split across FIRST_NAME/SECOND_NAME/THIRD_NAME/FOURTH_NAME) and organizations under
+// <ENTITY> (full name in FIRST_NAME). Parsed defensively by tag content, not a strict
+// schema validator — a field the UN renames or drops just yields fewer/no matches for
+// that record rather than throwing, same fail-open posture as the OFAC CSV parser above.
+// Exported for direct unit testing (see test/foreign-investor.test.ts) — there's no
+// SANCTIONS_LIVE_FEED=true in the test environment (by design, to keep CI network-free),
+// so this is the only way to verify the parsing logic itself against a realistic sample.
+export function parseUnConsolidatedXml(xml: string): SdnEntry[] {
+  const entries: SdnEntry[] = [];
+  const individualBlocks = xml.match(/<INDIVIDUAL>[\s\S]*?<\/INDIVIDUAL>/gi) || [];
+  for (const block of individualBlocks) {
+    const nome = [tagText(block, 'FIRST_NAME'), tagText(block, 'SECOND_NAME'), tagText(block, 'THIRD_NAME'), tagText(block, 'FOURTH_NAME')]
+      .filter(Boolean)
+      .join(' ');
+    if (nome) entries.push({ nome, programa: tagText(block, 'UN_LIST_TYPE') || 'ONU' });
+  }
+  const entityBlocks = xml.match(/<ENTITY>[\s\S]*?<\/ENTITY>/gi) || [];
+  for (const block of entityBlocks) {
+    const nome = tagText(block, 'FIRST_NAME');
+    if (nome) entries.push({ nome, programa: tagText(block, 'UN_LIST_TYPE') || 'ONU' });
+  }
+  return entries;
+}
+
+async function refreshUnCache(): Promise<SdnEntry[]> {
+  const res = await fetch(UN_SC_XML_URL);
+  if (!res.ok) throw new Error(`un_sc_fetch_failed: ${res.status}`);
+  const xml = await res.text();
+  const entries = parseUnConsolidatedXml(xml);
+  unCache = { entries, fetchedAt: Date.now() };
+  logger.info({ count: entries.length }, '[sanctions] Lista Consolidada do CSNU atualizada');
+  return entries;
+}
+
+async function getUnEntries(): Promise<SdnEntry[]> {
+  if (unCache && Date.now() - unCache.fetchedAt < CACHE_TTL_MS) return unCache.entries;
+  try {
+    return await refreshUnCache();
+  } catch (err) {
+    logger.warn({ err }, '[sanctions] falha ao baixar a Lista Consolidada do CSNU — mantendo cache anterior (se houver)');
+    return unCache?.entries ?? [];
+  }
+}
+
 // Adapter for a licensed commercial PLD/KYC provider (e.g. Serasa Compliance, Quod, Neoway)
 // — the kind of vendor Circular BCB 3.978/2020 compliance programs actually run on in
 // production, covering COAF/CVM/PEP lists the free OFAC feed above doesn't. Requires a
@@ -103,9 +158,10 @@ if (pldProviderEnabled) logger.info('[sanctions] provedor de PLD pago configurad
 export interface LiveScreeningMatch {
   nome: string;
   programa: string;
+  fonte: 'ofac' | 'un_sc';
 }
 
-export async function screenAgainstPaidProvider(nome: string, cnpj: string): Promise<LiveScreeningMatch | null> {
+export async function screenAgainstPaidProvider(nome: string, cnpj: string): Promise<{ nome: string; programa: string } | null> {
   if (!pldProviderEnabled) return null;
   const res = await fetch(`${pldProviderUrl}/screening`, {
     method: 'POST',
@@ -134,14 +190,26 @@ function normalize(s: string): string {
 // with a minimum length guard so short/generic tokens can't match half the list — real
 // sanctions screening tools bias toward over-flagging (false positives get a human
 // review), but an unguarded substring match on unnormalized names is just noise.
+function findMatch(entries: SdnEntry[], needle: string): SdnEntry | undefined {
+  return entries.find((e) => {
+    const candidate = normalize(e.nome);
+    return candidate.length >= 6 && (candidate.includes(needle) || needle.includes(candidate));
+  });
+}
+
+// Checks OFAC first, then the UN Security Council Consolidated List — both free/public,
+// both gated by the same SANCTIONS_LIVE_FEED flag (see module comment for why the UN list
+// isn't optional the way OFAC arguably is).
 export async function screenAgainstLiveFeed(nome: string): Promise<LiveScreeningMatch | null> {
   if (!liveFeedEnabled) return null;
   const needle = normalize(nome);
   if (needle.length < 6) return null;
-  const entries = await getEntries();
-  const hit = entries.find((e) => {
-    const candidate = normalize(e.nome);
-    return candidate.length >= 6 && (candidate.includes(needle) || needle.includes(candidate));
-  });
-  return hit ? { nome: hit.nome, programa: hit.programa } : null;
+
+  const ofacHit = findMatch(await getEntries(), needle);
+  if (ofacHit) return { nome: ofacHit.nome, programa: ofacHit.programa, fonte: 'ofac' };
+
+  const unHit = findMatch(await getUnEntries(), needle);
+  if (unHit) return { nome: unHit.nome, programa: unHit.programa, fonte: 'un_sc' };
+
+  return null;
 }

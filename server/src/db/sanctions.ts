@@ -5,7 +5,7 @@ import { isPlausiblySameEntity } from '../lib/pldSecondOpinion.js';
 export interface SanctionsMatch {
   nome: string;
   tipo: 'sancao' | 'pep';
-  fonte: 'provedor_pld' | 'ofac' | 'demonstracao';
+  fonte: 'provedor_pld' | 'ofac' | 'un_sc' | 'demonstracao';
 }
 
 // Screening priority: a licensed commercial PLD/KYC provider first (if PLD_PROVIDER_API_*
@@ -37,8 +37,8 @@ export async function screenEntity(nome: string, cnpj: string, userId?: number):
   // failure, isPlausiblySameEntity defaults to true, so behavior is unchanged from before
   // this feature existed.
   const liveHit = await screenAgainstLiveFeed(trimmedNome);
-  if (liveHit && (await isPlausiblySameEntity(trimmedNome, liveHit.nome, 'OFAC SDN', userId))) {
-    return { nome: liveHit.nome, tipo: 'sancao', fonte: 'ofac' };
+  if (liveHit && (await isPlausiblySameEntity(trimmedNome, liveHit.nome, liveHit.fonte === 'un_sc' ? 'Lista Consolidada do CSNU' : 'OFAC SDN', userId))) {
+    return { nome: liveHit.nome, tipo: 'sancao', fonte: liveHit.fonte };
   }
 
   const rows = db.prepare('SELECT nome, tipo FROM sanctions_watchlist_demo').all() as { nome: string; tipo: 'sancao' | 'pep' }[];

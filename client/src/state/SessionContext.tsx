@@ -45,7 +45,15 @@ interface SessionContextValue {
   loginWithTokens: (token: string, refreshToken: string) => Promise<void>;
   completeGoogleSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   logout: () => void;
-  submitKyb: (form: { cnpj: string; tipo: string; pl: string }) => Promise<void>;
+  submitKyb: (form: {
+    cnpj: string;
+    tipo: string;
+    pl: string;
+    naoResidente?: boolean;
+    paisDomicilio?: string;
+    taxIdEstrangeiro?: string;
+    representanteLegal?: string;
+  }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
 }

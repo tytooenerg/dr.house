@@ -11,6 +11,10 @@ export function KybModal() {
   const [cnpj, setCnpj] = useState('');
   const [tipo, setTipo] = useState('Banco comercial');
   const [pl, setPl] = useState('');
+  const [naoResidente, setNaoResidente] = useState(false);
+  const [paisDomicilio, setPaisDomicilio] = useState('');
+  const [taxIdEstrangeiro, setTaxIdEstrangeiro] = useState('');
+  const [representanteLegal, setRepresentanteLegal] = useState('');
   const [docUploaded, setDocUploaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +41,7 @@ export function KybModal() {
     }
     setSubmitting(true);
     try {
-      await submitKyb({ cnpj, tipo, pl });
+      await submitKyb({ cnpj, tipo, pl, naoResidente, paisDomicilio, taxIdEstrangeiro, representanteLegal });
     } finally {
       setSubmitting(false);
     }
@@ -50,9 +54,41 @@ export function KybModal() {
 
         {step === 0 && (
           <div className="flex flex-col gap-3.5 mb-2">
-            <Field label="CNPJ da instituição">
-              <Input placeholder="00.000.000/0001-00" value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
-            </Field>
+            <button
+              type="button"
+              onClick={() => setNaoResidente(!naoResidente)}
+              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-inputBorder text-[12.5px] font-semibold text-left cursor-pointer bg-transparent"
+            >
+              <span
+                className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
+                style={{ border: `2px solid ${naoResidente ? '#1E5EFF' : '#C7D0DE'}`, background: naoResidente ? '#1E5EFF' : '#fff' }}
+              >
+                {naoResidente && <span className="text-white text-[11px] leading-none">✓</span>}
+              </span>
+              Somos um investidor não residente (instituição estrangeira)
+            </button>
+
+            {naoResidente ? (
+              <>
+                <Field label="País de domicílio">
+                  <Input placeholder="Estados Unidos" value={paisDomicilio} onChange={(e) => setPaisDomicilio(e.target.value)} />
+                </Field>
+                <Field label="Identificação fiscal no país de origem (equivalente ao CNPJ)">
+                  <Input placeholder="EIN, TIN, VAT…" value={taxIdEstrangeiro} onChange={(e) => setTaxIdEstrangeiro(e.target.value)} />
+                </Field>
+                <Field label="Representante no Brasil (instituição autorizada pelo BC)">
+                  <Input placeholder="Nome do banco/instituição representante" value={representanteLegal} onChange={(e) => setRepresentanteLegal(e.target.value)} />
+                </Field>
+                <div className="text-[11.5px] text-textTertiary leading-relaxed">
+                  Investidores não residentes acessam a plataforma via Res. Conjunta BCB/CVM 13/2024. Um representante autorizado pelo Banco Central é
+                  necessário antes da operação — nossa equipe de compliance entrará em contato para concluir essa etapa.
+                </div>
+              </>
+            ) : (
+              <Field label="CNPJ da instituição">
+                <Input placeholder="00.000.000/0001-00" value={cnpj} onChange={(e) => setCnpj(e.target.value)} />
+              </Field>
+            )}
             <div>
               <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">Tipo de instituição</div>
               <div className="flex flex-col gap-2">

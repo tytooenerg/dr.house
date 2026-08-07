@@ -129,7 +129,11 @@ export function anonymizeUser(userId: number) {
   ).run(`deleted-user-${userId}@lastro.invalid`, crypto.randomBytes(32).toString('hex'), userId);
 }
 
-export function updateKybForm(userId: number, field: 'cnpj' | 'tipo' | 'pl', value: string) {
+export function updateKybForm(
+  userId: number,
+  field: 'cnpj' | 'tipo' | 'pl' | 'naoResidente' | 'paisDomicilio' | 'taxIdEstrangeiro' | 'representanteLegal',
+  value: string
+) {
   const user = getUserById(userId)!;
   const form = JSON.parse(user.kyb_form || '{}');
   form[field] = value;

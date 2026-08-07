@@ -13,7 +13,14 @@ export async function runPldScreening(userId: number, companyName: string, cnpj:
     setPldStatus(userId, 'clear', '');
     return { flagged: false as const };
   }
-  const fonteLabel = match.fonte === 'provedor_pld' ? 'provedor de PLD contratado' : match.fonte === 'ofac' ? 'lista OFAC (real)' : 'lista de demonstração';
+  const fonteLabel =
+    match.fonte === 'provedor_pld'
+      ? 'provedor de PLD contratado'
+      : match.fonte === 'ofac'
+        ? 'lista OFAC (real)'
+        : match.fonte === 'un_sc'
+          ? 'Lista Consolidada do CSNU (real)'
+          : 'lista de demonstração';
   const note = `Possível correspondência em ${fonteLabel} (${match.tipo === 'sancao' ? 'sanção' : 'PEP'}): ${match.nome}`;
   setPldStatus(userId, 'flagged', note);
   createComplianceAlert({ type: 'pld_screening', severity: 'critico', message: note, userId });
