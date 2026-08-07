@@ -112,6 +112,23 @@ interface RegulatoryNote {
   quando: string;
 }
 
+interface BackupInfo {
+  filename: string;
+  sizeBytes: number;
+  createdAt: string;
+  quando: string;
+}
+
+interface TedPendente {
+  referencia: string;
+  empresa: string;
+  valorFmt: string;
+  banco: string;
+  agencia: string;
+  conta: string;
+  quando: string;
+}
+
 const COLLECTION_DOC_LABELS: Record<string, string> = {
   notificacao_cobranca: 'Notificação extrajudicial',
   minuta_protesto: 'Minuta de protesto',
@@ -166,6 +183,11 @@ export function AdminPage() {
   const [regText, setRegText] = useState('');
   const [analyzingReg, setAnalyzingReg] = useState(false);
   const [regError, setRegError] = useState('');
+  const [backups, setBackups] = useState<BackupInfo[]>([]);
+  const [backupsEnabled, setBackupsEnabled] = useState(true);
+  const [runningBackup, setRunningBackup] = useState(false);
+  const [tedPendentes, setTedPendentes] = useState<TedPendente[]>([]);
+  const [confirmingTed, setConfirmingTed] = useState<string | null>(null);
 
   const loadKyb = () => api.get<{ pending: PendingKyb[] }>('/admin/kyb').then((d) => setPending(d.pending));
   const loadDisputes = () => api.get<{ disputes: AdminDispute[] }>('/admin/disputes').then((d) => setDisputes(d.disputes));
@@ -190,6 +212,12 @@ export function AdminPage() {
       setFeePctInput(String(d.feePct));
     });
   const loadRecoveries = () => api.get<{ recuperacoes: RecoveryEntry[] }>('/admin/juridico/recuperacoes').then((d) => setRecoveries(d.recuperacoes));
+  const loadBackups = () =>
+    api.get<{ enabled: boolean; backups: BackupInfo[] }>('/admin/backups').then((d) => {
+      setBackupsEnabled(d.enabled);
+      setBackups(d.backups);
+    });
+  const loadTedPendentes = () => api.get<{ pendentes: TedPendente[] }>('/admin/ted/pendentes').then((d) => setTedPendentes(d.pendentes));
 
   useEffect(() => {
     loadKyb();
@@ -203,7 +231,32 @@ export function AdminPage() {
     loadRegulatorio();
     loadFeeConfig();
     loadRecoveries();
+    loadBackups();
+    loadTedPendentes();
   }, []);
+
+  const runBackupNow = async () => {
+    setRunningBackup(true);
+    try {
+      await api.post('/admin/backups/run');
+      await loadBackups();
+    } catch {
+      // surfaced via the list simply not gaining a new entry
+    } finally {
+      setRunningBackup(false);
+    }
+  };
+
+  const confirmarTed = async (referencia: string) => {
+    setConfirmingTed(referencia);
+    try {
+      await api.post(`/admin/ted/${referencia}/confirmar`);
+      await loadTedPendentes();
+      await loadAudit();
+    } finally {
+      setConfirmingTed(null);
+    }
+  };
 
   const saveFeePct = async () => {
     const n = Number(feePctInput);
@@ -958,6 +1011,58 @@ export function AdminPage() {
             </div>
           ))}
           {audit && audit.entries.length === 0 && <EmptyState title="Nenhum evento registrado ainda" hint="Ações sensíveis da plataforma vão aparecer aqui" />}
+        </div>
+      )}
+
+      {tab === 'auditoria' && (
+        <div className="bg-white border border-border rounded-card overflow-hidden mt-5">
+          <div className="px-5 py-3.5 border-b border-border">
+            <div className="font-bold text-[14px]">Depósitos via TED pendentes de confirmação</div>
+            <div className="text-[12px] text-textMuted mt-0.5">Sem webhook automático (ver lib/tedRail.ts) — confira o extrato bancário real antes de confirmar</div>
+          </div>
+          {tedPendentes.map((t) => (
+            <div key={t.referencia} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+              <div>
+                <b>{t.empresa}</b> — {t.valorFmt}
+                <span className="text-textMuted">
+                  {' '}
+                  · {t.banco} ag. {t.agencia} cc {t.conta} · ref. {t.referencia} · {t.quando}
+                </span>
+              </div>
+              <Button size="sm" variant="success" disabled={confirmingTed === t.referencia} onClick={() => confirmarTed(t.referencia)}>
+                {confirmingTed === t.referencia ? 'Confirmando…' : 'Confirmar recebimento'}
+              </Button>
+            </div>
+          ))}
+          {tedPendentes.length === 0 && <EmptyState title="Nenhum TED pendente" hint="Depósitos via TED aparecem aqui até serem confirmados" />}
+        </div>
+      )}
+
+      {tab === 'auditoria' && (
+        <div className="bg-white border border-border rounded-card overflow-hidden mt-5">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+            <div>
+              <div className="font-bold text-[14px]">Backups do banco de dados</div>
+              <div className="text-[12px] text-textMuted mt-0.5">Snapshots automáticos a cada 6h, retenção configurável (padrão: últimos 28)</div>
+            </div>
+            <Button onClick={runBackupNow} disabled={runningBackup || !backupsEnabled} variant="secondary">
+              {runningBackup ? 'Gerando…' : 'Rodar backup agora'}
+            </Button>
+          </div>
+          {!backupsEnabled && (
+            <div className="px-5 py-3.5 text-[13px] text-textMuted">Desabilitado neste ambiente (banco em memória — não há arquivo em disco para copiar).</div>
+          )}
+          {backupsEnabled &&
+            backups.map((b) => (
+              <div key={b.filename} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+                <div className="font-mono-num text-[12px]">{b.filename}</div>
+                <div className="flex items-center gap-3 text-textMuted">
+                  <span>{(b.sizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
+                  <span>{b.quando}</span>
+                </div>
+              </div>
+            ))}
+          {backupsEnabled && backups.length === 0 && <EmptyState title="Nenhum backup gerado ainda" hint="O primeiro roda automaticamente ao iniciar o servidor" />}
         </div>
       )}
     </div>

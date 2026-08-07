@@ -17,6 +17,8 @@ import { pixEnabled, criarCobranca, enviarPix } from '../lib/paymentRail.js';
 import { createPixCharge, getPixCharge, concludePixCharge, listPixChargesByUser, recordPixPayout } from '../db/pix.js';
 import { boletoEnabled, emitirBoleto } from '../lib/boletoRail.js';
 import { createBoleto, getBoleto, concludeBoleto, listBoletosByUser } from '../db/boletos.js';
+import { tedEnabled, lastroStaticAccountConfigured, emitirInstrucaoTed, enviarTed } from '../lib/tedRail.js';
+import { createTedDeposit, listTedDepositsByUser, recordTedPayout } from '../db/ted.js';
 import { randomUUID } from 'node:crypto';
 
 export const accountRouter = Router();
@@ -84,6 +86,21 @@ function payload(req: import('express').Request) {
         linhaDigitavel: b.linha_digitavel,
         pdfUrl: b.pdf_url,
       })),
+    tedEnabled,
+    tedInstructionsAvailable: tedEnabled || lastroStaticAccountConfigured,
+    tedContaBancaria: settings.tedContaBancaria,
+    tedDeposits: listTedDepositsByUser(req.user!.id)
+      .slice(0, 10)
+      .map((t) => ({
+        referencia: t.referencia,
+        valorFmt: fmtBRL(t.valor),
+        status: t.status,
+        simulado: !!t.simulado,
+        banco: t.banco,
+        agencia: t.agencia,
+        conta: t.conta,
+        favorecidoNome: t.favorecido_nome,
+      })),
     settlementSpeed: settings.settlementSpeed,
     extrato: extratoView(req.user!.id),
   };
@@ -99,7 +116,7 @@ accountRouter.post('/kyc/bank', (req, res) => {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
     return;
   }
-  updateSettings(req.user!.id, { pixChave: parsed.data.chave, kycBankConnected: true });
+  req.user!.settings = JSON.stringify(updateSettings(req.user!.id, { pixChave: parsed.data.chave, kycBankConnected: true }));
   addLedgerEntry(req.user!.id, new Date().toLocaleDateString('pt-BR'), 'Chave Pix cadastrada para liquidação', 0);
   res.json(payload(req));
 });
@@ -224,6 +241,57 @@ accountRouter.post('/deposit/boleto/:nossoNumero/confirm-simulado', (req, res) =
   res.json(payload(req));
 });
 
+// Real TED rail (lib/tedRail.ts) — a third deposit method for large institutional
+// transfers. Unlike Pix/boleto, there's deliberately no self-service confirm-simulado
+// endpoint here: a deposited TED is only ever confirmed by a real BaaS webhook
+// (POST /public/ted-webhook, when TED_PSP_* is configured) or by an admin matching the
+// real bank statement (POST /admin/ted/:referencia/confirmar) — see lib/tedRail.ts for why.
+const depositTedSchema = z.object({ valor: z.number().positive().max(10_000_000) });
+
+accountRouter.post(
+  '/deposit/ted',
+  asyncHandler(async (req, res) => {
+    const parsed = depositTedSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const referencia = `TED${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
+    const instrucao = await emitirInstrucaoTed({ referencia, valor: parsed.data.valor, pagadorNome: req.user!.company_name });
+    createTedDeposit({
+      referencia: instrucao.referencia,
+      userId: req.user!.id,
+      valor: parsed.data.valor,
+      simulado: instrucao.simulado,
+      banco: instrucao.banco,
+      agencia: instrucao.agencia,
+      conta: instrucao.conta,
+      favorecidoNome: instrucao.favorecidoNome,
+      favorecidoCnpj: instrucao.favorecidoCnpj,
+    });
+    res.json({ instrucao, ...payload(req) });
+  })
+);
+
+const tedContaSchema = z.object({
+  banco: z.string().trim().min(1).max(80),
+  agencia: z.string().trim().min(1).max(20),
+  conta: z.string().trim().min(1).max(30),
+  tipoConta: z.enum(['corrente', 'poupanca']),
+  titularNome: z.string().trim().min(1).max(140),
+  titularCnpj: z.string().trim().min(11).max(20),
+});
+
+accountRouter.post('/kyc/bank-ted', (req, res) => {
+  const parsed = tedContaSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  req.user!.settings = JSON.stringify(updateSettings(req.user!.id, { tedContaBancaria: parsed.data }));
+  res.json(payload(req));
+});
+
 const withdrawSchema = z.object({ valor: z.number().positive().max(10_000_000) });
 
 accountRouter.post(
@@ -256,14 +324,64 @@ accountRouter.post(
   })
 );
 
+accountRouter.post(
+  '/withdraw/ted',
+  asyncHandler(async (req, res) => {
+    const parsed = withdrawSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const settings = getSettings(req.user!);
+    if (!settings.tedContaBancaria) {
+      res.status(409).json({ error: 'no_ted_account', message: 'Cadastre uma conta bancária para TED antes de sacar.' });
+      return;
+    }
+    const disponivel = saldoDisponivel(req.user!.id);
+    if (parsed.data.valor > disponivel) {
+      res.status(409).json({ error: 'insufficient_balance', message: `Saldo disponível: ${fmtBRL(disponivel)}` });
+      return;
+    }
+    const conta = settings.tedContaBancaria;
+    const payout = await enviarTed({
+      banco: conta.banco,
+      agencia: conta.agencia,
+      conta: conta.conta,
+      tipoConta: conta.tipoConta,
+      favorecidoNome: conta.titularNome,
+      favorecidoCnpj: conta.titularCnpj,
+      valor: parsed.data.valor,
+      descricao: `Saque Lastro — ${req.user!.company_name}`,
+    });
+    recordTedPayout({
+      userId: req.user!.id,
+      valor: parsed.data.valor,
+      banco: conta.banco,
+      agencia: conta.agencia,
+      conta: conta.conta,
+      favorecidoNome: conta.titularNome,
+      favorecidoCnpj: conta.titularCnpj,
+      simulado: payout.simulado,
+      protocolo: payout.protocolo,
+    });
+    addLedgerEntry(
+      req.user!.id,
+      new Date().toLocaleDateString('pt-BR'),
+      `Saque via TED para ${conta.banco} ag. ${conta.agencia}${payout.simulado ? ' (simulado)' : ''}`,
+      -parsed.data.valor
+    );
+    res.json(payload(req));
+  })
+);
+
 accountRouter.post('/kyc/docs', (req, res) => {
   const settings = getSettings(req.user!);
   const attempts = settings.kycDocsAttempts + 1;
-  if (attempts === 1) {
-    updateSettings(req.user!.id, { kycDocsAttempts: attempts, kycDocsRejected: true });
-  } else {
-    updateSettings(req.user!.id, { kycDocsAttempts: attempts, kycDocsRejected: false, kycDocsUploaded: true });
-  }
+  const merged =
+    attempts === 1
+      ? updateSettings(req.user!.id, { kycDocsAttempts: attempts, kycDocsRejected: true })
+      : updateSettings(req.user!.id, { kycDocsAttempts: attempts, kycDocsRejected: false, kycDocsUploaded: true });
+  req.user!.settings = JSON.stringify(merged);
   res.json(payload(req));
 });
 
@@ -275,7 +393,7 @@ accountRouter.post('/settlement-speed', (req, res) => {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
     return;
   }
-  updateSettings(req.user!.id, { settlementSpeed: parsed.data.speed });
+  req.user!.settings = JSON.stringify(updateSettings(req.user!.id, { settlementSpeed: parsed.data.speed }));
   res.json(payload(req));
 });
 

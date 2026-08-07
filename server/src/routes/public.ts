@@ -9,6 +9,8 @@ import { parseWebhookPixRecebido } from '../lib/paymentRail.js';
 import { getPixCharge, concludePixCharge } from '../db/pix.js';
 import { parseWebhookBoletoPago } from '../lib/boletoRail.js';
 import { getBoleto, concludeBoleto } from '../db/boletos.js';
+import { parseWebhookTedRecebido } from '../lib/tedRail.js';
+import { getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { logger } from '../lib/logger.js';
 
@@ -47,6 +49,21 @@ publicRouter.post('/boleto-webhook', (req, res) => {
     logger.info({ nossoNumero: boleto.nosso_numero, userId: boleto.user_id }, '[boleto] depósito confirmado via webhook');
   }
   res.status(200).json({ received: pagos.length });
+});
+
+// Real BaaS webhook target for "TED recebido" notifications, only ever called by a
+// TED_PSP_*-configured provider (lib/tedRail.ts) — the static-account path is always
+// confirmed by an admin instead (POST /admin/ted/:referencia/confirmar), never here.
+publicRouter.post('/ted-webhook', (req, res) => {
+  const recebidos = parseWebhookTedRecebido(req.body);
+  for (const r of recebidos) {
+    const deposito = getTedDeposit(r.referencia);
+    if (!deposito || deposito.status !== 'ativo') continue;
+    concludeTedDeposit(deposito.referencia, null);
+    addLedgerEntry(deposito.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via TED confirmado — ${fmtBRL(deposito.valor)}`, deposito.valor);
+    logger.info({ referencia: deposito.referencia, userId: deposito.user_id }, '[ted] depósito confirmado via webhook');
+  }
+  res.status(200).json({ received: recebidos.length });
 });
 
 publicRouter.get('/stats', (_req, res) => {

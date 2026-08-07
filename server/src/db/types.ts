@@ -27,6 +27,9 @@ export interface UserSettings {
   settlementSpeed: 'd0' | 'd1';
   kycBankConnected: boolean;
   pixChave: string | null;
+  // Destination bank account for TED withdrawals — a separate field from pixChave
+  // because TED needs full banking coordinates (banco/agência/conta), not a Pix key.
+  tedContaBancaria: { banco: string; agencia: string; conta: string; tipoConta: 'corrente' | 'poupanca'; titularNome: string; titularCnpj: string } | null;
   kycDocsUploaded: boolean;
   kycDocsRejected: boolean;
   kycDocsAttempts: number;
@@ -55,6 +58,7 @@ export function defaultSettings(): UserSettings {
     settlementSpeed: 'd1',
     kycBankConnected: false,
     pixChave: null,
+    tedContaBancaria: null,
     kycDocsUploaded: false,
     kycDocsRejected: false,
     kycDocsAttempts: 0,
@@ -123,6 +127,9 @@ export interface DuplicataRow {
   nfe_chave: string | null;
   compliance_score: number | null;
   created_at: string;
+  // 1 for duplicatas created via a test-mode partner API key (lib/sandboxData.ts) —
+  // filtered out of every live/internal read at the query layer (db/duplicatas.ts).
+  sandbox: number;
 }
 
 export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';

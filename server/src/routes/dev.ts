@@ -7,6 +7,7 @@ import { getSettings, updateSettings } from '../db/users.js';
 import { addApiLog, listApiLogs } from '../db/misc.js';
 import { generateApiKey } from '../auth/apiKey.js';
 import { createApiKey, getApiKeyUsageThisMonth, listApiKeys, revokeApiKey } from '../db/apiKeys.js';
+import { ensureSandboxDataset } from '../lib/sandboxData.js';
 import { createWebhook, deleteWebhook, getWebhook, listWebhooks } from '../db/webhooks.js';
 import { listDeliveriesForWebhook } from '../db/webhookDeliveries.js';
 import { fmtRelative } from '../lib/format.js';
@@ -71,6 +72,7 @@ devRouter.post('/keys/generate', (req, res) => {
   const { rawKey, keyHash, keyPrefix } = generateApiKey(mode);
   const label = mode === 'test' ? 'Chave de teste (sandbox)' : 'Chave de produção';
   createApiKey(req.user!.id, keyHash, keyPrefix, label, mode, scope);
+  if (mode === 'test') ensureSandboxDataset(req.user!);
   res.json({ rawKey, ...payload(req.user!.id, getSettings(req.user!)) });
 });
 

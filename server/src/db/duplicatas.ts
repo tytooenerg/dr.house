@@ -7,26 +7,32 @@ export function getDuplicata(id: string): DuplicataRow | undefined {
   return db.prepare('SELECT * FROM duplicatas WHERE id = ?').get(id) as DuplicataRow | undefined;
 }
 
+// Live/internal reads (SPA, background jobs, revenue, compliance) only ever see real
+// data — sandbox=1 rows created via a test-mode partner API key (lib/sandboxData.ts) are
+// filtered out here, at the query layer, so no caller can accidentally leak them into a
+// real list just by forgetting to check a flag.
 export function listByCedente(cedenteId: number): DuplicataRow[] {
-  return db.prepare('SELECT * FROM duplicatas WHERE cedente_id = ? ORDER BY created_at DESC').all(cedenteId) as DuplicataRow[];
+  return db.prepare('SELECT * FROM duplicatas WHERE cedente_id = ? AND sandbox = 0 ORDER BY created_at DESC').all(cedenteId) as DuplicataRow[];
 }
 
 export function countByCedenteThisMonth(cedenteId: number): number {
   const row = db
-    .prepare("SELECT COUNT(*) as n FROM duplicatas WHERE cedente_id = ? AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')")
+    .prepare("SELECT COUNT(*) as n FROM duplicatas WHERE cedente_id = ? AND sandbox = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')")
     .get(cedenteId) as { n: number };
   return row.n;
 }
 
-export function listMarketplace(): DuplicataRow[] {
+export function listMarketplace(sandbox = false): DuplicataRow[] {
   // Include 'vendida' too: a bought offer should still render (as "Comprada") in the
   // marketplace list rather than disappearing the instant someone buys it.
-  return db.prepare("SELECT * FROM duplicatas WHERE status IN ('no_mercado', 'vendida') ORDER BY created_at DESC").all() as DuplicataRow[];
+  return db
+    .prepare("SELECT * FROM duplicatas WHERE status IN ('no_mercado', 'vendida') AND sandbox = ? ORDER BY created_at DESC")
+    .all(sandbox ? 1 : 0) as DuplicataRow[];
 }
 
 export function listBySacadoNome(sacadoNome: string): DuplicataRow[] {
   return db
-    .prepare('SELECT * FROM duplicatas WHERE lower(sacado_nome) = lower(?) ORDER BY created_at DESC')
+    .prepare('SELECT * FROM duplicatas WHERE lower(sacado_nome) = lower(?) AND sandbox = 0 ORDER BY created_at DESC')
     .all(sacadoNome) as DuplicataRow[];
 }
 
@@ -56,11 +62,12 @@ export function createDuplicata(input: {
   registradora?: string | null;
   nfeChave?: string | null;
   id?: string;
+  sandbox?: boolean;
 }): DuplicataRow {
   const id = input.id ?? nextId('DUP-2026');
   db.prepare(
-    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, registradora, nfe_chave)
-     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @registradora, @nfeChave)`
+    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, registradora, nfe_chave, sandbox)
+     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @registradora, @nfeChave, @sandbox)`
   ).run({
     id,
     cedenteId: input.cedenteId,
@@ -78,6 +85,7 @@ export function createDuplicata(input: {
     score: scoreFor(input.sacadoNome),
     registradora: input.registradora ?? null,
     nfeChave: input.nfeChave || null,
+    sandbox: input.sandbox ? 1 : 0,
   });
   return getDuplicata(id)!;
 }
@@ -113,7 +121,7 @@ export function setInsurer(id: string, insurerKey: string | null) {
 }
 
 export function listInsuredByInsurerKey(insurerKey: string): DuplicataRow[] {
-  return db.prepare('SELECT * FROM duplicatas WHERE insurer_key = ? ORDER BY created_at DESC').all(insurerKey) as DuplicataRow[];
+  return db.prepare('SELECT * FROM duplicatas WHERE insurer_key = ? AND sandbox = 0 ORDER BY created_at DESC').all(insurerKey) as DuplicataRow[];
 }
 
 // A policy becomes claimable once its vencimento has passed and it was never sold —
@@ -121,7 +129,7 @@ export function listInsuredByInsurerKey(insurerKey: string): DuplicataRow[] {
 export function listClaimableByInsurerKey(insurerKey: string): DuplicataRow[] {
   const now = Date.now();
   return db
-    .prepare("SELECT * FROM duplicatas WHERE insurer_key = ? AND sinistro_status = 'none' AND status != 'vendida'")
+    .prepare("SELECT * FROM duplicatas WHERE insurer_key = ? AND sandbox = 0 AND sinistro_status = 'none' AND status != 'vendida'")
     .all(insurerKey)
     .filter((d) => parseFlexibleDate((d as DuplicataRow).vencimento).getTime() < now) as DuplicataRow[];
 }
@@ -136,7 +144,7 @@ export function setSinistroStatus(id: string, status: 'aberto' | 'aprovado' | 'n
 // checkCollectionEligibility, same JS-filter pattern as listClaimableByInsurerKey.
 export function listOverdueDuplicatas(): DuplicataRow[] {
   const now = Date.now();
-  return (db.prepare("SELECT * FROM duplicatas WHERE status IN ('aprovada', 'vendida')").all() as DuplicataRow[]).filter(
+  return (db.prepare("SELECT * FROM duplicatas WHERE status IN ('aprovada', 'vendida') AND sandbox = 0").all() as DuplicataRow[]).filter(
     (d) => parseFlexibleDate(d.vencimento).getTime() < now
   );
 }

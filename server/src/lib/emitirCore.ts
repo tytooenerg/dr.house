@@ -80,8 +80,13 @@ export type EmitirOutcome =
 const NFE_CHAVE_RE = /^\d{44}$/;
 
 // Shared by the internal /api/emitir/submit route (used by the SPA) and the public
-// /api/v1/duplicatas partner endpoint — same business rules and side effects either way.
-export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<EmitirOutcome> {
+// /api/v1/duplicatas partner endpoint — same business rules and side effects either way,
+// except when opts.sandbox is set (only ever passed by a test-mode partner API key —
+// see lib/sandboxData.ts): the real registradora network call is always skipped
+// regardless of REGISTRADORA_*_API_URL configuration, so sandbox test data can never
+// register fake data against a real registry, and the resulting duplicata is tagged
+// sandbox=1, invisible to every live/internal read (db/duplicatas.ts).
+export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sandbox?: boolean } = {}): Promise<EmitirOutcome> {
   if (!form.sacado || !form.valor || !form.vencimento) {
     return { status: 400, body: { error: 'validation_error', message: 'Preencha empresa sacada, valor e vencimento antes de enviar.' } };
   }
@@ -140,24 +145,28 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
 
   const preview = computeEmitirPreview(form);
   let registro: string;
-  try {
-    // Real HTTP round-trip when REGISTRADORA_<X>_API_URL/KEY is configured for the chosen
-    // registradora; otherwise the same simulated delay + registro-number generation this
-    // always did (see lib/registradoras.ts).
-    const result = await registrarNaRegistradora({
-      registradoraKey: registradora.key,
-      duplicataId: `dup_pending_${Date.now()}`,
-      valor: valorNum + batchTotal,
-      sacadoCnpj: form.cnpj,
-      vencimento: form.vencimento,
-    });
-    registro = result.registro;
-    if (!result.simulado) {
-      logger.info({ registradora: registradora.key, registro }, '[emitir] registro real confirmado pela registradora');
+  if (opts.sandbox) {
+    registro = `SANDBOX-${Date.now().toString(36).toUpperCase()}`;
+  } else {
+    try {
+      // Real HTTP round-trip when REGISTRADORA_<X>_API_URL/KEY is configured for the chosen
+      // registradora; otherwise the same simulated delay + registro-number generation this
+      // always did (see lib/registradoras.ts).
+      const result = await registrarNaRegistradora({
+        registradoraKey: registradora.key,
+        duplicataId: `dup_pending_${Date.now()}`,
+        valor: valorNum + batchTotal,
+        sacadoCnpj: form.cnpj,
+        vencimento: form.vencimento,
+      });
+      registro = result.registro;
+      if (!result.simulado) {
+        logger.info({ registradora: registradora.key, registro }, '[emitir] registro real confirmado pela registradora');
+      }
+    } catch (err) {
+      logger.warn({ err, registradora: registradora.key }, '[emitir] falha ao registrar na registradora');
+      return { status: 502, body: { error: 'cerc_unavailable', message: `Falha ao registrar na ${registradora.name} — conexão instável. Tente novamente.` } };
     }
-  } catch (err) {
-    logger.warn({ err, registradora: registradora.key }, '[emitir] falha ao registrar na registradora');
-    return { status: 502, body: { error: 'cerc_unavailable', message: `Falha ao registrar na ${registradora.name} — conexão instável. Tente novamente.` } };
   }
   const duplicata = createDuplicata({
     cedenteId: user.id,
@@ -171,8 +180,9 @@ export async function submitEmitir(user: UserRow, form: EmitirForm): Promise<Emi
     lastroPct: preview.lastroChecklist.pct,
     seguro: form.seguro,
     registro,
-    registradora: registradora.key,
+    registradora: opts.sandbox ? null : registradora.key,
     nfeChave: nfeChave || null,
+    sandbox: opts.sandbox,
   });
   ensureAceite(duplicata.id, '10 dias úteis restantes');
   recordAuditEvent(user.id, user.company_name, 'duplicata.registrada', { duplicataId: duplicata.id, registro, registradora: registradora.key });

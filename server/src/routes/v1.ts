@@ -38,16 +38,20 @@ v1Router.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
+    const sandbox = req.apiKey!.mode === 'test';
     const outcome = await withIdempotency(req.apiUser!.id, 'POST /v1/duplicatas', idempotencyHeader(req), req.body, () =>
-      submitEmitir(req.apiUser!, parsed.data)
+      submitEmitir(req.apiUser!, parsed.data, { sandbox })
     );
     res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
   })
 );
 
+// A test-mode key can only ever see sandbox=1 rows, and a live key only sandbox=0 —
+// enforced here (not just at listing time) so a partner can't probe for a real
+// duplicata's ID via a test key, or vice versa. See db/duplicatas.ts / lib/sandboxData.ts.
 v1Router.get('/duplicatas/:id', (req, res) => {
   const d = getDuplicata(req.params.id);
-  if (!d) {
+  if (!d || !!d.sandbox !== (req.apiKey!.mode === 'test')) {
     res.status(404).json({ error: 'not_found' });
     return;
   }
@@ -65,8 +69,10 @@ v1Router.get('/duplicatas/:id', (req, res) => {
   });
 });
 
-v1Router.get('/marketplace', (_req, res) => {
-  res.json({ offers: listMarketplace().map(buildOfferView) });
+// A test-mode key sees only the seeded sandbox marketplace (lib/sandboxData.ts) — never
+// the real, live offers other partners' live keys operate on.
+v1Router.get('/marketplace', (req, res) => {
+  res.json({ offers: listMarketplace(req.apiKey!.mode === 'test').map(buildOfferView) });
 });
 
 // Sacado-facing aceite endpoints — a sacado's ERP can list pending aceites and

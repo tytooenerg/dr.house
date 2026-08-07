@@ -5,7 +5,7 @@ import { approveKyb, listPendingKyb, rejectKyb } from '../db/users.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
-import { addNotification } from '../db/misc.js';
+import { addNotification, addLedgerEntry } from '../db/misc.js';
 import { recordAuditEvent, listAuditLog, verifyAuditChain } from '../db/audit.js';
 import { COLORS } from '../data/seed.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
@@ -28,6 +28,8 @@ import {
 import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } from '../db/regulatoryNotes.js';
 import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordRecovery } from '../lib/legalCollectionFee.js';
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
+import { runBackup, listBackups, backupEnabled } from '../lib/backup.js';
+import { listPendingTedDeposits, getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -493,3 +495,53 @@ adminRouter.get('/audit', (_req, res) => {
   }));
   res.json({ entries, chain: verifyAuditChain() });
 });
+
+// TED deposits have no self-service confirmation (see lib/tedRail.ts) — an admin matches
+// each pending reference against the real bank statement by hand, same as ops would at
+// any fintech without a BaaS virtual-account product providing an automatic webhook.
+adminRouter.get('/ted/pendentes', (_req, res) => {
+  const pendentes = listPendingTedDeposits().map((t) => ({
+    referencia: t.referencia,
+    empresa: t.company_name,
+    valorFmt: fmtBRL(t.valor),
+    banco: t.banco,
+    agencia: t.agencia,
+    conta: t.conta,
+    quando: fmtRelative(t.created_at),
+  }));
+  res.json({ pendentes });
+});
+
+adminRouter.post('/ted/:referencia/confirmar', (req, res) => {
+  const deposito = getTedDeposit(req.params.referencia);
+  if (!deposito) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  if (deposito.status !== 'ativo') {
+    res.status(409).json({ error: 'already_settled' });
+    return;
+  }
+  concludeTedDeposit(deposito.referencia, req.user!.id);
+  addLedgerEntry(deposito.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via TED confirmado (ref. ${deposito.referencia})`, deposito.valor);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.ted_confirmado', { referencia: deposito.referencia, valor: deposito.valor });
+  res.json({ ok: true });
+});
+
+adminRouter.get('/backups', (_req, res) => {
+  const backups = listBackups().map((b) => ({ ...b, quando: fmtRelative(b.createdAt) }));
+  res.json({ enabled: backupEnabled, backups });
+});
+
+adminRouter.post(
+  '/backups/run',
+  asyncHandler(async (req, res) => {
+    const backup = await runBackup();
+    if (!backup) {
+      res.status(409).json({ error: 'backups_disabled' });
+      return;
+    }
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.backup_manual', { filename: backup.filename });
+    res.json({ backup: { ...backup, quando: fmtRelative(backup.createdAt) } });
+  })
+);

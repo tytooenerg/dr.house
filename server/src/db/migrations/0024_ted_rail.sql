@@ -1,0 +1,38 @@
+-- Real TED payment rail (lib/tedRail.ts) — a third deposit/withdraw method alongside
+-- Pix and boleto, for large institutional transfers. Unlike pix_charges/boletos,
+-- ted_deposits has no self-service "confirm (simulado)" flow: reconciliation is always
+-- either a real BaaS webhook (TED_PSP_*) or an admin manually matching the bank
+-- statement (confirmed_by_admin_id) — never the depositing user self-attesting receipt.
+CREATE TABLE IF NOT EXISTS ted_deposits (
+  referencia TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  valor REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK(status IN ('ativo', 'recebido', 'expirado')),
+  simulado INTEGER NOT NULL DEFAULT 1,
+  banco TEXT NOT NULL,
+  agencia TEXT NOT NULL,
+  conta TEXT NOT NULL,
+  favorecido_nome TEXT NOT NULL,
+  favorecido_cnpj TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  confirmed_at TEXT,
+  confirmed_by_admin_id INTEGER REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_ted_deposits_user ON ted_deposits(user_id);
+CREATE INDEX IF NOT EXISTS idx_ted_deposits_status ON ted_deposits(status);
+
+CREATE TABLE IF NOT EXISTS ted_payouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  valor REAL NOT NULL,
+  banco TEXT NOT NULL,
+  agencia TEXT NOT NULL,
+  conta TEXT NOT NULL,
+  favorecido_nome TEXT NOT NULL,
+  favorecido_cnpj TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'concluido' CHECK(status IN ('concluido', 'falhou')),
+  simulado INTEGER NOT NULL DEFAULT 1,
+  protocolo TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ted_payouts_user ON ted_payouts(user_id);

@@ -8,7 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(__dirname, '../../data');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
-const dbPath = process.env.DB_PATH || path.join(dataDir, 'lastro.db');
+export const dbPath = process.env.DB_PATH || path.join(dataDir, 'lastro.db');
+export const dataDirPath = dataDir;
 export const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
@@ -45,6 +46,8 @@ export function resetDbForTests() {
     DELETE FROM claude_usage;
     DELETE FROM regulatory_notes;
     DELETE FROM boletos;
+    DELETE FROM ted_payouts;
+    DELETE FROM ted_deposits;
     DELETE FROM users;
   `);
 }

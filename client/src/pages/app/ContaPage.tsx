@@ -33,6 +33,24 @@ interface Boleto {
   linhaDigitavel: string | null;
   pdfUrl: string | null;
 }
+interface TedDeposit {
+  referencia: string;
+  valorFmt: string;
+  status: 'ativo' | 'recebido' | 'expirado';
+  simulado: boolean;
+  banco: string;
+  agencia: string;
+  conta: string;
+  favorecidoNome: string;
+}
+interface TedContaBancaria {
+  banco: string;
+  agencia: string;
+  conta: string;
+  tipoConta: 'corrente' | 'poupanca';
+  titularNome: string;
+  titularCnpj: string;
+}
 interface AccountData {
   kycChecklist: KycItem[];
   bankAccountDisplay: string;
@@ -42,6 +60,10 @@ interface AccountData {
   pixCharges: PixCharge[];
   boletoEnabled: boolean;
   boletos: Boleto[];
+  tedEnabled: boolean;
+  tedInstructionsAvailable: boolean;
+  tedContaBancaria: TedContaBancaria | null;
+  tedDeposits: TedDeposit[];
   settlementSpeed: 'd0' | 'd1';
   extrato: ExtratoRow[];
 }
@@ -52,6 +74,9 @@ export function ContaPage() {
   const [depositValor, setDepositValor] = useState('');
   const [boletoValor, setBoletoValor] = useState('');
   const [withdrawValor, setWithdrawValor] = useState('');
+  const [tedDepositValor, setTedDepositValor] = useState('');
+  const [tedWithdrawValor, setTedWithdrawValor] = useState('');
+  const [tedContaForm, setTedContaForm] = useState<TedContaBancaria>({ banco: '', agencia: '', conta: '', tipoConta: 'corrente', titularNome: '', titularCnpj: '' });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -161,6 +186,52 @@ export function ContaPage() {
       setData(d);
       setWithdrawValor('');
       setNotice('Saque solicitado via Pix.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const gerarDepositoTed = async () => {
+    const valor = Number(tedDepositValor.replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setBusy(true);
+    try {
+      const res = await api.post<AccountData & { instrucao: { simulado: boolean; banco: string; agencia: string; conta: string; favorecidoNome: string; referencia: string } }>(
+        '/account/deposit/ted',
+        { valor }
+      );
+      setData(res);
+      setTedDepositValor('');
+      setNotice(
+        res.instrucao.simulado
+          ? 'Instrução de TED gerada em modo simulado — configure TED_PSP_* ou LASTRO_TED_* para exibir dados bancários reais.'
+          : `Transfira via TED para ${res.instrucao.banco} ag. ${res.instrucao.agencia} cc ${res.instrucao.conta}, referência ${res.instrucao.referencia} — a confirmação não é automática, aguarde nossa equipe validar o recebimento no extrato bancário.`
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveContaTed = async () => {
+    if (!tedContaForm.banco.trim() || !tedContaForm.agencia.trim() || !tedContaForm.conta.trim() || !tedContaForm.titularNome.trim() || !tedContaForm.titularCnpj.trim()) return;
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>('/account/kyc/bank-ted', tedContaForm);
+      setData(d);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sacarTed = async () => {
+    const valor = Number(tedWithdrawValor.replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>('/account/withdraw/ted', { valor });
+      setData(d);
+      setTedWithdrawValor('');
+      setNotice('Saque solicitado via TED.');
     } finally {
       setBusy(false);
     }
@@ -349,6 +420,119 @@ export function ContaPage() {
             </div>
           ))}
       </Card>
+
+      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-bold text-[15px]">Depositar via TED</div>
+            <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
+          </div>
+          <div className="text-[12px] text-textSecondary mb-3">
+            {data.tedEnabled
+              ? 'Conta virtual dedicada gerada via provedor bancário real — confirmação automática por webhook.'
+              : data.tedInstructionsAvailable
+              ? 'Transferência para a conta bancária real da Lastro — confirmação manual pelo nosso time após validar o extrato (não é instantânea, diferente de Pix/boleto).'
+              : 'Modo simulado — nenhum provedor de TED real configurado (TED_PSP_* ou LASTRO_TED_*). Dados bancários abaixo são fictícios.'}
+          </div>
+          <div className="flex gap-2 mb-4">
+            <input
+              value={tedDepositValor}
+              onChange={(e) => setTedDepositValor(e.target.value)}
+              placeholder="Valor (R$)"
+              inputMode="decimal"
+              className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+            />
+            <Button variant="primary" disabled={busy || !tedDepositValor} onClick={gerarDepositoTed}>
+              Gerar instrução
+            </Button>
+          </div>
+          {data.tedDeposits
+            .filter((t) => t.status === 'ativo')
+            .map((t) => (
+              <div key={t.referencia} className="p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+                <div className="font-semibold">{t.valorFmt}</div>
+                <div className="text-textSecondary">
+                  {t.banco} · ag. {t.agencia} · cc {t.conta} — {t.favorecidoNome}
+                </div>
+                <div className="text-textTertiary text-[11px] mt-1">Ref. {t.referencia} · aguardando confirmação{t.simulado ? ' (simulado)' : ''}</div>
+              </div>
+            ))}
+        </Card>
+
+        <Card>
+          <div className="font-bold text-[15px] mb-4">Sacar via TED</div>
+          {!data.tedContaBancaria ? (
+            <div className="flex flex-col gap-2">
+              <input
+                value={tedContaForm.banco}
+                onChange={(e) => setTedContaForm({ ...tedContaForm, banco: e.target.value })}
+                placeholder="Banco (nome ou código)"
+                className="border border-border rounded-md px-3 py-2 text-[13px]"
+              />
+              <div className="flex gap-2">
+                <input
+                  value={tedContaForm.agencia}
+                  onChange={(e) => setTedContaForm({ ...tedContaForm, agencia: e.target.value })}
+                  placeholder="Agência"
+                  className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+                />
+                <input
+                  value={tedContaForm.conta}
+                  onChange={(e) => setTedContaForm({ ...tedContaForm, conta: e.target.value })}
+                  placeholder="Conta"
+                  className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+                />
+                <select
+                  value={tedContaForm.tipoConta}
+                  onChange={(e) => setTedContaForm({ ...tedContaForm, tipoConta: e.target.value as 'corrente' | 'poupanca' })}
+                  className="border border-border rounded-md px-2 py-2 text-[13px]"
+                >
+                  <option value="corrente">Corrente</option>
+                  <option value="poupanca">Poupança</option>
+                </select>
+              </div>
+              <input
+                value={tedContaForm.titularNome}
+                onChange={(e) => setTedContaForm({ ...tedContaForm, titularNome: e.target.value })}
+                placeholder="Nome do titular"
+                className="border border-border rounded-md px-3 py-2 text-[13px]"
+              />
+              <input
+                value={tedContaForm.titularCnpj}
+                onChange={(e) => setTedContaForm({ ...tedContaForm, titularCnpj: e.target.value })}
+                placeholder="CNPJ do titular"
+                className="border border-border rounded-md px-3 py-2 text-[13px]"
+              />
+              <Button
+                variant="primary"
+                disabled={busy || !tedContaForm.banco.trim() || !tedContaForm.agencia.trim() || !tedContaForm.conta.trim() || !tedContaForm.titularNome.trim() || !tedContaForm.titularCnpj.trim()}
+                onClick={saveContaTed}
+              >
+                Salvar conta bancária
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="text-[12.5px] text-textSecondary mb-3">
+                Enviado para {data.tedContaBancaria.banco} ag. {data.tedContaBancaria.agencia} cc {data.tedContaBancaria.conta}
+                {!data.tedEnabled && ' (simulado)'}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={tedWithdrawValor}
+                  onChange={(e) => setTedWithdrawValor(e.target.value)}
+                  placeholder="Valor (R$)"
+                  inputMode="decimal"
+                  className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+                />
+                <Button variant="primary" disabled={busy || !tedWithdrawValor} onClick={sacarTed}>
+                  Sacar
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
 
       <div className="bg-white border border-border rounded-card overflow-hidden mb-4">
         <div className="px-5 py-4.5 font-bold text-[15px] border-b border-border">Extrato de liquidação</div>
