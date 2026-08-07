@@ -26,6 +26,8 @@ import {
   markLegalDocumentReviewed,
 } from '../db/legalDocuments.js';
 import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } from '../db/regulatoryNotes.js';
+import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordRecovery } from '../lib/legalCollectionFee.js';
+import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -242,6 +244,7 @@ adminRouter.get('/juridico/cobranca', (_req, res) => {
       duplicataId: d.id,
       sacado: d.sacado_nome,
       cedente: d.cedente_nome,
+      valor: d.valor,
       valorFmt: fmtBRL(d.valor),
       vencimento: d.vencimento,
       eligible: eligibility.eligible,
@@ -256,8 +259,81 @@ adminRouter.get('/juridico/cobranca', (_req, res) => {
       })),
     };
   });
-  res.json({ overdue, disclaimer: LEGAL_DRAFT_DISCLAIMER });
+  res.json({ overdue, disclaimer: LEGAL_DRAFT_DISCLAIMER, feePct: getSuccessFeePct() });
 });
+
+// Success fee (lib/legalCollectionFee.ts) — admin-configurable %, charged only once a
+// duplicata escalated here is actually recovered. See GET/PUT below and POST .../recuperar.
+adminRouter.get('/juridico/cobranca-fee', (_req, res) => {
+  res.json({ feePct: getSuccessFeePct(), default: DEFAULT_SUCCESS_FEE_PCT });
+});
+
+adminRouter.get('/juridico/recuperacoes', (_req, res) => {
+  const recuperacoes = listAllLegalCollectionFees().map((r) => ({
+    duplicataId: r.duplicata_id,
+    sacado: r.sacado_nome,
+    cedente: r.cedente_nome,
+    recoveredValorFmt: fmtBRL(r.recovered_valor),
+    feeValorFmt: fmtBRL(r.fee_valor),
+    feePct: r.fee_pct,
+    chargedRole: r.charged_role,
+    quando: fmtRelative(r.created_at),
+  }));
+  res.json({ recuperacoes });
+});
+
+const feePctSchema = z.object({ feePct: z.number().min(0).max(50) });
+
+adminRouter.put(
+  '/juridico/cobranca-fee',
+  asyncHandler(async (req, res) => {
+    const parsed = feePctSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    setSuccessFeePct(parsed.data.feePct, req.user!.id);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.fee_atualizado', { feePct: parsed.data.feePct });
+    res.json({ feePct: parsed.data.feePct });
+  })
+);
+
+const recuperarSchema = z.object({ valorRecuperado: z.number().positive().optional() });
+
+adminRouter.post(
+  '/juridico/cobranca/:duplicataId/recuperar',
+  asyncHandler(async (req, res) => {
+    const parsed = recuperarSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const duplicata = getDuplicata(req.params.duplicataId);
+    if (!duplicata) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const eligibility = checkCollectionEligibility(duplicata);
+    if (!eligibility.eligible) {
+      res.status(409).json({ error: 'not_eligible', message: eligibility.reason });
+      return;
+    }
+    const result = recordRecovery(duplicata, parsed.data.valorRecuperado ?? duplicata.valor, req.user!.id);
+    if (!result) {
+      res.status(409).json({ error: 'already_recovered', message: 'Esta duplicata já teve uma recuperação registrada.' });
+      return;
+    }
+    const msg = `Duplicata ${duplicata.id} recuperada via cobrança jurídica — fee de sucesso de ${fmtBRL(result.feeValor)} (${result.feePct}%) debitado.`;
+    addNotification(result.chargedTo.userId, msg, COLORS.NAVY, 'disputa');
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.recuperacao_registrada', {
+      duplicataId: duplicata.id,
+      feeValor: result.feeValor,
+      feePct: result.feePct,
+      chargedTo: result.chargedTo,
+    });
+    res.json({ ok: true, feeValor: result.feeValor, feePct: result.feePct, chargedRole: result.chargedTo.role });
+  })
+);
 
 adminRouter.post(
   '/juridico/cobranca/:duplicataId/:tipo',

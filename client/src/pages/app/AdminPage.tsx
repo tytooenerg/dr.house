@@ -82,12 +82,24 @@ interface OverdueCollectionItem {
   duplicataId: string;
   sacado: string;
   cedente: string;
+  valor: number;
   valorFmt: string;
   vencimento: string;
   eligible: boolean;
   reason: string | null;
   diasEmAtraso: number;
   documentos: LegalDocRef[];
+}
+
+interface RecoveryEntry {
+  duplicataId: string;
+  sacado: string;
+  cedente: string;
+  recoveredValorFmt: string;
+  feeValorFmt: string;
+  feePct: number;
+  chargedRole: 'cedente' | 'investidor';
+  quando: string;
 }
 
 interface RegulatoryNote {
@@ -137,6 +149,13 @@ export function AdminPage() {
   const [legalDisclaimer, setLegalDisclaimer] = useState('');
   const [generatingCollection, setGeneratingCollection] = useState<string | null>(null);
   const [collectionError, setCollectionError] = useState<Record<string, string>>({});
+  const [feeConfig, setFeeConfig] = useState<{ feePct: number; default: number } | null>(null);
+  const [feePctInput, setFeePctInput] = useState('');
+  const [savingFeePct, setSavingFeePct] = useState(false);
+  const [recoveringId, setRecoveringId] = useState<string | null>(null);
+  const [recoveredValorInput, setRecoveredValorInput] = useState<Record<string, string>>({});
+  const [recoveryError, setRecoveryError] = useState<Record<string, string>>({});
+  const [recoveries, setRecoveries] = useState<RecoveryEntry[]>([]);
   const [minutas, setMinutas] = useState<LegalDocRef[]>([]);
   const [minutaType, setMinutaType] = useState<'resposta_lgpd' | 'termos_atualizacao' | 'notificacao_padrao'>('resposta_lgpd');
   const [minutaContext, setMinutaContext] = useState('');
@@ -159,12 +178,18 @@ export function AdminPage() {
       setThresholdInput(String(d.threshold));
     });
   const loadCobrancaJuridica = () =>
-    api.get<{ overdue: OverdueCollectionItem[]; disclaimer: string }>('/admin/juridico/cobranca').then((d) => {
+    api.get<{ overdue: OverdueCollectionItem[]; disclaimer: string; feePct: number }>('/admin/juridico/cobranca').then((d) => {
       setOverdue(d.overdue);
       setLegalDisclaimer(d.disclaimer);
     });
   const loadMinutas = () => api.get<{ documentos: LegalDocRef[] }>('/admin/juridico/minutas').then((d) => setMinutas(d.documentos));
   const loadRegulatorio = () => api.get<{ notes: RegulatoryNote[] }>('/admin/juridico/regulatorio').then((d) => setRegulatoryNotes(d.notes));
+  const loadFeeConfig = () =>
+    api.get<{ feePct: number; default: number }>('/admin/juridico/cobranca-fee').then((d) => {
+      setFeeConfig(d);
+      setFeePctInput(String(d.feePct));
+    });
+  const loadRecoveries = () => api.get<{ recuperacoes: RecoveryEntry[] }>('/admin/juridico/recuperacoes').then((d) => setRecoveries(d.recuperacoes));
 
   useEffect(() => {
     loadKyb();
@@ -176,7 +201,39 @@ export function AdminPage() {
     loadCobrancaJuridica();
     loadMinutas();
     loadRegulatorio();
+    loadFeeConfig();
+    loadRecoveries();
   }, []);
+
+  const saveFeePct = async () => {
+    const n = Number(feePctInput);
+    if (!Number.isFinite(n) || n < 0 || n > 50) return;
+    setSavingFeePct(true);
+    try {
+      await api.put('/admin/juridico/cobranca-fee', { feePct: n });
+      await loadFeeConfig();
+      await loadAudit();
+    } finally {
+      setSavingFeePct(false);
+    }
+  };
+
+  const recoverDuplicata = async (duplicataId: string) => {
+    setRecoveringId(duplicataId);
+    setRecoveryError((prev) => ({ ...prev, [duplicataId]: '' }));
+    try {
+      const raw = recoveredValorInput[duplicataId]?.trim();
+      const valorRecuperado = raw ? Number(raw.replace(/\./g, '').replace(',', '.')) : undefined;
+      await api.post(`/admin/juridico/cobranca/${duplicataId}/recuperar`, valorRecuperado ? { valorRecuperado } : undefined);
+      await loadCobrancaJuridica();
+      await loadRecoveries();
+      await loadAudit();
+    } catch (err) {
+      setRecoveryError((prev) => ({ ...prev, [duplicataId]: err instanceof ApiError ? err.message : 'Não foi possível registrar a recuperação.' }));
+    } finally {
+      setRecoveringId(null);
+    }
+  };
 
   const generateCollectionDoc = async (duplicataId: string, tipo: string) => {
     const key = `${duplicataId}:${tipo}`;
@@ -555,6 +612,30 @@ export function AdminPage() {
               <div className="rounded-[10px] px-4 py-3 text-[12.5px]" style={{ background: '#FBF1E0', color: '#8A5A0A' }}>
                 <b>Toda minuta é um rascunho.</b> {legalDisclaimer}
               </div>
+
+              <div className="bg-white border border-border rounded-card p-5">
+                <div className="font-bold text-[14px] mb-1">Fee de sucesso sobre valor recuperado</div>
+                <div className="text-textSecondary text-[12.5px] mb-3">
+                  Cobrado do credor atual (cedente, ou investidor se a duplicata foi vendida) apenas quando uma cobrança jurídica resulta em pagamento.
+                  Padrão: {feeConfig?.default ?? 5}%.
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    step={0.5}
+                    className="w-24 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+                    value={feePctInput}
+                    onChange={(e) => setFeePctInput(e.target.value)}
+                  />
+                  <span className="text-[13px] text-textSecondary">%</span>
+                  <Button size="sm" variant="secondary" disabled={savingFeePct || Number(feePctInput) === feeConfig?.feePct} onClick={saveFeePct}>
+                    {savingFeePct ? 'Salvando…' : 'Salvar'}
+                  </Button>
+                </div>
+              </div>
+
               {overdue.map((o) => (
                 <div key={o.duplicataId} className="bg-white border border-border rounded-card p-6">
                   <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
@@ -626,6 +707,28 @@ export function AdminPage() {
                       ))}
                     </div>
                   )}
+                  {o.eligible && (
+                    <div className="mt-3 pt-3 border-t border-hairline">
+                      <div className="text-[12.5px] font-bold mb-1.5">Registrar recuperação (sacado pagou fora da plataforma)</div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <input
+                          className="w-40 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+                          placeholder={o.valorFmt}
+                          value={recoveredValorInput[o.duplicataId] ?? ''}
+                          onChange={(e) => setRecoveredValorInput((prev) => ({ ...prev, [o.duplicataId]: e.target.value }))}
+                        />
+                        <Button
+                          size="sm"
+                          variant="success"
+                          disabled={recoveringId === o.duplicataId}
+                          onClick={() => recoverDuplicata(o.duplicataId)}
+                        >
+                          {recoveringId === o.duplicataId ? 'Registrando…' : `Registrar recuperação (fee ${feeConfig?.feePct ?? 5}%)`}
+                        </Button>
+                      </div>
+                      {recoveryError[o.duplicataId] && <div className="text-red text-[12px] font-semibold mt-1.5">{recoveryError[o.duplicataId]}</div>}
+                    </div>
+                  )}
                 </div>
               ))}
               {overdue.length === 0 && (
@@ -633,6 +736,27 @@ export function AdminPage() {
                   <EmptyState title="Nenhuma duplicata vencida no momento" hint="Duplicatas vencidas elegíveis para cobrança jurídica aparecem aqui" />
                 </div>
               )}
+
+              <div className="bg-white border border-border rounded-card overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-border font-bold text-[14px]">Histórico de recuperações</div>
+                {recoveries.map((r) => (
+                  <div key={r.duplicataId} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+                    <div>
+                      <div className="font-mono-num font-bold text-textSecondary">{r.duplicataId}</div>
+                      <div className="text-textSecondary text-[12px]">
+                        {r.cedente} → {r.sacado} · recuperado {r.recoveredValorFmt} · {r.quando}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold">
+                        Fee {r.feeValorFmt} ({r.feePct}%)
+                      </div>
+                      <div className="text-textTertiary text-[11.5px]">debitado do {r.chargedRole === 'investidor' ? 'investidor' : 'cedente'}</div>
+                    </div>
+                  </div>
+                ))}
+                {recoveries.length === 0 && <EmptyState title="Nenhuma recuperação registrada ainda" hint="Recuperações registradas acima aparecem aqui, com o fee de sucesso cobrado" />}
+              </div>
             </div>
           )}
 

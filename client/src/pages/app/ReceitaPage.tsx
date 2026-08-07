@@ -25,11 +25,18 @@ interface RealInsuranceCommission {
   totalApolices: number;
   comissaoPctFmt: string;
 }
+interface RealLegalCollectionFees {
+  totalFeeFmt: string;
+  totalRecoveredFmt: string;
+  totalCasos: number;
+  feePctFmt: string;
+}
 interface RevenueData {
   streams: RevenueStream[];
   totalFmt: string;
   realFees: RealFees;
   realInsuranceCommission: RealInsuranceCommission;
+  realLegalCollectionFees: RealLegalCollectionFees;
 }
 
 export function ReceitaPage() {
@@ -81,6 +88,24 @@ export function ReceitaPage() {
             <div className="text-[22px] font-extrabold">{data.realInsuranceCommission.totalComissaoFmt}</div>
             <div className="text-textTertiary text-[11.5px]">
               {data.realInsuranceCommission.totalApolices} apólice(s) · {data.realInsuranceCommission.totalPremiosFmt} em prêmios
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="mb-4">
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div>
+            <div className="font-bold text-[15px]">Fee de sucesso — cobrança jurídica</div>
+            <div className="text-textSecondary text-[12.5px] mt-0.5">
+              {data.realLegalCollectionFees.feePctFmt} sobre o valor recuperado quando uma duplicata escalada ao Jurídico é paga — cobrado do credor
+              atual (cedente ou investidor)
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[22px] font-extrabold">{data.realLegalCollectionFees.totalFeeFmt}</div>
+            <div className="text-textTertiary text-[11.5px]">
+              {data.realLegalCollectionFees.totalCasos} caso(s) · {data.realLegalCollectionFees.totalRecoveredFmt} recuperados
             </div>
           </div>
         </div>

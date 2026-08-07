@@ -18,3 +18,10 @@ export function getIntSetting(key: string, fallback: number): number {
   const n = Number(raw);
   return Number.isFinite(n) ? n : fallback;
 }
+
+export function getFloatSetting(key: string, fallback: number): number {
+  const raw = getPlatformSetting(key);
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}

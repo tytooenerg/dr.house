@@ -31,6 +31,7 @@ export function resetDbForTests() {
     DELETE FROM insurance_settlements;
     DELETE FROM sacado_network_signals;
     DELETE FROM resale_listings;
+    DELETE FROM legal_collection_fees;
     DELETE FROM purchases;
     DELETE FROM legal_documents;
     DELETE FROM duplicatas;

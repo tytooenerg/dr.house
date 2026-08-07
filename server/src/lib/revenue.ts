@@ -2,6 +2,8 @@ import { REVENUE_RAW, REV_COLORS } from '../data/seed.js';
 import { db } from '../db/index.js';
 import { platformFee, platformFeePct, INSURANCE_COMMISSION_PCT } from './settlement.js';
 import { sumInsuranceCommission } from '../db/insuranceSettlements.js';
+import { sumLegalCollectionFees } from '../db/legalCollectionFees.js';
+import { getSuccessFeePct } from './legalCollectionFee.js';
 import { fmtBRL } from './format.js';
 
 export function getRevenueStreams() {
@@ -25,6 +27,7 @@ export function getRevenueStreams() {
     totalFmt: 'R$ ' + total.toFixed(1) + 'k/mês',
     realFees: getRealPlatformFees(),
     realInsuranceCommission: getRealInsuranceCommission(),
+    realLegalCollectionFees: getRealLegalCollectionFees(),
   };
 }
 
@@ -58,5 +61,19 @@ function getRealInsuranceCommission() {
     totalPremiosFmt: fmtBRL(totalPremios),
     totalApolices,
     comissaoPctFmt: Math.round(INSURANCE_COMMISSION_PCT * 100) + '%',
+  };
+}
+
+// A real success fee charged only when a duplicata escalated to cobrança jurídica
+// (lib/legalCollection.ts) is actually marked recovered by an admin — see
+// lib/legalCollectionFee.ts. Computed from legal_collection_fees, an exact log of every
+// real charge, not recomputed from mutable current state.
+function getRealLegalCollectionFees() {
+  const { totalFeeValor, totalRecoveredValor, count } = sumLegalCollectionFees();
+  return {
+    totalFeeFmt: fmtBRL(totalFeeValor),
+    totalRecoveredFmt: fmtBRL(totalRecoveredValor),
+    totalCasos: count,
+    feePctFmt: getSuccessFeePct() + '%',
   };
 }
