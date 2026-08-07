@@ -55,12 +55,12 @@ export function DevelopersPage() {
             fundos que não têm escala para integrar um por um.
           </div>
           <div className="flex gap-3 mt-8">
-            <Link to="/" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
+            <Link to="/login" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
               Começar a integrar
             </Link>
-            <Link to="/" className="px-6 py-3.5 rounded-lg border border-inputBorder text-navy font-bold text-[15px]">
+            <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer" className="px-6 py-3.5 rounded-lg border border-inputBorder text-navy font-bold text-[15px]">
               Ver documentação
-            </Link>
+            </a>
           </div>
         </div>
 
@@ -235,7 +235,7 @@ export function DevelopersPage() {
         <div className="text-[32px] font-extrabold tracking-tight">Pronto para construir sobre a Lastro?</div>
         <div className="text-textSecondary text-[15px] mt-2.5">Chaves de teste em minutos, sem burocracia.</div>
         <div className="flex gap-3 justify-center mt-6.5">
-          <Link to="/" className="px-6.5 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
+          <Link to="/login" className="px-6.5 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
             Criar conta de desenvolvedor
           </Link>
           <div className="px-6.5 py-3.5 rounded-lg border border-inputBorder text-navy font-bold text-[15px]">Falar com vendas</div>

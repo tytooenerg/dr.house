@@ -145,6 +145,10 @@ A follow-up to "what's missing, what can we sell inside the platform" — five r
 4. **White-label licensing expansion** (`lib/whitelabelBilling.ts`, `POST /erp/whitelabel/plus`) — a flat monthly add-on on top of the existing free white-label branding (which only relabeled the WhatsApp reminder). Requires a brand already configured and the Empresarial plan; once subscribed, the sacado's own in-app aceite view shows the cedente's brand instead of generic "Lastro" (`lib/aceiteCore.ts`), not just the outbound message.
 5. **Institutional analytics/reporting subscription** (`lib/institutionalReporting.ts`, **Carteira & Histórico**) — a flat monthly add-on (Pro plan or above) unlocking portfolio-level analytics beyond the free per-transaction CSV/PDF export: rating concentration, insurance/coobrigação coverage, monthly performance trend and top sacado exposures, all aggregated server-side from the investor's own real purchases, plus a downloadable institutional PDF report for a comitê.
 
+### Marketing homepage
+
+`/` was previously just an alias for the login screen — there was no actual company website, and the public nav's own "Entrar"/"Falar com vendas" links pointed back at themselves. Added a real homepage (`pages/public/LandingPage.tsx`) covering the whole platform for a general audience (hero, problem/solution, the 5-step emission→liquidation flow, one card per participant — cedente/investidor/sacado/seguradora — product/compliance highlights, and a live stats band pulling real numbers from the same `GET /api/public/stats` the Transparência page uses, not fabricated marketing figures), reusing `PublicNav`/`PublicFooter` for visual consistency with the existing Developers/Preços/Transparência/Legal/Status pages. Login moved to `/login`; every internal link that used to point at `/` expecting the login/signup screen (nav, pricing/developers/embed/404 CTAs, the referral share link, `AppShell`'s auth redirect, the sidebar's logout redirect, and the e2e test suite) was updated to match.
+
 ## Running locally
 
 ```bash
@@ -205,7 +209,7 @@ client/src/
   layout/             app shell: Sidebar, NotificationBell, AiChat, AppShell
   pages/auth/         login/register, KYB modal, onboarding tour
   pages/app/          the 20+ authenticated screens (role-gated), including the admin back-office, Assinatura (billing), the Seguradora dashboard, Mercado Secundário and Cestas de Investimento
-  pages/public/       Developers, Preços, Legal, Transparência, Status, the embeddable /embed/simulador widget, 404
+  pages/public/       Landing (/, the marketing homepage), Developers, Preços, Legal, Transparência, Status, the embeddable /embed/simulador widget, 404
   state/               session context (JWT-backed auth, refresh-aware)
   lib/                 API client (with token-refresh retry), WebSocket hook, misc utilities
   data/navConfig.ts   sidebar nav + role→tab mapping

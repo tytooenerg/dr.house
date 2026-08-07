@@ -1,7 +1,7 @@
 import { test, expect, dismissOnboardingIfPresent } from './fixtures';
 
 test('demo seguradora sees the seeded policy/sinistro and can approve a claim', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('voce@empresa.com.br').fill('seguradora@lastro.demo');
   await page.getByPlaceholder('••••••••').fill('demo1234');
   await page.locator('form').getByRole('button', { name: 'Entrar' }).click();

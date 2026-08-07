@@ -9,7 +9,7 @@ referralRouter.get('/', (req, res) => {
   const user = req.user!;
   res.json({
     code: user.referral_code,
-    link: `/?ref=${user.referral_code}`,
+    link: `/login?ref=${user.referral_code}`,
     bonusEmissoesMensais: user.referral_bonus_emissions,
     indicados: listReferrals(user.id),
   });

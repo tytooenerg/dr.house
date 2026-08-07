@@ -5,7 +5,7 @@ export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'lega
   return (
     <div className="flex items-center justify-between px-14 py-5 border-b border-hairline">
       <div className="flex items-center gap-9">
-        <Link to="/developers">
+        <Link to="/">
           <Logo size={24} />
         </Link>
         <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-[#3D4658]">
@@ -27,10 +27,10 @@ export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'lega
         </div>
       </div>
       <div className="flex items-center gap-5 text-sm font-semibold">
-        <Link to="/" className="text-[#3D4658]">
+        <Link to="/login" className="text-[#3D4658]">
           Entrar
         </Link>
-        <Link to="/" className="px-4.5 py-2.5 rounded-lg bg-navy text-white">
+        <Link to="/legal#contato" className="px-4.5 py-2.5 rounded-lg bg-navy text-white">
           Falar com vendas
         </Link>
       </div>

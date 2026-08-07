@@ -26,6 +26,7 @@ import { ReceitaPage } from './pages/app/ReceitaPage';
 import { AdminPage } from './pages/app/AdminPage';
 import { AssinaturaPage } from './pages/app/AssinaturaPage';
 import { SeguradoraPage } from './pages/app/SeguradoraPage';
+import { LandingPage } from './pages/public/LandingPage';
 import { DevelopersPage } from './pages/public/DevelopersPage';
 import { PrecosPage } from './pages/public/PrecosPage';
 import { LegalPage } from './pages/public/LegalPage';
@@ -40,7 +41,8 @@ export default function App() {
   return (
     <SessionProvider>
       <Routes>
-        <Route path="/" element={<LoginPage />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/convite-equipe" element={<TeamInviteAcceptPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/completar-cadastro-google" element={<CompleteGoogleSignupPage />} />

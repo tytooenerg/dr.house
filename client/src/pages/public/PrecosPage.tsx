@@ -58,7 +58,7 @@ export function PrecosPage() {
             <div className="font-bold text-[17px] mb-1.5">Seguro sobre o recebível</div>
             <div className="text-textSecondary text-sm max-w-[520px]">Prêmio de referência 0,6% do valor, cobrado pela seguradora parceira — a Lastro recebe apenas comissão de distribuição, sem risco de sinistro.</div>
           </div>
-          <Link to="/" className="px-5.5 py-3 rounded-lg bg-blue text-white font-bold text-sm whitespace-nowrap">
+          <Link to="/login" className="px-5.5 py-3 rounded-lg bg-blue text-white font-bold text-sm whitespace-nowrap">
             Simular uma operação
           </Link>
         </div>

@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 
 test('demo investidor can buy an offer, then list it for resale on the mercado secundário', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('voce@empresa.com.br').fill('investidor@lastro.demo');
   await page.getByPlaceholder('••••••••').fill('demo1234');
   await page.locator('form').getByRole('button', { name: 'Entrar' }).click();

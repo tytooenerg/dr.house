@@ -74,7 +74,7 @@ export function EmbedSimuladorPage() {
             </div>
           </div>
           {result.sacadoRecognizedText && <div className="mt-3 text-[12px] text-textSecondary">{result.sacadoRecognizedText}</div>}
-          <a href="/" target="_blank" rel="noreferrer" className="inline-block mt-3 text-[12.5px] font-bold text-blue">
+          <a href="/login" target="_blank" rel="noreferrer" className="inline-block mt-3 text-[12.5px] font-bold text-blue">
             Antecipar com a Lastro →
           </a>
         </div>

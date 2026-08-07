@@ -6,7 +6,7 @@ function unique() {
 }
 
 async function registerAs(page: Page, opts: { roleTitle: string; nome: string; companyName: string; email: string }) {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await page.getByText(opts.roleTitle).click();
   await page.getByPlaceholder('Marina Costa').fill(opts.nome);
@@ -47,9 +47,9 @@ test('a cedente can emit a duplicata and the matching sacado can confirm it', as
   await expect(page.getByText('Duplicata registrada com sucesso')).toBeVisible();
 
   // Log out — otherwise the still-valid cedente session redirects straight past the
-  // register form on the next goto('/') instead of letting the sacado sign up fresh.
+  // register form on the next goto('/login') instead of letting the sacado sign up fresh.
   await page.getByRole('button', { name: 'Sair' }).click();
-  await expect(page).toHaveURL('/', { timeout: 10_000 });
+  await expect(page).toHaveURL('/login', { timeout: 10_000 });
 
   // 2. The sacado (matched by company name) registers and confirms the duplicata.
   await registerAs(page, {

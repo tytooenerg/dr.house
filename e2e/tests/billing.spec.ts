@@ -7,7 +7,7 @@ function unique() {
 test('a básico cedente can generate a sandbox key on Desenvolvedores, but live keys require upgrading to Empresarial', async ({ page }) => {
   const suffix = unique();
 
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await page.getByText('Empresa (cedente)').click();
   await page.getByPlaceholder('Marina Costa').fill('Cedente Teste');

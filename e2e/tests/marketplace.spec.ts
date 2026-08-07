@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 
 async function loginAsInvestidor(page: import('@playwright/test').Page) {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('voce@empresa.com.br').fill('investidor@lastro.demo');
   await page.getByPlaceholder('••••••••').fill('demo1234');
   await page.locator('form').getByRole('button', { name: 'Entrar' }).click();

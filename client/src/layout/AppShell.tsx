@@ -12,8 +12,8 @@ export function AppShell() {
   const isMobile = useIsMobile();
 
   if (loading) return null;
-  if (!user) return <Navigate to="/" replace />;
-  if (user.needsKyb) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.needsKyb) return <Navigate to="/login" replace />;
 
   return (
     <div className="flex min-h-screen w-full bg-bg text-navy relative" style={{ flexDirection: isMobile ? 'column' : 'row' }}>
