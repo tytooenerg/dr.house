@@ -133,6 +133,7 @@ export async function uploadFile(
   upload: { id: number; filename: string };
   extracted: Record<string, string> | null;
   analysis: { text: string; severity: 'ok' | 'atencao' | 'critico' }[] | null;
+  biometria: { passed: boolean; confidence: number } | null;
 }> {
   const token = getToken();
   const form = new FormData();

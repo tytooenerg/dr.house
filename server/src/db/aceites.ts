@@ -62,16 +62,19 @@ export interface AceiteAguardandoComContato extends AceiteRow {
   valor: number;
   sacado_user_id: number | null;
   sacado_telefone: string | null;
+  cedente_id: number | null;
 }
 
 // Feeds lib/aceiteReminder.ts's background job — every still-open aceite that hasn't been
 // reminded yet, with the sacado's own account (if they've registered) so the reminder can
 // actually be sent to a phone number. Deadline filtering (which of these are close enough
 // to warrant a reminder) is computed in JS via aceiteSlaStatus, same as everywhere else.
+// cedente_id lets the job personalize the reminder with the cedente's white-label brand
+// (settings.whitelabelBrand — Integrações ERP) when they've set one up.
 export function listAguardandoSemLembrete(): AceiteAguardandoComContato[] {
   return db
     .prepare(
-      `SELECT a.*, d.sacado_nome as sacado_nome, d.valor as valor, u.id as sacado_user_id, u.telefone as sacado_telefone
+      `SELECT a.*, d.sacado_nome as sacado_nome, d.valor as valor, u.id as sacado_user_id, u.telefone as sacado_telefone, d.cedente_id as cedente_id
        FROM aceites a
        JOIN duplicatas d ON d.id = a.duplicata_id
        LEFT JOIN users u ON u.role = 'sacado' AND lower(u.company_name) = lower(d.sacado_nome)

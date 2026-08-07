@@ -1,7 +1,8 @@
 import { COLORS, SACADOS, type Rating, type Sacado, type SacadoFactor } from '../data/seed.js';
-import { normalizeCnpj, ratingColors, scoreColorFor } from './format.js';
+import { normalizeCnpj, ratingColors, scoreColorFor, fmtBRL } from './format.js';
 import { summarizeSignals, type SignalSummary } from '../db/networkSignals.js';
 import { consultarBureau } from './creditBureau.js';
+import { consultarFluxoDeCaixa, type OpenFinanceCashFlowSignal } from './openFinance.js';
 import { askClaude, claudeEnabled, extractJson } from './claude.js';
 import { logger } from './logger.js';
 
@@ -66,6 +67,7 @@ export interface RiscoView {
   fonte: 'interno' | 'rede' | 'combinado';
   sinaisDeRede: SinaisDeRedeView | null;
   bureau: { score: number; fonte: string } | null;
+  openFinance: { receitaMediaMensalFmt: string; volatilidadePct: number; fonte: string } | null;
 }
 
 // Shared by the internal /api/risco/:name route (used by the SPA) and the public
@@ -104,6 +106,7 @@ export function buildRiscoView(name: string, s: Sacado): RiscoView {
     fonte: 'interno',
     sinaisDeRede: null,
     bureau: null,
+    openFinance: null,
   };
 }
 
@@ -154,7 +157,8 @@ export async function buildBlendedRiscoView(cnpj: string, userId?: number): Prom
   const view = buildBlendedRiscoViewSync(cnpj);
   if (!view) return null;
   const withBureau = await applyBureauBlend(view, cnpj);
-  return applyAiNarrative(withBureau, userId);
+  const withOpenFinance = await applyOpenFinanceBlend(withBureau, cnpj);
+  return applyAiNarrative(withOpenFinance, userId);
 }
 
 // A real bureau score (Serasa/Boa Vista/Quod — see lib/creditBureau.ts) is combined the
@@ -185,6 +189,42 @@ async function applyBureauBlend(view: RiscoView, cnpj: string): Promise<RiscoVie
     pd12m: PD12M_BY_RATING[rating],
     factors: [...view.factors, { label: `Score externo (${bureau.fonte})`, value: `${bureau.score}`, barPct: `${bureau.score}%`, barColor: scoreColorFor(bureau.score) }],
     bureau,
+  };
+}
+
+// Real Open Finance cash-flow data (lib/openFinance.ts) blended the same way — a fixed
+// weight nudging whatever score was already computed, never fully replacing it. Lower
+// revenue volatility (a more predictable cash flow) pulls the score up; higher volatility
+// pulls it down. No-op when OPEN_FINANCE_API_URL/KEY isn't configured or no consent is on
+// file for this CNPJ yet.
+const OPEN_FINANCE_WEIGHT = 0.25;
+
+async function applyOpenFinanceBlend(view: RiscoView, cnpj: string): Promise<RiscoView> {
+  let signal: OpenFinanceCashFlowSignal | null = null;
+  try {
+    signal = await consultarFluxoDeCaixa(cnpj);
+  } catch (err) {
+    logger.warn({ err }, '[risco] falha ao consultar sinal de fluxo de caixa via Open Finance');
+  }
+  if (!signal) return view;
+
+  const openFinanceScore = Math.max(5, Math.min(98, Math.round(100 - signal.volatilidadePct)));
+  const blendedScore = Math.round(view.score * (1 - OPEN_FINANCE_WEIGHT) + openFinanceScore * OPEN_FINANCE_WEIGHT);
+  const rating = ratingFromScore(blendedScore);
+  return {
+    ...view,
+    score: blendedScore,
+    rating,
+    scoreColor: scoreColorFor(blendedScore),
+    ratingBg: ratingColors(rating).bg,
+    ratingColor: ratingColors(rating).color,
+    gaugeScore: blendedScore,
+    pd12m: PD12M_BY_RATING[rating],
+    factors: [
+      ...view.factors,
+      { label: 'Fluxo de caixa (Open Finance)', value: `${fmtBRL(signal.receitaMediaMensal)}/mês, volatilidade ${signal.volatilidadePct}%`, barPct: `${openFinanceScore}%`, barColor: scoreColorFor(openFinanceScore) },
+    ],
+    openFinance: { receitaMediaMensalFmt: fmtBRL(signal.receitaMediaMensal), volatilidadePct: signal.volatilidadePct, fonte: signal.fonte },
   };
 }
 
@@ -277,6 +317,7 @@ function buildBlendedRiscoViewSync(cnpj: string): RiscoView | null {
       fonte: 'rede',
       sinaisDeRede: rede,
       bureau: null,
+    openFinance: null,
     };
   }
 
@@ -306,5 +347,6 @@ function buildBlendedRiscoViewSync(cnpj: string): RiscoView | null {
     fonte: 'combinado',
     sinaisDeRede: rede,
     bureau: null,
+    openFinance: null,
   };
 }

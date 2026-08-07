@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, uploadFile } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -25,6 +25,14 @@ interface PixCharge {
   simulado: boolean;
   brcode: string | null;
 }
+interface Boleto {
+  nossoNumero: string;
+  valorFmt: string;
+  status: 'ativo' | 'pago' | 'expirado';
+  simulado: boolean;
+  linhaDigitavel: string | null;
+  pdfUrl: string | null;
+}
 interface AccountData {
   kycChecklist: KycItem[];
   bankAccountDisplay: string;
@@ -32,6 +40,8 @@ interface AccountData {
   pixChave: string | null;
   saldoDisponivelFmt: string;
   pixCharges: PixCharge[];
+  boletoEnabled: boolean;
+  boletos: Boleto[];
   settlementSpeed: 'd0' | 'd1';
   extrato: ExtratoRow[];
 }
@@ -40,6 +50,7 @@ export function ContaPage() {
   const [data, setData] = useState<AccountData | null>(null);
   const [pixKeyInput, setPixKeyInput] = useState('');
   const [depositValor, setDepositValor] = useState('');
+  const [boletoValor, setBoletoValor] = useState('');
   const [withdrawValor, setWithdrawValor] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,6 +67,21 @@ export function ContaPage() {
     if (key === 'docs') {
       await api.post('/account/kyc/docs');
       load();
+    }
+  };
+
+  const enviarSelfie = async (file: File) => {
+    setBusy(true);
+    try {
+      const res = await uploadFile('selfie_liveness', file);
+      if (res.biometria) {
+        setNotice(res.biometria.passed ? 'Prova de vida verificada com sucesso.' : 'Não foi possível confirmar a prova de vida — tente novamente com melhor iluminação.');
+      } else {
+        setNotice('Selfie enviada (modo simulado — nenhum provedor de biometria configurado no servidor).');
+      }
+      load();
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -101,6 +127,31 @@ export function ContaPage() {
     }
   };
 
+  const gerarBoleto = async () => {
+    const valor = Number(boletoValor.replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setBusy(true);
+    try {
+      const res = await api.post<AccountData & { nossoNumero: string; simulado: boolean; pdfUrl: string | null }>('/account/deposit/boleto', { valor });
+      setData(res);
+      setBoletoValor('');
+      setNotice(res.simulado ? 'Boleto criado em modo simulado — confirme abaixo para creditar o saldo.' : 'Boleto criado — a linha digitável e o PDF estão disponíveis abaixo.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmarBoletoSimulado = async (nossoNumero: string) => {
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>(`/account/deposit/boleto/${nossoNumero}/confirm-simulado`);
+      setData(d);
+      setNotice(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sacar = async () => {
     const valor = Number(withdrawValor.replace(',', '.'));
     if (!valor || valor <= 0) return;
@@ -127,10 +178,28 @@ export function ContaPage() {
               <div key={k.label} className="flex items-center justify-between gap-2.5">
                 <div className="text-[13.5px] font-semibold">{k.label}</div>
                 <div className="flex items-center gap-2">
-                  {k.action && (
-                    <button type="button" onClick={() => runAction(k.action!.key)} className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">
+                  {k.action?.key === 'biometria' ? (
+                    <label className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">
                       {k.action.label}
-                    </button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="user"
+                        className="hidden"
+                        disabled={busy}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) enviarSelfie(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  ) : (
+                    k.action && (
+                      <button type="button" onClick={() => runAction(k.action!.key)} className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">
+                        {k.action.label}
+                      </button>
+                    )
                   )}
                   <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: k.bg, color: k.color }}>
                     {k.status}
@@ -233,6 +302,53 @@ export function ContaPage() {
           )}
         </Card>
       </div>
+
+      <Card className="mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="font-bold text-[15px]">Depositar via Boleto</div>
+          <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
+        </div>
+        {!data.boletoEnabled && (
+          <div className="text-[12px] text-textSecondary mb-3">
+            Modo simulado — nenhum PSP de boleto real configurado (BOLETO_PSP_*). O depósito precisa ser confirmado manualmente abaixo.
+          </div>
+        )}
+        <div className="flex gap-2 mb-4">
+          <input
+            value={boletoValor}
+            onChange={(e) => setBoletoValor(e.target.value)}
+            placeholder="Valor (R$)"
+            inputMode="decimal"
+            className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+          />
+          <Button variant="primary" disabled={busy || !boletoValor} onClick={gerarBoleto}>
+            Gerar boleto
+          </Button>
+        </div>
+        {data.boletos
+          .filter((b) => b.status === 'ativo')
+          .map((b) => (
+            <div key={b.nossoNumero} className="flex items-center justify-between gap-2 p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+              <div>
+                <div className="font-semibold">{b.valorFmt}</div>
+                {b.linhaDigitavel ? (
+                  <div className="break-all text-[10.5px] text-textSecondary">{b.linhaDigitavel}</div>
+                ) : (
+                  <div className="text-textSecondary">Aguardando pagamento (simulado)</div>
+                )}
+              </div>
+              {b.simulado && (
+                <button
+                  type="button"
+                  onClick={() => confirmarBoletoSimulado(b.nossoNumero)}
+                  className="px-2.5 py-1.5 rounded-md border-none bg-green text-white text-[11px] font-bold cursor-pointer whitespace-nowrap"
+                >
+                  Confirmar (simulado)
+                </button>
+              )}
+            </div>
+          ))}
+      </Card>
 
       <div className="bg-white border border-border rounded-card overflow-hidden mb-4">
         <div className="px-5 py-4.5 font-bold text-[15px] border-b border-border">Extrato de liquidação</div>

@@ -15,6 +15,15 @@ export interface UserSettings {
   sectorDiversification: { varejo: number; industria: number; construcao: number; servicos: number };
   erpConnections: { sap: boolean; totvs: boolean; omie: boolean; whitelabel: boolean };
   omieCredentials: { appKey: string; appSecret: string } | null;
+  sapCredentials: { baseUrl: string; companyDb: string; username: string; password: string } | null;
+  totvsCredentials: { baseUrl: string; clientId: string; clientSecret: string } | null;
+  // Opt-in, mirrors autoBidEnabled's opt-in-with-rules pattern on the investor side —
+  // pulls new open contas a receber from a connected ERP and auto-emits them as
+  // duplicatas without a manual click, capped at autoEmitMaxValor per emission.
+  autoEmitEnabled: boolean;
+  autoEmitMaxValor: string;
+  whitelabelBrand: { nome: string; corPrimaria: string; logoUrl: string } | null;
+  biometricVerified: boolean;
   settlementSpeed: 'd0' | 'd1';
   kycBankConnected: boolean;
   pixChave: string | null;
@@ -37,6 +46,12 @@ export function defaultSettings(): UserSettings {
     sectorDiversification: { varejo: 30, industria: 25, construcao: 20, servicos: 25 },
     erpConnections: { sap: false, totvs: false, omie: false, whitelabel: false },
     omieCredentials: null,
+    sapCredentials: null,
+    totvsCredentials: null,
+    autoEmitEnabled: false,
+    autoEmitMaxValor: '50.000',
+    whitelabelBrand: null,
+    biometricVerified: false,
     settlementSpeed: 'd1',
     kycBankConnected: false,
     pixChave: null,

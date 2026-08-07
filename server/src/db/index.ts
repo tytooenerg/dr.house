@@ -34,6 +34,7 @@ export function resetDbForTests() {
     DELETE FROM legal_collection_fees;
     DELETE FROM purchases;
     DELETE FROM legal_documents;
+    DELETE FROM auto_emit_imports;
     DELETE FROM duplicatas;
     DELETE FROM webhook_deliveries;
     DELETE FROM idempotency_keys;
@@ -43,6 +44,7 @@ export function resetDbForTests() {
     DELETE FROM system_health_checks;
     DELETE FROM claude_usage;
     DELETE FROM regulatory_notes;
+    DELETE FROM boletos;
     DELETE FROM users;
   `);
 }

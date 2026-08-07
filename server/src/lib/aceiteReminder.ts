@@ -1,4 +1,5 @@
 import { aceiteSlaStatus, listAguardandoSemLembrete, markReminderSent } from '../db/aceites.js';
+import { getUserById, getSettings } from '../db/users.js';
 import { fmtBRL } from './format.js';
 import { sendWhatsapp } from './smsNotifier.js';
 import { logger } from './logger.js';
@@ -21,7 +22,13 @@ function runCheck() {
       markReminderSent(a.id);
       continue;
     }
-    const texto = `Lastro: você tem ${diasRestantes} dia(s) para confirmar ou contestar a duplicata de ${fmtBRL(a.valor)} (${a.sacado_nome}). Acesse o Portal do Sacado.`;
+    // White-label (Integrações ERP): a cedente on the Empresarial plan can set a brand for
+    // exactly this kind of communication with their own fornecedores — the reminder reads
+    // as coming from them, "powered by Lastro", instead of raw "Lastro".
+    const cedente = a.cedente_id ? getUserById(a.cedente_id) : undefined;
+    const brand = cedente ? getSettings(cedente).whitelabelBrand : null;
+    const remetente = brand ? `${brand.nome} (via Lastro)` : 'Lastro';
+    const texto = `${remetente}: você tem ${diasRestantes} dia(s) para confirmar ou contestar a duplicata de ${fmtBRL(a.valor)} (${a.sacado_nome}). Acesse o Portal do Sacado.`;
     sendWhatsapp(a.sacado_telefone, texto)
       .then(() => markReminderSent(a.id))
       .catch((err) => logger.warn({ err, aceiteId: a.id }, '[aceite-reminder] falha ao enviar lembrete'));

@@ -5,10 +5,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requireAuth } from '../auth/middleware.js';
 import { addUpload } from '../db/misc.js';
-import { markKybDone } from '../db/users.js';
+import { markKybDone, updateSettings } from '../db/users.js';
 import { extractNfeFields } from '../lib/nfeExtraction.js';
 import { analyzeContract } from '../lib/contractAnalysis.js';
 import { recordContractAnalysis } from '../db/contractAnalyses.js';
+import { verificarProvaDeVida } from '../lib/biometricKyc.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 
@@ -75,6 +76,20 @@ uploadsRouter.post(
       if (analysis) recordContractAnalysis(req.user!.id, record.id, req.file.originalname, analysis);
     }
 
-    res.status(201).json({ upload: { id: record.id, filename: record.filename, kind: record.kind, createdAt: record.created_at }, extracted, analysis });
+    // Real biometric liveness check (lib/biometricKyc.ts) — replaces the old "Em análise"
+    // placeholder Conta & Liquidação's KYC checklist always showed for this step. Returns
+    // null (not a fabricated pass) when BIOMETRIC_KYC_API_URL/KEY isn't set, so the step
+    // stays "Pendente" honestly instead of claiming a check that never happened.
+    let biometria: { passed: boolean; confidence: number } | null = null;
+    if (kind === 'selfie_liveness') {
+      const buffer = fs.readFileSync(req.file.path);
+      const result = await verificarProvaDeVida(buffer, req.file.mimetype);
+      if (result) {
+        updateSettings(req.user!.id, { biometricVerified: result.passed });
+        biometria = { passed: result.passed, confidence: result.confidence };
+      }
+    }
+
+    res.status(201).json({ upload: { id: record.id, filename: record.filename, kind: record.kind, createdAt: record.created_at }, extracted, analysis, biometria });
   })
 );

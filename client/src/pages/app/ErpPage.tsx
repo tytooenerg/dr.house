@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
@@ -13,13 +13,25 @@ interface Connector {
   real: boolean;
   btnLabel: string;
 }
+interface WhitelabelBrand {
+  nome: string;
+  corPrimaria: string;
+  logoUrl: string;
+}
 interface ErpData {
   connectors: Connector[];
   whitelabelOn: boolean;
+  whitelabelBrand: WhitelabelBrand | null;
   omieConnected: boolean;
+  sapConnected: boolean;
+  totvsConnected: boolean;
+  autoEmitEnabled: boolean;
+  autoEmitMaxValor: string;
+  hasErpConnected: boolean;
 }
 interface ContaReceber {
-  codigoLancamento: number;
+  id?: string;
+  codigoLancamento?: number;
   cliente: string;
   numeroDocumento: string;
   valor: number;
@@ -32,10 +44,45 @@ export function ErpPage() {
   const [appKey, setAppKey] = useState('');
   const [appSecret, setAppSecret] = useState('');
   const [omieError, setOmieError] = useState<string | null>(null);
+
+  const [sapForm, setSapForm] = useState(false);
+  const [sapBaseUrl, setSapBaseUrl] = useState('');
+  const [sapCompanyDb, setSapCompanyDb] = useState('');
+  const [sapUsername, setSapUsername] = useState('');
+  const [sapPassword, setSapPassword] = useState('');
+  const [sapError, setSapError] = useState<string | null>(null);
+
+  const [totvsForm, setTotvsForm] = useState(false);
+  const [totvsBaseUrl, setTotvsBaseUrl] = useState('');
+  const [totvsClientId, setTotvsClientId] = useState('');
+  const [totvsClientSecret, setTotvsClientSecret] = useState('');
+  const [totvsError, setTotvsError] = useState<string | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [contas, setContas] = useState<ContaReceber[] | null>(null);
+  const [contasFonte, setContasFonte] = useState('');
 
-  const load = () => api.get<ErpData>('/erp').then(setData);
+  const [autoEmitMaxInput, setAutoEmitMaxInput] = useState('');
+  const [savingAutoEmit, setSavingAutoEmit] = useState(false);
+  const [autoEmitError, setAutoEmitError] = useState('');
+
+  const [brandForm, setBrandForm] = useState(false);
+  const [brandNome, setBrandNome] = useState('');
+  const [brandCor, setBrandCor] = useState('#1E5EFF');
+  const [brandLogo, setBrandLogo] = useState('');
+  const [brandError, setBrandError] = useState('');
+  const [savingBrand, setSavingBrand] = useState(false);
+
+  const load = () =>
+    api.get<ErpData>('/erp').then((d) => {
+      setData(d);
+      setAutoEmitMaxInput(d.autoEmitMaxValor);
+      if (d.whitelabelBrand) {
+        setBrandNome(d.whitelabelBrand.nome);
+        setBrandCor(d.whitelabelBrand.corPrimaria);
+        setBrandLogo(d.whitelabelBrand.logoUrl);
+      }
+    });
 
   useEffect(() => {
     load();
@@ -63,15 +110,84 @@ export function ErpPage() {
 
   const disconnectOmie = () => api.post<ErpData>('/erp/omie/disconnect').then((d) => { setData(d); setContas(null); });
 
-  const buscarContas = async () => {
+  const connectSap = async () => {
     setBusy(true);
+    setSapError(null);
     try {
-      const res = await api.get<{ contas: ContaReceber[] }>('/erp/omie/contas-receber');
-      setContas(res.contas);
+      const d = await api.post<ErpData>('/erp/sap/connect', { baseUrl: sapBaseUrl, companyDb: sapCompanyDb, username: sapUsername, password: sapPassword });
+      setData(d);
+      setSapForm(false);
+      setSapBaseUrl('');
+      setSapCompanyDb('');
+      setSapUsername('');
+      setSapPassword('');
+    } catch (err) {
+      setSapError(err instanceof ApiError ? err.message : 'Não foi possível validar as credenciais SAP.');
     } finally {
       setBusy(false);
     }
   };
+
+  const disconnectSap = () => api.post<ErpData>('/erp/sap/disconnect').then((d) => { setData(d); setContas(null); });
+
+  const connectTotvs = async () => {
+    setBusy(true);
+    setTotvsError(null);
+    try {
+      const d = await api.post<ErpData>('/erp/totvs/connect', { baseUrl: totvsBaseUrl, clientId: totvsClientId, clientSecret: totvsClientSecret });
+      setData(d);
+      setTotvsForm(false);
+      setTotvsBaseUrl('');
+      setTotvsClientId('');
+      setTotvsClientSecret('');
+    } catch (err) {
+      setTotvsError(err instanceof ApiError ? err.message : 'Não foi possível validar as credenciais TOTVS.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnectTotvs = () => api.post<ErpData>('/erp/totvs/disconnect').then((d) => { setData(d); setContas(null); });
+
+  const buscarContas = async (key: 'omie' | 'sap' | 'totvs', label: string) => {
+    setBusy(true);
+    try {
+      const res = await api.get<{ contas: ContaReceber[] }>(`/erp/${key}/contas-receber`);
+      setContas(res.contas);
+      setContasFonte(label);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveAutoEmit = async (enabled: boolean) => {
+    setSavingAutoEmit(true);
+    setAutoEmitError('');
+    try {
+      const d = await api.post<ErpData>('/erp/auto-emit', { enabled, maxValor: autoEmitMaxInput });
+      setData(d);
+    } catch (err) {
+      setAutoEmitError(err instanceof ApiError ? err.message : 'Não foi possível atualizar a emissão automática.');
+    } finally {
+      setSavingAutoEmit(false);
+    }
+  };
+
+  const saveBrand = async () => {
+    setSavingBrand(true);
+    setBrandError('');
+    try {
+      const d = await api.post<ErpData>('/erp/whitelabel/brand', { nome: brandNome, corPrimaria: brandCor, logoUrl: brandLogo });
+      setData(d);
+      setBrandForm(false);
+    } catch (err) {
+      setBrandError(err instanceof ApiError ? err.message : 'Não foi possível salvar a marca.');
+    } finally {
+      setSavingBrand(false);
+    }
+  };
+
+  const removeBrand = () => api.post<ErpData>('/erp/whitelabel/brand/remove').then(setData);
 
   return (
     <div>
@@ -89,7 +205,7 @@ export function ErpPage() {
                 <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: '#EAF3EE', color: '#0A5C36' }}>
                   Conectado ✓
                 </button>
-                <button type="button" onClick={buscarContas} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                <button type="button" onClick={() => buscarContas('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
                   Buscar contas a receber
                 </button>
                 <button type="button" onClick={disconnectOmie} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
@@ -105,10 +221,55 @@ export function ErpPage() {
                   Validar e conectar
                 </Button>
               </div>
+            ) : c.key === 'sap' && c.connected ? (
+              <div className="flex flex-col gap-2">
+                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: '#EAF3EE', color: '#0A5C36' }}>
+                  Conectado ✓
+                </button>
+                <button type="button" onClick={() => buscarContas('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                  Buscar faturas em aberto
+                </button>
+                <button type="button" onClick={disconnectSap} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
+                  Desconectar
+                </button>
+              </div>
+            ) : c.key === 'sap' && sapForm ? (
+              <div className="flex flex-col gap-2">
+                <input value={sapBaseUrl} onChange={(e) => setSapBaseUrl(e.target.value)} placeholder="https://seu-servidor:50000" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input value={sapCompanyDb} onChange={(e) => setSapCompanyDb(e.target.value)} placeholder="CompanyDB" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input value={sapUsername} onChange={(e) => setSapUsername(e.target.value)} placeholder="Usuário" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input value={sapPassword} onChange={(e) => setSapPassword(e.target.value)} placeholder="Senha" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                {sapError && <div className="text-[11px] text-red-600">{sapError}</div>}
+                <Button variant="primary" disabled={busy || !sapBaseUrl || !sapCompanyDb || !sapUsername || !sapPassword} onClick={connectSap}>
+                  Validar e conectar
+                </Button>
+              </div>
+            ) : c.key === 'totvs' && c.connected ? (
+              <div className="flex flex-col gap-2">
+                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: '#EAF3EE', color: '#0A5C36' }}>
+                  Conectado ✓
+                </button>
+                <button type="button" onClick={() => buscarContas('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                  Buscar contas a receber
+                </button>
+                <button type="button" onClick={disconnectTotvs} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
+                  Desconectar
+                </button>
+              </div>
+            ) : c.key === 'totvs' && totvsForm ? (
+              <div className="flex flex-col gap-2">
+                <input value={totvsBaseUrl} onChange={(e) => setTotvsBaseUrl(e.target.value)} placeholder="https://api.totvs.seudominio.com.br" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input value={totvsClientId} onChange={(e) => setTotvsClientId(e.target.value)} placeholder="client_id" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input value={totvsClientSecret} onChange={(e) => setTotvsClientSecret(e.target.value)} placeholder="client_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                {totvsError && <div className="text-[11px] text-red-600">{totvsError}</div>}
+                <Button variant="primary" disabled={busy || !totvsBaseUrl || !totvsClientId || !totvsClientSecret} onClick={connectTotvs}>
+                  Validar e conectar
+                </Button>
+              </div>
             ) : (
               <button
                 type="button"
-                onClick={() => (c.key === 'omie' ? setOmieForm(true) : toggleConnector(c.key))}
+                onClick={() => (c.key === 'omie' ? setOmieForm(true) : c.key === 'sap' ? setSapForm(true) : c.key === 'totvs' ? setTotvsForm(true) : toggleConnector(c.key))}
                 className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold cursor-pointer"
                 style={{ background: c.connected ? '#EAF3EE' : '#1E5EFF', color: c.connected ? '#0A5C36' : '#fff' }}
               >
@@ -121,13 +282,15 @@ export function ErpPage() {
 
       {contas && (
         <Card className="mb-4">
-          <div className="font-bold text-[15px] mb-3.5">Contas a receber importadas da Omie ({contas.length})</div>
+          <div className="font-bold text-[15px] mb-3.5">
+            Contas a receber importadas — {contasFonte} ({contas.length})
+          </div>
           {contas.length === 0 ? (
-            <div className="text-[13px] text-textSecondary">Nenhuma conta a receber em aberto encontrada na sua conta Omie.</div>
+            <div className="text-[13px] text-textSecondary">Nenhuma conta a receber em aberto encontrada.</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {contas.map((c) => (
-                <div key={c.codigoLancamento} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-[#F7F8FA] text-[12.5px]">
+              {contas.map((c, i) => (
+                <div key={c.id ?? c.codigoLancamento ?? i} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-[#F7F8FA] text-[12.5px]">
                   <div>{c.cliente} — doc. {c.numeroDocumento}</div>
                   <div className="font-mono-num font-semibold">
                     R$ {c.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · vence {c.vencimento}
@@ -139,14 +302,75 @@ export function ErpPage() {
         </Card>
       )}
 
-      <NavyCard className="flex items-center justify-between gap-4 flex-wrap mb-4">
-        <div>
-          <div className="font-bold text-[15px] mb-1.5">Programa white-label para sacados grandes</div>
-          <div className="text-[#9FB3D6] text-[13.5px] leading-relaxed max-w-[600px]">
-            Ofereça antecipação de recebíveis aos seus próprios fornecedores com sua marca, cores e URL — a Lastro cuida da infraestrutura por trás.
+      <Card className="mb-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+          <div className="font-bold text-[15px]">Emissão automática</div>
+          <Toggle on={data.autoEmitEnabled} onClick={() => saveAutoEmit(!data.autoEmitEnabled)} />
+        </div>
+        <div className="text-textSecondary text-[12.5px] mb-3">
+          {data.hasErpConnected
+            ? 'Novas contas a receber do ERP conectado viram duplicata automaticamente, sem precisar entrar em Emitir Duplicata — até o limite abaixo.'
+            : 'Conecte um ERP acima (Omie, SAP ou TOTVS) para poder ativar a emissão automática.'}
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="text-[12.5px] text-textSecondary">Limite por emissão:</span>
+          <input
+            className="w-40 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+            value={autoEmitMaxInput}
+            onChange={(e) => setAutoEmitMaxInput(e.target.value)}
+          />
+          <Button size="sm" variant="secondary" disabled={savingAutoEmit || autoEmitMaxInput === data.autoEmitMaxValor} onClick={() => saveAutoEmit(data.autoEmitEnabled)}>
+            {savingAutoEmit ? 'Salvando…' : 'Salvar limite'}
+          </Button>
+        </div>
+        {autoEmitError && <div className="text-red text-[12px] font-semibold mt-2">{autoEmitError}</div>}
+      </Card>
+
+      <NavyCard className="mb-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
+          <div>
+            <div className="font-bold text-[15px] mb-1.5">Programa white-label para sacados grandes</div>
+            <div className="text-[#9FB3D6] text-[13.5px] leading-relaxed max-w-[600px]">
+              Ofereça antecipação de recebíveis aos seus próprios fornecedores com sua marca, cores e logo — a Lastro cuida da infraestrutura por trás.
+              Disponível no plano Empresarial.
+            </div>
           </div>
         </div>
-        <Toggle on={data.whitelabelOn} onClick={() => toggleConnector('whitelabel')} size="lg" />
+        {data.whitelabelBrand && !brandForm ? (
+          <div className="flex items-center justify-between gap-3 flex-wrap bg-[#0B1F3A] border border-[#2A3F5F] rounded-lg p-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="rounded-md" style={{ width: 20, height: 20, background: data.whitelabelBrand.corPrimaria }} />
+              <span className="font-bold text-[13.5px]">{data.whitelabelBrand.nome}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setBrandForm(true)}>
+                Editar
+              </Button>
+              <Button size="sm" variant="danger" onClick={removeBrand}>
+                Remover
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <input value={brandNome} onChange={(e) => setBrandNome(e.target.value)} placeholder="Nome da marca" className="flex-1 min-w-[160px] border border-[#2A3F5F] bg-[#0B1F3A] rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input value={brandCor} onChange={(e) => setBrandCor(e.target.value)} placeholder="#1E5EFF" className="w-28 border border-[#2A3F5F] bg-[#0B1F3A] rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} placeholder="URL do logo" className="flex-1 min-w-[160px] border border-[#2A3F5F] bg-[#0B1F3A] rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+            </div>
+            {brandError && <div className="text-[11.5px]" style={{ color: '#FF9E9E' }}>{brandError}</div>}
+            <div className="flex items-center gap-2">
+              <Button size="sm" disabled={savingBrand || !brandNome || !brandLogo} onClick={saveBrand}>
+                {savingBrand ? 'Salvando…' : 'Salvar marca'}
+              </Button>
+              {data.whitelabelBrand && (
+                <Button size="sm" variant="ghost" onClick={() => setBrandForm(false)}>
+                  Cancelar
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </NavyCard>
 
       <Card>
@@ -154,7 +378,7 @@ export function ErpPage() {
         <div className="flex flex-col gap-2.5">
           {[
             'Elimina digitação manual e risco de erro humano no cadastro da duplicata',
-            'Você mantém o "botão de comando" — opt-in e decisão de antecipar continuam com seu financeiro',
+            'Você mantém o "botão de comando" — a emissão automática é opt-in e pode ser desligada a qualquer momento',
             'Aprovação em minutos, dinheiro na conta em até 24h após o leilão fechar',
           ].map((t) => (
             <div key={t} className="flex items-center gap-2.5 text-[13.5px]">

@@ -7,6 +7,8 @@ import { computeEmitirPreview } from '../lib/emitirCore.js';
 import { fmtRelative, fmtBRL } from '../lib/format.js';
 import { parseWebhookPixRecebido } from '../lib/paymentRail.js';
 import { getPixCharge, concludePixCharge } from '../db/pix.js';
+import { parseWebhookBoletoPago } from '../lib/boletoRail.js';
+import { getBoleto, concludeBoleto } from '../db/boletos.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { logger } from '../lib/logger.js';
 
@@ -30,6 +32,21 @@ publicRouter.post('/pix-webhook', (req, res) => {
     logger.info({ txid: charge.txid, userId: charge.user_id }, '[pix] depósito confirmado via webhook');
   }
   res.status(200).json({ received: recebidos.length });
+});
+
+// Real banking-partner webhook target for "boleto pago" notifications (lib/boletoRail.ts).
+// Same anti-spoofing caveat as the Pix webhook above: real verification is mTLS/IP
+// allowlist at the banking partner's infra level.
+publicRouter.post('/boleto-webhook', (req, res) => {
+  const pagos = parseWebhookBoletoPago(req.body);
+  for (const p of pagos) {
+    const boleto = getBoleto(p.nossoNumero);
+    if (!boleto || boleto.status !== 'ativo') continue;
+    concludeBoleto(boleto.nosso_numero);
+    addLedgerEntry(boleto.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via boleto confirmado — ${fmtBRL(boleto.valor)}`, boleto.valor);
+    logger.info({ nossoNumero: boleto.nosso_numero, userId: boleto.user_id }, '[boleto] depósito confirmado via webhook');
+  }
+  res.status(200).json({ received: pagos.length });
 });
 
 publicRouter.get('/stats', (_req, res) => {

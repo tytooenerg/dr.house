@@ -15,6 +15,8 @@ import { getRevenueStreams } from '../lib/revenue.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { pixEnabled, criarCobranca, enviarPix } from '../lib/paymentRail.js';
 import { createPixCharge, getPixCharge, concludePixCharge, listPixChargesByUser, recordPixPayout } from '../db/pix.js';
+import { boletoEnabled, emitirBoleto } from '../lib/boletoRail.js';
+import { createBoleto, getBoleto, concludeBoleto, listBoletosByUser } from '../db/boletos.js';
 import { randomUUID } from 'node:crypto';
 
 export const accountRouter = Router();
@@ -47,7 +49,13 @@ function payload(req: import('express').Request) {
         color: settings.kycDocsUploaded ? '#0A5C36' : settings.kycDocsRejected ? '#B03A2E' : '#5B6472',
         action: settings.kycDocsUploaded ? null : { label: settings.kycDocsRejected ? 'Reenviar documentos' : 'Enviar documentos', key: 'docs' },
       },
-      { label: 'Verificação antifraude (KYC)', status: 'Em análise', bg: '#FBF1E0', color: '#B8790A', action: null },
+      {
+        label: 'Verificação antifraude (prova de vida)',
+        status: settings.biometricVerified ? 'Verificado ✓' : 'Pendente',
+        bg: settings.biometricVerified ? '#EAF3EE' : '#F0F2F5',
+        color: settings.biometricVerified ? '#0A5C36' : '#5B6472',
+        action: settings.biometricVerified ? null : { label: 'Enviar selfie', key: 'biometria' },
+      },
       {
         label: 'Chave Pix para liquidação',
         status: settings.pixChave ? 'Concluído' : 'Pendente',
@@ -65,6 +73,17 @@ function payload(req: import('express').Request) {
     pixCharges: listPixChargesByUser(req.user!.id)
       .slice(0, 10)
       .map((c) => ({ txid: c.txid, valorFmt: fmtBRL(c.valor), status: c.status, simulado: !!c.simulado, brcode: c.brcode })),
+    boletoEnabled,
+    boletos: listBoletosByUser(req.user!.id)
+      .slice(0, 10)
+      .map((b) => ({
+        nossoNumero: b.nosso_numero,
+        valorFmt: fmtBRL(b.valor),
+        status: b.status,
+        simulado: !!b.simulado,
+        linhaDigitavel: b.linha_digitavel,
+        pdfUrl: b.pdf_url,
+      })),
     settlementSpeed: settings.settlementSpeed,
     extrato: extratoView(req.user!.id),
   };
@@ -137,6 +156,71 @@ accountRouter.post('/deposit/:txid/confirm-simulado', (req, res) => {
   }
   concludePixCharge(charge.txid, null);
   addLedgerEntry(req.user!.id, new Date().toLocaleDateString('pt-BR'), `Depósito via Pix confirmado (simulado) — ${fmtBRL(charge.valor)}`, charge.valor);
+  res.json(payload(req));
+});
+
+// Real boleto rail (lib/boletoRail.ts) — an alternative to Pix, since boleto is still a
+// widely used instrument in Brazilian antecipação de recebíveis. Same crediting rule as
+// Pix: the ledger is only credited when payment is actually confirmed (webhook, or the
+// simulated button below when no PSP is configured), never optimistically at emission.
+const depositBoletoSchema = z.object({ valor: z.number().positive().max(10_000_000) });
+
+accountRouter.post(
+  '/deposit/boleto',
+  asyncHandler(async (req, res) => {
+    const parsed = depositBoletoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const nossoNumero = randomUUID().replace(/-/g, '').slice(0, 20);
+    let cnpj: string | undefined;
+    try {
+      cnpj = JSON.parse(req.user!.kyb_form || '{}').cnpj;
+    } catch {
+      cnpj = undefined;
+    }
+    const vencimento = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+    const boleto = await emitirBoleto({
+      nossoNumero,
+      valor: parsed.data.valor,
+      vencimento,
+      pagadorNome: req.user!.company_name,
+      pagadorCnpj: cnpj,
+      descricao: `Depósito Lastro — ${req.user!.company_name}`,
+    });
+    createBoleto({
+      nossoNumero: boleto.nossoNumero,
+      userId: req.user!.id,
+      valor: parsed.data.valor,
+      simulado: boleto.simulado,
+      linhaDigitavel: boleto.linhaDigitavel,
+      codigoBarras: boleto.codigoBarras,
+      pdfUrl: boleto.pdfUrl,
+    });
+    res.json({ nossoNumero: boleto.nossoNumero, simulado: boleto.simulado, linhaDigitavel: boleto.linhaDigitavel, pdfUrl: boleto.pdfUrl, ...payload(req) });
+  })
+);
+
+// Demo/dev-only: simulates the banking partner's webhook confirming payment, since
+// there's no real PSP to actually pay the boleto against when BOLETO_PSP_* isn't
+// configured. Refuses to run once a real PSP is configured.
+accountRouter.post('/deposit/boleto/:nossoNumero/confirm-simulado', (req, res) => {
+  if (boletoEnabled) {
+    res.status(409).json({ error: 'boleto_real_configured', message: 'PSP de boleto real configurado — aguarde a confirmação de pagamento; não há confirmação simulada.' });
+    return;
+  }
+  const boleto = getBoleto(req.params.nossoNumero);
+  if (!boleto || boleto.user_id !== req.user!.id) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  if (boleto.status !== 'ativo') {
+    res.status(409).json({ error: 'already_settled' });
+    return;
+  }
+  concludeBoleto(boleto.nosso_numero);
+  addLedgerEntry(req.user!.id, new Date().toLocaleDateString('pt-BR'), `Depósito via boleto confirmado (simulado) — ${fmtBRL(boleto.valor)}`, boleto.valor);
   res.json(payload(req));
 });
 

@@ -95,6 +95,7 @@ function publicUser(user: UserRow) {
     navTabs: user.team_owner_id ? roleTabs.filter((t) => TEAM_MEMBER_ALLOWED_TABS.includes(t)) : roleTabs,
     isTeamMember: !!user.team_owner_id,
     totpEnabled: !!user.totp_enabled,
+    biometricVerified: settings.biometricVerified,
     plan: user.plan,
     subscriptionStatus: user.subscription_status,
     insurerKey: user.insurer_key,

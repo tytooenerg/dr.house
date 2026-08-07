@@ -146,6 +146,12 @@ export function listPendingKyb(): UserRow[] {
   return db.prepare("SELECT * FROM users WHERE role = 'investidor' AND kyb_status = 'pending' ORDER BY created_at ASC").all() as UserRow[];
 }
 
+// Feeds lib/autoEmitJob.ts — every cedente account is a candidate; the job itself checks
+// each one's settings.autoEmitEnabled (JSON, not a column) to decide who actually opted in.
+export function listActiveCedentes(): UserRow[] {
+  return db.prepare("SELECT * FROM users WHERE role = 'cedente' AND deleted_at IS NULL").all() as UserRow[];
+}
+
 export function setPldStatus(userId: number, status: 'clear' | 'flagged', note: string) {
   db.prepare('UPDATE users SET pld_status = ?, pld_match_note = ? WHERE id = ?').run(status, note, userId);
 }
