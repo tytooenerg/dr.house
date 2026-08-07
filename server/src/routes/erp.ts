@@ -1,19 +1,21 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
-import { getSettings, updateSettings } from '../db/users.js';
+import { getSettings, updateSettings, getUserById, setWhitelabelPlusEnabled } from '../db/users.js';
 import { ERP_CONNECTORS_META } from '../data/seed.js';
 import { testOmieConnection, listarContasReceberOmie } from '../lib/erpConnectors/omie.js';
 import { testSapConnection, listarContasReceberSap } from '../lib/erpConnectors/sap.js';
 import { testTotvsConnection, listarContasReceberTotvs } from '../lib/erpConnectors/totvs.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { fmtAddOnPrice } from '../lib/addOnBilling.js';
 
 export const erpRouter = Router();
 erpRouter.use(requireAuth);
 
 const REAL_KEYS = new Set(['sap', 'totvs', 'omie']);
 
-function payload(settings: ReturnType<typeof getSettings>) {
+function payload(settings: ReturnType<typeof getSettings>, userId: number) {
+  const user = getUserById(userId);
   return {
     connectors: ERP_CONNECTORS_META.map((c) => ({
       ...c,
@@ -35,10 +37,15 @@ function payload(settings: ReturnType<typeof getSettings>) {
     // Auto-emissão only makes sense once at least one real ERP is connected — surfaced so
     // the client can explain why the toggle is disabled otherwise.
     hasErpConnected: settings.erpConnections.omie || settings.erpConnections.sap || settings.erpConnections.totvs,
+    // Feature 4 — White-label Plus: a flat monthly recurring add-on (lib/whitelabelBilling.ts)
+    // on top of the free branding above, unlocking the extra touchpoints (aceite view
+    // brandLabel — lib/aceiteCore.ts). Independent of the plan tier.
+    whitelabelPlusEnabled: !!user?.whitelabel_plus_enabled,
+    whitelabelPlusPriceFmt: fmtAddOnPrice('whitelabel_plus'),
   };
 }
 
-erpRouter.get('/', (req, res) => res.json(payload(getSettings(req.user!))));
+erpRouter.get('/', (req, res) => res.json(payload(getSettings(req.user!), req.user!.id)));
 
 // whitelabel is the only remaining bare toggle here — its real branding form lives at
 // POST /whitelabel/brand below; SAP/TOTVS/Omie all go through their own /connect routes.
@@ -50,7 +57,7 @@ erpRouter.post('/:key/toggle', (req, res) => {
     return;
   }
   const updated = updateSettings(req.user!.id, { erpConnections: { ...settings.erpConnections, [key]: !settings.erpConnections[key] } });
-  res.json(payload(updated));
+  res.json(payload(updated, req.user!.id));
 });
 
 const omieConnectSchema = z.object({ appKey: z.string().trim().min(1), appSecret: z.string().trim().min(1) });
@@ -75,7 +82,7 @@ erpRouter.post(
       omieCredentials: { appKey: parsed.data.appKey, appSecret: parsed.data.appSecret },
       erpConnections: { ...settings.erpConnections, omie: true },
     });
-    res.json(payload(updated));
+    res.json(payload(updated, req.user!.id));
   })
 );
 
@@ -85,7 +92,7 @@ erpRouter.post('/omie/disconnect', (req, res) => {
     omieCredentials: null,
     erpConnections: { ...settings.erpConnections, omie: false },
   });
-  res.json(payload(updated));
+  res.json(payload(updated, req.user!.id));
 });
 
 // Real contas-a-receber pull from the cedente's own Omie account — the data Emitir
@@ -132,14 +139,14 @@ erpRouter.post(
       sapCredentials: parsed.data,
       erpConnections: { ...settings.erpConnections, sap: true },
     });
-    res.json(payload(updated));
+    res.json(payload(updated, req.user!.id));
   })
 );
 
 erpRouter.post('/sap/disconnect', (req, res) => {
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { sapCredentials: null, erpConnections: { ...settings.erpConnections, sap: false } });
-  res.json(payload(updated));
+  res.json(payload(updated, req.user!.id));
 });
 
 erpRouter.get(
@@ -184,14 +191,14 @@ erpRouter.post(
       totvsCredentials: parsed.data,
       erpConnections: { ...settings.erpConnections, totvs: true },
     });
-    res.json(payload(updated));
+    res.json(payload(updated, req.user!.id));
   })
 );
 
 erpRouter.post('/totvs/disconnect', (req, res) => {
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { totvsCredentials: null, erpConnections: { ...settings.erpConnections, totvs: false } });
-  res.json(payload(updated));
+  res.json(payload(updated, req.user!.id));
 });
 
 erpRouter.get(
@@ -234,7 +241,7 @@ erpRouter.post(
       autoEmitEnabled: parsed.data.enabled,
       autoEmitMaxValor: parsed.data.maxValor ?? settings.autoEmitMaxValor,
     });
-    res.json(payload(updated));
+    res.json(payload(updated, req.user!.id));
   })
 );
 
@@ -268,12 +275,38 @@ erpRouter.post(
       whitelabelBrand: parsed.data,
       erpConnections: { ...settings.erpConnections, whitelabel: true },
     });
-    res.json(payload(updated));
+    res.json(payload(updated, req.user!.id));
   })
 );
 
 erpRouter.post('/whitelabel/brand/remove', (req, res) => {
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { whitelabelBrand: null, erpConnections: { ...settings.erpConnections, whitelabel: false } });
-  res.json(payload(updated));
+  res.json(payload(updated, req.user!.id));
+});
+
+const whitelabelPlusSchema = z.object({ enabled: z.boolean() });
+
+// White-label Plus (feature 4) — a flat monthly recurring add-on (lib/whitelabelBilling.ts)
+// unlocking extra branding touchpoints beyond the free WhatsApp-reminder relabeling: the
+// sacado's own aceite view now shows the cedente's brand instead of generic "Lastro"
+// (lib/aceiteCore.ts). Requires a brand already configured and the Empresarial plan —
+// same gate as the free branding above.
+erpRouter.post('/whitelabel/plus', (req, res) => {
+  if (req.user!.plan !== 'empresarial') {
+    res.status(402).json({ error: 'plan_required', requiredPlan: 'empresarial', message: 'White-label Plus está disponível a partir do plano Empresarial.' });
+    return;
+  }
+  const parsed = whitelabelPlusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const settings = getSettings(req.user!);
+  if (parsed.data.enabled && !settings.whitelabelBrand) {
+    res.status(409).json({ error: 'brand_required', message: 'Configure sua marca em White-label antes de assinar o White-label Plus.' });
+    return;
+  }
+  setWhitelabelPlusEnabled(req.user!.id, parsed.data.enabled);
+  res.json(payload(settings, req.user!.id));
 });

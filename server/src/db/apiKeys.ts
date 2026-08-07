@@ -1,10 +1,18 @@
 import { db } from './index.js';
-import type { ApiKeyMode, ApiKeyRow, ApiKeyScope } from './types.js';
+import type { ApiKeyMode, ApiKeyRow, ApiKeyScope, ApiKeyProduct } from './types.js';
 
-export function createApiKey(userId: number, keyHash: string, keyPrefix: string, label: string, mode: ApiKeyMode = 'live', scope: ApiKeyScope = 'read_write'): ApiKeyRow {
+export function createApiKey(
+  userId: number,
+  keyHash: string,
+  keyPrefix: string,
+  label: string,
+  mode: ApiKeyMode = 'live',
+  scope: ApiKeyScope = 'read_write',
+  product: ApiKeyProduct = 'platform'
+): ApiKeyRow {
   const info = db
-    .prepare('INSERT INTO api_keys (user_id, key_hash, key_prefix, label, mode, scope) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(userId, keyHash, keyPrefix, label, mode, scope);
+    .prepare('INSERT INTO api_keys (user_id, key_hash, key_prefix, label, mode, scope, product) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(userId, keyHash, keyPrefix, label, mode, scope, product);
   return db.prepare('SELECT * FROM api_keys WHERE id = ?').get(Number(info.lastInsertRowid)) as ApiKeyRow;
 }
 
@@ -45,4 +53,20 @@ export function getApiKeyUsageThisMonth(apiKeyId: number): number {
     | { calls: number }
     | undefined;
   return row?.calls ?? 0;
+}
+
+// Feeds lib/apiOverageBilling.ts — total live, full-platform-product API calls per user
+// for a given month, the number the overage billing job compares against the included
+// quota. Test-mode usage (free, to encourage adoption — see the sandbox dev tier) and
+// narrow-product keys (Score API / PLD screening API, billed per-call separately) are
+// deliberately excluded.
+export function sumLivePlatformUsageByUser(monthKey: string): { userId: number; calls: number }[] {
+  return db
+    .prepare(
+      `SELECT k.user_id as userId, SUM(u.calls) as calls FROM api_key_usage u
+       JOIN api_keys k ON k.id = u.api_key_id
+       WHERE u.month_key = ? AND k.mode = 'live' AND k.product = 'platform'
+       GROUP BY k.user_id`
+    )
+    .all(monthKey) as { userId: number; calls: number }[];
 }

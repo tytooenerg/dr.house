@@ -11,9 +11,18 @@ interface ApiKeyView {
   label: string;
   mode: 'live' | 'test';
   scope: 'read_only' | 'read_write';
+  product: 'platform' | 'score_api' | 'pld_screening_api';
   callsThisMonth: number;
   createdAt: string;
   lastUsed: string;
+}
+interface AddonChargeView {
+  id: number;
+  kind: string;
+  quantidade: number;
+  valorFmt: string;
+  descricao: string;
+  quando: string;
 }
 interface WebhookView {
   id: number;
@@ -33,6 +42,10 @@ interface DeliveryView {
 interface DevData {
   webhookEvents: string[];
   apiKeys: ApiKeyView[];
+  apiOverage: { includedCallsPerMonth: number; callsThisMonth: number; overageThisMonth: number; pricePerCallFmt: string; estimatedChargeFmt: string };
+  scoreApiPriceFmt: string;
+  pldScreeningApiPriceFmt: string;
+  addonCharges: AddonChargeView[];
   webhooks: WebhookView[];
   apiLog: { status: string; method: string; path: string; time: string }[];
   playgroundEndpoint: string;
@@ -52,6 +65,7 @@ export function DevPage() {
   const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
   const [keyMode, setKeyMode] = useState<'live' | 'test'>('live');
   const [keyScope, setKeyScope] = useState<'read_write' | 'read_only'>('read_write');
+  const [keyProduct, setKeyProduct] = useState<'platform' | 'score_api' | 'pld_screening_api'>('platform');
   const [openDeliveriesFor, setOpenDeliveriesFor] = useState<number | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryView[]>([]);
   const [keyError, setKeyError] = useState('');
@@ -72,7 +86,7 @@ export function DevPage() {
   const generateKey = async () => {
     setKeyError('');
     try {
-      const res = await api.post<DevData & { rawKey: string }>('/dev/keys/generate', { mode: keyMode, scope: keyScope });
+      const res = await api.post<DevData & { rawKey: string }>('/dev/keys/generate', { mode: keyMode, scope: keyScope, product: keyProduct });
       setNewKey(res.rawKey);
       setData(res);
     } catch (err) {
@@ -151,6 +165,11 @@ export function DevPage() {
                     <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">
                       {k.scope === 'read_only' ? 'Somente leitura' : 'Leitura e escrita'}
                     </span>
+                    {k.product !== 'platform' && (
+                      <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: '#EAF0FB', color: '#1B4DB1' }}>
+                        {k.product === 'score_api' ? 'Score API' : 'PLD Screening API'}
+                      </span>
+                    )}
                   </div>
                   <div className="text-textTertiary text-[11px] mt-0.5">
                     Criada {k.createdAt} · usada pela última vez: {k.lastUsed} · {k.callsThisMonth} chamada{k.callsThisMonth === 1 ? '' : 's'} este mês
@@ -172,11 +191,21 @@ export function DevPage() {
               <option value="read_write">Leitura e escrita</option>
               <option value="read_only">Somente leitura</option>
             </Select>
+            <Select value={keyProduct} onChange={(e) => setKeyProduct(e.target.value as typeof keyProduct)} className="text-[12.5px]">
+              <option value="platform">API completa (plataforma)</option>
+              <option value="score_api">Score API — {data.scoreApiPriceFmt}/chamada</option>
+              <option value="pld_screening_api">PLD Screening API — {data.pldScreeningApiPriceFmt}/chamada</option>
+            </Select>
           </div>
           <Button size="sm" variant="secondary" onClick={generateKey}>
             Gerar {data.apiKeys.length > 0 ? 'nova chave' : 'chave de produção'}
           </Button>
           {keyError && <div className="mt-2 text-[12px] font-semibold text-red">{keyError}</div>}
+          {keyProduct !== 'platform' && (
+            <div className="mt-2 text-[11.5px] text-textTertiary">
+              Produto avulso, vendável a empresas que não são clientes Lastro — cobrado por chamada, sem exigir plano Empresarial.
+            </div>
+          )}
 
           <div className="h-px bg-[#EEF1F5] my-5" />
 
@@ -329,6 +358,48 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
             )}
           </div>
         </div>
+      </Card>
+
+      <Card className="mb-4">
+        <div className="font-bold text-[15px] mb-1">Uso e cobrança de excedente</div>
+        <div className="text-textSecondary text-[12.5px] mb-4">
+          A franquia mensal é gratuita — chamadas de chaves de produção da API completa além dela são cobradas automaticamente no fechamento do mês.
+        </div>
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+            <div className="text-textTertiary text-[11px] font-bold uppercase">Franquia mensal</div>
+            <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.includedCallsPerMonth.toLocaleString('pt-BR')}</div>
+          </div>
+          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+            <div className="text-textTertiary text-[11px] font-bold uppercase">Chamadas este mês</div>
+            <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.callsThisMonth.toLocaleString('pt-BR')}</div>
+          </div>
+          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+            <div className="text-textTertiary text-[11px] font-bold uppercase">Excedente</div>
+            <div className="font-mono-num text-[15px] font-extrabold mt-1">
+              {data.apiOverage.overageThisMonth.toLocaleString('pt-BR')} <span className="text-textTertiary text-[11px] font-semibold">({data.apiOverage.pricePerCallFmt}/chamada)</span>
+            </div>
+          </div>
+          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+            <div className="text-textTertiary text-[11px] font-bold uppercase">Estimativa a cobrar</div>
+            <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.estimatedChargeFmt}</div>
+          </div>
+        </div>
+        {data.addonCharges.length > 0 && (
+          <>
+            <div className="h-px bg-[#EEF1F5] my-4" />
+            <div className="font-bold text-[13px] mb-2.5">Cobranças recentes</div>
+            <div className="flex flex-col gap-1.5">
+              {data.addonCharges.map((c) => (
+                <div key={c.id} className="flex items-center justify-between text-[12px] gap-2">
+                  <span className="text-textSecondary flex-1 min-w-0 truncate">{c.descricao}</span>
+                  <span className="font-mono-num font-bold flex-shrink-0">{c.valorFmt}</span>
+                  <span className="text-textTertiary flex-shrink-0">{c.quando}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </Card>
 
       <div className="bg-white border border-border rounded-card overflow-hidden">

@@ -10,9 +10,13 @@ import { createApiKey, getApiKeyUsageThisMonth, listApiKeys, revokeApiKey } from
 import { ensureSandboxDataset } from '../lib/sandboxData.js';
 import { createWebhook, deleteWebhook, getWebhook, listWebhooks } from '../db/webhooks.js';
 import { listDeliveriesForWebhook } from '../db/webhookDeliveries.js';
-import { fmtRelative } from '../lib/format.js';
+import { fmtRelative, fmtBRL } from '../lib/format.js';
 import { PLAYGROUND_ENDPOINTS, PLAYGROUND_FIELD_LABELS, WEBHOOK_EVENTS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { getIncludedCallsPerMonth } from '../lib/apiOverageBilling.js';
+import { fmtAddOnPrice, getAddOnPrice } from '../lib/addOnBilling.js';
+import { listAddOnChargesByUser } from '../db/addOnCharges.js';
+import type { ApiKeyProduct } from '../db/types.js';
 
 export const devRouter = Router();
 // Any authenticated account can reach Desenvolvedores and generate a free sandbox
@@ -22,20 +26,46 @@ devRouter.use(requireAuth);
 
 function payload(userId: number, settings: ReturnType<typeof getSettings>, playgroundResult: unknown = null, playgroundLoading = false) {
   const ep = PLAYGROUND_ENDPOINTS[settings.playgroundEndpoint];
+  const keys = listApiKeys(userId).filter((k) => !k.revoked);
+  const platformCallsThisMonth = keys
+    .filter((k) => k.mode === 'live' && k.product === 'platform')
+    .reduce((sum, k) => sum + getApiKeyUsageThisMonth(k.id), 0);
+  const included = getIncludedCallsPerMonth();
   return {
     webhookEvents: WEBHOOK_EVENTS,
-    apiKeys: listApiKeys(userId)
-      .filter((k) => !k.revoked)
-      .map((k) => ({
-        id: k.id,
-        prefix: k.key_prefix,
-        label: k.label,
-        mode: k.mode,
-        scope: k.scope,
-        callsThisMonth: getApiKeyUsageThisMonth(k.id),
-        createdAt: fmtRelative(k.created_at),
-        lastUsed: k.last_used_at ? fmtRelative(k.last_used_at) : 'nunca usada',
-      })),
+    apiKeys: keys.map((k) => ({
+      id: k.id,
+      prefix: k.key_prefix,
+      label: k.label,
+      mode: k.mode,
+      scope: k.scope,
+      product: k.product,
+      callsThisMonth: getApiKeyUsageThisMonth(k.id),
+      createdAt: fmtRelative(k.created_at),
+      lastUsed: k.last_used_at ? fmtRelative(k.last_used_at) : 'nunca usada',
+    })),
+    // Feature 1 — API usage overage: what an Empresarial account with live platform keys
+    // would owe (or already owes) beyond the monthly included quota. Estimated live from
+    // this month's still-accumulating usage; the real charge only posts once the billing
+    // job runs for the completed month (lib/apiOverageBilling.ts).
+    apiOverage: {
+      includedCallsPerMonth: included,
+      callsThisMonth: platformCallsThisMonth,
+      overageThisMonth: Math.max(0, platformCallsThisMonth - included),
+      pricePerCallFmt: fmtAddOnPrice('api_overage'),
+      estimatedChargeFmt: fmtBRL(Math.max(0, platformCallsThisMonth - included) * getAddOnPrice('api_overage')),
+    },
+    // Features 2/3 — standalone data-product keys and what they've cost so far.
+    scoreApiPriceFmt: fmtAddOnPrice('score_api'),
+    pldScreeningApiPriceFmt: fmtAddOnPrice('pld_screening_api'),
+    addonCharges: listAddOnChargesByUser(userId, 20).map((c) => ({
+      id: c.id,
+      kind: c.kind,
+      quantidade: c.quantity,
+      valorFmt: fmtBRL(c.amount),
+      descricao: c.description,
+      quando: fmtRelative(c.created_at),
+    })),
     webhooks: listWebhooks(userId).map((w) => ({ id: w.id, url: w.url, event: w.event, active: !!w.active })),
     apiLog: listApiLogs(userId).map((r) => ({ status: r.status, method: r.method, path: r.path, time: fmtRelative(r.created_at) })),
     playgroundEndpoint: settings.playgroundEndpoint,
@@ -52,6 +82,10 @@ devRouter.get('/', (req, res) => res.json(payload(req.user!.id, getSettings(req.
 const generateKeySchema = z.object({
   mode: z.enum(['live', 'test']).optional().default('live'),
   scope: z.enum(['read_only', 'read_write']).optional().default('read_write'),
+  // 'score_api'/'pld_screening_api' are standalone, pay-per-call data products (features
+  // 2/3) — deliberately NOT gated behind Empresarial the way the full 'platform' product
+  // is, since they're sold on their own, billed per call, not part of the subscription.
+  product: z.enum(['platform', 'score_api', 'pld_screening_api']).optional().default('platform'),
 });
 
 devRouter.post('/keys/generate', (req, res) => {
@@ -60,8 +94,8 @@ devRouter.post('/keys/generate', (req, res) => {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
     return;
   }
-  const { mode, scope } = parsed.data;
-  if (mode === 'live' && !planAtLeast(req.user!.plan, 'empresarial')) {
+  const { mode, scope, product } = parsed.data;
+  if (mode === 'live' && product === 'platform' && !planAtLeast(req.user!.plan, 'empresarial')) {
     res.status(402).json({
       error: 'plan_required',
       requiredPlan: 'empresarial',
@@ -70,9 +104,10 @@ devRouter.post('/keys/generate', (req, res) => {
     return;
   }
   const { rawKey, keyHash, keyPrefix } = generateApiKey(mode);
-  const label = mode === 'test' ? 'Chave de teste (sandbox)' : 'Chave de produção';
-  createApiKey(req.user!.id, keyHash, keyPrefix, label, mode, scope);
-  if (mode === 'test') ensureSandboxDataset(req.user!);
+  const productLabel: Record<ApiKeyProduct, string> = { platform: '', score_api: 'Score API', pld_screening_api: 'PLD Screening API' };
+  const label = product === 'platform' ? (mode === 'test' ? 'Chave de teste (sandbox)' : 'Chave de produção') : `${productLabel[product]} (${mode === 'test' ? 'teste' : 'produção'})`;
+  createApiKey(req.user!.id, keyHash, keyPrefix, label, mode, scope, product);
+  if (mode === 'test' && product === 'platform') ensureSandboxDataset(req.user!);
   res.json({ rawKey, ...payload(req.user!.id, getSettings(req.user!)) });
 });
 

@@ -22,6 +22,24 @@ export function linkGoogleAccount(userId: number, googleSub: string) {
   db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(googleSub, userId);
 }
 
+// Add-on subscriptions (features 4/5 — lib/whitelabelBilling.ts, lib/institutionalReporting.ts)
+// tracked directly on the user row, independent of the plan (Básico/Pro/Empresarial).
+export function setWhitelabelPlusEnabled(userId: number, enabled: boolean) {
+  db.prepare('UPDATE users SET whitelabel_plus_enabled = ? WHERE id = ?').run(enabled ? 1 : 0, userId);
+}
+
+export function setInstitutionalReportingEnabled(userId: number, enabled: boolean) {
+  db.prepare('UPDATE users SET institutional_reporting_enabled = ? WHERE id = ?').run(enabled ? 1 : 0, userId);
+}
+
+export function listUsersWithWhitelabelPlus(): UserRow[] {
+  return db.prepare('SELECT * FROM users WHERE whitelabel_plus_enabled = 1 AND deleted_at IS NULL').all() as UserRow[];
+}
+
+export function listUsersWithInstitutionalReporting(): UserRow[] {
+  return db.prepare('SELECT * FROM users WHERE institutional_reporting_enabled = 1 AND deleted_at IS NULL').all() as UserRow[];
+}
+
 export function getSeguradoraByInsurerKey(insurerKey: string): UserRow | undefined {
   return db.prepare("SELECT * FROM users WHERE role = 'seguradora' AND insurer_key = ? ORDER BY id ASC LIMIT 1").get(insurerKey) as UserRow | undefined;
 }

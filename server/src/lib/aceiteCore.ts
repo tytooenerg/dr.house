@@ -5,6 +5,7 @@ import { addNotification } from '../db/misc.js';
 import { createDispute, getDisputeByAceite } from '../db/disputes.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { addSignal } from '../db/networkSignals.js';
+import { getUserById, getSettings } from '../db/users.js';
 import { fmtBRL } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
@@ -28,11 +29,24 @@ function view(
     valor: number;
     sacado_nome?: string;
     cedente_nome?: string;
+    cedente_id?: number | null;
   },
   editable: boolean
 ) {
   const meta = STATUS_META[a.status];
   const sla = aceiteSlaStatus(a);
+  // White-label Plus (lib/whitelabelBilling.ts): a sacado viewing their own aceite sees the
+  // cedente's brand instead of "Lastro", same substitution already applied to WhatsApp
+  // reminders (lib/aceiteReminder.ts) — but gated behind the paid tier, not the free
+  // whitelabelBrand setup alone, so branding-only cedentes don't get this for free.
+  let brandLabel: string | null = null;
+  if (editable && a.cedente_id) {
+    const cedente = getUserById(a.cedente_id);
+    if (cedente?.whitelabel_plus_enabled) {
+      const brand = getSettings(cedente).whitelabelBrand;
+      if (brand?.nome) brandLabel = brand.nome;
+    }
+  }
   return {
     id: a.id,
     duplicataId: a.duplicata_id,
@@ -46,6 +60,7 @@ function view(
     editable,
     sacado: a.sacado_nome,
     cedente: a.cedente_nome,
+    brandLabel,
     slaDiasRestantes: sla.diasRestantes,
     slaVencido: sla.vencido,
   };

@@ -103,6 +103,8 @@ export interface UserRow {
   totp_enabled: number;
   google_sub: string | null;
   auth_provider: 'password' | 'google';
+  whitelabel_plus_enabled: number;
+  institutional_reporting_enabled: number;
 }
 
 export interface DuplicataRow {
@@ -147,6 +149,10 @@ export interface NetworkSignalRow {
 
 export type ApiKeyMode = 'live' | 'test';
 export type ApiKeyScope = 'read_only' | 'read_write';
+// 'platform' is the full partner API (today's only behavior); 'score_api' and
+// 'pld_screening_api' are narrow, standalone data-product keys (lib/addOnBilling.ts) —
+// sellable to a company that isn't a Lastro cedente/investidor/sacado at all.
+export type ApiKeyProduct = 'platform' | 'score_api' | 'pld_screening_api';
 
 export interface ApiKeyRow {
   id: number;
@@ -157,6 +163,7 @@ export interface ApiKeyRow {
   revoked: number;
   mode: ApiKeyMode;
   scope: ApiKeyScope;
+  product: ApiKeyProduct;
   last_used_at: string | null;
   created_at: string;
 }

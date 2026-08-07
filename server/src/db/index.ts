@@ -50,6 +50,7 @@ export function resetDbForTests() {
     DELETE FROM ted_deposits;
     DELETE FROM suspicious_activity_reports;
     DELETE FROM foreign_investor_screenings;
+    DELETE FROM addon_charges;
     DELETE FROM users;
   `);
 }

@@ -22,6 +22,8 @@ interface ErpData {
   connectors: Connector[];
   whitelabelOn: boolean;
   whitelabelBrand: WhitelabelBrand | null;
+  whitelabelPlusEnabled: boolean;
+  whitelabelPlusPriceFmt: string;
   omieConnected: boolean;
   sapConnected: boolean;
   totvsConnected: boolean;
@@ -188,6 +190,17 @@ export function ErpPage() {
   };
 
   const removeBrand = () => api.post<ErpData>('/erp/whitelabel/brand/remove').then(setData);
+
+  const [whitelabelPlusError, setWhitelabelPlusError] = useState('');
+  const toggleWhitelabelPlus = async (enabled: boolean) => {
+    setWhitelabelPlusError('');
+    try {
+      const d = await api.post<ErpData>('/erp/whitelabel/plus', { enabled });
+      setData(d);
+    } catch (err) {
+      setWhitelabelPlusError(err instanceof ApiError ? err.message : 'Não foi possível atualizar o White-label Plus.');
+    }
+  };
 
   return (
     <div>
@@ -371,6 +384,19 @@ export function ErpPage() {
             </div>
           </div>
         )}
+
+        {data.whitelabelBrand && (
+          <div className="mt-3.5 pt-3.5 border-t border-[#2A3F5F] flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="font-bold text-[13.5px]">White-label Plus</div>
+              <div className="text-[#9FB3D6] text-[12px] mt-0.5 max-w-[520px]">
+                Estende sua marca à própria tela de aceite do sacado (hoje só o WhatsApp de lembrete é personalizado) — {data.whitelabelPlusPriceFmt}/mês.
+              </div>
+            </div>
+            <Toggle on={data.whitelabelPlusEnabled} onClick={() => toggleWhitelabelPlus(!data.whitelabelPlusEnabled)} />
+          </div>
+        )}
+        {whitelabelPlusError && <div className="text-[11.5px] mt-2" style={{ color: '#FF9E9E' }}>{whitelabelPlusError}</div>}
       </NavyCard>
 
       <Card>

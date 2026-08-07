@@ -1,12 +1,18 @@
+import { z } from 'zod';
 import { Router } from 'express';
 import PDFDocument from 'pdfkit';
 import { requireAuth } from '../auth/middleware.js';
 import { listPurchasesByInvestor } from '../db/duplicatas.js';
-import { effectiveOwnerId } from '../db/users.js';
+import { effectiveOwnerId, getUserById, setInstitutionalReportingEnabled } from '../db/users.js';
+import { planAtLeast } from '../lib/billing.js';
+import { fmtAddOnPrice } from '../lib/addOnBilling.js';
+import { buildInstitutionalAnalytics, streamInstitutionalReportPdf } from '../lib/institutionalReporting.js';
 import { fmtBRL, toIsoUtc } from '../lib/format.js';
 
 export const historicoRouter = Router();
 historicoRouter.use(requireAuth);
+
+const INSTITUTIONAL_REPORTING_MIN_PLAN = 'pro';
 
 function rows(req: import('express').Request) {
   return listPurchasesByInvestor(effectiveOwnerId(req.user!)).map((p) => ({
@@ -90,4 +96,58 @@ historicoRouter.get('/export.pdf', (req, res) => {
   if (all.length === 0) doc.fontSize(10).fillColor('#8B97AC').text('Nenhuma operação registrada ainda.');
 
   doc.end();
+});
+
+// Feature 5 — Institutional Reporting: a flat monthly subscription
+// (lib/institutionalReporting.ts) unlocking portfolio-level analytics beyond the free
+// per-transaction export above — rating concentration, insurance coverage, monthly
+// performance trend and top exposures, plus a downloadable institutional PDF report.
+// Requires the Pro plan or above; keyed by effectiveOwnerId so a team member account
+// (which has no purchases of its own) always reads/toggles the owner's subscription.
+historicoRouter.get('/institutional/status', (req, res) => {
+  const owner = getUserById(effectiveOwnerId(req.user!))!;
+  res.json({
+    enabled: !!owner.institutional_reporting_enabled,
+    priceFmt: fmtAddOnPrice('institutional_reporting'),
+    planOk: planAtLeast(req.user!.plan, INSTITUTIONAL_REPORTING_MIN_PLAN),
+    requiredPlan: INSTITUTIONAL_REPORTING_MIN_PLAN,
+  });
+});
+
+const institutionalSubscribeSchema = z.object({ enabled: z.boolean() });
+
+historicoRouter.post('/institutional/assinar', (req, res) => {
+  if (!planAtLeast(req.user!.plan, INSTITUTIONAL_REPORTING_MIN_PLAN)) {
+    res
+      .status(402)
+      .json({ error: 'plan_required', requiredPlan: INSTITUTIONAL_REPORTING_MIN_PLAN, message: 'Relatórios Institucionais está disponível a partir do plano Pro.' });
+    return;
+  }
+  const parsed = institutionalSubscribeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  setInstitutionalReportingEnabled(effectiveOwnerId(req.user!), parsed.data.enabled);
+  res.json({ enabled: parsed.data.enabled, priceFmt: fmtAddOnPrice('institutional_reporting') });
+});
+
+function requireInstitutionalReporting(req: import('express').Request, res: import('express').Response): boolean {
+  const owner = getUserById(effectiveOwnerId(req.user!));
+  if (!owner?.institutional_reporting_enabled) {
+    res.status(402).json({ error: 'subscription_required', message: 'Assine Relatórios Institucionais para acessar este recurso.' });
+    return false;
+  }
+  return true;
+}
+
+historicoRouter.get('/institutional/analytics', (req, res) => {
+  if (!requireInstitutionalReporting(req, res)) return;
+  res.json(buildInstitutionalAnalytics(effectiveOwnerId(req.user!)));
+});
+
+historicoRouter.get('/institutional/report.pdf', (req, res) => {
+  if (!requireInstitutionalReporting(req, res)) return;
+  const analytics = buildInstitutionalAnalytics(effectiveOwnerId(req.user!));
+  streamInstitutionalReportPdf(res, req.user!.company_name, analytics);
 });

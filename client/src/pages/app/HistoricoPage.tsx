@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api, downloadFile } from '../../lib/api';
+import { api, downloadFile, ApiError } from '../../lib/api';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
 
@@ -22,6 +23,19 @@ interface HistoricoData {
   pageSize: number;
   total: number;
 }
+interface InstitutionalStatus {
+  enabled: boolean;
+  priceFmt: string;
+  planOk: boolean;
+  requiredPlan: string;
+}
+interface InstitutionalAnalytics {
+  posicoesAtivas: number;
+  comRegressoPct: number;
+  comSeguroPct: number;
+  ratingDistribution: { rating: string; valorFmt: string; pct: number }[];
+  maioresExposicoes: { sacado: string; valorFmt: string; pct: number }[];
+}
 
 const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
 
@@ -29,10 +43,42 @@ export function HistoricoPage() {
   const [data, setData] = useState<HistoricoData | null>(null);
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [institutional, setInstitutional] = useState<InstitutionalStatus | null>(null);
+  const [analytics, setAnalytics] = useState<InstitutionalAnalytics | null>(null);
+  const [institutionalError, setInstitutionalError] = useState('');
+  const [exportingReport, setExportingReport] = useState(false);
 
   useEffect(() => {
     api.get<HistoricoData>(`/historico?page=${page}&pageSize=10`).then(setData);
   }, [page]);
+
+  useEffect(() => {
+    api.get<InstitutionalStatus>('/historico/institutional/status').then(setInstitutional);
+  }, []);
+
+  useEffect(() => {
+    if (institutional?.enabled) api.get<InstitutionalAnalytics>('/historico/institutional/analytics').then(setAnalytics);
+    else setAnalytics(null);
+  }, [institutional?.enabled]);
+
+  const toggleInstitutional = async (enabled: boolean) => {
+    setInstitutionalError('');
+    try {
+      const res = await api.post<{ enabled: boolean; priceFmt: string }>('/historico/institutional/assinar', { enabled });
+      setInstitutional((prev) => (prev ? { ...prev, enabled: res.enabled } : prev));
+    } catch (err) {
+      setInstitutionalError(err instanceof ApiError ? err.message : 'Não foi possível atualizar a assinatura.');
+    }
+  };
+
+  const exportReport = async () => {
+    setExportingReport(true);
+    try {
+      await downloadFile('/historico/institutional/report.pdf', 'relatorio-institucional.pdf');
+    } finally {
+      setExportingReport(false);
+    }
+  };
 
   const historico = data?.historico ?? [];
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
@@ -99,6 +145,74 @@ export function HistoricoPage() {
           </div>
         </div>
       </Card>
+
+      {institutional && (
+        <NavyCard className="mb-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-1">
+            <div>
+              <div className="font-bold text-[15px] mb-1.5">Relatórios Institucionais</div>
+              <div className="text-[#9FB3D6] text-[13.5px] leading-relaxed max-w-[600px]">
+                Analytics de carteira acima do extrato por operação — concentração por rating, maiores exposições e desempenho mensal, com relatório em PDF pronto para o comitê. {institutional.priceFmt}/mês, a partir do plano {institutional.requiredPlan === 'pro' ? 'Pro' : institutional.requiredPlan}.
+              </div>
+            </div>
+            {institutional.planOk ? (
+              <Toggle on={institutional.enabled} onClick={() => toggleInstitutional(!institutional.enabled)} />
+            ) : (
+              <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: '#2A3F5F', color: '#C7D6FF' }}>
+                Requer plano {institutional.requiredPlan === 'pro' ? 'Pro' : institutional.requiredPlan}
+              </span>
+            )}
+          </div>
+          {institutionalError && <div className="text-[11.5px] mt-1" style={{ color: '#FF9E9E' }}>{institutionalError}</div>}
+
+          {institutional.enabled && analytics && (
+            <div className="mt-4 pt-4 border-t border-[#2A3F5F]">
+              <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                <div>
+                  <div className="text-[#9FB3D6] text-[11.5px] font-bold uppercase">Posições ativas</div>
+                  <div className="font-mono-num text-lg font-extrabold mt-1">{analytics.posicoesAtivas}</div>
+                </div>
+                <div>
+                  <div className="text-[#9FB3D6] text-[11.5px] font-bold uppercase">Com regresso</div>
+                  <div className="font-mono-num text-lg font-extrabold mt-1">{analytics.comRegressoPct}%</div>
+                </div>
+                <div>
+                  <div className="text-[#9FB3D6] text-[11.5px] font-bold uppercase">Com seguro</div>
+                  <div className="font-mono-num text-lg font-extrabold mt-1">{analytics.comSeguroPct}%</div>
+                </div>
+              </div>
+              <div className="grid gap-5 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div>
+                  <div className="font-bold text-[12.5px] mb-2">Distribuição por rating</div>
+                  <div className="flex flex-col gap-1.5">
+                    {analytics.ratingDistribution.map((r) => (
+                      <div key={r.rating} className="flex items-center justify-between text-[12.5px]">
+                        <span className="text-[#9FB3D6]">{r.rating}</span>
+                        <span className="font-mono-num">{r.valorFmt} ({r.pct}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="font-bold text-[12.5px] mb-2">Maiores exposições</div>
+                  <div className="flex flex-col gap-1.5">
+                    {analytics.maioresExposicoes.length === 0 && <span className="text-[#9FB3D6] text-[12px]">Nenhuma operação registrada ainda.</span>}
+                    {analytics.maioresExposicoes.map((e) => (
+                      <div key={e.sacado} className="flex items-center justify-between text-[12.5px] gap-2">
+                        <span className="text-[#9FB3D6] flex-1 min-w-0 truncate">{e.sacado}</span>
+                        <span className="font-mono-num flex-shrink-0">{e.valorFmt} ({e.pct}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <Button size="sm" variant="secondary" onClick={exportReport} disabled={exportingReport}>
+                {exportingReport ? 'Exportando…' : 'Baixar relatório institucional (PDF)'}
+              </Button>
+            </div>
+          )}
+        </NavyCard>
+      )}
 
       <div className="bg-white border border-border rounded-card overflow-hidden">
         <div className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>

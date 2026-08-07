@@ -39,6 +39,13 @@ import {
 import { runSuspiciousActivityScan, getStructuringThreshold, setStructuringThreshold } from '../lib/suspiciousActivityMonitor.js';
 import { generateAndRecordEligibility } from '../lib/foreignInvestorCompliance.js';
 import { listForeignInvestorScreeningsByUser } from '../db/foreignInvestorScreenings.js';
+import { getAddOnPrice, setAddOnPrice, getAddOnDefaultPrice } from '../lib/addOnBilling.js';
+import { sumAddOnChargesByKind, listRecentAddOnCharges, type AddOnKind } from '../db/addOnCharges.js';
+import { getIncludedCallsPerMonth, setIncludedCallsPerMonth, runApiOverageBilling } from '../lib/apiOverageBilling.js';
+import { runWhitelabelPlusBilling } from '../lib/whitelabelBilling.js';
+import { runInstitutionalReportingBilling } from '../lib/institutionalReporting.js';
+
+const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -668,6 +675,94 @@ adminRouter.post(
     markSuspiciousActivityReported(report.id, req.user!.id, parsed.data.externalReference, parsed.data.note);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.sar_reportado_coaf', { reportId: report.id, externalReference: parsed.data.externalReference });
     res.json({ ok: true });
+  })
+);
+
+// Shared config/visibility for the 5 add-on revenue products (lib/addOnBilling.ts) —
+// pricing per kind and a combined recent-charges feed, reused across features 1-5.
+adminRouter.get('/addons/precos', (_req, res) => {
+  const precos = ADDON_KINDS.map((kind) => ({ kind, precoFmt: fmtBRL(getAddOnPrice(kind)), preco: getAddOnPrice(kind), padraoFmt: fmtBRL(getAddOnDefaultPrice(kind)) }));
+  res.json({ precos });
+});
+
+const addonPriceSchema = z.object({ kind: z.enum(ADDON_KINDS as [AddOnKind, ...AddOnKind[]]), preco: z.number().positive().max(1_000_000) });
+
+adminRouter.put('/addons/precos', (req, res) => {
+  const parsed = addonPriceSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  setAddOnPrice(parsed.data.kind, parsed.data.preco, req.user!.id);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.addon_price_updated', { kind: parsed.data.kind, preco: parsed.data.preco });
+  res.json({ kind: parsed.data.kind, preco: getAddOnPrice(parsed.data.kind), precoFmt: fmtBRL(getAddOnPrice(parsed.data.kind)) });
+});
+
+adminRouter.get('/addons/cobrancas', (_req, res) => {
+  const resumo = ADDON_KINDS.map((kind) => {
+    const { total, count } = sumAddOnChargesByKind(kind);
+    return { kind, totalFmt: fmtBRL(total), count };
+  });
+  const recentes = listRecentAddOnCharges(100).map((c) => ({
+    id: c.id,
+    empresa: c.company_name,
+    kind: c.kind,
+    quantidade: c.quantity,
+    valorFmt: fmtBRL(c.amount),
+    descricao: c.description,
+    quando: fmtRelative(c.created_at),
+  }));
+  res.json({ resumo, recentes });
+});
+
+// Feature 1: API usage overage billing.
+adminRouter.get('/api-overage/config', (_req, res) => {
+  res.json({ included: getIncludedCallsPerMonth() });
+});
+
+const overageConfigSchema = z.object({ included: z.number().int().positive().max(10_000_000) });
+
+adminRouter.put('/api-overage/config', (req, res) => {
+  const parsed = overageConfigSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  setIncludedCallsPerMonth(parsed.data.included, req.user!.id);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.api_overage_quota_updated', { included: parsed.data.included });
+  res.json({ included: getIncludedCallsPerMonth() });
+});
+
+adminRouter.post(
+  '/api-overage/cobrar',
+  asyncHandler(async (req, res) => {
+    const period = typeof req.body?.period === 'string' ? req.body.period : undefined;
+    const result = await runApiOverageBilling(period);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.api_overage_cobranca_manual', { ...result });
+    res.json(result);
+  })
+);
+
+// Feature 4: White-label Plus monthly billing — same manual-trigger pattern as
+// api-overage/cobrar, for re-running (or force-running early) the 24h background job.
+adminRouter.post(
+  '/whitelabel-plus/cobrar',
+  asyncHandler(async (req, res) => {
+    const period = typeof req.body?.period === 'string' ? req.body.period : undefined;
+    const result = await runWhitelabelPlusBilling(period);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.whitelabel_plus_cobranca_manual', { ...result });
+    res.json(result);
+  })
+);
+
+// Feature 5: Institutional Reporting monthly billing — same manual-trigger pattern.
+adminRouter.post(
+  '/institutional-reporting/cobrar',
+  asyncHandler(async (req, res) => {
+    const period = typeof req.body?.period === 'string' ? req.body.period : undefined;
+    const result = await runInstitutionalReportingBilling(period);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.institutional_reporting_cobranca_manual', { ...result });
+    res.json(result);
   })
 );
 

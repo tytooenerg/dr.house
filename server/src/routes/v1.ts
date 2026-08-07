@@ -12,6 +12,8 @@ import { getDuplicata, listMarketplace } from '../db/duplicatas.js';
 import { buildOfferView } from '../lib/marketCompute.js';
 import { fmtBRL } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { chargePerCall } from '../lib/addOnBilling.js';
+import { screenEntity } from '../db/sanctions.js';
 
 // Public, versioned, API-key-authenticated endpoints for external partners (ERPs, FIDCs,
 // securitizadoras, sacados, seguradoras…) to integrate with directly — distinct from the
@@ -19,6 +21,25 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 // third parties. See GET /api/v1/openapi.json for the full machine-readable reference.
 export const v1Router = Router();
 v1Router.use(apiKeyRateLimiter, requireApiKey);
+
+// A narrow-product key (Score API / PLD screening API — features 2/3, sold standalone to
+// companies that aren't full Lastro partners) can only ever reach the one endpoint it was
+// sold for. 'platform' keys (every key issued before this feature, and every normal
+// partner key today) are unaffected — this only restricts the two new product types.
+v1Router.use((req, res, next) => {
+  const product = req.apiKey!.product;
+  if (product === 'platform') {
+    next();
+    return;
+  }
+  const isScoreRoute = product === 'score_api' && req.method === 'GET' && /^\/sacados\/[^/]+\/score$/.test(req.path);
+  const isPldRoute = product === 'pld_screening_api' && req.method === 'POST' && req.path === '/pld/triagem';
+  if (isScoreRoute || isPldRoute) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: 'forbidden', message: 'Esta chave é válida apenas para o produto contratado (Score API ou PLD Screening API).' });
+});
 
 function idempotencyHeader(req: import('express').Request): string | undefined {
   const raw = req.header('Idempotency-Key');
@@ -144,6 +165,12 @@ v1Router.get(
       res.status(404).json({ error: 'not_found', message: 'Nenhum histórico de score encontrado para este CNPJ.' });
       return;
     }
+    // Only a standalone Score API key (feature 2) gets charged per call — a full
+    // 'platform' key's score access is already covered by its subscription/overage
+    // billing (lib/apiOverageBilling.ts), never double-billed.
+    if (req.apiKey!.product === 'score_api') {
+      await chargePerCall(req.apiUser!.id, 'score_api', `Consulta de score via Score API — CNPJ ${req.params.cnpj}`);
+    }
     res.json(view);
   })
 );
@@ -169,5 +196,36 @@ v1Router.post(
     addSignal(req.params.cnpj, req.apiUser!.id, parsed.data.tipo, parsed.data.nota);
     const view = await buildBlendedRiscoView(req.params.cnpj, req.apiUser!.id);
     res.json(view);
+  })
+);
+
+const pldTriagemSchema = z.object({
+  nome: z.string().trim().min(2, 'Informe o nome a ser triado.'),
+  documento: z.string().trim().max(40).optional().default(''),
+});
+
+// Feature 3 — PLD/KYC screening as a standalone product: wraps the exact same real
+// OFAC + UN Security Council Consolidated List + demo-watchlist screening every KYB
+// submission already goes through (db/sanctions.ts), sold on its own to a company that
+// wants compliance screening without building it — the same reuse-what's-already-real
+// pattern as the Score API. A 'platform' key can call this too, bundled at no extra
+// charge; only a dedicated pld_screening_api key gets billed per call.
+v1Router.post(
+  '/pld/triagem',
+  asyncHandler(async (req, res) => {
+    const parsed = pldTriagemSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const match = await screenEntity(parsed.data.nome, parsed.data.documento, req.apiUser!.id);
+    if (req.apiKey!.product === 'pld_screening_api') {
+      await chargePerCall(req.apiUser!.id, 'pld_screening_api', `Triagem PLD via API — ${parsed.data.nome}`);
+    }
+    res.json({
+      nome: parsed.data.nome,
+      flagged: !!match,
+      match: match ? { nome: match.nome, tipo: match.tipo, fonte: match.fonte } : null,
+    });
   })
 );
