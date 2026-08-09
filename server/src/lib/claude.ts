@@ -97,6 +97,36 @@ export async function askClaudeWithDocument(
   }
 }
 
+// Tool-use call for the agentic layer (lib/agentRuntime.ts) — every other function in this
+// file is a single request/response turn; this one hands Claude a real tool belt and
+// returns the raw Message so the caller can inspect stop_reason / tool_use blocks and
+// drive the loop (execute tools, feed results back, repeat). Same real-when-configured
+// gate as every other call here: null when ANTHROPIC_API_KEY isn't set.
+export async function askClaudeWithTools(params: {
+  system: string;
+  messages: Anthropic.MessageParam[];
+  tools: Anthropic.Tool[];
+  maxTokens: number;
+  meta: ClaudeCallMeta;
+}): Promise<Anthropic.Message | null> {
+  if (!client) return null;
+  try {
+    const message = await client.messages.create({
+      model: MODEL,
+      max_tokens: params.maxTokens,
+      system: params.system,
+      messages: params.messages,
+      tools: params.tools,
+    });
+    logUsage(params.meta, message.usage, true);
+    return message;
+  } catch (err) {
+    logger.warn({ err }, '[claude] chamada de agente (tool use) falhou');
+    logUsage(params.meta, undefined, false);
+    return null;
+  }
+}
+
 // Tolerant JSON extraction — Claude sometimes wraps JSON in prose/fences despite
 // instructions; this pulls the first {...} block rather than failing the whole feature.
 export function extractJson<T>(text: string): T | null {

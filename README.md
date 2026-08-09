@@ -84,6 +84,31 @@ Before this pass, Claude (`ANTHROPIC_API_KEY`) only powered the chat widget (`ro
 - **Sinistro triage copilot** (`lib/sinistroCopilot.ts`, `GET /seguradora/sinistro/:duplicataId/ai-triagem`) — flags real inconsistencies (aceite still pending, an unresolved dispute, days-overdue) for the seguradora to review before approving/denying a claim — same on-demand, human-decides pattern.
 - **PLD second opinion on ambiguous matches** (`lib/pldSecondOpinion.ts`) — every PLD source that matches by plain substring (OFAC live feed, the demo watchlist) risks false positives (a shared surname, a generic word). Before such a match becomes an actual KYB flag, Claude judges whether the queried name and the matched entry plausibly refer to the same real entity. Only ever narrows a match to "not flagged" — never widens or invents one — and defaults to keeping the original match standing when Claude is unavailable or errors, so nothing about PLD screening gets weaker without a key configured. A paid PLD provider's own match (not a substring match Lastro computed) is never second-guessed this way — that's already an authoritative external decision.
 
+### Agentes de IA (agentic)
+
+Every feature above is one prompt in, one answer out — a single `askClaude()` call. This layer is different: an **agent** gets a real tool belt (functions that read or write actual Lastro data) and a loop (`lib/agentRuntime.ts`) — propose a tool call, execute it, see the result, decide the next step, repeat, until it has enough to answer or hits the step limit (default 8). `askClaudeWithTools` (`lib/claude.ts`) is the tool-use-capable call this loop drives; every step (what the model said, which tool it called, what came back) is logged to `agent_runs`/`agent_steps` for audit.
+
+The one hard rule: **any tool that writes something with real consequence — money, a compliance/KYB decision, an official legal/regulatory record — is marked `sensitive` and never executes automatically**, no matter how confident the model is. The runtime parks the call in `agent_pending_actions` instead; a human (admin) has to explicitly approve it (`POST /agents/pending/:id/approve`, which runs the exact real handler with the exact input proposed) or reject it (`POST /agents/pending/:id/reject`, which never runs it). Read-only investigation tools execute immediately — that's what makes the agent actually investigate instead of just asking permission for every step.
+
+Without `ANTHROPIC_API_KEY`, an agent run does **not** silently execute tools on a fixed script — it stops immediately in an honestly-labeled `mode: 'simulado'` run, same fallback philosophy as every single-shot feature above.
+
+10 agents are registered (`lib/agents/*.ts`), each wrapping real existing pipelines/data as tools, surfaced in the back-office's **Agentes IA** tab (admin-only for now):
+
+| Agente | O que investiga | Ação sensível (aprovação humana) |
+|---|---|---|
+| Emissão (`emissao`) | Duplicidade + risco do sacado antes de emitir | `emitir_duplicata` — registra na registradora de verdade |
+| Underwriting (`underwriting`) | Score interno, bureau, histórico judicial, Open Finance | *(sem ação — só parecer)* |
+| PLD/AML (`pld`) | Sanções/PEP, histórico judicial, alertas existentes | `sinalizar_pld` — flag de PLD na conta |
+| Cobrança (`cobranca`) | Elegibilidade para cobrança jurídica | `escalar_cobranca` — gera e registra notificação/protesto/execução |
+| Disputas & Sinistros (`disputa_sinistro`) | Histórico de disputa, triagem de sinistro | `resolver_disputa` — registra o veredito final |
+| Regulatório (`regulatorio`) | Impacto de um normativo (BACEN/CVM/COAF) | `registrar_nota` — nota regulatória oficial |
+| Onboarding/KYB (`onboarding`) | Sanções/PEP + judicial de uma empresa em análise | `aprovar_kyb` / `rejeitar_kyb` |
+| Auto-Bid (`autobid`) | Regras do investidor vs. uma oferta específica | `comprar_oferta` — compromete capital real |
+| Suporte (`suporte`) | Status real de duplicata/aceite/conta | `reenviar_lembrete_aceite` — envia WhatsApp real |
+| Comercial (`comercial`) | Perfil/indicações de uma conta recém-cadastrada | `registrar_nota_comercial` — nota permanente no audit log |
+
+This is admin-gated end-to-end (`routes/agents.ts`) — a self-service version (an agent acting only on its own account, e.g. a cedente running Emissão on itself) is a natural next step but needs its own scoping rules, not built here.
+
 ### Platform hardening (rate limiting, cost metering, real team accounts, real 2FA)
 
 - **Rate limiting on every Claude-calling route** (`lib/aiRateLimit.ts`) — chat, NF-e/contract analysis, the risk narrative, the dispute/sinistro copilots, and PLD second opinion (via KYB) all share one limiter: 30 requests/15min, keyed per authenticated user (not per IP, so it can't be bypassed by a shared office/NAT IP and doesn't penalize other users on it). Each of these is a real, metered Anthropic API cost — see the next point — so this is cost/abuse control, not just spam prevention.

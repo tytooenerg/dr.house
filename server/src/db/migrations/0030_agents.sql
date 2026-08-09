@@ -1,0 +1,53 @@
+-- Agentic AI layer: every "agent" (lib/agents/*.ts) runs as a real Claude tool-use loop,
+-- not a single-shot prompt like the rest of the AI features in this repo. This table set
+-- is the audit trail for that loop — every run, every tool call/result the model made, and
+-- every action a tool wanted to take that was sensitive enough to require a human's
+-- explicit approval before it actually touched the database. Nothing here is invented:
+-- a "pendente" pending_action is a real gate a human must clear via
+-- POST /agents/pending/:id/approve — the tool literally does not run until then.
+CREATE TABLE IF NOT EXISTS agent_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  agent_id TEXT NOT NULL,
+  user_id INTEGER REFERENCES users(id),
+  subject_type TEXT,
+  subject_id TEXT,
+  input TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK(mode IN ('llm', 'simulado')),
+  status TEXT NOT NULL DEFAULT 'em_andamento' CHECK(status IN ('em_andamento', 'concluido', 'limite_de_passos', 'erro', 'simulado')),
+  summary TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_agent ON agent_runs(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_runs_user ON agent_runs(user_id);
+
+CREATE TABLE IF NOT EXISTS agent_steps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL REFERENCES agent_runs(id),
+  step_no INTEGER NOT NULL,
+  type TEXT NOT NULL CHECK(type IN ('assistente', 'ferramenta', 'erro_ferramenta', 'pendente_aprovacao', 'final', 'erro')),
+  tool_name TEXT,
+  payload TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_steps_run ON agent_steps(run_id);
+
+-- A tool call the model wanted to make but that was flagged `sensitive` in its agent
+-- definition — anything that writes money, a compliance decision, a KYB approval, an
+-- official legal/regulatory record, etc. The runtime never calls the handler itself;
+-- it just parks the call here. A human (admin) approves or rejects it explicitly, and
+-- only approval actually invokes the real handler (see routes/agents.ts).
+CREATE TABLE IF NOT EXISTS agent_pending_actions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL REFERENCES agent_runs(id),
+  agent_id TEXT NOT NULL,
+  tool_name TEXT NOT NULL,
+  input TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK(status IN ('pendente', 'aprovada', 'rejeitada')),
+  result TEXT,
+  decided_by INTEGER REFERENCES users(id),
+  decided_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_pending_status ON agent_pending_actions(status);
+CREATE INDEX IF NOT EXISTS idx_agent_pending_run ON agent_pending_actions(run_id);

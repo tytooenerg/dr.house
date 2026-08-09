@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { AgentesIaPanel } from './admin/AgentesIaPanel';
 
 interface PendingKyb {
   id: number;
@@ -204,7 +205,7 @@ const MINUTA_TYPE_LABELS: Record<string, string> = {
   notificacao_padrao: 'Notificação padrão',
 };
 
-type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'auditoria';
+type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | 'auditoria';
 type LegalSubTab = 'cobranca' | 'minutas' | 'regulatorio';
 
 export function AdminPage() {
@@ -630,6 +631,7 @@ export function AdminPage() {
           ['compliance', `Compliance (${complianceQueue.length})`],
           ['juridico', 'Jurídico'],
           ['ia', 'Uso de IA'],
+          ['agentes', 'Agentes IA'],
           ['auditoria', 'Auditoria'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -1328,6 +1330,8 @@ export function AdminPage() {
           )}
         </div>
       )}
+
+      {tab === 'agentes' && <AgentesIaPanel />}
 
       {tab === 'auditoria' && (
         <div className="bg-white border border-border rounded-card overflow-hidden">

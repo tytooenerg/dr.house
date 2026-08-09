@@ -36,6 +36,7 @@ import { secundarioRouter } from './routes/secundario.js';
 import { cestasRouter } from './routes/cestas.js';
 import { referralRouter } from './routes/referral.js';
 import { publicRouter } from './routes/public.js';
+import { agentsRouter } from './routes/agents.js';
 
 export const app = express();
 
@@ -104,6 +105,7 @@ app.use('/api/secundario', secundarioRouter);
 app.use('/api/cestas', cestasRouter);
 app.use('/api/referral', referralRouter);
 app.use('/api/public', publicRouter);
+app.use('/api/agents', agentsRouter);
 // Public, unauthenticated — registered before the v1Router mount so it never hits
 // requireApiKey — lets partners point Swagger/Postman/codegen at it directly.
 app.get('/api/v1/openapi.json', (_req, res) => res.json(openApiSpec));
