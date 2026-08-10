@@ -14,7 +14,8 @@
     "build": "npm run build -w server && npm run build -w client",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
     "test": "npm run test -w server && npm run test -w client",
-    "test:e2e": "npm run test -w e2e"
+    "test:e2e": "npm run test -w e2e",
+    "loadtest": "node scripts/loadtest/run.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
