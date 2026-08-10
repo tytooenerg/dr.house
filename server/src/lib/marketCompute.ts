@@ -3,6 +3,8 @@ import { BID_TEMPLATES, COLORS, EXTRA_BIDDERS, INSURERS } from '../data/seed.js'
 import { fmtBRL, scoreColorFor } from './format.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { isPurchased } from '../db/duplicatas.js';
+import { ratingFromScore } from './riscoCore.js';
+import { estimateRateBand } from './dynamicPricing.js';
 
 const ACEITE_BADGE = {
   aceita: { label: 'Aceite confirmado', bg: '#EAF3EE', color: COLORS.GREEN },
@@ -27,8 +29,12 @@ function getLiveExtraBids(startedAt: string | null, baseRate: number) {
 export function buildOfferView(d: DuplicataRow) {
   const score = d.score ?? 60;
   const sc = scoreColorFor(score);
-  const desagio = d.desagio ?? '2,5%';
-  const baseRate = parseFloat(desagio.replace(',', '.'));
+  // desagio is never actually populated at emission time — this was a flat '2,5%' for
+  // every real duplicata regardless of rating or market conditions until now. Falls back
+  // to a rating-based estimate adjusted by real 30-day supply/demand (lib/dynamicPricing.ts)
+  // instead of one fixed number for the whole marketplace.
+  const baseRate = d.desagio ? parseFloat(d.desagio.replace(',', '.')) : estimateRateBand(ratingFromScore(score)).mid;
+  const desagio = baseRate.toFixed(2).replace('.', ',') + '%';
   const aceite = getAceiteByDuplicata(d.id);
   const aceiteStatus = aceite?.status ?? 'aguardando';
   const aceiteBadge = ACEITE_BADGE[aceiteStatus];

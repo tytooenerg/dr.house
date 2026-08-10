@@ -12,6 +12,7 @@ import { chooseRegistradora, registrarNaRegistradora } from './registradoras.js'
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
+import { estimateRateBand } from './dynamicPricing.js';
 import type { UserRow } from '../db/types.js';
 
 export const emitirFormSchema = z.object({
@@ -27,16 +28,16 @@ export const emitirFormSchema = z.object({
 
 export type EmitirForm = z.infer<typeof emitirFormSchema>;
 
-const RATE_BANDS: Record<string, [number, number]> = { AA: [1.2, 1.6], A: [1.5, 2.0], B: [2.2, 2.9], C: [3.2, 4.2] };
-
 export function computeEmitirPreview(form: EmitirForm) {
   const valorNum = parseBRLNumber(form.valor);
   const batchTotal = form.batchValores.reduce((sum, v) => sum + parseBRLNumber(v), 0);
   const totalValor = valorNum + batchTotal;
   const matched = SACADOS[form.sacado];
   const emitPremio = form.seguro ? valorNum * 0.006 : 0;
-  const band = matched ? RATE_BANDS[matched.rating] ?? RATE_BANDS.A : RATE_BANDS.A;
-  const taxaMid = (band[0] + band[1]) / 2;
+  // Real supply/demand adjustment (lib/dynamicPricing.ts) instead of a fixed band — the
+  // same rating can quote a different rate today than last month depending on how much
+  // capital is actually chasing offers right now.
+  const { mid: taxaMid, signal } = estimateRateBand(matched?.rating ?? 'A');
 
   const items = [
     { label: 'Dados do sacado e CNPJ', done: !!(form.sacado && form.cnpj) },
@@ -64,6 +65,9 @@ export function computeEmitirPreview(form: EmitirForm) {
       taxaEstimadaFmt: taxaMid.toFixed(1).replace('.', ',') + '% a.m.',
       plataformaFeeFmt: totalValor ? fmtBRL(platformFee(totalValor)) : '—',
       totalValor,
+      // Transparency for the UI/API consumer: this is why the estimate moved since last
+      // time, not just a number that changed with no explanation.
+      liquidezMultiplicador: Number(signal.multiplier.toFixed(3)),
     },
     sacadoRecognized: !!matched,
     sacadoRecognizedText: matched ? `${form.sacado} já tem histórico na Lastro — rating ${matched.rating}, score ${matched.score}.` : '',
