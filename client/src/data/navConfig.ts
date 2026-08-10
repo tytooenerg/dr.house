@@ -12,6 +12,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'erp', label: 'Integrações ERP', path: '/app/erp', group: 'operacoes' },
   { key: 'emitir', label: 'Emitir Duplicata', path: '/app/emitir', group: 'operacoes' },
   { key: 'minhas', label: 'Minhas Duplicatas', path: '/app/minhas', group: 'operacoes' },
+  { key: 'linha-credito', label: 'Linha de Crédito', path: '/app/linha-credito', group: 'operacoes' },
   { key: 'secundario', label: 'Mercado Secundário', path: '/app/secundario', group: 'operacoes' },
   { key: 'cestas', label: 'Cestas de Investimento', path: '/app/cestas', group: 'operacoes' },
   { key: 'suitability', label: 'Perfil de Investidor', path: '/app/suitability', group: 'operacoes' },

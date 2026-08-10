@@ -12,6 +12,7 @@ import { MarketplacePage } from './pages/app/MarketplacePage';
 import { AutomacaoPage } from './pages/app/AutomacaoPage';
 import { ComparadorPage } from './pages/app/ComparadorPage';
 import { MinhasPage } from './pages/app/MinhasPage';
+import { CreditLinePage } from './pages/app/CreditLinePage';
 import { RiscoPage } from './pages/app/RiscoPage';
 import { HistoricoPage } from './pages/app/HistoricoPage';
 import { ErpPage } from './pages/app/ErpPage';
@@ -69,6 +70,7 @@ export default function App() {
           />
           <Route path="comparador" element={<Gate tab="comparador"><ComparadorPage /></Gate>} />
           <Route path="minhas" element={<Gate tab="minhas"><MinhasPage /></Gate>} />
+          <Route path="linha-credito" element={<Gate tab="linha-credito"><CreditLinePage /></Gate>} />
           <Route path="secundario" element={<Gate tab="secundario"><SecundarioPage /></Gate>} />
           <Route path="cestas" element={<Gate tab="cestas"><CestasPage /></Gate>} />
           <Route path="suitability" element={<Gate tab="suitability"><SuitabilityPage /></Gate>} />
