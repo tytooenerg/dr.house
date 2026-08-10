@@ -13,6 +13,8 @@ bash scripts/postgres/validate-schema.sh
 
 Both were actually run against a real local PostgreSQL 16 (`apt install postgresql-16`, `pg_ctlcluster 16 main start`) while building this — not hand-reviewed and assumed to work. All 38 migrations apply cleanly and produce all 58 tables; a follow-up smoke test (insert a user, insert a duplicata referencing it, join them back) confirmed the foreign keys and the two hand-translated CHECK-widening migrations (see below) work correctly together, not just parse.
 
+**Now wired into CI** (`.github/workflows/ci.yml`'s `postgres-schema-check` job) against a real `postgres:16` service container on every push/PR — the same two commands above, with `PGHOST=localhost`/`PGPORT=5432`/`PGUSER=postgres`/`PGPASSWORD=postgres` (the service container's defaults) instead of the local trust-auth Unix socket used during manual development. Confirmed locally against a TCP+password-authenticated instance (not just the Unix-socket path) before wiring it in, so the job isn't written-and-hoped either. This means a future migration that breaks Postgres portability gets caught automatically instead of silently drifting until someone remembers to run these scripts by hand.
+
 ## What `generate-schema.mjs` actually does
 
 A narrow, mechanical translation — a grep across all 38 SQLite migrations turned up exactly two non-portable patterns:

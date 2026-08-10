@@ -69,3 +69,40 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 7
+
+  # Keeps server/src/db/migrations-postgres/ honest: scripts/postgres/generate-schema.mjs's
+  # translation is only worth anything if it's actually re-verified against a real Postgres
+  # whenever a migration changes, not just the one time it was done by hand (see
+  # docs/postgres-migration.md and scripts/postgres/README.md). A real postgres:16 service
+  # container, not a mock — the same check that was run manually while building this.
+  postgres-schema-check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Translate SQLite migrations to Postgres
+        run: node scripts/postgres/generate-schema.mjs
+
+      - name: Validate translated schema against a real Postgres 16
+        run: bash scripts/postgres/validate-schema.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
