@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import './db/index.js';
 import { httpLogger, logger } from './lib/logger.js';
 import { captureError } from './lib/sentry.js';
+import { metricsMiddleware } from './lib/metrics.js';
 import { adminRouter } from './routes/admin.js';
 
 import { authRouter } from './routes/auth.js';
@@ -74,6 +75,7 @@ app.use('/api', (req, res, next) =>
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 app.use(express.json());
+app.use(metricsMiddleware);
 if (!process.env.VITEST) app.use(httpLogger);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'lastro-api' }));

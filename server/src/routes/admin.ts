@@ -47,6 +47,7 @@ import { runInstitutionalReportingBilling } from '../lib/institutionalReporting.
 import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/agents.js';
 import { trainModel, getModel, MIN_TRAINING_SAMPLES } from '../lib/mlScoring.js';
 import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
+import { computeMetrics } from '../lib/metrics.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -316,6 +317,14 @@ adminRouter.post('/ml-scoring/retrain', (req, res) => {
 // current book, never a stale cached verdict.
 adminRouter.get('/fraud-anomalies', (_req, res) => {
   res.json({ findings: runFraudAnomalyScan() });
+});
+
+// Real per-route latency (p50/p95) and error rate from this process's own request history
+// (lib/metrics.ts) — in-memory only, resets on restart, honestly labeled as such rather
+// than pretending to be a durable APM.
+adminRouter.get('/metrics', (req, res) => {
+  const windowMinutes = Math.max(1, Math.min(1440, Number(req.query.windowMinutes) || 60));
+  res.json(computeMetrics(windowMinutes));
 });
 
 // Compliance AI Engine's auto-suspend bar (see lib/complianceEngine.ts) — admin-tunable
