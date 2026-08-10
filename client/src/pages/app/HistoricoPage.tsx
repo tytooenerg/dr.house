@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useLang } from '../../lib/i18n';
 
 interface Historico {
   data: string;
@@ -55,6 +56,7 @@ interface RebalanceView {
 const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
 
 export function HistoricoPage() {
+  const { t } = useLang();
   const [data, setData] = useState<HistoricoData | null>(null);
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
@@ -150,8 +152,8 @@ export function HistoricoPage() {
   return (
     <div>
       <PageHeader
-        title="Carteira & Histórico"
-        subtitle="Suas operações concluídas e retornos obtidos"
+        title={t('historico.title', 'Carteira & Histórico')}
+        subtitle={t('historico.subtitle', 'Suas operações concluídas e retornos obtidos')}
         right={
           <div className="flex gap-2">
             <Button variant="secondary" size="sm" onClick={() => exportAs('csv')} disabled={exporting}>
@@ -383,7 +385,7 @@ export function HistoricoPage() {
             </span>
           </div>
         ))}
-        {historico.length === 0 && <EmptyState title="Nenhuma operação ainda" hint="Suas operações concluídas vão aparecer aqui" />}
+        {historico.length === 0 && <EmptyState title={t('historico.emptyTitle', 'Nenhuma operação ainda')} hint={t('historico.emptyHint', 'Suas operações concluídas vão aparecer aqui')} />}
         {historico.length > 0 && totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-border text-[12.5px] text-textSecondary">
             <span>

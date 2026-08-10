@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, downloadFile } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
+import { useLang } from '../../lib/i18n';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { AgentesIaPanel } from './admin/AgentesIaPanel';
@@ -242,6 +243,7 @@ type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | '
 type LegalSubTab = 'cobranca' | 'minutas' | 'regulatorio';
 
 export function AdminPage() {
+  const { t } = useLang();
   const [tab, setTab] = useState<Tab>('kyb');
   const [pending, setPending] = useState<PendingKyb[]>([]);
   const [disputes, setDisputes] = useState<AdminDispute[]>([]);
@@ -738,7 +740,7 @@ export function AdminPage() {
 
   return (
     <div>
-      <PageHeader title="Back-office" subtitle="Aprovação de credenciamento, arbitragem de disputas e trilha de auditoria da plataforma" />
+      <PageHeader title={t('admin.title', 'Back-office')} subtitle={t('admin.subtitle', 'Aprovação de credenciamento, arbitragem de disputas e trilha de auditoria da plataforma')} />
 
       <div className="flex gap-1 mb-5 p-1 rounded-lg bg-bg w-fit">
         {([

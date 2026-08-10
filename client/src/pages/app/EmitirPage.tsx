@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
+import { useLang } from '../../lib/i18n';
 
 interface EmitForm {
   sacado: string;
@@ -40,6 +41,7 @@ function fmtBRL(n: number) {
 const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', seguro: false, nfeChave: '' };
 
 export function EmitirPage() {
+  const { t } = useLang();
   const [form, setForm] = useState<EmitForm>(EMPTY_FORM);
   const [batchRows, setBatchRows] = useState<BatchRow[]>([]);
   const [nfAnexada, setNfAnexada] = useState(false);
@@ -119,7 +121,7 @@ export function EmitirPage() {
   if (result) {
     return (
       <div>
-        <PageHeader title="Emitir Duplicata" subtitle="Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma" />
+        <PageHeader title={t('emitir.title', 'Emitir Duplicata')} subtitle={t('emitir.subtitle', 'Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma')} />
         <Card className="p-10 text-center max-w-[560px]">
           <div className="w-14 h-14 rounded-full bg-greenBg mx-auto mb-4.5 flex items-center justify-center">
             <div className="w-6 h-6 rounded-full border-[3px] border-green" />
@@ -143,8 +145,8 @@ export function EmitirPage() {
   return (
     <div>
       <PageHeader
-        title="Emitir Duplicata"
-        subtitle="Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma"
+        title={t('emitir.title', 'Emitir Duplicata')}
+        subtitle={t('emitir.subtitle', 'Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma')}
         right={<span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-greenBg text-green">Aprovação em minutos · dinheiro em até 24h</span>}
       />
 

@@ -101,6 +101,33 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'marketplace.tokenQtyPlaceholder': 'number of tokens',
     'marketplace.emptyTitle': 'No offers found',
     'marketplace.emptyHint': 'Try searching for a different debtor or originator',
+
+    // My Receivables page (static chrome only)
+    'minhas.title': 'My Receivables',
+    'minhas.subtitle': 'Register and track the receivables you sent to market',
+    'minhas.dropzoneTitle': 'Drag an XML or PDF of an invoice / receivable',
+    'minhas.dropzoneHint': 'or click to select a file from your computer',
+    'minhas.colSacado': 'Debtor',
+    'minhas.colValor': 'Amount',
+    'minhas.colEmissao': 'Issued',
+    'minhas.colVencimento': 'Due date',
+    'minhas.colLastro': 'Backing',
+    'minhas.colStatus': 'Status / Action',
+    'minhas.disparar': 'Start auction',
+
+    // Portfolio & History page (static chrome only — the operations table itself stays PT-BR)
+    'historico.title': 'Portfolio & History',
+    'historico.subtitle': 'Your completed operations and returns earned',
+    'historico.emptyTitle': 'No operations yet',
+    'historico.emptyHint': 'Your completed operations will show up here',
+
+    // Issue Receivable page (static chrome only — the emission form itself stays PT-BR)
+    'emitir.title': 'Issue Receivable',
+    'emitir.subtitle': "Issue and register a receivable directly on Lastro — without leaving the platform",
+
+    // Back Office (admin) page header only — the panel's many tabs stay PT-BR
+    'admin.title': 'Back Office',
+    'admin.subtitle': 'Onboarding approval, dispute arbitration and the platform audit trail',
   },
 };
 // PT strings live inline in each component as the ptDefault argument to t() — the app's

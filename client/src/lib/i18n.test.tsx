@@ -13,6 +13,10 @@ function Probe() {
       <span data-testid="unknown">{t('some.key.never.translated', 'Valor padrão em PT')}</span>
       <span data-testid="dashboard-title">{t('dashboard.title', 'Visão Geral')}</span>
       <span data-testid="marketplace-buy-tokens">{t('marketplace.buyTokens', 'Comprar tokens')}</span>
+      <span data-testid="minhas-title">{t('minhas.title', 'Minhas Duplicatas')}</span>
+      <span data-testid="historico-title">{t('historico.title', 'Carteira & Histórico')}</span>
+      <span data-testid="emitir-title">{t('emitir.title', 'Emitir Duplicata')}</span>
+      <span data-testid="admin-title">{t('admin.title', 'Back-office')}</span>
     </div>
   );
 }
@@ -58,6 +62,10 @@ describe('i18n', () => {
     await user.click(screen.getByRole('button', { name: /trocar idioma/i }));
     expect(screen.getByTestId('dashboard-title').textContent).toBe('Overview');
     expect(screen.getByTestId('marketplace-buy-tokens').textContent).toBe('Buy tokens');
+    expect(screen.getByTestId('minhas-title').textContent).toBe('My Receivables');
+    expect(screen.getByTestId('historico-title').textContent).toBe('Portfolio & History');
+    expect(screen.getByTestId('emitir-title').textContent).toBe('Issue Receivable');
+    expect(screen.getByTestId('admin-title').textContent).toBe('Back Office');
   });
 
   it('falls back to the PT default for a key with no English translation yet, instead of rendering the raw key', async () => {
