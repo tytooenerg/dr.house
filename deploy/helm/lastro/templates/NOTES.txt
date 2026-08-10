@@ -1,0 +1,35 @@
+Lastro foi implantado como {{ include "lastro.fullname" . }}.
+
+{{- if .Values.ingress.enabled }}
+Acesse via: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+Nenhum Ingress habilitado (ingress.enabled: false). Para acessar localmente:
+  kubectl port-forward svc/{{ include "lastro.fullname" . }} 8080:{{ .Values.service.port }}
+  # depois abra http://localhost:8080
+{{- end }}
+
+IMPORTANTE — leia antes de escalar:
+Este chart fixa replicaCount em {{ .Values.replicaCount }}. O app persiste em SQLite
+(server/src/db/index.ts), um banco de escritor único — múltiplas réplicas escrevendo no
+mesmo arquivo (mesmo via um PVC ReadWriteMany) corrompem dados ou perdem escritas sob
+concorrência real. Não aumente replicaCount nem habilite autoscaling.enabled antes de
+migrar para Postgres — o caminho real está documentado (e deliberadamente NÃO implementado
+ainda) em docs/postgres-migration.md no repositório.
+
+{{- if not .Values.existingSecret }}
+
+Nenhum existingSecret configurado — o app está rodando apenas com as variáveis não
+sensíveis em `env` (values.yaml). Recursos que dependem de credenciais (Stripe, Claude,
+Twilio, SMTP, Pix/boleto/TED, registradoras, SAML, OpenTelemetry, …) permanecem
+desativados exatamente como ficam localmente sem essas variáveis — nenhum é fingido, cada
+um se anuncia como desativado nos logs na subida (mesmo padrão real-when-configured do
+restante do projeto). Crie um Secret com as chaves reais que precisar e aponte
+`existingSecret` para ele.
+{{- end }}
+
+{{- if .Values.redis.enabled }}
+
+Redis do próprio chart está habilitado ({{ include "lastro.fullname" . }}-redis) — uma
+única réplica sem persistência, suficiente para o relay de WebSocket multi-instância opcional;
+não é Redis de produção com alta disponibilidade.
+{{- end }}
