@@ -238,6 +238,36 @@ export interface ResaleListingRow {
   created_at: string;
 }
 
+export type ResaleBidStatus = 'ativo' | 'aceito' | 'recusado' | 'cancelado' | 'superado';
+
+export interface ResaleBidRow {
+  id: number;
+  listing_id: number;
+  bidder_id: number;
+  valor: number;
+  status: ResaleBidStatus;
+  created_at: string;
+}
+
+export interface BlockTradeRow {
+  id: number;
+  buyer_id: number;
+  criteria_json: string;
+  quantidade: number;
+  valor_total: number;
+  desconto_pct: number;
+  created_at: string;
+}
+
+export interface BlockTradeItemRow {
+  id: number;
+  block_trade_id: number;
+  listing_id: number;
+  duplicata_id: string;
+  seller_id: number;
+  valor: number;
+}
+
 export interface SystemHealthCheckRow {
   id: number;
   status: 'ok' | 'degraded';

@@ -1,0 +1,41 @@
+-- Real market depth on the secondary market (lib/resaleCore.ts) — buyers can now place a
+-- bid below/above a listing's asking price instead of only accepting it outright, and the
+-- seller decides which bid (if any) to accept. A bidder can hold at most one 'ativo' bid
+-- per listing (enforced in app code, not a DB constraint, since SQLite CHECK can't easily
+-- express "at most one row per (listing_id, bidder_id) where status='ativo'" alongside a
+-- history of past bids on the same listing).
+CREATE TABLE IF NOT EXISTS resale_bids (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  listing_id INTEGER NOT NULL REFERENCES resale_listings(id),
+  bidder_id INTEGER NOT NULL REFERENCES users(id),
+  valor REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK(status IN ('ativo','aceito','recusado','cancelado','superado')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_resale_bids_listing ON resale_bids(listing_id, status);
+CREATE INDEX IF NOT EXISTS idx_resale_bids_bidder ON resale_bids(bidder_id, status);
+
+-- Institutional block trades (lib/blockTrade.ts) — a single negotiated transaction that
+-- sweeps several active resale listings at once against one buyer's criteria, real enough
+-- to need its own audit trail: a summary row plus one item row per matched listing, so
+-- "what exactly did we buy in this block, at what price" stays answerable after the fact.
+CREATE TABLE IF NOT EXISTS block_trades (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  buyer_id INTEGER NOT NULL REFERENCES users(id),
+  criteria_json TEXT NOT NULL,
+  quantidade INTEGER NOT NULL,
+  valor_total REAL NOT NULL,
+  desconto_pct REAL NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_block_trades_buyer ON block_trades(buyer_id);
+
+CREATE TABLE IF NOT EXISTS block_trade_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  block_trade_id INTEGER NOT NULL REFERENCES block_trades(id),
+  listing_id INTEGER NOT NULL REFERENCES resale_listings(id),
+  duplicata_id TEXT NOT NULL REFERENCES duplicatas(id),
+  seller_id INTEGER NOT NULL REFERENCES users(id),
+  valor REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_block_trade_items_trade ON block_trade_items(block_trade_id);
