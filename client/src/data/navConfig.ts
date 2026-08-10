@@ -14,6 +14,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'minhas', label: 'Minhas Duplicatas', path: '/app/minhas', group: 'operacoes' },
   { key: 'secundario', label: 'Mercado Secundário', path: '/app/secundario', group: 'operacoes' },
   { key: 'cestas', label: 'Cestas de Investimento', path: '/app/cestas', group: 'operacoes' },
+  { key: 'suitability', label: 'Perfil de Investidor', path: '/app/suitability', group: 'operacoes' },
   { key: 'aceite', label: 'Aceite do Sacado', path: '/app/aceite', group: 'operacoes' },
   { key: 'sacado', label: 'Portal do Sacado', path: '/app/sacado', group: 'operacoes' },
   { key: 'disputa', label: 'Resolução de Disputas', path: '/app/disputa', group: 'operacoes' },

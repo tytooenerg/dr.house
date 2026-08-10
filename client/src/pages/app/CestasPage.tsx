@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
@@ -24,6 +25,7 @@ export function CestasPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<InvestResult | null>(null);
   const [error, setError] = useState('');
+  const [needsSuitability, setNeedsSuitability] = useState(false);
 
   useEffect(() => {
     api.get<{ cestas: CestaDef[] }>('/cestas').then((d) => setCestas(d.cestas));
@@ -34,11 +36,14 @@ export function CestasPage() {
     setLoading(true);
     setError('');
     setResult(null);
+    setNeedsSuitability(false);
     try {
       const res = await api.post<InvestResult>('/cestas/investir', { cesta: selected, valor });
       setResult(res);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível investir agora.');
+      const code = err instanceof ApiError && err.body && typeof err.body === 'object' ? (err.body as { error?: string }).error : undefined;
+      setNeedsSuitability(code === 'suitability_required' || code === 'suitability_mismatch');
     } finally {
       setLoading(false);
     }
@@ -82,7 +87,19 @@ export function CestasPage() {
               {loading ? 'Investindo…' : 'Investir agora'}
             </Button>
           </div>
-          {error && <div className="mt-3 text-red text-[12.5px] font-semibold">{error}</div>}
+          {error && (
+            <div className="mt-3 text-red text-[12.5px] font-semibold">
+              {error}
+              {needsSuitability && (
+                <>
+                  {' '}
+                  <Link to="/app/suitability" className="underline">
+                    Responder questionário de suitability
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
         </Card>
       )}
 

@@ -235,6 +235,20 @@ A code-defined registry (`FEATURE_FLAG_DEFS`) of real operational kill switches,
 
 Also supports a deterministic percentage rollout (`rolloutPct`, hash of flag key + user id, so a given user always lands on the same side instead of flipping between requests) for any future flag that needs a gradual ramp rather than a hard on/off. `GET/POST /admin/feature-flags[/:key]`.
 
+### Questionário de suitability do investidor (`lib/suitability.ts`, investidor **Perfil de Investidor**)
+
+A CVM-style suitability (adequação) questionnaire — a real, deterministic point-scored assessment (6 questions covering objetivo, horizonte, tolerância a perdas, experiência, concentração patrimonial e estabilidade de renda; every point traces to a single answer, no black box) that classifies an investor as **conservador / moderado / arrojado**, valid for 24 months (`suitability_assessments` table, migration `0035_suitability.sql`). `GET/POST /suitability`.
+
+The real gate this feeds: **cestas de investimento** (`lib/cestasCore.ts`) are the platform choosing where an investor's money goes, closer to a recommendation than a manual "Comprar" click on a specific offer — so the two riskier baskets require a valid, non-expired assessment matching or exceeding their risk tier. The safest basket (conservadora) never requires one, on the theory that an unknown risk tolerance is conservatively assumed to be fine with the safest option:
+
+| Cesta | Perfil mínimo exigido |
+|---|---|
+| Conservadora (AA/A) | Nenhum |
+| Diversificada (AA–C) | Moderado |
+| Agressiva (B/C) | Arrojado |
+
+Missing/expired → `403 suitability_required`; present but too conservative for the chosen basket → `403 suitability_mismatch` — the client surfaces both with a link straight to the questionnaire.
+
 ### Marketing homepage
 
 `/` was previously just an alias for the login screen — there was no actual company website, and the public nav's own "Entrar"/"Falar com vendas" links pointed back at themselves. Added a real homepage (`pages/public/LandingPage.tsx`) covering the whole platform for a general audience (hero, problem/solution, the 5-step emission→liquidation flow, one card per participant — cedente/investidor/sacado/seguradora — product/compliance highlights, and a live stats band pulling real numbers from the same `GET /api/public/stats` the Transparência page uses, not fabricated marketing figures), reusing `PublicNav`/`PublicFooter` for visual consistency with the existing Developers/Preços/Transparência/Legal/Status pages. Login moved to `/login`; every internal link that used to point at `/` expecting the login/signup screen (nav, pricing/developers/embed/404 CTAs, the referral share link, `AppShell`'s auth redirect, the sidebar's logout redirect, and the e2e test suite) was updated to match.

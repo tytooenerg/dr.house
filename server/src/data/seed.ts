@@ -323,7 +323,7 @@ export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'adm
 export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora', string[]> = {
   admin: ['admin', 'perfil'],
   seguradora: ['seguradora', 'perfil'],
-  investidor: ['dashboard', 'marketplace', 'secundario', 'cestas', 'automacao', 'risco', 'historico', 'comparador', 'compliance', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
+  investidor: ['dashboard', 'marketplace', 'secundario', 'cestas', 'suitability', 'automacao', 'risco', 'historico', 'comparador', 'compliance', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
   cedente: ['dashboard', 'erp', 'emitir', 'minhas', 'aceite', 'risco', 'historico', 'compliance', 'dev', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
   sacado: ['dashboard', 'sacado', 'historico', 'conta', 'disputa', 'perfil'],
 };

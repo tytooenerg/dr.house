@@ -6,6 +6,7 @@ import { deliverWebhookEvent } from './webhookDelivery.js';
 import { settlePurchase } from './settlement.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { SACADOS, type Rating } from '../data/seed.js';
+import { checkCestaSuitability } from './suitability.js';
 import type { DuplicataRow, UserRow } from '../db/types.js';
 
 export const CESTAS = {
@@ -45,7 +46,7 @@ export type InvestOutcome =
       };
     }
   | { status: 400; body: { error: 'validation_error'; message: string } }
-  | { status: 403; body: { error: 'forbidden' | 'kyb_required'; message: string } }
+  | { status: 403; body: { error: 'forbidden' | 'kyb_required' | 'suitability_required' | 'suitability_mismatch'; message: string } }
   | { status: 409; body: { error: 'no_offers'; message: string } };
 
 // One-shot allocation, not continuous automation (see automation.ts for the ongoing
@@ -57,6 +58,15 @@ export function investInBasket(user: UserRow, cestaKey: CestaKey, valorRaw: stri
   }
   if (user.kyb_status !== 'approved') {
     return { status: 403, body: { error: 'kyb_required', message: 'Seu credenciamento institucional ainda está em análise.' } };
+  }
+  // See lib/suitability.ts — a basket is the platform choosing where money goes, closer
+  // to a recommendation than a manual "Comprar" click, so the riskier baskets require a
+  // valid, non-expired suitability profile proving the investor's risk tolerance supports
+  // it. 'conservadora' never requires one (an unknown risk tolerance is conservatively
+  // assumed to be fine with the safest option).
+  const suitability = checkCestaSuitability(user.id, cestaKey);
+  if (!suitability.ok) {
+    return { status: 403, body: { error: suitability.error, message: suitability.message } };
   }
   const budget = parseBRLNumber(valorRaw);
   if (budget <= 0) {

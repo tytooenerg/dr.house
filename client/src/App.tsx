@@ -36,6 +36,7 @@ import { StatusPage } from './pages/public/StatusPage';
 import { EmbedSimuladorPage } from './pages/public/EmbedSimuladorPage';
 import { SecundarioPage } from './pages/app/SecundarioPage';
 import { CestasPage } from './pages/app/CestasPage';
+import { SuitabilityPage } from './pages/app/SuitabilityPage';
 import { NotFoundPage } from './pages/public/NotFoundPage';
 
 export default function App() {
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="minhas" element={<Gate tab="minhas"><MinhasPage /></Gate>} />
           <Route path="secundario" element={<Gate tab="secundario"><SecundarioPage /></Gate>} />
           <Route path="cestas" element={<Gate tab="cestas"><CestasPage /></Gate>} />
+          <Route path="suitability" element={<Gate tab="suitability"><SuitabilityPage /></Gate>} />
           <Route path="risco" element={<Gate tab="risco"><RiscoPage /></Gate>} />
           <Route path="historico" element={<Gate tab="historico"><HistoricoPage /></Gate>} />
           <Route path="erp" element={<Gate tab="erp"><ErpPage /></Gate>} />
