@@ -3,6 +3,8 @@ import { listOpenDisputesByCedente } from '../db/disputes.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { fmtBRL } from './format.js';
 import { ratingFromScore } from './riscoCore.js';
+import { fundDraw, returnFromRepayment } from './creditLineFund.js';
+import { getFundBalance } from '../db/creditLineFund.js';
 import {
   createDraw,
   getCreditLineByCedente,
@@ -187,9 +189,20 @@ export function drawCreditLine(cedenteId: number, valor: number): DrawOutcome {
   if (valor > disponivel) {
     return { status: 409, body: { error: 'limit_exceeded', message: `Valor solicitado excede o disponível (${fmtBRL(disponivel)}).` } };
   }
-  createDraw(line.id, valor, line.taxa_am);
+  // The cedente's own limit is necessary but not sufficient — the line is now funded by a
+  // real investor pool (lib/creditLineFund.ts), not Lastro's own unlimited capital, so a
+  // draw also needs the pool to actually have the money.
+  const poolBalance = getFundBalance();
+  if (valor > poolBalance) {
+    return {
+      status: 409,
+      body: { error: 'fund_insufficient', message: `O pool de fomento à linha de crédito não tem saldo suficiente agora (disponível: ${fmtBRL(poolBalance)}).` },
+    };
+  }
+  const draw = createDraw(line.id, valor, line.taxa_am);
   setCreditLineUtilizado(line.id, utilizado + valor);
   addLedgerEntry(cedenteId, new Date().toLocaleDateString('pt-BR'), `Saque da linha de crédito rotativa — ${fmtBRL(valor)} a ${line.taxa_am.toFixed(1).replace('.', ',')}% a.m.`, valor);
+  fundDraw(draw.id, valor);
   return { status: 200, body: { ok: true, disponivelFmt: fmtBRL(disponivel - valor) } };
 }
 
@@ -214,6 +227,7 @@ export function repayCreditLine(cedenteId: number, valor: number): RepayOutcome 
     remaining -= paid;
     if (newBalance <= 0.005) settleDraw(draw.id);
     else updateDrawBalance(draw.id, newBalance, new Date().toISOString());
+    if (paid > 0) returnFromRepayment(draw.id, paid);
   }
 
   const utilizado = refreshUtilizado(line.id);

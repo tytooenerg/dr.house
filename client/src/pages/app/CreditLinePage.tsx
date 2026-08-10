@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { useSession } from '../../state/SessionContext';
 
 interface DrawRow {
   id: number;
@@ -24,7 +25,133 @@ interface CreditLineOverview {
   draws: DrawRow[];
 }
 
+interface FundLedgerRow {
+  tipo: string;
+  valorFmt: string;
+  descricao: string;
+  quando: string;
+}
+
+interface FundOverview {
+  balanceFmt: string;
+  yourPositionFmt: string | null;
+  yourAvailableToRedeemFmt: string | null;
+  recentLedger: FundLedgerRow[];
+}
+
+// A real pool, funded by investor contributions, is what actually finances every draw below
+// (lib/creditLineFund.ts) — not Lastro's own unlimited capital. Cedentes see the pool's live
+// balance for context (a draw can be rejected for lack of pool liquidity, not just for
+// exceeding their own limit); investidores see the contribute/redeem controls.
+function FundCard() {
+  const { user } = useSession();
+  const isInvestor = user?.role === 'investidor';
+  const [fund, setFund] = useState<FundOverview | null>(null);
+  const [valor, setValor] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const load = () => api.get<FundOverview>('/credit-line-fund').then(setFund);
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const parsed = Number(valor.replace(',', '.'));
+
+  const contribuir = async () => {
+    setError('');
+    setNotice('');
+    if (!parsed || parsed <= 0) {
+      setError('Informe um valor válido para aportar.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/credit-line-fund/contribuir', { valor: parsed });
+      setValor('');
+      setNotice('Aporte registrado — valor debitado do seu extrato.');
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível registrar o aporte.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resgatar = async () => {
+    setError('');
+    setNotice('');
+    if (!parsed || parsed <= 0) {
+      setError('Informe um valor válido para resgatar.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/credit-line-fund/resgatar', { valor: parsed });
+      setValor('');
+      setNotice('Resgate registrado — valor creditado no seu extrato.');
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível registrar o resgate.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!fund) return null;
+
+  return (
+    <Card className="mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-bold text-[15px]">Pool de fomento à linha de crédito</div>
+        <span className="text-[12.5px] font-bold text-textSecondary">Saldo do pool: {fund.balanceFmt}</span>
+      </div>
+      <p className="text-[12.5px] text-textSecondary mb-3">
+        Capital real de investidores financia cada saque de cedente na linha de crédito rotativa — sem aporte no pool, não há saque possível.
+        Devoluções (principal + juros) voltam ao pool. Sua posição rastreia o principal aportado; o rendimento coletado dos cedentes cresce o
+        saldo geral do pool, sem uma atribuição precisa de cota por investidor.
+      </p>
+      {isInvestor && (
+        <>
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div>
+              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Sua posição</div>
+              <div className="font-mono-num font-bold text-[15px]">{fund.yourPositionFmt}</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Disponível para resgate</div>
+              <div className="font-mono-num font-bold text-[15px] text-blue">{fund.yourAvailableToRedeemFmt}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Valor em R$"
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              className="border border-border rounded-md px-3 py-2 text-sm w-48"
+            />
+            <Button disabled={busy} onClick={contribuir}>
+              Aportar
+            </Button>
+            <Button disabled={busy} onClick={resgatar}>
+              Resgatar
+            </Button>
+          </div>
+          {error && <div className="mt-2.5 text-red text-[12.5px] font-semibold">{error}</div>}
+          {notice && <div className="mt-2.5 text-green text-[12.5px] font-semibold">{notice}</div>}
+        </>
+      )}
+    </Card>
+  );
+}
+
 export function CreditLinePage() {
+  const { user } = useSession();
+  const isCedente = user?.role === 'cedente';
   const [overview, setOverview] = useState<CreditLineOverview | null>(null);
   const [valor, setValor] = useState('');
   const [busy, setBusy] = useState(false);
@@ -34,8 +161,8 @@ export function CreditLinePage() {
   const load = () => api.get<CreditLineOverview>('/credit-line').then(setOverview);
 
   useEffect(() => {
-    load();
-  }, []);
+    if (isCedente) load();
+  }, [isCedente]);
 
   const parsed = Number(valor.replace(',', '.'));
 
@@ -83,10 +210,12 @@ export function CreditLinePage() {
     <div>
       <PageHeader
         title="Linha de Crédito"
-        subtitle="Antecipação de capital de giro contra o seu próprio histórico real de emissões na Lastro — não é a compra de uma duplicata específica por um investidor, é capital de giro rotativo baseado no seu volume e score reais dos últimos 90 dias"
+        subtitle="Antecipação de capital de giro contra o seu próprio histórico real de emissões na Lastro, financiada por um pool real de investidores — não é a compra de uma duplicata específica, é capital de giro rotativo baseado no seu volume e score reais dos últimos 90 dias"
       />
 
-      {!overview ? null : !overview.eligible ? (
+      <FundCard />
+
+      {!isCedente ? null : !overview ? null : !overview.eligible ? (
         <Card>
           <div className="font-bold text-[15px] mb-2">Ainda não elegível</div>
           <p className="text-[12.5px] text-textSecondary">{overview.motivo}</p>
