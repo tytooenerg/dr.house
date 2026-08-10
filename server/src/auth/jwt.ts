@@ -100,6 +100,59 @@ export function verifyGoogleSignupToken(token: string): GoogleSignupTokenPayload
   }
 }
 
+// RelayState for the SAML SP-initiated redirect round-trip — same reasoning as
+// signGoogleOAuthState (stateless CSRF protection, carries only a nonce + optional
+// referral code across the redirect to the IdP and back).
+const SAML_RELAY_STATE_TYPE = 'saml_relay_state';
+
+export function signSamlRelayState(referralCode?: string): string {
+  return jwt.sign({ typ: SAML_RELAY_STATE_TYPE, nonce: crypto.randomBytes(8).toString('hex'), ref: referralCode ?? null }, SECRET, { expiresIn: '10m' });
+}
+
+export function verifySamlRelayState(token: string): { referralCode: string | null } | null {
+  try {
+    const decoded = jwt.verify(token, SECRET) as Record<string, unknown>;
+    if (decoded.typ !== SAML_RELAY_STATE_TYPE) return null;
+    return { referralCode: typeof decoded.ref === 'string' ? decoded.ref : null };
+  } catch {
+    return null;
+  }
+}
+
+const SAML_SIGNUP_TYPE = 'saml_signup';
+
+// Issued after a real, signature-verified SAML assertion for an email Lastro has never
+// seen — proves "the configured IdP already authenticated this person as this email"
+// without creating an account yet, since role/companyName still need to be collected.
+// Exchanged for a real account by POST /auth/saml/complete-signup.
+export function signSamlSignupToken(input: { email: string; nome: string; samlSubjectId: string; referralCode?: string | null }): string {
+  return jwt.sign({ typ: SAML_SIGNUP_TYPE, email: input.email, nome: input.nome, samlSubjectId: input.samlSubjectId, ref: input.referralCode ?? null }, SECRET, {
+    expiresIn: '30m',
+  });
+}
+
+export interface SamlSignupTokenPayload {
+  email: string;
+  nome: string;
+  samlSubjectId: string;
+  referralCode: string | null;
+}
+
+export function verifySamlSignupToken(token: string): SamlSignupTokenPayload | null {
+  try {
+    const decoded = jwt.verify(token, SECRET) as Record<string, unknown>;
+    if (decoded.typ !== SAML_SIGNUP_TYPE || typeof decoded.email !== 'string' || typeof decoded.samlSubjectId !== 'string') return null;
+    return {
+      email: decoded.email,
+      nome: typeof decoded.nome === 'string' ? decoded.nome : '',
+      samlSubjectId: decoded.samlSubjectId,
+      referralCode: typeof decoded.ref === 'string' ? decoded.ref : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function generateRefreshToken(): string {
   return crypto.randomBytes(48).toString('hex');
 }

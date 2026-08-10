@@ -102,7 +102,8 @@ export interface UserRow {
   totp_secret: string | null;
   totp_enabled: number;
   google_sub: string | null;
-  auth_provider: 'password' | 'google';
+  saml_subject_id: string | null;
+  auth_provider: 'password' | 'google' | 'saml';
   whitelabel_plus_enabled: number;
   institutional_reporting_enabled: number;
 }

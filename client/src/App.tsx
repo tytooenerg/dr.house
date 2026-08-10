@@ -6,6 +6,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { TeamInviteAcceptPage } from './pages/auth/TeamInviteAcceptPage';
 import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage';
 import { CompleteGoogleSignupPage } from './pages/auth/CompleteGoogleSignupPage';
+import { CompleteSamlSignupPage } from './pages/auth/CompleteSamlSignupPage';
 import { DashboardPage } from './pages/app/DashboardPage';
 import { MarketplacePage } from './pages/app/MarketplacePage';
 import { AutomacaoPage } from './pages/app/AutomacaoPage';
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/convite-equipe" element={<TeamInviteAcceptPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/completar-cadastro-google" element={<CompleteGoogleSignupPage />} />
+        <Route path="/completar-cadastro-saml" element={<CompleteSamlSignupPage />} />
         <Route path="/developers" element={<DevelopersPage />} />
         <Route path="/precos" element={<PrecosPage />} />
         <Route path="/legal" element={<LegalPage />} />

@@ -8,6 +8,8 @@ import {
   getUserById,
   getUserByGoogleSub,
   linkGoogleAccount,
+  getUserBySamlSubject,
+  linkSamlAccount,
   submitKybForReview,
   updateKybForm,
   updateSettings,
@@ -25,8 +27,14 @@ import {
   verifyGoogleOAuthState,
   signGoogleSignupToken,
   verifyGoogleSignupToken,
+  signSamlRelayState,
+  verifySamlRelayState,
+  signSamlSignupToken,
+  verifySamlSignupToken,
 } from '../auth/jwt.js';
 import { googleOAuthEnabled, buildGoogleAuthUrl, exchangeCodeForProfile } from '../lib/googleOAuth.js';
+import { samlSsoEnabled, buildLoginRequestUrl, validateAssertion } from '../lib/samlSso.js';
+import express from 'express';
 import crypto from 'node:crypto';
 import { createRefreshToken, findValidRefreshToken, revokeAllRefreshTokensForUser, revokeRefreshToken } from '../db/refreshTokens.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -371,6 +379,147 @@ authRouter.post(
     });
     const { accessToken, refreshToken } = issueTokens(user);
     recordAuditEvent(user.id, user.company_name, 'user.registered_google', { role });
+    res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });
+  })
+);
+
+function samlAcsUrl(req: import('express').Request): string {
+  return process.env.SAML_SP_ACS_URL || `${req.protocol}://${req.get('host')}/api/auth/saml/acs`;
+}
+
+// Public — same reasoning as /google/config: lets the client decide whether to show
+// "Entrar com SSO corporativo" at all, since there's deliberately no simulated fallback
+// for a third party's identity assertion.
+authRouter.get('/saml/config', (_req, res) => {
+  res.json({ enabled: samlSsoEnabled });
+});
+
+authRouter.get('/saml/login', (req, res) => {
+  if (!samlSsoEnabled) {
+    res.status(404).json({ error: 'not_configured', message: 'SSO corporativo não está configurado neste ambiente.' });
+    return;
+  }
+  const referralCode = typeof req.query.ref === 'string' ? req.query.ref : undefined;
+  const relayState = signSamlRelayState(referralCode);
+  const url = buildLoginRequestUrl(samlAcsUrl(req), relayState);
+  if (!url) {
+    res.status(500).json({ error: 'saml_misconfigured', message: 'Não foi possível montar a requisição de login SAML.' });
+    return;
+  }
+  res.redirect(302, url);
+});
+
+// The IdP POSTs the assertion here as application/x-www-form-urlencoded (SAMLResponse +
+// RelayState), never JSON — needs its own body parser, same pattern as the Stripe webhook's
+// raw parser in app.ts. This is the Assertion Consumer Service (ACS) endpoint.
+authRouter.post(
+  '/saml/acs',
+  express.urlencoded({ extended: true }),
+  asyncHandler(async (req, res) => {
+    if (!samlSsoEnabled) {
+      res.redirect(302, `${APP_URL}/?samlError=nao_configurado`);
+      return;
+    }
+    const relayStateToken = typeof req.body.RelayState === 'string' ? req.body.RelayState : null;
+    const relayState = relayStateToken ? verifySamlRelayState(relayStateToken) : null;
+    if (!relayState) {
+      res.redirect(302, `${APP_URL}/?samlError=sessao_invalida`);
+      return;
+    }
+    let profile;
+    try {
+      profile = await validateAssertion(samlAcsUrl(req), req.body);
+    } catch (err) {
+      logger.error({ err }, '[saml-sso] falha ao validar a resposta SAML');
+      res.redirect(302, `${APP_URL}/?samlError=falha_saml`);
+      return;
+    }
+    if (!profile) {
+      res.redirect(302, `${APP_URL}/?samlError=falha_saml`);
+      return;
+    }
+
+    const bySamlSubject = getUserBySamlSubject(profile.subjectId);
+    if (bySamlSubject) {
+      const { accessToken, refreshToken } = issueTokens(bySamlSubject);
+      recordAuditEvent(bySamlSubject.id, bySamlSubject.company_name, 'user.login_saml', {});
+      res.redirect(302, `${APP_URL}/oauth/callback?token=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}`);
+      return;
+    }
+
+    const byEmail = getUserByEmail(profile.email);
+    if (byEmail) {
+      // Account linking: the same verified email already has a Lastro account — attach
+      // this SAML identity to it rather than creating a duplicate.
+      linkSamlAccount(byEmail.id, profile.subjectId);
+      const { accessToken, refreshToken } = issueTokens(byEmail);
+      recordAuditEvent(byEmail.id, byEmail.company_name, 'user.saml_linked', {});
+      res.redirect(302, `${APP_URL}/oauth/callback?token=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}`);
+      return;
+    }
+
+    // Brand new email — can't create the account yet (role/companyName still needed), so
+    // hand the client a short-lived, IdP-verified signup token instead.
+    const signupToken = signSamlSignupToken({
+      email: profile.email,
+      nome: profile.name,
+      samlSubjectId: profile.subjectId,
+      referralCode: relayState.referralCode,
+    });
+    res.redirect(
+      302,
+      `${APP_URL}/completar-cadastro-saml?signupToken=${encodeURIComponent(signupToken)}&nome=${encodeURIComponent(profile.name)}&email=${encodeURIComponent(profile.email)}`
+    );
+  })
+);
+
+const completeSamlSignupSchema = z.object({
+  signupToken: z.string().trim().min(10),
+  companyName: z.string().trim().min(2, 'Informe o nome da empresa.'),
+  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora']),
+  insurerKey: z.enum(INSURERS.map((i) => i.key) as [string, ...string[]]).optional(),
+});
+
+authRouter.post(
+  '/saml/complete-signup',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = completeSamlSignupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const { companyName, role, insurerKey } = parsed.data;
+    if (role === 'seguradora' && !insurerKey) {
+      res.status(400).json({ error: 'validation_error', message: 'Selecione qual seguradora sua conta representa.' });
+      return;
+    }
+    const payload = verifySamlSignupToken(parsed.data.signupToken);
+    if (!payload) {
+      res.status(401).json({ error: 'unauthorized', message: 'Sessão de cadastro via SSO expirada — tente novamente.' });
+      return;
+    }
+    // The token itself proves the IdP already authenticated this email; re-check it hasn't
+    // been claimed (by a normal registration or a concurrent SSO signup) meanwhile.
+    if (getUserByEmail(payload.email) || getUserBySamlSubject(payload.samlSubjectId)) {
+      res.status(409).json({ error: 'email_taken', message: 'Já existe uma conta com este e-mail.' });
+      return;
+    }
+    // SSO-only accounts still get a real password_hash — a random, never-revealed value
+    // bcrypt-hashed the normal way, so verifyPassword can never match it.
+    const randomPasswordHash = await hashPassword(crypto.randomBytes(24).toString('hex'));
+    const user = createUser({
+      email: payload.email,
+      passwordHash: randomPasswordHash,
+      nome: payload.nome || companyName,
+      companyName,
+      role,
+      insurerKey,
+      referredByCode: payload.referralCode ?? undefined,
+      samlSubjectId: payload.samlSubjectId,
+    });
+    const { accessToken, refreshToken } = issueTokens(user);
+    recordAuditEvent(user.id, user.company_name, 'user.registered_saml', { role });
     res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });
   })
 );

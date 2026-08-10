@@ -44,6 +44,7 @@ interface SessionContextValue {
   acceptTeamInvite: (input: { token: string; nome?: string; password: string }) => Promise<void>;
   loginWithTokens: (token: string, refreshToken: string) => Promise<void>;
   completeGoogleSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
+  completeSamlSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   logout: () => void;
   submitKyb: (form: {
     cnpj: string;
@@ -157,6 +158,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const completeSamlSignup = useCallback(async (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/saml/complete-signup', input);
+      setSessionTokens(data.token, data.refreshToken);
+      setUser(data.user);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível concluir o cadastro.');
+      throw err;
+    }
+  }, []);
+
   const logout = useCallback(() => {
     const refreshToken = getRefreshToken();
     api.post('/auth/logout', refreshToken ? { refreshToken } : undefined).catch(() => {});
@@ -184,6 +197,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     acceptTeamInvite,
     loginWithTokens,
     completeGoogleSignup,
+    completeSamlSignup,
     logout,
     submitKyb,
     completeOnboarding,

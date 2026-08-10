@@ -22,6 +22,14 @@ export function linkGoogleAccount(userId: number, googleSub: string) {
   db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(googleSub, userId);
 }
 
+export function getUserBySamlSubject(samlSubjectId: string): UserRow | undefined {
+  return db.prepare('SELECT * FROM users WHERE saml_subject_id = ?').get(samlSubjectId) as UserRow | undefined;
+}
+
+export function linkSamlAccount(userId: number, samlSubjectId: string) {
+  db.prepare('UPDATE users SET saml_subject_id = ? WHERE id = ?').run(samlSubjectId, userId);
+}
+
 // Add-on subscriptions (features 4/5 — lib/whitelabelBilling.ts, lib/institutionalReporting.ts)
 // tracked directly on the user row, independent of the plan (Básico/Pro/Empresarial).
 export function setWhitelabelPlusEnabled(userId: number, enabled: boolean) {
@@ -76,11 +84,13 @@ export function createUser(input: {
   referredByCode?: string;
   teamOwnerId?: number;
   googleSub?: string;
+  samlSubjectId?: string;
 }): UserRow {
   const referrer = input.referredByCode ? getUserByReferralCode(input.referredByCode) : undefined;
+  const authProvider = input.googleSub ? 'google' : input.samlSubjectId ? 'saml' : 'password';
   const info = db
     .prepare(
-      'INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings, referral_code, referred_by_user_id, team_owner_id, google_sub, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (email, password_hash, nome, company_name, role, insurer_key, settings, referral_code, referred_by_user_id, team_owner_id, google_sub, saml_subject_id, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
     .run(
       input.email.toLowerCase().trim(),
@@ -94,7 +104,8 @@ export function createUser(input: {
       referrer?.id ?? null,
       input.teamOwnerId ?? null,
       input.googleSub ?? null,
-      input.googleSub ? 'google' : 'password'
+      input.samlSubjectId ?? null,
+      authProvider
     );
   if (referrer) bumpReferralBonus(referrer.id);
   return getUserById(Number(info.lastInsertRowid))!;
