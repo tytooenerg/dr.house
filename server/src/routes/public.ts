@@ -20,12 +20,27 @@ import { logger } from '../lib/logger.js';
 // (a partner's own site, an anonymous visitor) so none of them require login.
 export const publicRouter = Router();
 
+// Rate limiter shared by the three payment-rail webhook targets below. Their real
+// anti-spoofing story is mTLS/IP-allowlisting at the PSP/infra level (see each route's own
+// comment) plus the fact that txid/nossoNumero/referencia are all crypto.randomUUID()-grade
+// unguessable — but neither of those is a reason to leave an unauthenticated POST endpoint
+// completely unthrottled. Limit is generous (a real PSP can legitimately burst retries)
+// purely as brute-force/DoS defense-in-depth, found in the security self-review
+// (docs/security-review-2026-08.md, finding SR-2).
+const paymentWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited' },
+});
+
 // Real PSP webhook target for "pix recebido" notifications (BACEN standard shape,
 // see lib/paymentRail.ts). Anti-spoofing for a real deployment is mTLS on the registered
 // webhook URL, not a header signature — configure that at the PSP/infra level once a real
 // PIX_PSP_* contract exists. Always 200s so a legitimately-signed retry isn't triggered by
 // an unrelated/already-processed txid.
-publicRouter.post('/pix-webhook', (req, res) => {
+publicRouter.post('/pix-webhook', paymentWebhookLimiter, (req, res) => {
   const recebidos = parseWebhookPixRecebido(req.body);
   for (const r of recebidos) {
     const charge = getPixCharge(r.txid);
@@ -40,7 +55,7 @@ publicRouter.post('/pix-webhook', (req, res) => {
 // Real banking-partner webhook target for "boleto pago" notifications (lib/boletoRail.ts).
 // Same anti-spoofing caveat as the Pix webhook above: real verification is mTLS/IP
 // allowlist at the banking partner's infra level.
-publicRouter.post('/boleto-webhook', (req, res) => {
+publicRouter.post('/boleto-webhook', paymentWebhookLimiter, (req, res) => {
   const pagos = parseWebhookBoletoPago(req.body);
   for (const p of pagos) {
     const boleto = getBoleto(p.nossoNumero);
@@ -55,7 +70,7 @@ publicRouter.post('/boleto-webhook', (req, res) => {
 // Real BaaS webhook target for "TED recebido" notifications, only ever called by a
 // TED_PSP_*-configured provider (lib/tedRail.ts) — the static-account path is always
 // confirmed by an admin instead (POST /admin/ted/:referencia/confirmar), never here.
-publicRouter.post('/ted-webhook', (req, res) => {
+publicRouter.post('/ted-webhook', paymentWebhookLimiter, (req, res) => {
   const recebidos = parseWebhookTedRecebido(req.body);
   for (const r of recebidos) {
     const deposito = getTedDeposit(r.referencia);

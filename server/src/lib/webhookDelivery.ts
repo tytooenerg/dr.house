@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { listActiveWebhooksForEvent } from '../db/webhooks.js';
 import { createDelivery, recordDeliveryAttempt } from '../db/webhookDeliveries.js';
+import { checkUrlIsPublic } from './ssrfGuard.js';
 import { logger } from './logger.js';
 
 // Configurable so tests don't leave 30-minute timers running past the test file's
@@ -23,6 +24,16 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function attemptDelivery(deliveryId: number, url: string, secret: string, body: string, event: string, attempt: number): Promise<boolean> {
+  // Re-checked on every attempt, not just at registration time (routes/dev.ts) — retries
+  // are spread out up to 30 minutes apart, long enough for a DNS-rebinding attacker to
+  // repoint an initially-public hostname at an internal address after it passed
+  // validation. See lib/ssrfGuard.ts / docs/security-review-2026-08.md finding SR-1.
+  const check = await checkUrlIsPublic(url);
+  if (!check.safe) {
+    recordDeliveryAttempt(deliveryId, attempt, 'failed', null, `blocked: ${check.reason || 'destino não permitido'}`);
+    logger.warn({ deliveryId, url }, '[webhooks] delivery blocked — destination no longer resolves to a public address');
+    return false;
+  }
   const signature = crypto.createHmac('sha256', secret).update(body).digest('hex');
   try {
     const res = await fetch(url, {

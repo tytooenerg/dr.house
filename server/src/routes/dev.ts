@@ -13,6 +13,7 @@ import { listDeliveriesForWebhook } from '../db/webhookDeliveries.js';
 import { fmtRelative, fmtBRL } from '../lib/format.js';
 import { PLAYGROUND_ENDPOINTS, PLAYGROUND_FIELD_LABELS, WEBHOOK_EVENTS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { checkUrlIsPublic } from '../lib/ssrfGuard.js';
 import { getIncludedCallsPerMonth } from '../lib/apiOverageBilling.js';
 import { fmtAddOnPrice, getAddOnPrice } from '../lib/addOnBilling.js';
 import { listAddOnChargesByUser } from '../db/addOnCharges.js';
@@ -118,22 +119,33 @@ devRouter.post('/keys/:id/revoke', (req, res) => {
 
 const webhookSchema = z.object({ url: z.string().trim().url('Informe uma URL válida.'), event: z.enum(WEBHOOK_EVENTS as [string, ...string[]]) });
 
-devRouter.post('/webhooks', (req, res) => {
-  if (!planAtLeast(req.user!.plan, 'empresarial')) {
-    res.status(402).json({ error: 'plan_required', requiredPlan: 'empresarial', message: 'Webhooks requerem o plano Empresarial.' });
-    return;
-  }
-  const parsed = webhookSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
-    return;
-  }
-  const secret = `whsec_${crypto.randomBytes(16).toString('hex')}`;
-  createWebhook(req.user!.id, parsed.data.url, parsed.data.event, secret);
-  // The signing secret is only ever shown here, at creation time — same one-time-reveal
-  // pattern as the API key — so the partner can configure signature verification on their end.
-  res.json({ secret, ...payload(req.user!.id, getSettings(req.user!)) });
-});
+devRouter.post(
+  '/webhooks',
+  asyncHandler(async (req, res) => {
+    if (!planAtLeast(req.user!.plan, 'empresarial')) {
+      res.status(402).json({ error: 'plan_required', requiredPlan: 'empresarial', message: 'Webhooks requerem o plano Empresarial.' });
+      return;
+    }
+    const parsed = webhookSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    // SSRF guard (lib/ssrfGuard.ts, security-review finding SR-1) — a webhook URL is
+    // requested by the same account that receives the delivery attempts/errors, so
+    // rejecting a private/internal address here is a real check, not just UX politeness.
+    const check = await checkUrlIsPublic(parsed.data.url);
+    if (!check.safe) {
+      res.status(400).json({ error: 'validation_error', message: check.reason || 'URL de webhook não permitida.' });
+      return;
+    }
+    const secret = `whsec_${crypto.randomBytes(16).toString('hex')}`;
+    createWebhook(req.user!.id, parsed.data.url, parsed.data.event, secret);
+    // The signing secret is only ever shown here, at creation time — same one-time-reveal
+    // pattern as the API key — so the partner can configure signature verification on their end.
+    res.json({ secret, ...payload(req.user!.id, getSettings(req.user!)) });
+  })
+);
 
 devRouter.post('/webhooks/:id/delete', (req, res) => {
   deleteWebhook(req.user!.id, Number(req.params.id));
