@@ -18,6 +18,16 @@ export function recordInsuranceSettlement(input: {
   return db.prepare('SELECT * FROM insurance_settlements WHERE id = ?').get(Number(info.lastInsertRowid)) as InsuranceSettlementRow;
 }
 
+// The actual quote a duplicata was insured at (see lib/insuranceQuotes.ts) — recorded once
+// at insure-time and never recomputed, so what the UI shows as "prêmio" always matches what
+// was really charged, even if the sacado's score later moves and would produce a different
+// quote today.
+export function getLatestInsuranceSettlement(duplicataId: string): InsuranceSettlementRow | undefined {
+  return db
+    .prepare('SELECT * FROM insurance_settlements WHERE duplicata_id = ? ORDER BY id DESC LIMIT 1')
+    .get(duplicataId) as InsuranceSettlementRow | undefined;
+}
+
 export function sumInsuranceCommission(): { totalPremios: number; totalComissao: number; totalApolices: number } {
   const row = db
     .prepare('SELECT COUNT(*) as n, COALESCE(SUM(premio), 0) as premios, COALESCE(SUM(comissao_lastro), 0) as comissao FROM insurance_settlements')

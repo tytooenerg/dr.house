@@ -12,6 +12,7 @@ interface Insurer {
   name: string;
   premioFmt: string;
   selo: string;
+  recommended?: boolean;
 }
 interface Bid {
   name: string;
@@ -208,7 +209,9 @@ export function MarketplacePage() {
 
                 {insurerPickerFor === offer.id && (
                   <div className="absolute top-[38px] left-0 z-20 w-80 bg-white border border-border rounded-xl shadow-dropdown overflow-hidden">
-                    <div className="px-4 py-3 text-xs font-bold text-textSecondary border-b border-hairline">Comparar seguradoras parceiras</div>
+                    <div className="px-4 py-3 text-xs font-bold text-textSecondary border-b border-hairline">
+                      Cotações em tempo real — cada seguradora precifica este risco de forma diferente
+                    </div>
                     {offer.insurerOptions.map((ins) => (
                       <button
                         key={ins.key}
@@ -217,7 +220,12 @@ export function MarketplacePage() {
                         className="w-full flex items-center justify-between gap-2.5 px-4 py-3 border-none bg-transparent cursor-pointer text-left border-b border-[#F5F7FA] last:border-b-0"
                       >
                         <div>
-                          <div className="font-bold text-[13px] text-navy">{ins.name}</div>
+                          <div className="font-bold text-[13px] text-navy flex items-center gap-1.5">
+                            {ins.name}
+                            {ins.recommended && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-greenBg text-green">Melhor cotação</span>
+                            )}
+                          </div>
                           <div className="text-textTertiary text-[11.5px] mt-0.5">{ins.selo}</div>
                         </div>
                         <div className="font-mono-num font-bold text-[13px] text-blue flex-shrink-0">{ins.premioFmt}</div>

@@ -7,6 +7,7 @@ import { getSeguradoraByInsurerKey } from '../db/users.js';
 import { buildOfferView } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { settlePurchase, settleInsurance } from '../lib/settlement.js';
+import { computeInsurerQuotePct } from '../lib/insuranceQuotes.js';
 import { INSURERS } from '../data/seed.js';
 
 export const marketRouter = Router();
@@ -89,7 +90,11 @@ marketRouter.post('/:id/insure', (req, res) => {
   setInsurer(d.id, newKey);
   if (newKey && newKey !== d.insurer_key) {
     const insurer = INSURERS.find((i) => i.key === newKey)!;
-    const premio = d.valor * (insurer.premioPct / 100);
+    // The premium charged is the live competing quote (lib/insuranceQuotes.ts) at the
+    // moment of contracting — each insurer prices this specific duplicata's real risk
+    // differently, not the same flat catalog rate every time.
+    const premioPct = computeInsurerQuotePct(insurer.key, d);
+    const premio = d.valor * (premioPct / 100);
     const seguradoraUser = getSeguradoraByInsurerKey(insurer.key);
     settleInsurance({ duplicataId: d.id, investorId: req.user!.id, insurerKey: insurer.key, insurerUserId: seguradoraUser?.id ?? null, premio });
   }

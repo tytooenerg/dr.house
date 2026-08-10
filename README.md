@@ -258,6 +258,16 @@ A free, deterministic recommendation engine — no LLM involved — that compare
 
 Every suggestion names a concrete R$ amount to trim/add and never executes anything — same human-in-the-loop principle as the rest of the platform; the investor decides whether and how to act (e.g. listing an overweight position on the mercado secundário). `GET /historico/rebalanceamento`, surfaced as a card on Carteira & Histórico whenever the investor has at least one active position.
 
+### Seguro com múltiplas seguradoras concorrendo (`lib/insuranceQuotes.ts`)
+
+Every insurer used to quote the exact same flat `premioPct` for every duplicata regardless of risk — "compare seguradoras" in the UI was cosmetic, since the numbers never actually moved. Each of the 3 partner insurers now has its own deterministic, documented pricing formula driven by real attributes of the specific duplicata, so they genuinely disagree on price depending on the risk profile:
+
+- **Too Seguros** ("Parceira desde 2024") specializes in low-risk paper — tightens its price as the sacado's score climbs, widens it for weaker scores.
+- **Pottencial Seguradora** ("Maior cobertura de sinistro") prices flat regardless of score — its edge is coverage breadth, not risk selection — but adds a small surcharge on large tickets, since a single big claim concentrates more of its exposure.
+- **Junto Seguros** ("Aprovação mais rápida") discounts duplicatas maturing soon (less time for something to go wrong before it pays out), holding its base rate otherwise.
+
+The marketplace's "Contratar seguro" picker now shows 3 **live, per-offer** quotes, cheapest flagged as recommended, instead of one static catalog. The premium actually charged at contract time is what gets recorded (`insurance_settlements`) and is what the UI keeps showing afterward — a sacado's score moving later never retroactively changes what an investor is shown as having already paid.
+
 ### Marketing homepage
 
 `/` was previously just an alias for the login screen — there was no actual company website, and the public nav's own "Entrar"/"Falar com vendas" links pointed back at themselves. Added a real homepage (`pages/public/LandingPage.tsx`) covering the whole platform for a general audience (hero, problem/solution, the 5-step emission→liquidation flow, one card per participant — cedente/investidor/sacado/seguradora — product/compliance highlights, and a live stats band pulling real numbers from the same `GET /api/public/stats` the Transparência page uses, not fabricated marketing figures), reusing `PublicNav`/`PublicFooter` for visual consistency with the existing Developers/Preços/Transparência/Legal/Status pages. Login moved to `/login`; every internal link that used to point at `/` expecting the login/signup screen (nav, pricing/developers/embed/404 CTAs, the referral share link, `AppShell`'s auth redirect, the sidebar's logout redirect, and the e2e test suite) was updated to match.

@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { INSURANCE_COMMISSION_PCT } from '../src/lib/settlement.js';
+import { computeInsurerQuotePct } from '../src/lib/insuranceQuotes.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -33,7 +34,7 @@ async function pickUninsuredOffer(token: string) {
   const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
   const offer = market.body.offers.find((o: { insurerInfo: unknown }) => !o.insurerInfo);
   if (!offer) throw new Error('no uninsured offer available for test');
-  return offer as { id: string; valor: number };
+  return offer as { id: string; valor: number; score: number; vencimento: string };
 }
 
 function ledgerAmounts(extrato: { descricao: string; valorFmt: string; isPositive: boolean }[], substr: string) {
@@ -60,7 +61,9 @@ describe('POST /api/market/:id/insure', () => {
     const res = await request(app).post(`/api/market/${offer.id}/insure`).set('Authorization', `Bearer ${token}`).send({ key: 'too' });
     expect(res.status).toBe(200);
 
-    const premio = offer.valor * 0.0055; // Too Seguros: 0.55%
+    // Too Seguros' real quote for this specific offer (lib/insuranceQuotes.ts) — no
+    // longer a flat 0.55% for every duplicata regardless of risk.
+    const premio = offer.valor * (computeInsurerQuotePct('too', offer) / 100);
     const comissao = premio * INSURANCE_COMMISSION_PCT;
     const repasse = premio - comissao;
 

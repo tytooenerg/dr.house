@@ -5,6 +5,8 @@ import { getAceiteByDuplicata } from '../db/aceites.js';
 import { isPurchased } from '../db/duplicatas.js';
 import { ratingFromScore } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
+import { listInsuranceQuotes } from './insuranceQuotes.js';
+import { getLatestInsuranceSettlement } from '../db/insuranceSettlements.js';
 
 const ACEITE_BADGE = {
   aceita: { label: 'Aceite confirmado', bg: '#EAF3EE', color: COLORS.GREEN },
@@ -61,7 +63,19 @@ export function buildOfferView(d: DuplicataRow) {
   const remainingSec = Math.max(0, Math.round((closeAt - Date.now()) / 1000));
   const countdown = `${Math.floor(remainingSec / 3600)}h ${String(Math.floor((remainingSec % 3600) / 60)).padStart(2, '0')}min`;
 
-  const insurer = d.insurer_key ? INSURERS.find((ins) => ins.key === d.insurer_key) ?? null : null;
+  // insurerInfo shows the premium actually charged at insure-time (the recorded
+  // settlement), never a freshly recomputed quote — a sacado's score moving afterward
+  // must not retroactively change what the investor is shown as already having paid.
+  // insurerOptions are today's live competing quotes (lib/insuranceQuotes.ts), cheapest
+  // first and flagged — this is what changes every time score/valor/vencimento change.
+  let insurer: { key: string; name: string; premioFmt: string; selo: string } | null = null;
+  if (d.insurer_key) {
+    const catalogEntry = INSURERS.find((ins) => ins.key === d.insurer_key);
+    const settlement = getLatestInsuranceSettlement(d.id);
+    const premioFmt = settlement && d.valor > 0 ? ((settlement.premio / d.valor) * 100).toFixed(2).replace('.', ',') + '%' : catalogEntry?.premioFmt ?? '—';
+    insurer = catalogEntry ? { key: catalogEntry.key, name: catalogEntry.name, premioFmt, selo: catalogEntry.selo } : null;
+  }
+  const insurerOptions = listInsuranceQuotes(d);
 
   return {
     id: d.id,
@@ -85,7 +99,7 @@ export function buildOfferView(d: DuplicataRow) {
     aceiteBadgeBg: aceiteBadge.bg,
     aceiteBadgeColor: aceiteBadge.color,
     insurerInfo: insurer,
-    insurerOptions: INSURERS,
+    insurerOptions,
     aiMatch: score >= 76,
     aiMatchPct: score >= 84 ? '96%' : '89%',
     aiSuggestedRate: (baseRate - 0.3).toFixed(1).replace('.', ',') + '%',
