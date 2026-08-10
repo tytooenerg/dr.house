@@ -14,7 +14,7 @@ export function platformFee(valor: number): number {
   return valor * platformFeePct(valor);
 }
 
-function pctLabel(valor: number): string {
+export function pctLabel(valor: number): string {
   const pct = platformFeePct(valor) * 100; // 0.35 | 0.3 | 0.25
   const str = pct.toFixed(2).replace(/0$/, '');
   return str.replace('.', ',') + '%';

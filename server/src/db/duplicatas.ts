@@ -156,9 +156,18 @@ export function listOverdueDuplicatas(): DuplicataRow[] {
   );
 }
 
+// A duplicata counts as "purchased" (unavailable for a fresh whole purchase) either the
+// normal way — a row in `purchases` — or because a fractional offering exists for it at
+// all (lib/fractionalOfferings.ts), open or completed: once tokens are being sold to
+// multiple investors, the whole receivable can never also be sold whole to someone else,
+// same as it can't be double-sold whole to two different investors. Every existing caller
+// already only ever used this as "can this still be bought" — extending, not narrowing,
+// what it means to be unavailable is safe for every pre-existing call site.
 export function isPurchased(duplicataId: string): boolean {
   const row = db.prepare('SELECT COUNT(*) as n FROM purchases WHERE duplicata_id = ?').get(duplicataId) as { n: number };
-  return row.n > 0;
+  if (row.n > 0) return true;
+  const offering = db.prepare('SELECT COUNT(*) as n FROM fractional_offerings WHERE duplicata_id = ?').get(duplicataId) as { n: number };
+  return offering.n > 0;
 }
 
 export function createPurchase(duplicataId: string, investorId: number, valor: number, taxa: string) {

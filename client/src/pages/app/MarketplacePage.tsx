@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { useMarketSocket } from '../../lib/useMarketSocket';
 import { PageHeader } from '../../components/ui/Card';
 import { Input, Select } from '../../components/ui/Input';
@@ -26,6 +26,20 @@ interface Bid {
   tagBg: string;
   tagColor: string;
 }
+interface FractionalOffering {
+  duplicataId: string;
+  totalTokens: number;
+  tokenValorFmt: string;
+  tokensVendidos: number;
+  tokensRestantes: number;
+  pctVendido: number;
+  status: 'aberta' | 'concluida';
+  holdersCount: number;
+}
+// Mirrors server FRACTIONAL_MIN_VALOR (lib/fractionalOfferings.ts) — only offers at or
+// above this face value are eligible for tokenização.
+const FRACTIONAL_MIN_VALOR = 150000;
+
 interface Offer {
   id: string;
   sacado: string;
@@ -61,6 +75,11 @@ export function MarketplacePage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [insurerPickerFor, setInsurerPickerFor] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [fractionalPickerFor, setFractionalPickerFor] = useState<string | null>(null);
+  const [fractionalOffering, setFractionalOffering] = useState<FractionalOffering | null>(null);
+  const [fractionalTokensInput, setFractionalTokensInput] = useState('');
+  const [fractionalBusy, setFractionalBusy] = useState(false);
+  const [fractionalError, setFractionalError] = useState('');
 
   useEffect(() => {
     if (!insurerPickerFor) return;
@@ -102,6 +121,35 @@ export function MarketplacePage() {
   const insure = async (id: string, key: string | null) => {
     await api.post(`/market/${id}/insure`, { key });
     setInsurerPickerFor(null);
+  };
+
+  const openFractionalPicker = async (id: string) => {
+    setFractionalError('');
+    setFractionalTokensInput('');
+    setFractionalPickerFor(fractionalPickerFor === id ? null : id);
+    if (fractionalPickerFor !== id) {
+      const res = await api.get<{ eligible: boolean; reason: string | null; offering: FractionalOffering | null }>(`/market/${id}/fracionamento`);
+      setFractionalOffering(res.offering);
+    }
+  };
+
+  const buyFractionalTokens = async (id: string) => {
+    setFractionalError('');
+    const tokens = Number(fractionalTokensInput);
+    if (!Number.isInteger(tokens) || tokens <= 0) {
+      setFractionalError('Informe uma quantidade válida de tokens.');
+      return;
+    }
+    setFractionalBusy(true);
+    try {
+      const res = await api.post<{ offering: FractionalOffering }>(`/market/${id}/fracionar`, { tokens });
+      setFractionalOffering(res.offering);
+      setFractionalTokensInput('');
+    } catch (err) {
+      setFractionalError(err instanceof ApiError ? err.message : 'Não foi possível comprar os tokens.');
+    } finally {
+      setFractionalBusy(false);
+    }
   };
 
   return (
@@ -231,6 +279,54 @@ export function MarketplacePage() {
                         <div className="font-mono-num font-bold text-[13px] text-blue flex-shrink-0">{ins.premioFmt}</div>
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {offer.valor >= FRACTIONAL_MIN_VALOR && offer.canBuy && (
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-bold border border-inputBorder bg-white text-navy"
+                    onClick={() => openFractionalPicker(offer.id)}
+                  >
+                    Fracionar
+                  </button>
+                )}
+                {fractionalPickerFor === offer.id && (
+                  <div className="absolute top-[38px] left-0 z-20 w-96 bg-white border border-border rounded-xl shadow-dropdown p-4">
+                    <div className="text-xs font-bold text-textSecondary mb-2">
+                      Tokenização — cada token representa {fractionalOffering ? Math.round(100 / fractionalOffering.totalTokens) : 1}% do valor de face
+                    </div>
+                    {fractionalOffering ? (
+                      <>
+                        <div className="text-[12.5px] mb-2">
+                          {fractionalOffering.tokensVendidos}/{fractionalOffering.totalTokens} tokens vendidos ({fractionalOffering.pctVendido}%) —{' '}
+                          {fractionalOffering.holdersCount} investidor(es) — {fractionalOffering.tokenValorFmt}/token
+                        </div>
+                        {fractionalOffering.status === 'concluida' ? (
+                          <div className="text-[12.5px] font-bold text-green">Totalmente alocada.</div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              placeholder={`até ${fractionalOffering.tokensRestantes} tokens`}
+                              value={fractionalTokensInput}
+                              onChange={(e) => setFractionalTokensInput(e.target.value)}
+                              className="flex-1"
+                            />
+                            <Button size="sm" disabled={fractionalBusy} onClick={() => buyFractionalTokens(offer.id)}>
+                              {fractionalBusy ? 'Comprando…' : 'Comprar tokens'}
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input placeholder="quantidade de tokens" value={fractionalTokensInput} onChange={(e) => setFractionalTokensInput(e.target.value)} className="flex-1" />
+                        <Button size="sm" disabled={fractionalBusy} onClick={() => buyFractionalTokens(offer.id)}>
+                          {fractionalBusy ? 'Comprando…' : 'Comprar tokens'}
+                        </Button>
+                      </div>
+                    )}
+                    {fractionalError && <div className="mt-2 text-red text-[12px] font-semibold">{fractionalError}</div>}
                   </div>
                 )}
               </div>

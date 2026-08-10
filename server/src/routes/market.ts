@@ -8,7 +8,9 @@ import { buildOfferView } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { settlePurchase, settleInsurance } from '../lib/settlement.js';
 import { computeInsurerQuotePct } from '../lib/insuranceQuotes.js';
+import { checkFractionalEligibility, buyFractionalTokens, buyTokensSchema, buildOfferingView, listMyFractionalHoldings } from '../lib/fractionalOfferings.js';
 import { INSURERS } from '../data/seed.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const marketRouter = Router();
 marketRouter.use(requireAuth);
@@ -99,4 +101,30 @@ marketRouter.post('/:id/insure', (req, res) => {
     settleInsurance({ duplicataId: d.id, investorId: req.user!.id, insurerKey: insurer.key, insurerUserId: seguradoraUser?.id ?? null, premio });
   }
   res.json({ offers: listMarketplace().map(buildOfferView) });
+});
+
+// Tokenização/fracionamento (lib/fractionalOfferings.ts) — a real, purely additive
+// alternative to whole purchase for large duplicatas: multiple investors can each buy a
+// slice instead of one investor funding the whole thing.
+marketRouter.get('/:id/fracionamento', (req, res) => {
+  const eligibility = checkFractionalEligibility(req.params.id);
+  const offering = buildOfferingView(req.params.id);
+  res.json({ eligible: eligibility.eligible, reason: eligibility.eligible ? null : eligibility.reason, offering });
+});
+
+marketRouter.post(
+  '/:id/fracionar',
+  asyncHandler(async (req, res) => {
+    const parsed = buyTokensSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const outcome = buyFractionalTokens(req.user!, req.params.id, parsed.data.tokens);
+    res.status(outcome.status).json(outcome.body);
+  })
+);
+
+marketRouter.get('/minhas-cotas', (req, res) => {
+  res.json({ holdings: listMyFractionalHoldings(req.user!.id) });
 });
