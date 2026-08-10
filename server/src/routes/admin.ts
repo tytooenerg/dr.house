@@ -46,6 +46,7 @@ import { runWhitelabelPlusBilling } from '../lib/whitelabelBilling.js';
 import { runInstitutionalReportingBilling } from '../lib/institutionalReporting.js';
 import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/agents.js';
 import { trainModel, getModel, MIN_TRAINING_SAMPLES } from '../lib/mlScoring.js';
+import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -309,6 +310,12 @@ adminRouter.post('/ml-scoring/retrain', (req, res) => {
   const result = trainModel();
   recordAuditEvent(req.user!.id, req.user!.company_name, 'ml_scoring.retrain', { trained: result.trained, reason: result.reason ?? null });
   res.json(result);
+});
+
+// Computed fresh on every call (lib/fraudAnomalyDetection.ts) — always reflects the
+// current book, never a stale cached verdict.
+adminRouter.get('/fraud-anomalies', (_req, res) => {
+  res.json({ findings: runFraudAnomalyScan() });
 });
 
 // Compliance AI Engine's auto-suspend bar (see lib/complianceEngine.ts) — admin-tunable

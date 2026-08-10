@@ -1,5 +1,6 @@
 import { listSuspiciousActivityReports } from '../db/suspiciousActivity.js';
 import { listRecentComplianceAlerts } from '../db/complianceAlerts.js';
+import { runFraudAnomalyScan } from './fraudAnomalyDetection.js';
 import { runAgent } from './agentRuntime.js';
 import { pldAgent } from './agents/pld.js';
 import { hasRecentAgentRun } from '../db/agents.js';
@@ -31,6 +32,11 @@ export async function runPldAgentScan(): Promise<{ scanned: number; newPendingAc
   for (const a of listRecentComplianceAlerts(30)) {
     if (a.user_id && (a.type === 'valor_anomalo' || a.type === 'nfe_duplicidade') && !candidates.has(a.user_id)) {
       candidates.set(a.user_id, `alerta de compliance (${a.type}): ${a.message}`);
+    }
+  }
+  for (const f of runFraudAnomalyScan()) {
+    if (f.cedenteId && !candidates.has(f.cedenteId)) {
+      candidates.set(f.cedenteId, `anomalia de rede (${f.tipo}): ${f.descricao}`);
     }
   }
 
