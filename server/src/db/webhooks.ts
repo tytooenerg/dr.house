@@ -25,3 +25,13 @@ export function deleteAllWebhooksForUser(userId: number) {
 export function getWebhook(userId: number, webhookId: number): WebhookRow | undefined {
   return db.prepare('SELECT * FROM webhooks WHERE id = ? AND user_id = ?').get(webhookId, userId) as WebhookRow | undefined;
 }
+
+// Real secret rotation — a partner whose signing secret leaked (checked into a repo,
+// exposed in a log, an employee departure) doesn't have to delete and recreate the
+// webhook (losing its delivery history) just to invalidate the old secret. The new value
+// takes effect on the very next delivery attempt — lib/webhookDelivery.ts always reads
+// the row fresh, never caches a secret across deliveries.
+export function rotateWebhookSecret(userId: number, webhookId: number, newSecret: string): WebhookRow | undefined {
+  db.prepare('UPDATE webhooks SET secret = ? WHERE id = ? AND user_id = ?').run(newSecret, webhookId, userId);
+  return getWebhook(userId, webhookId);
+}

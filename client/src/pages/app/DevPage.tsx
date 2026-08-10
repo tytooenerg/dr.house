@@ -115,6 +115,16 @@ export function DevPage() {
     }
   };
   const removeWebhook = (id: number) => api.post<DevData>(`/dev/webhooks/${id}/delete`).then(setData);
+  const rotateSecret = async (id: number) => {
+    setWebhookError('');
+    try {
+      const res = await api.post<DevData & { secret: string }>(`/dev/webhooks/${id}/rotate-secret`);
+      setNewWebhookSecret(res.secret);
+      setData(res);
+    } catch (err) {
+      setWebhookError(err instanceof ApiError ? err.message : 'Não foi possível rotacionar o secret.');
+    }
+  };
   const toggleDeliveries = async (id: number) => {
     if (openDeliveriesFor === id) {
       setOpenDeliveriesFor(null);
@@ -235,6 +245,9 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     <button type="button" onClick={() => toggleDeliveries(w.id)} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none">
                       {openDeliveriesFor === w.id ? 'Ocultar entregas' : 'Ver entregas'}
+                    </button>
+                    <button type="button" onClick={() => rotateSecret(w.id)} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none">
+                      Rotacionar secret
                     </button>
                     <button type="button" onClick={() => removeWebhook(w.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none">
                       Remover

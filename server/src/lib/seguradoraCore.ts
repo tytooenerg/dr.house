@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { listInsuredByInsurerKey, listClaimableByInsurerKey, setSinistroStatus } from '../db/duplicatas.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { addNotification } from '../db/misc.js';
+import { deliverWebhookEvent } from './webhookDelivery.js';
 import { INSURERS, COLORS } from '../data/seed.js';
 import { fmtBRL } from './format.js';
 import type { UserRow } from '../db/types.js';
@@ -74,6 +75,12 @@ export function decideSinistro(user: UserRow, duplicataId: string, input: Sinist
       input.decision === 'aprovado' ? COLORS.GREEN : COLORS.RED,
       'disputa'
     );
+    void deliverWebhookEvent(target.cedente_id, 'sinistro.decidido', {
+      duplicataId: target.id,
+      decision: input.decision,
+      note: input.note,
+      insurer: insurer.key,
+    });
   }
   recordAuditEvent(user.id, user.company_name, 'sinistro.decidido', { duplicataId: target.id, decision: input.decision });
   return { status: 200, body: buildSeguradoraPayload(user) };

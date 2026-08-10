@@ -269,7 +269,22 @@ export const EXTRATO_RAW = [
   { data: '28/06/2026', descricao: 'Depósito para liquidação futura', valor: 50000.0 },
 ];
 
-export const WEBHOOK_EVENTS = ['duplicata.registrada', 'leilao.aberto', 'lance.recebido', 'leilao.encerrado', 'pagamento.confirmado'];
+// leilao.aberto/lance.recebido/leilao.encerrado predate the rest of this list and are not
+// currently fired by anything real — kept for backward compatibility with any partner
+// already registered on them, not removed silently. The three below (added for "webhooks
+// v2") are wired to real trigger points: see lib/seguradoraCore.ts (sinistro.decidido),
+// lib/blockTrade.ts (block_trade.executado), and routes/v1.ts POST /sacados/:cnpj/sinais
+// (rating.alterado).
+export const WEBHOOK_EVENTS = [
+  'duplicata.registrada',
+  'leilao.aberto',
+  'lance.recebido',
+  'leilao.encerrado',
+  'pagamento.confirmado',
+  'sinistro.decidido',
+  'block_trade.executado',
+  'rating.alterado',
+];
 
 export const CHAT_SUGGESTIONS = ['O que é deságio?', 'Sou obrigado a aceitar a duplicata?', 'Como funciona o leilão?'];
 

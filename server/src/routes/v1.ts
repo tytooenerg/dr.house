@@ -8,12 +8,13 @@ import { buildBlendedRiscoView } from '../lib/riscoCore.js';
 import { addSignal } from '../db/networkSignals.js';
 import { getRegistradora } from '../lib/registradoras.js';
 import { withIdempotency } from '../lib/idempotency.js';
-import { getDuplicata, listMarketplace } from '../db/duplicatas.js';
+import { getDuplicata, listMarketplace, listBySacadoNome } from '../db/duplicatas.js';
 import { buildOfferView } from '../lib/marketCompute.js';
 import { fmtBRL } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { chargePerCall } from '../lib/addOnBilling.js';
 import { screenEntity } from '../db/sanctions.js';
+import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 
 // Public, versioned, API-key-authenticated endpoints for external partners (ERPs, FIDCs,
 // securitizadoras, sacados, seguradoras…) to integrate with directly — distinct from the
@@ -196,8 +197,25 @@ v1Router.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
+    // Fire rating.alterado to every cedente with a real (non-sandbox) relationship to this
+    // sacado only when the reported signal actually moved the rating band (AA/A/B/C), not
+    // on every signal — a cedente cares "did my counterparty's risk profile change",
+    // not "did someone report anything at all".
+    const before = await buildBlendedRiscoView(req.params.cnpj);
     addSignal(req.params.cnpj, req.apiUser!.id, parsed.data.tipo, parsed.data.nota);
     const view = await buildBlendedRiscoView(req.params.cnpj, req.apiUser!.id);
+    if (view && before && view.rating !== before.rating) {
+      const cedenteIds = new Set(listBySacadoNome(view.name).map((d) => d.cedente_id).filter((id): id is number => id !== null));
+      for (const cedenteId of cedenteIds) {
+        void deliverWebhookEvent(cedenteId, 'rating.alterado', {
+          sacado: view.name,
+          cnpj: req.params.cnpj,
+          ratingAnterior: before.rating,
+          ratingAtual: view.rating,
+          score: view.score,
+        });
+      }
+    }
     res.json(view);
   })
 );

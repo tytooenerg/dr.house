@@ -8,7 +8,7 @@ import { addApiLog, listApiLogs } from '../db/misc.js';
 import { generateApiKey } from '../auth/apiKey.js';
 import { createApiKey, getApiKeyUsageThisMonth, listApiKeys, revokeApiKey } from '../db/apiKeys.js';
 import { ensureSandboxDataset } from '../lib/sandboxData.js';
-import { createWebhook, deleteWebhook, getWebhook, listWebhooks } from '../db/webhooks.js';
+import { createWebhook, deleteWebhook, getWebhook, listWebhooks, rotateWebhookSecret } from '../db/webhooks.js';
 import { listDeliveriesForWebhook } from '../db/webhookDeliveries.js';
 import { fmtRelative, fmtBRL } from '../lib/format.js';
 import { PLAYGROUND_ENDPOINTS, PLAYGROUND_FIELD_LABELS, WEBHOOK_EVENTS } from '../data/seed.js';
@@ -150,6 +150,21 @@ devRouter.post(
 devRouter.post('/webhooks/:id/delete', (req, res) => {
   deleteWebhook(req.user!.id, Number(req.params.id));
   res.json(payload(req.user!.id, getSettings(req.user!)));
+});
+
+// Real secret rotation (see db/webhooks.ts rotateWebhookSecret) — invalidates the old
+// signing secret immediately, without losing the webhook's registration or delivery
+// history, the same one-time-reveal shape as creation: the new value is only ever
+// returned in this response, never shown again after.
+devRouter.post('/webhooks/:id/rotate-secret', (req, res) => {
+  const webhookId = Number(req.params.id);
+  if (!getWebhook(req.user!.id, webhookId)) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  const secret = `whsec_${crypto.randomBytes(16).toString('hex')}`;
+  rotateWebhookSecret(req.user!.id, webhookId, secret);
+  res.json({ secret, ...payload(req.user!.id, getSettings(req.user!)) });
 });
 
 devRouter.get('/webhooks/:id/deliveries', (req, res) => {

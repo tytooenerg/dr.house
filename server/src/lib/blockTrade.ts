@@ -7,6 +7,7 @@ import { addBlockTradeItem, createBlockTrade, listBlockTradeItems, listMyBlockTr
 import { executeResaleTrade, parseValor, viewResaleMarket, type ResaleOutcome } from './resaleCore.js';
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { deliverWebhookEvent } from './webhookDelivery.js';
 import { fmtBRL } from './format.js';
 import { COLORS } from '../data/seed.js';
 
@@ -130,6 +131,12 @@ export function runBlockTrade(user: UserRow, criteriaRaw: BlockTradeCriteria): R
       `Sua posição na duplicata ${listing.duplicata_id} foi vendida em um block trade institucional por ${fmtBRL(listing.asking_valor)} — o preço pago é exatamente o anunciado.`,
       COLORS.GREEN
     );
+    void deliverWebhookEvent(listing.seller_id, 'block_trade.executado', {
+      blockTradeId: blockTrade.id,
+      duplicataId: listing.duplicata_id,
+      valor: listing.asking_valor,
+      buyerId: user.id,
+    });
     itens.push({ duplicataId: listing.duplicata_id, valorFmt: fmtBRL(listing.asking_valor) });
   }
 
