@@ -307,6 +307,8 @@ export function AdminPage() {
   const [downloadingCoafId, setDownloadingCoafId] = useState<number | null>(null);
   const [cvmPeriod, setCvmPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [downloadingCvm, setDownloadingCvm] = useState(false);
+  const [darfPeriod, setDarfPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [downloadingDarf, setDownloadingDarf] = useState(false);
   const [fundClaims, setFundClaims] = useState<FundClaim[]>([]);
   const [fundBalanceFmt, setFundBalanceFmt] = useState('');
   const [decidingFundClaimId, setDecidingFundClaimId] = useState<number | null>(null);
@@ -540,6 +542,15 @@ export function AdminPage() {
       await downloadFile(`/admin/regulatorio/cvm-informe.pdf?period=${cvmPeriod}`, `cvm-informe-${cvmPeriod}.pdf`);
     } finally {
       setDownloadingCvm(false);
+    }
+  };
+
+  const downloadDarf = async () => {
+    setDownloadingDarf(true);
+    try {
+      await downloadFile(`/admin/juridico/darf.pdf?period=${darfPeriod}`, `darf-irrf-${darfPeriod}.pdf`);
+    } finally {
+      setDownloadingDarf(false);
     }
   };
 
@@ -1180,6 +1191,25 @@ export function AdminPage() {
               />
               <Button size="sm" variant="secondary" disabled={downloadingCvm} onClick={downloadCvmReport}>
                 {downloadingCvm ? 'Gerando…' : 'Baixar informe (PDF)'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="bg-white border border-border rounded-card p-5 mt-4">
+            <div className="font-bold text-[14px] mb-1">DARF — IRRF agregado sobre resgates do período</div>
+            <div className="text-textSecondary text-[12.5px] mb-3">
+              Mesmo cálculo de IR pela tabela regressiva da Central Fiscal do investidor, agregado por período de resgate — documento de apoio ao
+              recolhimento, não uma guia protocolada. Lastro não retém IR automaticamente hoje.
+            </div>
+            <div className="flex items-center gap-2.5">
+              <input
+                type="month"
+                className="px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+                value={darfPeriod}
+                onChange={(e) => setDarfPeriod(e.target.value)}
+              />
+              <Button size="sm" variant="secondary" disabled={downloadingDarf} onClick={downloadDarf}>
+                {downloadingDarf ? 'Gerando…' : 'Baixar DARF (PDF)'}
               </Button>
             </div>
           </div>

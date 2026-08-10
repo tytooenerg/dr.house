@@ -53,6 +53,7 @@ import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 import { computeMetrics } from '../lib/metrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
+import { buildDarfSummary, streamDarfPdf } from '../lib/darfGenerator.js';
 import { buildFundOverview, listFundClaimsForAdmin, decideFundClaimOutcome, fundClaimDecisionSchema } from '../lib/guaranteeFund.js';
 import { runStressTest } from '../lib/guaranteeFundStressTest.js';
 
@@ -837,6 +838,21 @@ adminRouter.get('/regulatorio/cvm-informe.pdf', (req, res) => {
   const stats = buildCvmPeriodStats(period);
   recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.cvm_informe_gerado', { period });
   streamCvmReportPdf(res, stats);
+});
+
+// DARF (lib/darfGenerator.ts) — the platform's own aggregate side of the same IR
+// regressive-table math lib/incomeTaxStatement.ts computes per investor (see that module's
+// GET /historico/informe-rendimentos for the investor-facing version).
+adminRouter.get('/juridico/darf', (req, res) => {
+  const period = resolveCvmPeriod(req.query.period);
+  res.json(buildDarfSummary(period));
+});
+
+adminRouter.get('/juridico/darf.pdf', (req, res) => {
+  const period = resolveCvmPeriod(req.query.period);
+  const summary = buildDarfSummary(period);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.darf_gerado', { period });
+  streamDarfPdf(res, summary);
 });
 
 // Fundo de garantia (lib/guaranteeFund.ts) — an admin reviews each investor-filed claim
