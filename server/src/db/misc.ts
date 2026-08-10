@@ -3,6 +3,7 @@ import { db } from './index.js';
 import { getSettings, getUserById } from './users.js';
 import { sendEmail } from '../lib/mailer.js';
 import { sendWhatsapp } from '../lib/smsNotifier.js';
+import { sendWebPush } from '../lib/webPush.js';
 import { logger } from '../lib/logger.js';
 
 // --- notifications ---
@@ -18,6 +19,11 @@ export function addNotification(userId: number, text: string, color: string, cat
   if (settings.notifyViaWhatsapp && user.telefone) {
     sendWhatsapp(user.telefone, `Lastro: ${text}`).catch((err) => logger.warn({ err, userId }, '[whatsapp] falha ao notificar'));
   }
+  // Real Web Push (lib/webPush.ts) — fires for every real, categorized in-app notification,
+  // same choke point email/WhatsApp already use, so every existing call site across the app
+  // gets it automatically. A no-op with no subscribed device (sendWebPush's own early
+  // return), so this is silent for the vast majority of users who never opted in.
+  sendWebPush(userId, { title: 'Lastro', body: text }).catch((err) => logger.warn({ err, userId }, '[web-push] falha ao notificar'));
 }
 
 // Fan-out to every admin account — used by background jobs (the cobrança agent scan, the

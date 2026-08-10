@@ -34,6 +34,24 @@ interface TwoFactorStatus {
   remainingRecoveryCodes: number;
 }
 
+interface PushConfig {
+  enabled: boolean;
+  publicKey: string | null;
+}
+
+// Real Web Push (server/src/lib/webPush.ts) — VAPID key delivery, permission request,
+// service worker registration and pushManager.subscribe() all happen for real in the
+// browser; nothing here is simulated client-side (the server-side send is what's
+// real-when-configured, not this).
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const output = new Uint8Array(new ArrayBuffer(rawData.length));
+  for (let i = 0; i < rawData.length; i++) output[i] = rawData.charCodeAt(i);
+  return output;
+}
+
 const NOTIF_ROWS: { key: keyof ProfileData['notifPrefs']; label: string; hint: string }[] = [
   { key: 'leilao', label: 'Leilões em andamento', hint: 'Encerramento e lances concorrentes' },
   { key: 'aceite', label: 'Aceite de duplicatas', hint: 'Quando um sacado confirma ou contesta' },
@@ -67,11 +85,21 @@ export function PerfilPage() {
   const [disable2faPassword, setDisable2faPassword] = useState('');
   const [disable2faError, setDisable2faError] = useState('');
   const [savingTwoFactor, setSavingTwoFactor] = useState(false);
+  const [pushConfig, setPushConfig] = useState<PushConfig | null>(null);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushError, setPushError] = useState('');
 
   useEffect(() => {
     api.get<ProfileData>('/profile').then(setData);
     api.get<ReferralData>('/referral').then(setReferral);
     api.get<TwoFactorStatus>('/auth/2fa/status').then(setTwoFactor);
+    api.get<PushConfig>('/notifications/push/config').then(setPushConfig);
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.getRegistration().then(async (registration) => {
+        const sub = await registration?.pushManager.getSubscription();
+        setPushSubscribed(!!sub);
+      });
+    }
   }, []);
 
   if (!data) return <PageSkeleton />;
@@ -89,6 +117,39 @@ export function PerfilPage() {
   const toggleWhatsapp = async () => {
     const d = await api.post<ProfileData>('/profile/notify-whatsapp-toggle');
     setData(d);
+  };
+
+  const togglePush = async () => {
+    setPushError('');
+    if (pushSubscribed) {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const sub = await registration?.pushManager.getSubscription();
+      if (sub) {
+        await api.post('/notifications/push/unsubscribe', { endpoint: sub.endpoint });
+        await sub.unsubscribe();
+      }
+      setPushSubscribed(false);
+      return;
+    }
+    if (!pushConfig?.enabled || !pushConfig.publicKey) return;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setPushError('Permissão de notificação negada pelo navegador.');
+        return;
+      }
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      const sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(pushConfig.publicKey),
+      });
+      const json = sub.toJSON();
+      await api.post('/notifications/push/subscribe', { endpoint: json.endpoint, keys: json.keys });
+      setPushSubscribed(true);
+    } catch (err) {
+      setPushError(err instanceof ApiError ? err.message : 'Não foi possível ativar notificações push neste navegador.');
+    }
   };
 
   const save = () => {
@@ -232,6 +293,16 @@ export function PerfilPage() {
               </div>
               <Toggle on={data.notifyViaWhatsapp} onClick={toggleWhatsapp} />
             </div>
+            {pushConfig?.enabled && 'serviceWorker' in navigator && 'PushManager' in window && (
+              <div className="flex items-center justify-between pt-2 border-t border-hairline">
+                <div>
+                  <div className="font-semibold text-[13.5px]">Notificações push no navegador</div>
+                  <div className="text-textTertiary text-xs mt-0.5">Alertas reais direto no seu navegador ou desktop, mesmo com a aba fechada</div>
+                  {pushError && <div className="text-red text-xs mt-1 font-semibold">{pushError}</div>}
+                </div>
+                <Toggle on={pushSubscribed} onClick={togglePush} />
+              </div>
+            )}
           </div>
         </Card>
       </div>
