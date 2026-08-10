@@ -306,6 +306,10 @@ server/test/          Vitest + Supertest integration/unit tests
 e2e/
   playwright.config.ts builds + boots the app in production mode and runs tests against it
   tests/                login, marketplace buy flow, cross-account emitir→aceite flow, plan-gating→upgrade→unlock flow, seguradora sinistro flow
+
+sdks/
+  node/                 @lastro/sdk — TypeScript/JS client for /api/v1, zero runtime deps, tested end-to-end in-process
+  python/                lastro-sdk — Python client for /api/v1, zero third-party deps, tested end-to-end against a real spawned server
 ```
 
 ## Roles
