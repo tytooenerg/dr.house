@@ -15,6 +15,13 @@ export function listByCedente(cedenteId: number): DuplicataRow[] {
   return db.prepare('SELECT * FROM duplicatas WHERE cedente_id = ? AND sandbox = 0 ORDER BY created_at DESC').all(cedenteId) as DuplicataRow[];
 }
 
+// Training set for lib/mlScoring.ts — every real (non-sandbox) duplicata, regardless of
+// status, so the trainer can derive whatever label it needs from real state transitions
+// (sinistro_status, status='paga' via legal recovery) rather than a curated subset.
+export function listAllDuplicatasForTraining(): DuplicataRow[] {
+  return db.prepare('SELECT * FROM duplicatas WHERE sandbox = 0').all() as DuplicataRow[];
+}
+
 export function countByCedenteThisMonth(cedenteId: number): number {
   const row = db
     .prepare("SELECT COUNT(*) as n FROM duplicatas WHERE cedente_id = ? AND sandbox = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')")

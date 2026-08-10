@@ -45,6 +45,7 @@ import { getIncludedCallsPerMonth, setIncludedCallsPerMonth, runApiOverageBillin
 import { runWhitelabelPlusBilling } from '../lib/whitelabelBilling.js';
 import { runInstitutionalReportingBilling } from '../lib/institutionalReporting.js';
 import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/agents.js';
+import { trainModel, getModel, MIN_TRAINING_SAMPLES } from '../lib/mlScoring.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -288,6 +289,26 @@ adminRouter.post(
 // console's actual invoice.
 adminRouter.get('/ai-usage', (_req, res) => {
   res.json(getClaudeUsageSummary());
+});
+
+// Real trained scoring model (lib/mlScoring.ts) backing the Underwriting agent's
+// prever_probabilidade_ml tool and the standalone Score API product. Status is always
+// available even with no model yet, so the panel can explain why (dados insuficientes)
+// instead of just looking broken.
+adminRouter.get('/ml-scoring', (_req, res) => {
+  const model = getModel();
+  res.json({
+    minTrainingSamples: MIN_TRAINING_SAMPLES,
+    model: model
+      ? { nSamples: model.nSamples, nPositive: model.nPositive, trainAccuracy: model.trainAccuracy, trainedAt: model.trainedAt, featureNames: model.featureNames, weights: model.weights }
+      : null,
+  });
+});
+
+adminRouter.post('/ml-scoring/retrain', (req, res) => {
+  const result = trainModel();
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'ml_scoring.retrain', { trained: result.trained, reason: result.reason ?? null });
+  res.json(result);
 });
 
 // Compliance AI Engine's auto-suspend bar (see lib/complianceEngine.ts) — admin-tunable

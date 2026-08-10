@@ -61,6 +61,11 @@ interface ComplianceQueueItem {
   quando: string;
 }
 
+interface MlScoringStatus {
+  minTrainingSamples: number;
+  model: { nSamples: number; nPositive: number; trainAccuracy: number; trainedAt: string; featureNames: string[]; weights: number[] } | null;
+}
+
 interface AiUsageSummary {
   totalCalls: number;
   failedCalls: number;
@@ -223,6 +228,9 @@ export function AdminPage() {
   const [complianceQueue, setComplianceQueue] = useState<ComplianceQueueItem[]>([]);
   const [complianceNoteById, setComplianceNoteById] = useState<Record<string, string>>({});
   const [aiUsage, setAiUsage] = useState<AiUsageSummary | null>(null);
+  const [mlScoring, setMlScoring] = useState<MlScoringStatus | null>(null);
+  const [retrainingMl, setRetrainingMl] = useState(false);
+  const [mlRetrainMessage, setMlRetrainMessage] = useState('');
   const [threshold, setThreshold] = useState<{ threshold: number; default: number } | null>(null);
   const [thresholdInput, setThresholdInput] = useState('');
   const [savingThreshold, setSavingThreshold] = useState(false);
@@ -278,6 +286,18 @@ export function AdminPage() {
   const loadAudit = () => api.get<{ entries: AuditEntry[]; chain: { valid: boolean; brokenAt: number | null } }>('/admin/audit').then(setAudit);
   const loadCompliance = () => api.get<{ pending: ComplianceQueueItem[] }>('/admin/compliance-queue').then((d) => setComplianceQueue(d.pending));
   const loadAiUsage = () => api.get<AiUsageSummary>('/admin/ai-usage').then(setAiUsage);
+  const loadMlScoring = () => api.get<MlScoringStatus>('/admin/ml-scoring').then(setMlScoring);
+  const retrainMl = async () => {
+    setRetrainingMl(true);
+    setMlRetrainMessage('');
+    try {
+      const result = await api.post<{ trained: boolean; reason?: string }>('/admin/ml-scoring/retrain');
+      setMlRetrainMessage(result.trained ? 'Modelo retreinado com sucesso.' : result.reason ?? 'Não foi possível treinar.');
+      await loadMlScoring();
+    } finally {
+      setRetrainingMl(false);
+    }
+  };
   const loadThreshold = () =>
     api.get<{ threshold: number; default: number }>('/admin/compliance-threshold').then((d) => {
       setThreshold(d);
@@ -330,6 +350,7 @@ export function AdminPage() {
     loadAudit();
     loadCompliance();
     loadAiUsage();
+    loadMlScoring();
     loadThreshold();
     loadCobrancaJuridica();
     loadMinutas();
@@ -1330,6 +1351,30 @@ export function AdminPage() {
             útil para identificar qual recurso está gerando mais gasto, não é uma fatura. Cada rota que chama a IA também tem limite de 30 chamadas por
             usuário a cada 15 minutos.
           </div>
+
+          {mlScoring && (
+            <div className="bg-white border border-border rounded-card p-5">
+              <div className="flex items-center justify-between flex-wrap gap-2.5 mb-2">
+                <div className="font-bold text-[14px]">Score de crédito — modelo treinado (ML)</div>
+                <Button size="sm" variant="secondary" disabled={retrainingMl} onClick={retrainMl}>
+                  {retrainingMl ? 'Treinando…' : 'Retreinar agora'}
+                </Button>
+              </div>
+              {mlScoring.model ? (
+                <div className="text-[12.5px] text-textSecondary">
+                  Treinado em {new Date(mlScoring.model.trainedAt).toLocaleString('pt-BR')} com {mlScoring.model.nSamples} amostras (
+                  {mlScoring.model.nPositive} com resultado ruim) — acurácia de treino {(mlScoring.model.trainAccuracy * 100).toFixed(0)}%. Usado pelo
+                  Agente de Underwriting (ferramenta <code>prever_probabilidade_ml</code>).
+                </div>
+              ) : (
+                <div className="text-[12.5px] text-textSecondary">
+                  Nenhum modelo treinado ainda — mínimo de {mlScoring.minTrainingSamples} duplicatas com resultado real (sinistro aprovado ou recuperação
+                  jurídica) na base.
+                </div>
+              )}
+              {mlRetrainMessage && <div className="text-[12px] font-bold text-blue mt-2">{mlRetrainMessage}</div>}
+            </div>
+          )}
           {aiUsage && (
             <>
               <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
