@@ -249,6 +249,15 @@ The real gate this feeds: **cestas de investimento** (`lib/cestasCore.ts`) are t
 
 Missing/expired → `403 suitability_required`; present but too conservative for the chosen basket → `403 suitability_mismatch` — the client surfaces both with a link straight to the questionnaire.
 
+### Rebalanceamento sugerido de carteira (`lib/portfolioRebalance.ts`, Carteira & Histórico)
+
+A free, deterministic recommendation engine — no LLM involved — that compares an investor's real current allocation against target bands for their suitability profile (reusing the conservador/moderado/arrojado profile above; defaults to a neutral "moderado" band, clearly labeled, if the investor hasn't completed the questionnaire) and flags two kinds of drift:
+
+- **Rating drift** — actual % invested per rating (AA/A/B/C) vs. the profile's target band, only surfaced past a 10-point threshold so small rounding never generates noise.
+- **Single-sacado concentration** — any one counterparty above a profile-scaled limit (15% conservador / 25% moderado / 35% arrojado), regardless of its rating.
+
+Every suggestion names a concrete R$ amount to trim/add and never executes anything — same human-in-the-loop principle as the rest of the platform; the investor decides whether and how to act (e.g. listing an overweight position on the mercado secundário). `GET /historico/rebalanceamento`, surfaced as a card on Carteira & Histórico whenever the investor has at least one active position.
+
 ### Marketing homepage
 
 `/` was previously just an alias for the login screen — there was no actual company website, and the public nav's own "Entrar"/"Falar com vendas" links pointed back at themselves. Added a real homepage (`pages/public/LandingPage.tsx`) covering the whole platform for a general audience (hero, problem/solution, the 5-step emission→liquidation flow, one card per participant — cedente/investidor/sacado/seguradora — product/compliance highlights, and a live stats band pulling real numbers from the same `GET /api/public/stats` the Transparência page uses, not fabricated marketing figures), reusing `PublicNav`/`PublicFooter` for visual consistency with the existing Developers/Preços/Transparência/Legal/Status pages. Login moved to `/login`; every internal link that used to point at `/` expecting the login/signup screen (nav, pricing/developers/embed/404 CTAs, the referral share link, `AppShell`'s auth redirect, the sidebar's logout redirect, and the e2e test suite) was updated to match.

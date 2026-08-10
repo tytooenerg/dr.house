@@ -7,6 +7,7 @@ import { effectiveOwnerId, getUserById, setInstitutionalReportingEnabled } from 
 import { planAtLeast } from '../lib/billing.js';
 import { fmtAddOnPrice } from '../lib/addOnBilling.js';
 import { buildInstitutionalAnalytics, streamInstitutionalReportPdf } from '../lib/institutionalReporting.js';
+import { buildRebalanceView } from '../lib/portfolioRebalance.js';
 import { fmtBRL, toIsoUtc } from '../lib/format.js';
 
 export const historicoRouter = Router();
@@ -150,4 +151,13 @@ historicoRouter.get('/institutional/report.pdf', (req, res) => {
   if (!requireInstitutionalReporting(req, res)) return;
   const analytics = buildInstitutionalAnalytics(effectiveOwnerId(req.user!));
   streamInstitutionalReportPdf(res, req.user!.company_name, analytics);
+});
+
+// Suggested portfolio rebalancing (lib/portfolioRebalance.ts) — free for every investidor,
+// unlike the paid Institutional Reporting analytics above: this is a smaller, targeted
+// recommendation (rating/concentration drift vs. the investor's own suitability profile),
+// not a full reporting suite. Returns a degenerate empty view for a cedente account (no
+// purchases), same as GET /historico itself — no role check needed.
+historicoRouter.get('/rebalanceamento', (req, res) => {
+  res.json(buildRebalanceView(effectiveOwnerId(req.user!)));
 });

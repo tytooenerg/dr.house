@@ -36,6 +36,15 @@ interface InstitutionalAnalytics {
   ratingDistribution: { rating: string; valorFmt: string; pct: number }[];
   maioresExposicoes: { sacado: string; valorFmt: string; pct: number }[];
 }
+interface RebalanceView {
+  totalInvestidoFmt: string;
+  posicoesAtivas: number;
+  profile: 'conservador' | 'moderado' | 'arrojado';
+  usingDefaultProfile: boolean;
+  ratingComparison: { rating: string; actualPct: number; targetPct: number; valorFmt: string }[];
+  sacadoConcentration: { sacado: string; valorFmt: string; pct: number; limitPct: number; overLimit: boolean }[];
+  suggestions: { type: string; message: string; valorFmt: string }[];
+}
 
 const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
 
@@ -47,10 +56,15 @@ export function HistoricoPage() {
   const [analytics, setAnalytics] = useState<InstitutionalAnalytics | null>(null);
   const [institutionalError, setInstitutionalError] = useState('');
   const [exportingReport, setExportingReport] = useState(false);
+  const [rebalance, setRebalance] = useState<RebalanceView | null>(null);
 
   useEffect(() => {
     api.get<HistoricoData>(`/historico?page=${page}&pageSize=10`).then(setData);
   }, [page]);
+
+  useEffect(() => {
+    api.get<RebalanceView>('/historico/rebalanceamento').then(setRebalance);
+  }, []);
 
   useEffect(() => {
     api.get<InstitutionalStatus>('/historico/institutional/status').then(setInstitutional);
@@ -123,6 +137,42 @@ export function HistoricoPage() {
           <div className="text-2xl font-extrabold mt-2.5">{data?.rentabilidadeMediaFmt ?? '—'}</div>
         </Card>
       </div>
+
+      {rebalance && rebalance.posicoesAtivas > 0 && (
+        <Card className="mb-4 px-6 py-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+            <div className="font-bold text-[14.5px]">Rebalanceamento sugerido</div>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">
+              Perfil {rebalance.profile === 'conservador' ? 'Conservador' : rebalance.profile === 'moderado' ? 'Moderado' : 'Arrojado'}
+              {rebalance.usingDefaultProfile ? ' (padrão — responda o questionário de suitability)' : ''}
+            </span>
+          </div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">
+            Comparação da sua alocação atual com a faixa alvo do seu perfil — não executa nada automaticamente, apenas sugere.
+          </div>
+          <div className="grid gap-1.5 mb-3.5">
+            {rebalance.ratingComparison.map((r) => (
+              <div key={r.rating} className="flex items-center justify-between text-[12.5px]">
+                <span className="text-textSecondary w-8">{r.rating}</span>
+                <span className="font-mono-num">
+                  {r.actualPct}% atual · {r.targetPct}% alvo
+                </span>
+              </div>
+            ))}
+          </div>
+          {rebalance.suggestions.length === 0 ? (
+            <div className="text-[12.5px] text-green font-semibold">Sua carteira está dentro das faixas recomendadas para seu perfil.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {rebalance.suggestions.map((s, i) => (
+                <div key={i} className="text-[12.5px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+                  {s.message}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card className="mb-4 px-6 py-5">
         <div className="font-bold text-[14.5px] mb-3.5">Saúde da carteira — mesma linguagem usada em FIDCs</div>
