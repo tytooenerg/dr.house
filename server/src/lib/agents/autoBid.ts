@@ -71,6 +71,7 @@ export const autoBidAgent: AgentDefinition = {
         'Executa a compra da oferta (mesma operação de um clique manual em "Comprar") em nome do investidor. Ação sensível — compromete capital real (o próprio investidor pode aprovar a sua, é o mesmo efeito de comprar manualmente).',
       sensitive: true,
       selfApprovable: true,
+      extractValueBRL: async (input: { duplicataId: string }) => getDuplicata(input.duplicataId)?.valor ?? null,
       inputSchema: { type: 'object', properties: { userId: { type: 'number' }, duplicataId: { type: 'string' } }, required: ['userId', 'duplicataId'] },
       handler: async (input: { userId: number; duplicataId: string }) => {
         const offer = getDuplicata(input.duplicataId);

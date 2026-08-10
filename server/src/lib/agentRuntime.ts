@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { askClaudeWithTools, claudeEnabled } from './claude.js';
 import { logger } from './logger.js';
 import { addAgentStep, createAgentRun, createPendingAction, finishAgentRun } from '../db/agents.js';
+import { isAgentEnabled, isAgentOverBudget, getAgentDailyBudgetUsd, getDualApprovalThresholdBrl } from './agentGovernance.js';
 import type { Role } from '../db/types.js';
 
 // The agentic layer: every other AI feature in this codebase (chat, NF-e extraction, risk
@@ -38,6 +39,15 @@ export interface AgentToolDef<TInput = any> {
   // sensitive tool (a compliance/KYB decision, a legal escalation, anything about someone
   // else's account) stays admin-only no matter what.
   selfApprovable?: boolean;
+  // Only meaningful on a sensitive tool. Resolves the real BRL value the proposed action
+  // would move (e.g. the emission's valor, the offer being bought) — governance
+  // (lib/agentGovernance.ts) compares it to the configured dual-approval threshold to
+  // decide whether this pending action needs one admin's approval or two. A tool without
+  // this always needs just one (its "value" isn't a single number — a KYB decision, a
+  // legal escalation). Errors/nulls fall back to requiring only one approval rather than
+  // blocking the action outright — governance narrows what's auto-approved, it never
+  // itself becomes a new way to fail closed on a wrong guess.
+  extractValueBRL?: (input: TInput, ctx: AgentRunContext) => Promise<number | null>;
   handler: (input: TInput, ctx: AgentRunContext) => Promise<unknown>;
 }
 
@@ -63,7 +73,7 @@ export interface AgentRunStepView {
 export interface AgentRunOutcome {
   runId: number;
   mode: 'llm' | 'simulado';
-  status: 'concluido' | 'limite_de_passos' | 'erro' | 'simulado';
+  status: 'concluido' | 'limite_de_passos' | 'erro' | 'simulado' | 'desabilitado' | 'orcamento_excedido';
   summary: string;
   steps: AgentRunStepView[];
   pendingActions: { id: number; toolName: string; input: unknown }[];
@@ -79,6 +89,23 @@ export interface RunAgentOptions {
 }
 
 export async function runAgent(def: AgentDefinition, opts: RunAgentOptions): Promise<AgentRunOutcome> {
+  // Governance gates — checked before any run row is even created, no cost incurred
+  // either way. A disabled agent (admin kill switch) or one that already spent its
+  // configured daily budget refuses outright instead of degrading silently.
+  if (!isAgentEnabled(def.id)) {
+    const runId = createAgentRun({ agentId: def.id, userId: opts.userId ?? null, subjectType: opts.subjectType ?? null, subjectId: opts.subjectId ?? null, input: opts.input, mode: 'simulado' });
+    const summary = `Agente "${def.label}" está desabilitado por um admin — nenhuma execução foi realizada.`;
+    finishAgentRun(runId, 'simulado', summary);
+    return { runId, mode: 'simulado', status: 'desabilitado', summary, steps: [], pendingActions: [] };
+  }
+  if (isAgentOverBudget(def.id)) {
+    const runId = createAgentRun({ agentId: def.id, userId: opts.userId ?? null, subjectType: opts.subjectType ?? null, subjectId: opts.subjectId ?? null, input: opts.input, mode: 'simulado' });
+    const budget = getAgentDailyBudgetUsd(def.id);
+    const summary = `Agente "${def.label}" atingiu o orçamento diário configurado (US$ ${budget?.toFixed(2)}) — execução recusada até a virada do dia ou aumento do orçamento.`;
+    finishAgentRun(runId, 'simulado', summary);
+    return { runId, mode: 'simulado', status: 'orcamento_excedido', summary, steps: [], pendingActions: [] };
+  }
+
   const runId = createAgentRun({
     agentId: def.id,
     userId: opts.userId ?? null,
@@ -148,7 +175,16 @@ export async function runAgent(def: AgentDefinition, opts: RunAgentOptions): Pro
       }
 
       if (toolDef.sensitive) {
-        const pendingId = createPendingAction({ runId, agentId: def.id, toolName: block.name, input: block.input });
+        let approvalsRequired = 1;
+        if (toolDef.extractValueBRL) {
+          try {
+            const value = await toolDef.extractValueBRL(block.input, ctx);
+            if (value !== null && value >= getDualApprovalThresholdBrl()) approvalsRequired = 2;
+          } catch (err) {
+            logger.warn({ err, tool: block.name, agent: def.id }, '[agent] falha ao calcular valor da ação para governança — seguindo com aprovação única');
+          }
+        }
+        const pendingId = createPendingAction({ runId, agentId: def.id, toolName: block.name, input: block.input, approvalsRequired });
         pendingActions.push({ id: pendingId, toolName: block.name, input: block.input });
         addAgentStep(runId, step, 'pendente_aprovacao', block.name, { input: block.input, pendingActionId: pendingId });
         steps.push({ type: 'pendente_aprovacao', toolName: block.name, payload: { input: block.input, pendingActionId: pendingId } });

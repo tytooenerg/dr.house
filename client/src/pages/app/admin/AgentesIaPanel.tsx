@@ -6,6 +6,7 @@ import {
   type AgentSummary,
   type AgentRunOutcome,
   type PendingActionRow,
+  type AgentGovernanceEntry,
   STEP_LABELS,
   STEP_COLOR,
   renderPayload,
@@ -23,6 +24,11 @@ export function AgentesIaPanel() {
   const [lastRun, setLastRun] = useState<AgentRunOutcome | null>(null);
   const [pending, setPending] = useState<PendingActionRow[]>([]);
   const [decidingId, setDecidingId] = useState<number | null>(null);
+  const [showGovernance, setShowGovernance] = useState(false);
+  const [governance, setGovernance] = useState<{ dualApprovalThresholdBrl: number; agents: AgentGovernanceEntry[] } | null>(null);
+  const [thresholdInput, setThresholdInput] = useState('');
+  const [budgetInputs, setBudgetInputs] = useState<Record<string, string>>({});
+  const [savingGov, setSavingGov] = useState<string | null>(null);
 
   const loadAgents = () => api.get<{ llmEnabled: boolean; agents: AgentSummary[] }>('/agents').then((d) => {
     setAgents(d.agents);
@@ -30,11 +36,51 @@ export function AgentesIaPanel() {
     setSelectedId((prev) => prev ?? d.agents[0]?.id ?? null);
   });
   const loadPending = () => api.get<{ pending: PendingActionRow[] }>('/agents/pending').then((d) => setPending(d.pending));
+  const loadGovernance = () =>
+    api.get<{ dualApprovalThresholdBrl: number; agents: AgentGovernanceEntry[] }>('/agents/governance').then((d) => {
+      setGovernance(d);
+      setThresholdInput(String(d.dualApprovalThresholdBrl));
+      setBudgetInputs(Object.fromEntries(d.agents.map((a) => [a.id, a.dailyBudgetUsd === null ? '' : String(a.dailyBudgetUsd)])));
+    });
 
   useEffect(() => {
     loadAgents();
     loadPending();
+    loadGovernance();
   }, []);
+
+  const toggleAgentEnabled = async (agentId: string, enabled: boolean) => {
+    setSavingGov(agentId);
+    try {
+      await api.put(`/agents/governance/${agentId}`, { enabled });
+      await loadGovernance();
+    } finally {
+      setSavingGov(null);
+    }
+  };
+
+  const saveBudget = async (agentId: string) => {
+    setSavingGov(agentId);
+    try {
+      const raw = budgetInputs[agentId]?.trim() ?? '';
+      await api.put(`/agents/governance/${agentId}`, { dailyBudgetUsd: raw === '' ? null : Number(raw) });
+      await loadGovernance();
+    } finally {
+      setSavingGov(null);
+    }
+  };
+
+  const saveThreshold = async () => {
+    const n = Number(thresholdInput.replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0) return;
+    setSavingGov('__threshold');
+    try {
+      await api.put('/agents/governance/dual-approval-threshold', { thresholdBrl: n });
+      await loadGovernance();
+    } finally {
+      setSavingGov(null);
+    }
+  };
 
   const selected = agents.find((a) => a.id === selectedId) ?? null;
 
@@ -81,14 +127,63 @@ export function AgentesIaPanel() {
         )}
       </div>
 
+      <div>
+        <button type="button" onClick={() => setShowGovernance((v) => !v)} className="text-[12.5px] font-bold text-blue bg-transparent border-none cursor-pointer px-0">
+          {showGovernance ? '▾' : '▸'} Governança dos agentes (kill switch, orçamento, dupla aprovação)
+        </button>
+        {showGovernance && governance && (
+          <div className="bg-white border border-border rounded-card mt-2.5 overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border flex items-center gap-2.5 flex-wrap">
+              <span className="font-bold text-[13px]">Valor mínimo para exigir 2 aprovadores (BRL)</span>
+              <input value={thresholdInput} onChange={(e) => setThresholdInput(e.target.value)} className="w-32 px-2.5 py-1.5 rounded-md border border-border text-[12.5px]" />
+              <Button size="sm" variant="secondary" disabled={savingGov === '__threshold'} onClick={saveThreshold}>
+                Salvar
+              </Button>
+            </div>
+            {governance.agents.map((g) => (
+              <div key={g.id} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    disabled={savingGov === g.id}
+                    onClick={() => toggleAgentEnabled(g.id, !g.enabled)}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer border-none"
+                    style={{ background: g.enabled ? '#EAF3EE' : '#F7E9E7', color: g.enabled ? '#0A5C36' : '#B3261E' }}
+                  >
+                    {g.enabled ? 'Ativo' : 'Desativado'}
+                  </button>
+                  <span className="text-[12.5px] font-bold">{agents.find((a) => a.id === g.id)?.label ?? g.id}</span>
+                  <span className="text-[11.5px] text-textTertiary">gasto hoje: US$ {g.spentTodayUsd.toFixed(3)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11.5px] text-textSecondary">Orçamento diário (US$, vazio = ilimitado)</span>
+                  <input
+                    value={budgetInputs[g.id] ?? ''}
+                    onChange={(e) => setBudgetInputs((prev) => ({ ...prev, [g.id]: e.target.value }))}
+                    placeholder="ilimitado"
+                    className="w-24 px-2.5 py-1.5 rounded-md border border-border text-[12.5px]"
+                  />
+                  <Button size="sm" variant="secondary" disabled={savingGov === g.id} onClick={() => saveBudget(g.id)}>
+                    Salvar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {pending.length > 0 && (
         <div className="bg-white border border-[#F1C889] rounded-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border font-bold text-[14px] bg-[#FBF1E0]">Ações pendentes de aprovação ({pending.length})</div>
           {pending.map((p) => (
             <div key={p.id} className="px-5 py-3.5 border-b border-[#F5F7FA] last:border-b-0 flex items-start justify-between gap-4">
               <div>
-                <div className="font-bold text-[13px]">
+                <div className="font-bold text-[13px] flex items-center gap-2">
                   {agents.find((a) => a.id === p.agent_id)?.label ?? p.agent_id} → <code>{p.tool_name}</code>
+                  {p.approvals_required > 1 && (
+                    <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-[#FBF1E0] text-[#8A5A00]">requer {p.approvals_required} aprovadores</span>
+                  )}
                 </div>
                 <pre className="mt-1 text-[11.5px] text-textSecondary whitespace-pre-wrap font-mono-num">{renderPayload(JSON.parse(p.input))}</pre>
               </div>

@@ -40,6 +40,14 @@ export interface PendingActionRow {
   input: string;
   status: 'pendente' | 'aprovada' | 'rejeitada';
   created_at: string;
+  approvals_required: number;
+}
+
+export interface AgentGovernanceEntry {
+  id: string;
+  enabled: boolean;
+  dailyBudgetUsd: number | null;
+  spentTodayUsd: number;
 }
 
 export const STEP_LABELS: Record<string, string> = {

@@ -49,6 +49,16 @@ export interface ClaudeUsageSummary {
   last30Days: ClaudeUsageByDay[];
 }
 
+// Today's estimated spend for one feature (e.g. `agent_${agentId}`) — used by
+// lib/agentGovernance.ts to enforce a per-agent daily budget. UTC day boundary (same as
+// SQLite's date('now')), a deliberate simplification rather than per-timezone billing.
+export function sumFeatureCostToday(feature: string): number {
+  const row = db
+    .prepare(`SELECT COALESCE(SUM(estimated_cost_usd), 0) as cost FROM claude_usage WHERE feature = ? AND date(created_at) = date('now')`)
+    .get(feature) as { cost: number };
+  return row.cost;
+}
+
 export function getClaudeUsageSummary(): ClaudeUsageSummary {
   const totals = db
     .prepare(

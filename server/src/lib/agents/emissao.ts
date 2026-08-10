@@ -2,6 +2,7 @@ import { checkDuplicidade } from '../dupCheck.js';
 import { buildBlendedRiscoView } from '../riscoCore.js';
 import { computeEmitirPreview, submitEmitir, emitirFormSchema } from '../emitirCore.js';
 import { getUserById } from '../../db/users.js';
+import { parseBRLNumber } from '../format.js';
 import type { AgentDefinition } from '../agentRuntime.js';
 
 export const emissaoAgent: AgentDefinition = {
@@ -50,6 +51,13 @@ export const emissaoAgent: AgentDefinition = {
         'Registra de verdade a duplicata na registradora e a submete ao Compliance AI Engine. Ação sensível — sempre passa por aprovação antes de executar (o próprio cedente pode aprovar a sua, é o mesmo efeito de um envio manual do formulário).',
       sensitive: true,
       selfApprovable: true,
+      // Above the configured dual-approval threshold (lib/agentGovernance.ts), an
+      // admin-run emission needs two admins to approve — self-service (the cedente
+      // approving their own) is unaffected either way, see routes/agents.ts.
+      extractValueBRL: async (input: Record<string, unknown>) => {
+        const valor = typeof input.valor === 'string' ? parseBRLNumber(input.valor) : 0;
+        return Number.isFinite(valor) ? valor : null;
+      },
       inputSchema: {
         type: 'object',
         properties: {

@@ -40,6 +40,11 @@ export interface AgentPendingActionRow {
   decided_by: number | null;
   decided_at: string | null;
   created_at: string;
+  // How many distinct admins must approve before the handler executes — 1 for almost every
+  // action; 2 when the tool declared a real monetary value (AgentToolDef.extractValueBRL)
+  // at or above the configured dual-approval threshold. Self-service approval by the
+  // account owner ignores this entirely (see routes/agents.ts).
+  approvals_required: number;
 }
 
 export function createAgentRun(input: {
@@ -107,10 +112,10 @@ export function hasRecentAgentRun(agentId: string, subjectType: string, subjectI
   return !!row;
 }
 
-export function createPendingAction(input: { runId: number; agentId: string; toolName: string; input: unknown }): number {
+export function createPendingAction(input: { runId: number; agentId: string; toolName: string; input: unknown; approvalsRequired?: number }): number {
   const info = db
-    .prepare(`INSERT INTO agent_pending_actions (run_id, agent_id, tool_name, input) VALUES (?, ?, ?, ?)`)
-    .run(input.runId, input.agentId, input.toolName, JSON.stringify(input.input ?? null));
+    .prepare(`INSERT INTO agent_pending_actions (run_id, agent_id, tool_name, input, approvals_required) VALUES (?, ?, ?, ?, ?)`)
+    .run(input.runId, input.agentId, input.toolName, JSON.stringify(input.input ?? null), input.approvalsRequired ?? 1);
   return info.lastInsertRowid as number;
 }
 
@@ -133,6 +138,24 @@ export function listPendingActionsForUser(userId: number, status: AgentPendingSt
 
 export function listPendingActionsForRun(runId: number): AgentPendingActionRow[] {
   return db.prepare('SELECT * FROM agent_pending_actions WHERE run_id = ? ORDER BY id DESC').all(runId) as AgentPendingActionRow[];
+}
+
+// Dual-approval bookkeeping (routes/agents.ts admin approve path only — self-service
+// approval never goes through this). Returns false if this admin already recorded an
+// approval for this action (the UNIQUE(pending_action_id, admin_id) constraint catches
+// it), true otherwise, so the caller can tell "recorded" from "already had your vote".
+export function recordApproval(pendingActionId: number, adminId: number): boolean {
+  try {
+    db.prepare('INSERT INTO agent_pending_approvals (pending_action_id, admin_id) VALUES (?, ?)').run(pendingActionId, adminId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function countApprovals(pendingActionId: number): number {
+  const row = db.prepare('SELECT COUNT(*) as n FROM agent_pending_approvals WHERE pending_action_id = ?').get(pendingActionId) as { n: number };
+  return row.n;
 }
 
 export function decidePendingAction(id: number, status: 'aprovada' | 'rejeitada', decidedBy: number, result: unknown) {

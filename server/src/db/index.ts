@@ -51,6 +51,7 @@ export function resetDbForTests() {
     DELETE FROM suspicious_activity_reports;
     DELETE FROM foreign_investor_screenings;
     DELETE FROM addon_charges;
+    DELETE FROM agent_pending_approvals;
     DELETE FROM agent_pending_actions;
     DELETE FROM agent_steps;
     DELETE FROM agent_runs;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { claudeEnabled } from '../lib/claude.js';
@@ -15,7 +15,18 @@ import {
   listPendingActionsForUser,
   getPendingAction,
   decidePendingAction,
+  recordApproval,
+  countApprovals,
 } from '../db/agents.js';
+import {
+  isAgentEnabled,
+  setAgentEnabled,
+  getAgentDailyBudgetUsd,
+  setAgentDailyBudgetUsd,
+  agentSpentTodayUsd,
+  getDualApprovalThresholdBrl,
+  setDualApprovalThresholdBrl,
+} from '../lib/agentGovernance.js';
 
 // Two access levels share this router:
 //  - admin: sees/runs every agent, against any account, and approves/rejects anything.
@@ -63,6 +74,63 @@ agentsRouter.get('/pending', (req, res) => {
   const pending = isAdmin(req.user!.role) ? listPendingActions('pendente') : listPendingActionsForUser(req.user!.id, 'pendente');
   res.json({ pending });
 });
+
+// Governance: kill switch + daily budget per agent, and the BRL threshold above which a
+// sensitive tool's admin-approved pending action needs two distinct admins instead of one
+// (see AgentToolDef.extractValueBRL). Admin-only — these are platform-wide controls, not
+// per-user settings.
+agentsRouter.get('/governance', requireRole('admin'), (_req, res) => {
+  res.json({
+    dualApprovalThresholdBrl: getDualApprovalThresholdBrl(),
+    agents: Object.keys(AGENTS).map((id) => ({
+      id,
+      enabled: isAgentEnabled(id),
+      dailyBudgetUsd: getAgentDailyBudgetUsd(id),
+      spentTodayUsd: agentSpentTodayUsd(id),
+    })),
+  });
+});
+
+const agentSettingsSchema = z.object({ enabled: z.boolean().optional(), dailyBudgetUsd: z.number().nonnegative().nullable().optional() });
+
+// Registered before the generic '/governance/:agentId' below — Express matches routes in
+// registration order, so the specific path must come first or ':agentId' would swallow
+// "dual-approval-threshold" as if it were an agent id.
+const thresholdSchema = z.object({ thresholdBrl: z.number().positive() });
+
+agentsRouter.put('/governance/dual-approval-threshold', requireRole('admin'), (req, res) => {
+  const parsed = thresholdSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  setDualApprovalThresholdBrl(parsed.data.thresholdBrl, req.user!.id);
+  res.json({ thresholdBrl: getDualApprovalThresholdBrl() });
+});
+
+agentsRouter.put(
+  '/governance/:agentId',
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    if (!getAgent(req.params.agentId)) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const parsed = agentSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    if (parsed.data.enabled !== undefined) setAgentEnabled(req.params.agentId, parsed.data.enabled, req.user!.id);
+    if (parsed.data.dailyBudgetUsd !== undefined) setAgentDailyBudgetUsd(req.params.agentId, parsed.data.dailyBudgetUsd, req.user!.id);
+    res.json({
+      id: req.params.agentId,
+      enabled: isAgentEnabled(req.params.agentId),
+      dailyBudgetUsd: getAgentDailyBudgetUsd(req.params.agentId),
+      spentTodayUsd: agentSpentTodayUsd(req.params.agentId),
+    });
+  })
+);
 
 const runSchema = z.object({
   input: z.string().trim().min(1).max(4000),
@@ -129,6 +197,21 @@ agentsRouter.post(
       const isOwn = !!run && run.user_id === req.user!.id;
       if (!isOwn || !tool?.selfApprovable) {
         res.status(403).json({ error: 'forbidden', message: 'Apenas um admin pode decidir esta ação.' });
+        return;
+      }
+    } else if (pending.approvals_required > 1) {
+      // Dual approval: self-service never reaches here (isOwn/selfApprovable is checked
+      // above and executes immediately without this branch) — this only applies to an
+      // admin approving a high-value action. Record this admin's vote; only execute once
+      // enough distinct admins have approved.
+      const recorded = recordApproval(id, req.user!.id);
+      if (!recorded) {
+        res.status(409).json({ error: 'already_approved_by_you' });
+        return;
+      }
+      const approvalsSoFar = countApprovals(id);
+      if (approvalsSoFar < pending.approvals_required) {
+        res.json({ ok: true, waitingForMoreApprovals: true, approvalsSoFar, approvalsRequired: pending.approvals_required });
         return;
       }
     }
