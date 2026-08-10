@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { Card, PageHeader } from '../../components/ui/Card';
 import { Donut } from '../../components/ui/Gauge';
+import { useLang } from '../../lib/i18n';
 
 interface Kpi {
   label: string;
@@ -35,6 +36,7 @@ interface DashboardData {
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const { t } = useLang();
 
   useEffect(() => {
     api.get<DashboardData>('/dashboard').then(setData);
@@ -45,8 +47,8 @@ export function DashboardPage() {
   return (
     <div>
       <PageHeader
-        title="Visão Geral"
-        subtitle="Resumo da sua atividade na plataforma"
+        title={t('dashboard.title', 'Visão Geral')}
+        subtitle={t('dashboard.subtitle', 'Resumo da sua atividade na plataforma')}
         right={<div className="text-[13px] text-textSecondary font-mono-num">{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</div>}
       />
 
@@ -68,7 +70,7 @@ export function DashboardPage() {
 
       <div className="grid gap-4" style={{ gridTemplateColumns: '1.6fr 1fr' }}>
         <Card>
-          <div className="font-bold text-[15px] mb-5">Volume antecipado por mês</div>
+          <div className="font-bold text-[15px] mb-5">{t('dashboard.volumeChart', 'Volume antecipado por mês')}</div>
           <div className="flex items-end gap-4 h-[180px] px-1">
             {data.monthlyBars.map((bar) => (
               <div key={bar.label} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
@@ -81,10 +83,10 @@ export function DashboardPage() {
         </Card>
 
         <Card className="flex flex-col items-center">
-          <div className="font-bold text-[15px] self-start mb-4">Carteira por rating</div>
+          <div className="font-bold text-[15px] self-start mb-4">{t('dashboard.ratingChart', 'Carteira por rating')}</div>
           <Donut stops={data.riskDonutStops} size={150}>
             <div className="text-xl font-extrabold">{data.activeDuplicatas}</div>
-            <div className="text-[11px] text-textSecondary">operações</div>
+            <div className="text-[11px] text-textSecondary">{t('dashboard.operacoes', 'operações')}</div>
           </Donut>
           <div className="flex flex-col gap-2 w-full mt-5">
             {data.ratingLegend.map((r) => (

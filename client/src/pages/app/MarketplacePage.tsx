@@ -6,6 +6,7 @@ import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { AiTag } from '../../components/ui/Badge';
+import { useLang } from '../../lib/i18n';
 
 interface Insurer {
   key: string;
@@ -69,6 +70,7 @@ interface Offer {
 }
 
 export function MarketplacePage() {
+  const { t } = useLang();
   const { offers: liveOffers, connected } = useMarketSocket<Offer>();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('taxa');
@@ -155,23 +157,23 @@ export function MarketplacePage() {
   return (
     <div>
       <PageHeader
-        title="Marketplace de Duplicatas"
-        subtitle="Ofertas disponíveis para antecipação — compradores e cedentes"
+        title={t('marketplace.title', 'Marketplace de Duplicatas')}
+        subtitle={t('marketplace.subtitle', 'Ofertas disponíveis para antecipação — compradores e cedentes')}
         right={
           <span className="flex items-center gap-1.5 text-xs font-semibold text-textTertiary">
             <span className="rounded-full" style={{ width: 7, height: 7, background: connected ? '#0A5C36' : '#B8C2D4' }} />
-            {connected ? 'Atualizações ao vivo' : 'Conectando…'}
+            {connected ? t('marketplace.liveUpdates', 'Atualizações ao vivo') : t('marketplace.connecting', 'Conectando…')}
           </span>
         }
       />
 
       <div className="flex gap-2.5 mb-4">
-        <Input placeholder="Buscar por sacado ou cedente" value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[340px]" />
+        <Input placeholder={t('marketplace.searchPlaceholder', 'Buscar por sacado ou cedente')} value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[340px]" />
         <Select value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="taxa">Ordenar: melhor deságio</option>
-          <option value="score">Ordenar: maior score</option>
-          <option value="valor">Ordenar: maior valor</option>
-          <option value="prazo">Ordenar: leilão fechando</option>
+          <option value="taxa">{t('marketplace.sortRate', 'Ordenar: melhor deságio')}</option>
+          <option value="score">{t('marketplace.sortScore', 'Ordenar: maior score')}</option>
+          <option value="valor">{t('marketplace.sortValue', 'Ordenar: maior valor')}</option>
+          <option value="prazo">{t('marketplace.sortDeadline', 'Ordenar: leilão fechando')}</option>
         </Select>
       </div>
 
@@ -180,12 +182,12 @@ export function MarketplacePage() {
           className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
           style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}
         >
-          <div>Sacado</div>
-          <div>Cedente</div>
-          <div>Valor</div>
-          <div>Deságio</div>
-          <div>Vencimento</div>
-          <div>Score / Aceite / Ação</div>
+          <div>{t('marketplace.colSacado', 'Sacado')}</div>
+          <div>{t('marketplace.colCedente', 'Cedente')}</div>
+          <div>{t('marketplace.colValor', 'Valor')}</div>
+          <div>{t('marketplace.colDesagio', 'Deságio')}</div>
+          <div>{t('marketplace.colVencimento', 'Vencimento')}</div>
+          <div>{t('marketplace.colAction', 'Score / Aceite / Ação')}</div>
         </div>
 
         {offers.map((offer) => {
@@ -213,10 +215,10 @@ export function MarketplacePage() {
                     onClick={() => toggleExpand(offer.id)}
                     className="px-3 py-1.5 rounded-md border border-inputBorder cursor-pointer text-[12.5px] font-bold bg-white text-navy"
                   >
-                    {isExpanded ? 'Fechar leilão' : 'Ver leilão'}
+                    {isExpanded ? t('marketplace.closeAuction', 'Fechar leilão') : t('marketplace.viewAuction', 'Ver leilão')}
                   </button>
                   <Button size="sm" disabled={!offer.canBuy || busyId === offer.id} onClick={() => buy(offer.id)}>
-                    {busyId === offer.id ? 'Comprando…' : offer.btnLabel}
+                    {busyId === offer.id ? t('marketplace.buying', 'Comprando…') : offer.btnLabel}
                   </Button>
                 </div>
               </div>
@@ -229,13 +231,13 @@ export function MarketplacePage() {
                       Segurada por {offer.insurerInfo.name}
                     </div>
                     <button type="button" className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer underline" onClick={() => insure(offer.id, null)}>
-                      Trocar
+                      {t('marketplace.swap', 'Trocar')}
                     </button>
                   </>
                 ) : (
                   <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-inputBorder bg-bg text-xs font-bold text-textSecondary">
                     <span className="rounded-full border border-current" style={{ width: 7, height: 7 }} />
-                    Sem cobertura de seguro
+                    {t('marketplace.noInsurance', 'Sem cobertura de seguro')}
                   </div>
                 )}
                 <button
@@ -249,16 +251,16 @@ export function MarketplacePage() {
                   onClick={() => setInsurerPickerFor(insurerPickerFor === offer.id ? null : offer.id)}
                 >
                   <span className="rounded-full bg-current" style={{ width: 7, height: 7 }} />
-                  {offer.insurerInfo ? 'Segurada ✓' : 'Contratar seguro'}
+                  {offer.insurerInfo ? t('marketplace.insured', 'Segurada ✓') : t('marketplace.getInsurance', 'Contratar seguro')}
                 </button>
                 <div className="text-xs text-textSecondary">
-                  {offer.insurerInfo ? `Segurada por ${offer.insurerInfo.name} — prêmio ${offer.insurerInfo.premioFmt}` : 'Proteção contra inadimplência disponível — compare seguradoras'}
+                  {offer.insurerInfo ? `Segurada por ${offer.insurerInfo.name} — prêmio ${offer.insurerInfo.premioFmt}` : t('marketplace.insuranceHint', 'Proteção contra inadimplência disponível — compare seguradoras')}
                 </div>
 
                 {insurerPickerFor === offer.id && (
                   <div className="absolute top-[38px] left-0 z-20 w-80 bg-white border border-border rounded-xl shadow-dropdown overflow-hidden">
                     <div className="px-4 py-3 text-xs font-bold text-textSecondary border-b border-hairline">
-                      Cotações em tempo real — cada seguradora precifica este risco de forma diferente
+                      {t('marketplace.liveQuotesHint', 'Cotações em tempo real — cada seguradora precifica este risco de forma diferente')}
                     </div>
                     {offer.insurerOptions.map((ins) => (
                       <button
@@ -271,7 +273,7 @@ export function MarketplacePage() {
                           <div className="font-bold text-[13px] text-navy flex items-center gap-1.5">
                             {ins.name}
                             {ins.recommended && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-greenBg text-green">Melhor cotação</span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-greenBg text-green">{t('marketplace.bestQuote', 'Melhor cotação')}</span>
                             )}
                           </div>
                           <div className="text-textTertiary text-[11.5px] mt-0.5">{ins.selo}</div>
@@ -288,7 +290,7 @@ export function MarketplacePage() {
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-bold border border-inputBorder bg-white text-navy"
                     onClick={() => openFractionalPicker(offer.id)}
                   >
-                    Fracionar
+                    {t('marketplace.fractionalize', 'Fracionar')}
                   </button>
                 )}
                 {fractionalPickerFor === offer.id && (
@@ -303,7 +305,7 @@ export function MarketplacePage() {
                           {fractionalOffering.holdersCount} investidor(es) — {fractionalOffering.tokenValorFmt}/token
                         </div>
                         {fractionalOffering.status === 'concluida' ? (
-                          <div className="text-[12.5px] font-bold text-green">Totalmente alocada.</div>
+                          <div className="text-[12.5px] font-bold text-green">{t('marketplace.fullyAllocated', 'Totalmente alocada.')}</div>
                         ) : (
                           <div className="flex items-center gap-2">
                             <Input
@@ -313,16 +315,16 @@ export function MarketplacePage() {
                               className="flex-1"
                             />
                             <Button size="sm" disabled={fractionalBusy} onClick={() => buyFractionalTokens(offer.id)}>
-                              {fractionalBusy ? 'Comprando…' : 'Comprar tokens'}
+                              {fractionalBusy ? t('marketplace.buying', 'Comprando…') : t('marketplace.buyTokens', 'Comprar tokens')}
                             </Button>
                           </div>
                         )}
                       </>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Input placeholder="quantidade de tokens" value={fractionalTokensInput} onChange={(e) => setFractionalTokensInput(e.target.value)} className="flex-1" />
+                        <Input placeholder={t('marketplace.tokenQtyPlaceholder', 'quantidade de tokens')} value={fractionalTokensInput} onChange={(e) => setFractionalTokensInput(e.target.value)} className="flex-1" />
                         <Button size="sm" disabled={fractionalBusy} onClick={() => buyFractionalTokens(offer.id)}>
-                          {fractionalBusy ? 'Comprando…' : 'Comprar tokens'}
+                          {fractionalBusy ? t('marketplace.buying', 'Comprando…') : t('marketplace.buyTokens', 'Comprar tokens')}
                         </Button>
                       </div>
                     )}
@@ -366,7 +368,7 @@ export function MarketplacePage() {
           );
         })}
 
-        {offers.length === 0 && <EmptyState title="Nenhuma oferta encontrada" hint="Tente buscar por outro sacado ou cedente" />}
+        {offers.length === 0 && <EmptyState title={t('marketplace.emptyTitle', 'Nenhuma oferta encontrada')} hint={t('marketplace.emptyHint', 'Tente buscar por outro sacado ou cedente')} />}
       </div>
     </div>
   );

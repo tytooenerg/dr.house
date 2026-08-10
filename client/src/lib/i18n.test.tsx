@@ -11,6 +11,8 @@ function Probe() {
       <span data-testid="lang">{lang}</span>
       <span data-testid="known">{t('nav.developers', 'Desenvolvedores')}</span>
       <span data-testid="unknown">{t('some.key.never.translated', 'Valor padrão em PT')}</span>
+      <span data-testid="dashboard-title">{t('dashboard.title', 'Visão Geral')}</span>
+      <span data-testid="marketplace-buy-tokens">{t('marketplace.buyTokens', 'Comprar tokens')}</span>
     </div>
   );
 }
@@ -41,6 +43,21 @@ describe('i18n', () => {
     await user.click(screen.getByRole('button', { name: /trocar idioma/i }));
     expect(screen.getByTestId('lang').textContent).toBe('en');
     expect(screen.getByTestId('known').textContent).toBe('Developers');
+  });
+
+  it('translates the Dashboard and Marketplace page chrome keys added beyond nav/footer', async () => {
+    const user = userEvent.setup();
+    render(
+      <LanguageProvider>
+        <Probe />
+        <LanguageToggle />
+      </LanguageProvider>
+    );
+    expect(screen.getByTestId('dashboard-title').textContent).toBe('Visão Geral');
+    expect(screen.getByTestId('marketplace-buy-tokens').textContent).toBe('Comprar tokens');
+    await user.click(screen.getByRole('button', { name: /trocar idioma/i }));
+    expect(screen.getByTestId('dashboard-title').textContent).toBe('Overview');
+    expect(screen.getByTestId('marketplace-buy-tokens').textContent).toBe('Buy tokens');
   });
 
   it('falls back to the PT default for a key with no English translation yet, instead of rendering the raw key', async () => {
