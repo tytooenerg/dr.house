@@ -48,6 +48,7 @@ import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/age
 import { trainModel, getModel, MIN_TRAINING_SAMPLES } from '../lib/mlScoring.js';
 import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 import { computeMetrics } from '../lib/metrics.js';
+import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -840,5 +841,39 @@ adminRouter.post(
     }
     recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.backup_manual', { filename: backup.filename });
     res.json({ backup: { ...backup, quando: fmtRelative(backup.createdAt) } });
+  })
+);
+
+// Feature flags — see lib/featureFlags.ts for the registry and every real gate that
+// respects these. GET always returns every known flag (even ones never overridden), so
+// the panel never has to guess what flags exist.
+adminRouter.get('/feature-flags', (_req, res) => {
+  res.json({ flags: listFeatureFlagViews() });
+});
+
+const featureFlagUpdateSchema = z.object({
+  enabled: z.boolean(),
+  rolloutPct: z.number().int().min(0).max(100).optional().default(100),
+});
+
+adminRouter.post(
+  '/feature-flags/:key',
+  asyncHandler(async (req, res) => {
+    const parsed = featureFlagUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const flag = setFeatureFlag(req.params.key, parsed.data.enabled, parsed.data.rolloutPct, req.user!.id);
+    if (!flag) {
+      res.status(404).json({ error: 'not_found', message: 'Flag desconhecida.' });
+      return;
+    }
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.feature_flag_alterada', {
+      key: req.params.key,
+      enabled: parsed.data.enabled,
+      rolloutPct: parsed.data.rolloutPct,
+    });
+    res.json({ flags: listFeatureFlagViews() });
   })
 );

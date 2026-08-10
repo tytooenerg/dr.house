@@ -224,6 +224,17 @@ The secondary market (`routes/secundario.ts`) was a fixed-price classifieds boar
 
 Both share the same trade-execution path as the original outright-buy flow (`executeResaleTrade`), so settlement/ledger/notification behavior stays consistent across all three ways a resale position can change hands.
 
+### Feature flags administráveis (`lib/featureFlags.ts`, admin **Feature flags** tab)
+
+A code-defined registry (`FEATURE_FLAG_DEFS`) of real operational kill switches, each with its own default and each checked at a genuine call site — not a catalog nobody reads. An admin toggle overrides the code default at runtime (`feature_flags` table, migration `0034_feature_flags.sql`); with no override the app behaves exactly as if the system didn't exist. Ships with four real gates:
+
+- **`new_registrations`** — blocks all three signup paths (e-mail/senha, Google, SAML) at once during an incident, without touching login for existing accounts.
+- **`embeddable_widget`** — pauses the public rate-simulator endpoint that powers the embeddable widget (e.g. if one embedding domain is abusing it) independently of the global rate limiter.
+- **`secondary_market_block_trade`** — pauses institutional block-trade sweeps without affecting ordinary resale buys/bids/listings.
+- **`market_maker_agent`** — a global pause on the Market Maker agent's periodic scan (`lib/marketMakerAgentJob.ts`), separate from each investor's own opt-in, which stays intact and simply resumes once re-enabled.
+
+Also supports a deterministic percentage rollout (`rolloutPct`, hash of flag key + user id, so a given user always lands on the same side instead of flipping between requests) for any future flag that needs a gradual ramp rather than a hard on/off. `GET/POST /admin/feature-flags[/:key]`.
+
 ### Marketing homepage
 
 `/` was previously just an alias for the login screen — there was no actual company website, and the public nav's own "Entrar"/"Falar com vendas" links pointed back at themselves. Added a real homepage (`pages/public/LandingPage.tsx`) covering the whole platform for a general audience (hero, problem/solution, the 5-step emission→liquidation flow, one card per participant — cedente/investidor/sacado/seguradora — product/compliance highlights, and a live stats band pulling real numbers from the same `GET /api/public/stats` the Transparência page uses, not fabricated marketing figures), reusing `PublicNav`/`PublicFooter` for visual consistency with the existing Developers/Preços/Transparência/Legal/Status pages. Login moved to `/login`; every internal link that used to point at `/` expecting the login/signup screen (nav, pricing/developers/embed/404 CTAs, the referral share link, `AppShell`'s auth redirect, the sidebar's logout redirect, and the e2e test suite) was updated to match.

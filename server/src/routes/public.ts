@@ -14,6 +14,7 @@ import { getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
+import { isFeatureEnabled } from '../lib/featureFlags.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
 // the embeddable rate simulator widget — all meant to be called from outside the app
@@ -119,6 +120,13 @@ const simulateSchema = z.object({
 // model as the real Emitir Duplicata flow (lib/emitirCore.ts), just without persisting
 // anything, so the number a visitor sees is never fictional.
 publicRouter.post('/simular', simulateLimiter, (req, res) => {
+  // See lib/featureFlags.ts — an admin can kill the widget endpoint alone (e.g. a
+  // specific embedding domain is abusing it) without touching the public rate limiter
+  // used everywhere else, and without redeploying.
+  if (!isFeatureEnabled('embeddable_widget')) {
+    res.status(503).json({ error: 'feature_disabled', message: 'O widget de simulação está temporariamente indisponível.' });
+    return;
+  }
   const parsed = simulateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });

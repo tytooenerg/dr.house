@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { AgentesIaPanel } from './admin/AgentesIaPanel';
+import { FeatureFlagsPanel } from './admin/FeatureFlagsPanel';
 
 interface PendingKyb {
   id: number;
@@ -211,7 +212,7 @@ const MINUTA_TYPE_LABELS: Record<string, string> = {
   notificacao_padrao: 'Notificação padrão',
 };
 
-type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | 'auditoria';
+type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | 'flags' | 'auditoria';
 type LegalSubTab = 'cobranca' | 'minutas' | 'regulatorio';
 
 export function AdminPage() {
@@ -665,6 +666,7 @@ export function AdminPage() {
           ['juridico', 'Jurídico'],
           ['ia', 'Uso de IA'],
           ['agentes', 'Agentes IA'],
+          ['flags', 'Feature flags'],
           ['auditoria', 'Auditoria'],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -1419,6 +1421,8 @@ export function AdminPage() {
       )}
 
       {tab === 'agentes' && <AgentesIaPanel />}
+
+      {tab === 'flags' && <FeatureFlagsPanel />}
 
       {tab === 'auditoria' && (
         <div className="bg-white border border-border rounded-card overflow-hidden">

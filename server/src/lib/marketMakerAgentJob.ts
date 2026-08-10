@@ -6,6 +6,7 @@ import { addNotification } from '../db/misc.js';
 import { claudeEnabled } from './claude.js';
 import { COLORS } from '../data/seed.js';
 import { logger } from './logger.js';
+import { isFeatureEnabled } from './featureFlags.js';
 
 // Turns the Market Maker agent from "an investor has to remember to click it" into the
 // actual liquidity source the feature promises — same pattern as cobrancaAgentJob.ts and
@@ -21,6 +22,11 @@ export async function runMarketMakerAgentScan(): Promise<{ scanned: number; newP
   // investigation to run automatically, so the job is a documented no-op rather than a
   // fake scan.
   if (!claudeEnabled) return { scanned: 0, newPendingActions: 0 };
+  // Global kill switch (see lib/featureFlags.ts) — distinct from each investor's own
+  // settings.marketMakerEnabled opt-in: this one lets an admin pause automated liquidity
+  // for everyone at once (e.g. during a market disruption) without touching anyone's
+  // individual preference, which stays intact and simply resumes once re-enabled.
+  if (!isFeatureEnabled('market_maker_agent')) return { scanned: 0, newPendingActions: 0 };
 
   let scanned = 0;
   let newPendingActions = 0;

@@ -49,7 +49,17 @@ import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { generateTotpSecret, verifyTotp, otpauthUrl, generateRecoveryCode } from '../lib/totp.js';
 import { setTotpSecret, enableTotp, disableTotp, storeRecoveryCodes, consumeRecoveryCode, countRemainingRecoveryCodes } from '../db/twoFactor.js';
 import { logger } from '../lib/logger.js';
+import { isFeatureEnabled } from '../lib/featureFlags.js';
 import type { UserRow } from '../db/types.js';
+
+// Shared by all three registration entry points (email/senha, Google, SAML) — an admin
+// disabling the 'new_registrations' flag (see routes/admin.ts) during an incident blocks
+// new accounts everywhere at once, without touching login for existing users.
+function registrationsDisabledResponse(res: import('express').Response): boolean {
+  if (isFeatureEnabled('new_registrations')) return false;
+  res.status(503).json({ error: 'feature_disabled', message: 'Novos cadastros estão temporariamente desativados. Tente novamente em breve.' });
+  return true;
+}
 
 export const authRouter = Router();
 
@@ -141,6 +151,7 @@ authRouter.post(
   '/register',
   bruteForceLimiter,
   asyncHandler(async (req, res) => {
+    if (registrationsDisabledResponse(res)) return;
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
@@ -342,6 +353,7 @@ authRouter.post(
   '/google/complete-signup',
   bruteForceLimiter,
   asyncHandler(async (req, res) => {
+    if (registrationsDisabledResponse(res)) return;
     const parsed = completeGoogleSignupSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
@@ -484,6 +496,7 @@ authRouter.post(
   '/saml/complete-signup',
   bruteForceLimiter,
   asyncHandler(async (req, res) => {
+    if (registrationsDisabledResponse(res)) return;
     const parsed = completeSamlSignupSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });

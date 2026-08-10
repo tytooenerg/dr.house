@@ -10,6 +10,7 @@ import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { fmtBRL } from './format.js';
 import { COLORS } from '../data/seed.js';
+import { isFeatureEnabled } from './featureFlags.js';
 
 // Institutional block trade — a single negotiated transaction that sweeps several active
 // resale listings at once, real enough that it needs its own eligibility bar, minimum size,
@@ -65,6 +66,11 @@ export interface BlockTradeResult {
 // optimal execution — a real institutional desk's smart-order-router would weigh sacado
 // concentration, duration, and more.
 export function runBlockTrade(user: UserRow, criteriaRaw: BlockTradeCriteria): ResaleOutcome<BlockTradeResult> {
+  // See lib/featureFlags.ts — lets an admin pause institutional sweeps (e.g. during
+  // volatile market conditions) without touching ordinary resale buys/bids/listings.
+  if (!isFeatureEnabled('secondary_market_block_trade', { userId: user.id })) {
+    return { status: 409, body: { error: 'feature_disabled', message: 'Block trades institucionais estão temporariamente indisponíveis.' } };
+  }
   if (user.role !== 'investidor') {
     return { status: 403, body: { error: 'forbidden', message: 'Apenas contas de investidor podem executar block trades.' } };
   }
