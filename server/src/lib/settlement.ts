@@ -1,5 +1,6 @@
 import { addLedgerEntry } from '../db/misc.js';
 import { recordInsuranceSettlement } from '../db/insuranceSettlements.js';
+import { contributeToFund } from './guaranteeFund.js';
 import { fmtBRL } from './format.js';
 
 // Single source of truth for the platform fee — reused by the Emitir Duplicata preview
@@ -39,6 +40,9 @@ export function settlePurchase(opts: { duplicataId: string; sacadoNome: string; 
       net
     );
   }
+  // See lib/guaranteeFund.ts — a slice of Lastro's own fee, never an extra charge to
+  // either party, seeds the reserve that later covers uninsured defaults.
+  contributeToFund(opts.duplicataId, fee);
   return { fee, net };
 }
 

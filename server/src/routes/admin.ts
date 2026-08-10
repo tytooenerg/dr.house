@@ -50,6 +50,7 @@ import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 import { computeMetrics } from '../lib/metrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
+import { buildFundOverview, listFundClaimsForAdmin, decideFundClaimOutcome, fundClaimDecisionSchema } from '../lib/guaranteeFund.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -767,6 +768,37 @@ adminRouter.get('/regulatorio/cvm-informe.pdf', (req, res) => {
   recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.cvm_informe_gerado', { period });
   streamCvmReportPdf(res, stats);
 });
+
+// Fundo de garantia (lib/guaranteeFund.ts) — an admin reviews each investor-filed claim
+// against an uninsured, overdue duplicata and decides whether the reserve pays out
+// (capped by both FUND_COVERAGE_PCT and the fund's real available balance).
+adminRouter.get('/guarantee-fund', (_req, res) => {
+  res.json(buildFundOverview());
+});
+
+adminRouter.get('/guarantee-fund/claims', (req, res) => {
+  const status = typeof req.query.status === 'string' ? (req.query.status as 'aberto' | 'aprovado' | 'negado') : undefined;
+  res.json({ claims: listFundClaimsForAdmin(status) });
+});
+
+adminRouter.post(
+  '/guarantee-fund/claims/:id/decidir',
+  asyncHandler(async (req, res) => {
+    const parsed = fundClaimDecisionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const outcome = decideFundClaimOutcome(req.user!.id, Number(req.params.id), parsed.data.decision, parsed.data.note);
+    if (outcome.status === 200) {
+      recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.guarantee_fund_claim_decidido', {
+        claimId: Number(req.params.id),
+        decision: parsed.data.decision,
+      });
+    }
+    res.status(outcome.status).json(outcome.body);
+  })
+);
 
 // Shared config/visibility for the 5 add-on revenue products (lib/addOnBilling.ts) —
 // pricing per kind and a combined recent-charges feed, reused across features 1-5.

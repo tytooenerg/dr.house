@@ -10,6 +10,7 @@ interface Stats {
   totalSacadosDistintos: number;
   taxaInadimplenciaPct: number;
   tempoMedioLiquidacaoHoras: number | null;
+  fundoGarantiaFmt: string;
   registradoras: { key: string; nome: string; totalDuplicatas: number }[];
   geradoEm: string;
 }
@@ -62,6 +63,13 @@ export function TransparenciaPage() {
                 label="Tempo médio até liquidação"
                 value={stats.tempoMedioLiquidacaoHoras != null ? `${stats.tempoMedioLiquidacaoHoras}h` : '—'}
                 hint="Entre a emissão e a compra por um investidor"
+              />
+            </div>
+            <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr' }}>
+              <Metric
+                label="Fundo de garantia"
+                value={stats.fundoGarantiaFmt}
+                hint="Reserva real, alimentada por uma fração da taxa de plataforma, para cobrir inadimplência em duplicatas sem seguro contratado"
               />
             </div>
             {stats.registradoras.length > 0 && (

@@ -36,6 +36,12 @@ interface InstitutionalAnalytics {
   ratingDistribution: { rating: string; valorFmt: string; pct: number }[];
   maioresExposicoes: { sacado: string; valorFmt: string; pct: number }[];
 }
+interface FundEligiblePosition {
+  duplicataId: string;
+  sacado: string;
+  valorFmt: string;
+  vencimento: string;
+}
 interface RebalanceView {
   totalInvestidoFmt: string;
   posicoesAtivas: number;
@@ -59,6 +65,10 @@ export function HistoricoPage() {
   const [rebalance, setRebalance] = useState<RebalanceView | null>(null);
   const [irYear, setIrYear] = useState(new Date().getFullYear());
   const [exportingIr, setExportingIr] = useState(false);
+  const [fundEligible, setFundEligible] = useState<FundEligiblePosition[]>([]);
+  const [filingClaimId, setFilingClaimId] = useState<string | null>(null);
+  const [fundClaimError, setFundClaimError] = useState('');
+  const [fundClaimSuccessIds, setFundClaimSuccessIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     api.get<HistoricoData>(`/historico?page=${page}&pageSize=10`).then(setData);
@@ -67,6 +77,26 @@ export function HistoricoPage() {
   useEffect(() => {
     api.get<RebalanceView>('/historico/rebalanceamento').then(setRebalance);
   }, []);
+
+  const loadFundEligible = () => api.get<{ eligible: FundEligiblePosition[] }>('/guarantee-fund/eligible').then((d) => setFundEligible(d.eligible));
+
+  useEffect(() => {
+    loadFundEligible();
+  }, []);
+
+  const fileFundClaim = async (duplicataId: string) => {
+    setFundClaimError('');
+    setFilingClaimId(duplicataId);
+    try {
+      await api.post('/guarantee-fund/claims', { duplicataId });
+      setFundClaimSuccessIds((prev) => new Set(prev).add(duplicataId));
+      await loadFundEligible();
+    } catch (err) {
+      setFundClaimError(err instanceof ApiError ? err.message : 'Não foi possível acionar o fundo de garantia.');
+    } finally {
+      setFilingClaimId(null);
+    }
+  };
 
   useEffect(() => {
     api.get<InstitutionalStatus>('/historico/institutional/status').then(setInstitutional);
@@ -182,6 +212,36 @@ export function HistoricoPage() {
               ))}
             </div>
           )}
+        </Card>
+      )}
+
+      {(fundEligible.length > 0 || fundClaimSuccessIds.size > 0) && (
+        <Card className="mb-4 px-6 py-5">
+          <div className="font-bold text-[14.5px] mb-1">Fundo de garantia</div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">
+            Posições sem seguro contratado que já venceram e ainda não foram pagas — você pode acionar o fundo de garantia da plataforma, que cobre
+            até 80% do valor, limitado ao saldo real disponível no fundo.
+          </div>
+          {fundClaimError && <div className="mb-2 text-red text-[12.5px] font-semibold">{fundClaimError}</div>}
+          <div className="flex flex-col gap-2">
+            {fundEligible.map((p) => (
+              <div key={p.duplicataId} className="flex items-center justify-between text-[12.5px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+                <span className="font-semibold">{p.sacado}</span>
+                <span className="text-textSecondary">venceu em {p.vencimento}</span>
+                <span className="font-mono-num font-bold">{p.valorFmt}</span>
+                <Button size="sm" variant="secondary" disabled={filingClaimId === p.duplicataId} onClick={() => fileFundClaim(p.duplicataId)}>
+                  {filingClaimId === p.duplicataId ? 'Enviando…' : 'Acionar fundo'}
+                </Button>
+              </div>
+            ))}
+            {[...fundClaimSuccessIds]
+              .filter((id) => !fundEligible.some((p) => p.duplicataId === id))
+              .map((id) => (
+                <div key={id} className="text-[12.5px] text-green font-semibold">
+                  Acionamento registrado para {id} — um admin vai revisar.
+                </div>
+              ))}
+          </div>
         </Card>
       )}
 

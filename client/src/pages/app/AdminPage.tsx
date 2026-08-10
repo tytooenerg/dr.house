@@ -145,6 +145,18 @@ interface SarReport {
   quando: string;
 }
 
+interface FundClaim {
+  id: number;
+  duplicataId: string;
+  sacado: string;
+  investidor: string;
+  valorSolicitadoFmt: string;
+  valorPagoFmt: string | null;
+  status: 'aberto' | 'aprovado' | 'negado';
+  note: string | null;
+  createdAt: string;
+}
+
 const SAR_TIPO_LABELS: Record<string, string> = {
   fracionamento: 'Fracionamento',
   entrada_saida_rapida: 'Entrada/saída rápida',
@@ -273,6 +285,10 @@ export function AdminPage() {
   const [downloadingCoafId, setDownloadingCoafId] = useState<number | null>(null);
   const [cvmPeriod, setCvmPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [downloadingCvm, setDownloadingCvm] = useState(false);
+  const [fundClaims, setFundClaims] = useState<FundClaim[]>([]);
+  const [fundBalanceFmt, setFundBalanceFmt] = useState('');
+  const [decidingFundClaimId, setDecidingFundClaimId] = useState<number | null>(null);
+  const [fundNoteById, setFundNoteById] = useState<Record<number, string>>({});
   const [foreignScreeningsById, setForeignScreeningsById] = useState<Record<number, ForeignInvestorScreening[]>>({});
   const [generatingMemoId, setGeneratingMemoId] = useState<number | null>(null);
   const [addonPrices, setAddonPrices] = useState<AddonPrice[]>([]);
@@ -347,6 +363,9 @@ export function AdminPage() {
       setIncludedCalls(d.included);
       setIncludedCallsInput(String(d.included));
     });
+  const loadFundClaims = () =>
+    api.get<{ claims: FundClaim[] }>('/admin/guarantee-fund/claims?status=aberto').then((d) => setFundClaims(d.claims));
+  const loadFundBalance = () => api.get<{ balanceFmt: string }>('/admin/guarantee-fund').then((d) => setFundBalanceFmt(d.balanceFmt));
 
   useEffect(() => {
     loadKyb();
@@ -364,6 +383,8 @@ export function AdminPage() {
     loadBackups();
     loadTedPendentes();
     loadSar();
+    loadFundClaims();
+    loadFundBalance();
     loadAddonPrices();
     loadAddonCobrancas();
     loadApiOverageConfig();
@@ -453,6 +474,20 @@ export function AdminPage() {
       await loadAudit();
     } finally {
       setSarActionId(null);
+    }
+  };
+
+  const decideFundClaim = async (id: number, decision: 'aprovado' | 'negado') => {
+    const note = (fundNoteById[id] ?? '').trim();
+    if (!note) return;
+    setDecidingFundClaimId(id);
+    try {
+      await api.post(`/admin/guarantee-fund/claims/${id}/decidir`, { decision, note });
+      await loadFundClaims();
+      await loadFundBalance();
+      await loadAudit();
+    } finally {
+      setDecidingFundClaimId(null);
     }
   };
 
@@ -1087,6 +1122,54 @@ export function AdminPage() {
                 {downloadingCvm ? 'Gerando…' : 'Baixar informe (PDF)'}
               </Button>
             </div>
+          </div>
+
+          <div className="bg-white border border-border rounded-card p-5 mt-4">
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-bold text-[14px]">Fundo de garantia — acionamentos em aberto</div>
+              <span className="text-[12.5px] font-bold text-textSecondary">Saldo do fundo: {fundBalanceFmt || '—'}</span>
+            </div>
+            <div className="text-textSecondary text-[12.5px] mb-3">
+              Cobre defaults em duplicatas sem seguro contratado, alimentado por 10% da taxa de plataforma — nunca um custo extra ao cedente ou
+              investidor. Pagamento aprovado é limitado a 80% do valor solicitado e ao saldo real disponível.
+            </div>
+            {fundClaims.map((c) => (
+              <div key={c.id} className="rounded-[10px] p-4 mb-3 last:mb-0 border border-border">
+                <div className="flex items-start justify-between gap-2.5 mb-2">
+                  <div>
+                    <div className="font-bold text-[13.5px]">
+                      {c.investidor} <span className="font-normal text-textMuted">— {c.sacado} ({c.duplicataId})</span>
+                    </div>
+                    <div className="text-textSecondary text-[12.5px] mt-1">Solicitado: {c.valorSolicitadoFmt}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[12.5px]"
+                    placeholder="Justificativa da decisão"
+                    value={fundNoteById[c.id] ?? ''}
+                    onChange={(e) => setFundNoteById((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                  />
+                  <Button
+                    size="sm"
+                    variant="success"
+                    disabled={decidingFundClaimId === c.id || !(fundNoteById[c.id] ?? '').trim()}
+                    onClick={() => decideFundClaim(c.id, 'aprovado')}
+                  >
+                    Aprovar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={decidingFundClaimId === c.id || !(fundNoteById[c.id] ?? '').trim()}
+                    onClick={() => decideFundClaim(c.id, 'negado')}
+                  >
+                    Negar
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {fundClaims.length === 0 && <EmptyState title="Nenhum acionamento em aberto" hint="Solicitações do fundo de garantia aparecem aqui" />}
           </div>
         </div>
       )}
