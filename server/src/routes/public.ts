@@ -12,6 +12,7 @@ import { getBoleto, concludeBoleto } from '../db/boletos.js';
 import { parseWebhookTedRecebido } from '../lib/tedRail.js';
 import { getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { addLedgerEntry } from '../db/misc.js';
+import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
@@ -66,8 +67,13 @@ publicRouter.post('/ted-webhook', (req, res) => {
   res.status(200).json({ received: recebidos.length });
 });
 
-publicRouter.get('/stats', (_req, res) => {
-  res.json(buildPublicStats());
+// Fully public, no auth, so it's the platform's highest-traffic real read (the
+// transparency page + anyone embedding it) — cached for a short 30s TTL (lib/cache.ts,
+// real Redis when REDIS_URL is set, an in-memory TTL map otherwise) instead of
+// recomputing the full aggregate on every request. 30s of staleness on public transparency
+// numbers is a real trade-off worth stating, not one worth hiding.
+publicRouter.get('/stats', async (_req, res) => {
+  res.json(await cached('public:stats', 30, () => buildPublicStats()));
 });
 
 publicRouter.get('/status', (_req, res) => {
