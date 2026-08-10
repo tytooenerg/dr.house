@@ -52,6 +52,17 @@ interface RebalanceView {
   sacadoConcentration: { sacado: string; valorFmt: string; pct: number; limitPct: number; overLimit: boolean }[];
   suggestions: { type: string; message: string; valorFmt: string }[];
 }
+interface PerformanceDashboard {
+  positionsCount: number;
+  totalInvestidoFmt: string;
+  retornoMedioPonderadoPct: number;
+  volatilidadePct: number;
+  sharpeLike: number | null;
+  riskFreeRateAnnualPct: number;
+  maiorConcentracaoSacadoPct: number;
+  sacadosDistintos: number;
+  positions: { duplicataId: string; sacado: string; retornoAnualizadoPct: number; diasCarencia: number }[];
+}
 
 const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
 
@@ -71,6 +82,8 @@ export function HistoricoPage() {
   const [filingClaimId, setFilingClaimId] = useState<string | null>(null);
   const [fundClaimError, setFundClaimError] = useState('');
   const [fundClaimSuccessIds, setFundClaimSuccessIds] = useState<Set<string>>(new Set());
+  const [performance, setPerformance] = useState<PerformanceDashboard | null>(null);
+  const [riskFreeInput, setRiskFreeInput] = useState(0);
 
   useEffect(() => {
     api.get<HistoricoData>(`/historico?page=${page}&pageSize=10`).then(setData);
@@ -78,6 +91,14 @@ export function HistoricoPage() {
 
   useEffect(() => {
     api.get<RebalanceView>('/historico/rebalanceamento').then(setRebalance);
+  }, []);
+
+  const loadPerformance = (riskFree: number) => {
+    api.get<PerformanceDashboard>(`/historico/performance?riskFree=${riskFree}`).then(setPerformance);
+  };
+
+  useEffect(() => {
+    loadPerformance(0);
   }, []);
 
   const loadFundEligible = () => api.get<{ eligible: FundEligiblePosition[] }>('/guarantee-fund/eligible').then((d) => setFundEligible(d.eligible));
@@ -269,6 +290,61 @@ export function HistoricoPage() {
           </Button>
         </div>
       </Card>
+
+      {performance && performance.positionsCount > 0 && (
+        <Card className="mb-4 px-6 py-5">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+            <div className="font-bold text-[14.5px]">Desempenho ajustado ao risco</div>
+          </div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">
+            Retorno anualizado ponderado e dispersão entre suas posições atuais — não é uma volatilidade de série temporal (a duplicata não tem
+            marcação a mercado diária), e o retorno livre de risco abaixo é o valor que você informar, não uma taxa CDI/SELIC ao vivo.
+          </div>
+          <div className="flex items-center gap-2.5 mb-3.5">
+            <span className="text-textSecondary text-[12.5px]">Taxa livre de risco (% a.a.)</span>
+            <input
+              type="number"
+              step="0.1"
+              className="w-24 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+              value={riskFreeInput}
+              onChange={(e) => setRiskFreeInput(Number(e.target.value) || 0)}
+            />
+            <Button size="sm" variant="secondary" onClick={() => loadPerformance(riskFreeInput)}>
+              Recalcular
+            </Button>
+          </div>
+          <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <div>
+              <div className="text-textSecondary text-[11.5px] font-bold uppercase">Retorno anualizado médio</div>
+              <div className="font-mono-num text-lg font-extrabold mt-1">{performance.retornoMedioPonderadoPct.toFixed(2).replace('.', ',')}%</div>
+            </div>
+            <div>
+              <div className="text-textSecondary text-[11.5px] font-bold uppercase">Volatilidade (dispersão)</div>
+              <div className="font-mono-num text-lg font-extrabold mt-1">{performance.volatilidadePct.toFixed(2).replace('.', ',')}%</div>
+            </div>
+            <div>
+              <div className="text-textSecondary text-[11.5px] font-bold uppercase">Índice tipo Sharpe</div>
+              <div className="font-mono-num text-lg font-extrabold mt-1">{performance.sharpeLike == null ? '—' : performance.sharpeLike.toFixed(2).replace('.', ',')}</div>
+            </div>
+            <div>
+              <div className="text-textSecondary text-[11.5px] font-bold uppercase">Maior concentração (sacado)</div>
+              <div className="font-mono-num text-lg font-extrabold mt-1">{performance.maiorConcentracaoSacadoPct.toFixed(1).replace('.', ',')}%</div>
+            </div>
+          </div>
+          <div className="text-textTertiary text-[11.5px] mb-2">
+            {performance.positionsCount} posições · {performance.sacadosDistintos} sacados distintos · {performance.totalInvestidoFmt} investidos
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {performance.positions.slice(0, 8).map((p) => (
+              <div key={p.duplicataId} className="flex items-center justify-between text-[12.5px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+                <span className="font-semibold flex-1 min-w-0 truncate">{p.sacado}</span>
+                <span className="text-textSecondary">{p.diasCarencia}d</span>
+                <span className="font-mono-num font-bold ml-3">{p.retornoAnualizadoPct.toFixed(2).replace('.', ',')}% a.a.</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="mb-4 px-6 py-5">
         <div className="font-bold text-[14.5px] mb-3.5">Saúde da carteira — mesma linguagem usada em FIDCs</div>

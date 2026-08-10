@@ -9,6 +9,7 @@ import { fmtAddOnPrice } from '../lib/addOnBilling.js';
 import { buildInstitutionalAnalytics, streamInstitutionalReportPdf } from '../lib/institutionalReporting.js';
 import { buildRebalanceView } from '../lib/portfolioRebalance.js';
 import { buildIncomeTaxStatement, streamIncomeTaxStatementPdf } from '../lib/incomeTaxStatement.js';
+import { buildPerformanceDashboard } from '../lib/investorPerformance.js';
 import { fmtBRL, toIsoUtc } from '../lib/format.js';
 
 export const historicoRouter = Router();
@@ -183,4 +184,29 @@ historicoRouter.get('/informe-rendimentos.pdf', (req, res) => {
   const year = resolveYear(req.query.year);
   const statement = buildIncomeTaxStatement(owner.id, owner.company_name, year);
   streamIncomeTaxStatementPdf(res, statement);
+});
+
+// Risk-adjusted performance (lib/investorPerformance.ts) — free for every investidor, same
+// as the rebalancing suggestions and informe de rendimentos above. `year` is optional
+// (all-time when omitted, unlike informe-rendimentos which always resolves to a specific
+// year); `riskFree` is caller-supplied, never a hardcoded "current CDI/SELIC" this codebase
+// has no live, verified source for.
+function resolveOptionalYear(raw: unknown): number | null {
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  const currentYear = new Date().getUTCFullYear();
+  if (Number.isInteger(n) && n >= 2020 && n <= currentYear) return n;
+  return null;
+}
+
+function resolveRiskFree(raw: unknown): number {
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(-50, Math.min(50, n)) : 0;
+}
+
+historicoRouter.get('/performance', (req, res) => {
+  const owner = effectiveOwnerId(req.user!);
+  const year = resolveOptionalYear(req.query.year);
+  const riskFreeRateAnnualPct = resolveRiskFree(req.query.riskFree);
+  res.json(buildPerformanceDashboard(owner, { year, riskFreeRateAnnualPct }));
 });
