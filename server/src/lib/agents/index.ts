@@ -1,4 +1,4 @@
-import type { AgentDefinition } from '../agentRuntime.js';
+import { registerAgentRegistry, type AgentDefinition } from '../agentRuntime.js';
 import type { Role } from '../../db/types.js';
 import { emissaoAgent } from './emissao.js';
 import { underwritingAgent } from './underwriting.js';
@@ -28,6 +28,10 @@ export const AGENTS: Record<string, AgentDefinition> = {
   [suporteAgent.id]: suporteAgent,
   [comercialAgent.id]: comercialAgent,
 };
+
+// Lets agentRuntime.ts's handoff tool (createHandoffTool) call another agent by id without
+// this module and agentRuntime.ts importing each other — see the comment there.
+registerAgentRegistry(AGENTS);
 
 // Admins see every agent regardless of role. Everyone else only sees the ones whose
 // selfServiceRoles include their role — and only ever in the context of their own account,

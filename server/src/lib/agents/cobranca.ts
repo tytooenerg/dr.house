@@ -2,14 +2,15 @@ import { getDuplicata, listOverdueDuplicatas } from '../../db/duplicatas.js';
 import { checkCollectionEligibility, generateCollectionDraft, type CollectionDocType } from '../legalCollection.js';
 import { recordLegalDocument } from '../../db/legalDocuments.js';
 import { fmtBRL } from '../format.js';
-import type { AgentDefinition } from '../agentRuntime.js';
+import { createHandoffTool, type AgentDefinition } from '../agentRuntime.js';
 
 export const cobrancaAgent: AgentDefinition = {
   id: 'cobranca',
   label: 'Agente de Cobrança',
   description: 'Acompanha duplicatas vencidas, verifica elegibilidade para cobrança jurídica e escala para notificação/protesto/execução quando apropriado.',
-  systemPrompt: `Você é o agente de régua de cobrança da Lastro. Use listar_vencidas para ver duplicatas em atraso, ou vá direto a um ID conhecido. Para cada caso, primeiro chame checar_elegibilidade — cobrança jurídica exige a duplicata vencida, o aceite confirmado pelo sacado, e nenhuma disputa aberta. Se elegível, escolha a ação proporcional aos dias de atraso: poucos dias em atraso → notificacao_cobranca; atraso maior sem resposta → minuta_protesto; casos extremos e antigos → peticao_execucao. Chame escalar_cobranca só quando a elegibilidade for confirmada — essa ação é sensível, sempre passa por aprovação humana e revisão de um advogado antes de qualquer envio real. Ao final, explique sua decisão para cada caso analisado.`,
+  systemPrompt: `Você é o agente de régua de cobrança da Lastro. Use listar_vencidas para ver duplicatas em atraso, ou vá direto a um ID conhecido. Para cada caso, primeiro chame checar_elegibilidade — cobrança jurídica exige a duplicata vencida, o aceite confirmado pelo sacado, e nenhuma disputa aberta. Se elegível, escolha a ação proporcional aos dias de atraso: poucos dias em atraso → notificacao_cobranca; atraso maior sem resposta → minuta_protesto; casos extremos e antigos → peticao_execucao. Se a checagem de elegibilidade indicar uma disputa em aberto, acione o agente de disputas (acionar_agente) para uma avaliação mais completa em vez de simplesmente marcar como não elegível. Chame escalar_cobranca só quando a elegibilidade for confirmada — essa ação é sensível, sempre passa por aprovação humana e revisão de um advogado antes de qualquer envio real. Ao final, explique sua decisão para cada caso analisado.`,
   tools: [
+    createHandoffTool(['disputa_sinistro']),
     {
       name: 'listar_vencidas',
       description: 'Lista duplicatas atualmente vencidas (não pagas, prazo de vencimento já passado).',

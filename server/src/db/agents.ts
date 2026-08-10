@@ -100,6 +100,16 @@ export function getLatestAgentRunForSubject(agentId: string, subjectType: string
     .get(agentId, subjectType, subjectId) as AgentRunRow | undefined;
 }
 
+// Cross-agent memory (lib/agentRuntime.ts's buildPriorContext): every prior *completed*
+// run against the same real-world subject, regardless of which of the 10 agents produced
+// it — a cobrança run on a duplicata should see what the underwriting agent already found
+// about it, not start blind every time.
+export function listAgentRunsForSubject(subjectType: string, subjectId: string, limit = 5): AgentRunRow[] {
+  return db
+    .prepare(`SELECT * FROM agent_runs WHERE subject_type = ? AND subject_id = ? AND status = 'concluido' ORDER BY id DESC LIMIT ?`)
+    .all(subjectType, subjectId, limit) as AgentRunRow[];
+}
+
 // Dedup guard for background jobs (cobrança agent scan) — skip a subject that was already
 // scanned recently regardless of outcome, so a job running every few hours doesn't re-spend
 // tokens investigating the same case over and over while nothing has changed.

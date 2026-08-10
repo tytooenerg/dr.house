@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { askClaudeWithTools, claudeEnabled } from './claude.js';
 import { logger } from './logger.js';
-import { addAgentStep, createAgentRun, createPendingAction, finishAgentRun } from '../db/agents.js';
+import { addAgentStep, createAgentRun, createPendingAction, finishAgentRun, listAgentRunsForSubject } from '../db/agents.js';
 import { isAgentEnabled, isAgentOverBudget, getAgentDailyBudgetUsd, getDualApprovalThresholdBrl } from './agentGovernance.js';
 import type { Role } from '../db/types.js';
 
@@ -16,6 +16,12 @@ import type { Role } from '../db/types.js';
 export interface AgentRunContext {
   runId: number;
   userId?: number;
+  subjectType?: string;
+  subjectId?: string;
+  // How many agent-to-agent handoffs deep this run is (0 = a top-level run). Only a
+  // top-level run may hand off (see createHandoffTool) — a run that itself resulted from a
+  // handoff cannot hand off again, a simple, hard guard against a handoff loop.
+  handoffDepth?: number;
 }
 
 export interface AgentToolDef<TInput = any> {
@@ -86,6 +92,69 @@ export interface RunAgentOptions {
   userId?: number;
   subjectType?: string;
   subjectId?: string;
+  handoffDepth?: number;
+}
+
+// Cross-agent memory: every prior *completed* run against the same real-world subject
+// (subjectType/subjectId — e.g. a duplicataId, a userId), regardless of which agent
+// produced it, gets folded into the system prompt as reference context. A cobrança run on
+// a duplicata the underwriting agent already investigated doesn't start blind — it's told
+// what was already found, though it's still instructed to verify current data rather than
+// trust old context blindly (state changes: a duplicata that was clean yesterday can be
+// flagged today).
+async function buildPriorContext(subjectType: string | undefined, subjectId: string | undefined, excludeRunId: number): Promise<string> {
+  if (!subjectType || !subjectId) return '';
+  const prior = listAgentRunsForSubject(subjectType, subjectId, 5).filter((r) => r.id !== excludeRunId && r.summary);
+  if (prior.length === 0) return '';
+  const lines = prior.map((r) => `- [agente ${r.agent_id}, ${r.created_at}] ${r.summary}`).join('\n');
+  return `\n\n---\nContexto de investigações anteriores de outros agentes sobre este mesmo caso (${subjectType}=${subjectId}) — use como referência, mas confirme dados atuais via ferramentas quando relevante, pois o estado pode ter mudado:\n${lines}`;
+}
+
+const MAX_HANDOFF_DEPTH = 1;
+
+// Lazily injected by lib/agents/index.ts once every agent is defined — avoids a circular
+// import (agentRuntime.ts would otherwise have to import agents/index.ts, which imports
+// every agent file, which imports agentRuntime.ts for the AgentDefinition type). The
+// handoff tool's handler only reads this at call time, long after the whole module graph
+// has finished loading.
+let agentRegistry: Record<string, AgentDefinition> | null = null;
+export function registerAgentRegistry(registry: Record<string, AgentDefinition>) {
+  agentRegistry = registry;
+}
+
+// Factory for a generic "call another agent" tool — attach it to an agent's `tools` array
+// wherever a real handoff makes sense (e.g. Emissão handing an uncertain case to
+// Underwriting). Never sensitive itself: it doesn't write anything on its own, it just
+// runs another agent's own loop, which enforces its own sensitive/governance rules exactly
+// as if it had been invoked directly.
+export function createHandoffTool(callableAgentIds: string[]): AgentToolDef<{ agentId: string; instrucao: string }> {
+  return {
+    name: 'acionar_agente',
+    description: `Aciona outro agente da Lastro para investigar algo fora do escopo deste, repassando o contexto necessário. Agentes disponíveis para acionar: ${callableAgentIds.join(', ')}. Use apenas quando a investigação realmente precisar da especialidade do outro agente.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agentId: { type: 'string', enum: callableAgentIds },
+        instrucao: { type: 'string', description: 'O que o outro agente deve investigar, com todo o contexto necessário (ele não vê esta conversa).' },
+      },
+      required: ['agentId', 'instrucao'],
+    },
+    handler: async (input, ctx) => {
+      const depth = ctx.handoffDepth ?? 0;
+      if (depth >= MAX_HANDOFF_DEPTH) return { erro: 'Profundidade máxima de encadeamento de agentes atingida — investigue diretamente com as ferramentas disponíveis.' };
+      if (!agentRegistry) return { erro: 'Registro de agentes indisponível.' };
+      const target = agentRegistry[input.agentId];
+      if (!target || !callableAgentIds.includes(input.agentId)) return { erro: `Agente "${input.agentId}" não pode ser acionado a partir daqui.` };
+      const outcome = await runAgent(target, {
+        input: input.instrucao,
+        userId: ctx.userId,
+        subjectType: ctx.subjectType,
+        subjectId: ctx.subjectId,
+        handoffDepth: depth + 1,
+      });
+      return { agenteAcionado: input.agentId, runId: outcome.runId, status: outcome.status, resumo: outcome.summary, acoesPendentesCriadas: outcome.pendingActions.length };
+    },
+  };
 }
 
 export async function runAgent(def: AgentDefinition, opts: RunAgentOptions): Promise<AgentRunOutcome> {
@@ -134,11 +203,18 @@ export async function runAgent(def: AgentDefinition, opts: RunAgentOptions): Pro
   const maxSteps = def.maxSteps ?? DEFAULT_MAX_STEPS;
   const steps: AgentRunStepView[] = [];
   const pendingActions: AgentRunOutcome['pendingActions'] = [];
-  const ctx: AgentRunContext = { runId, userId: opts.userId };
+  const ctx: AgentRunContext = {
+    runId,
+    userId: opts.userId,
+    subjectType: opts.subjectType,
+    subjectId: opts.subjectId,
+    handoffDepth: opts.handoffDepth ?? 0,
+  };
+  const system = def.systemPrompt + (await buildPriorContext(opts.subjectType, opts.subjectId, runId));
 
   for (let step = 0; step < maxSteps; step++) {
     const message = await askClaudeWithTools({
-      system: def.systemPrompt,
+      system,
       messages,
       tools,
       maxTokens: 1500,

@@ -3,15 +3,16 @@ import { buildBlendedRiscoView } from '../riscoCore.js';
 import { computeEmitirPreview, submitEmitir, emitirFormSchema } from '../emitirCore.js';
 import { getUserById } from '../../db/users.js';
 import { parseBRLNumber } from '../format.js';
-import type { AgentDefinition } from '../agentRuntime.js';
+import { createHandoffTool, type AgentDefinition } from '../agentRuntime.js';
 
 export const emissaoAgent: AgentDefinition = {
   id: 'emissao',
   label: 'Agente de Emissão',
   description: 'Investiga duplicidade e risco do sacado antes de decidir se uma duplicata pode ser emitida e registrada na registradora.',
   selfServiceRoles: ['cedente'],
-  systemPrompt: `Você é o agente de emissão da Lastro, uma plataforma de duplicata escritural. Um cedente quer emitir uma duplicata. Antes de decidir, investigue: (1) se há duplicidade suspeita para o mesmo sacado/valor/vencimento, usando checar_duplicidade; (2) o risco de crédito do sacado, usando consultar_risco_sacado, quando houver CNPJ. Use calcular_preview_emissao para ver o checklist de completude. Só chame emitir_duplicata se a checagem de duplicidade não indicar duplicidade suspeita. Se indicar, explique o motivo de não emitir e pare — não chame emitir_duplicata nesse caso. Ao final, escreva um resumo objetivo em português explicando sua decisão e os dados que você usou para chegar nela — nunca invente dados que as ferramentas não retornaram.`,
+  systemPrompt: `Você é o agente de emissão da Lastro, uma plataforma de duplicata escritural. Um cedente quer emitir uma duplicata. Antes de decidir, investigue: (1) se há duplicidade suspeita para o mesmo sacado/valor/vencimento, usando checar_duplicidade; (2) o risco de crédito do sacado, usando consultar_risco_sacado, quando houver CNPJ. Use calcular_preview_emissao para ver o checklist de completude. Se o risco do sacado vier ambíguo ou sem histórico suficiente para decidir com confiança, você pode acionar_agente para pedir um parecer mais aprofundado ao agente de underwriting antes de decidir. Só chame emitir_duplicata se a checagem de duplicidade não indicar duplicidade suspeita. Se indicar, explique o motivo de não emitir e pare — não chame emitir_duplicata nesse caso. Ao final, escreva um resumo objetivo em português explicando sua decisão e os dados que você usou para chegar nela — nunca invente dados que as ferramentas não retornaram.`,
   tools: [
+    createHandoffTool(['underwriting']),
     {
       name: 'checar_duplicidade',
       description: 'Verifica se já existe outra duplicata registrada para o mesmo CNPJ, ID ou chave de NF-e — sinal clássico de financiamento duplicado.',
