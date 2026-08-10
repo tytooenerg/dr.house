@@ -5,6 +5,7 @@ import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
+import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 
 interface EmitForm {
   sacado: string;
@@ -146,6 +147,14 @@ export function EmitirPage() {
         subtitle="Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma"
         right={<span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-greenBg text-green">Aprovação em minutos · dinheiro em até 24h</span>}
       />
+
+      <div className="mb-4">
+        <SelfServiceAgentCard
+          agentId="emissao"
+          title="Deixe a IA investigar e emitir para você"
+          placeholder="Ex: emita uma duplicata de R$ 50.000 para o Grupo Atlas Varejo (CNPJ 58.442.111/0001-27), vencimento em 30 dias, com seguro"
+        />
+      </div>
 
       <div className="grid gap-4 items-start" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
         <Card className="p-7 flex flex-col gap-4">

@@ -34,6 +34,9 @@ import { recordAuditEvent } from '../db/audit.js';
 import { INSURERS, KYB_TIPOS, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { runPldScreening } from '../lib/pldScreening.js';
+import { runAgent } from '../lib/agentRuntime.js';
+import { onboardingAgent } from '../lib/agents/onboarding.js';
+import { claudeEnabled } from '../lib/claude.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { generateTotpSecret, verifyTotp, otpauthUrl, generateRecoveryCode } from '../lib/totp.js';
 import { setTotpSecret, enableTotp, disableTotp, storeRecoveryCodes, consumeRecoveryCode, countRemainingRecoveryCodes } from '../db/twoFactor.js';
@@ -419,6 +422,21 @@ authRouter.post(
     recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj, naoResidente: parsed.data.naoResidente });
     const screeningId = parsed.data.naoResidente ? parsed.data.taxIdEstrangeiro : parsed.data.cnpj;
     await runPldScreening(userId, req.user!.company_name, screeningId);
+
+    // Pre-triage, fire-and-forget: the Onboarding agent investigates this account (sanções,
+    // histórico judicial) in the background so the admin KYB queue can show a ready
+    // recommendation instead of the admin starting from zero. Never blocks the response,
+    // never itself approves/rejects — aprovar_kyb/rejeitar_kyb stay sensitive/gated exactly
+    // like a manually-triggered run. A no-op (not even a wasted "simulado" row) when
+    // ANTHROPIC_API_KEY isn't configured, same discipline as every other agent job.
+    if (claudeEnabled) {
+      void runAgent(onboardingAgent, {
+        input: `Uma empresa acabou de submeter o KYB para análise (userId=${userId}). Investigue sanções/PEP e histórico judicial e recomende aprovar ou rejeitar, com evidências concretas.`,
+        subjectType: 'user',
+        subjectId: String(userId),
+      }).catch((err) => logger.warn({ err, userId }, '[onboarding-agent] falha na pré-triagem automática'));
+    }
+
     const refreshed = getUserById(userId)!;
     res.json({ user: publicUser(refreshed) });
   })

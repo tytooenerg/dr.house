@@ -8,6 +8,7 @@ export const emissaoAgent: AgentDefinition = {
   id: 'emissao',
   label: 'Agente de Emissão',
   description: 'Investiga duplicidade e risco do sacado antes de decidir se uma duplicata pode ser emitida e registrada na registradora.',
+  selfServiceRoles: ['cedente'],
   systemPrompt: `Você é o agente de emissão da Lastro, uma plataforma de duplicata escritural. Um cedente quer emitir uma duplicata. Antes de decidir, investigue: (1) se há duplicidade suspeita para o mesmo sacado/valor/vencimento, usando checar_duplicidade; (2) o risco de crédito do sacado, usando consultar_risco_sacado, quando houver CNPJ. Use calcular_preview_emissao para ver o checklist de completude. Só chame emitir_duplicata se a checagem de duplicidade não indicar duplicidade suspeita. Se indicar, explique o motivo de não emitir e pare — não chame emitir_duplicata nesse caso. Ao final, escreva um resumo objetivo em português explicando sua decisão e os dados que você usou para chegar nela — nunca invente dados que as ferramentas não retornaram.`,
   tools: [
     {
@@ -46,8 +47,9 @@ export const emissaoAgent: AgentDefinition = {
     {
       name: 'emitir_duplicata',
       description:
-        'Registra de verdade a duplicata na registradora e a submete ao Compliance AI Engine. Ação sensível — sempre passa por aprovação humana antes de executar.',
+        'Registra de verdade a duplicata na registradora e a submete ao Compliance AI Engine. Ação sensível — sempre passa por aprovação antes de executar (o próprio cedente pode aprovar a sua, é o mesmo efeito de um envio manual do formulário).',
       sensitive: true,
+      selfApprovable: true,
       inputSchema: {
         type: 'object',
         properties: {

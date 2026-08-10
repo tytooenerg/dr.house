@@ -10,6 +10,7 @@ import { startSuspiciousActivityJob } from './lib/suspiciousActivityMonitor.js';
 import { startApiOverageBillingJob } from './lib/apiOverageBilling.js';
 import { startWhitelabelPlusBillingJob } from './lib/whitelabelBilling.js';
 import { startInstitutionalReportingBillingJob } from './lib/institutionalReporting.js';
+import { startCobrancaAgentJob } from './lib/cobrancaAgentJob.js';
 import { logger } from './lib/logger.js';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -26,6 +27,7 @@ async function main() {
   startApiOverageBillingJob();
   startWhitelabelPlusBillingJob();
   startInstitutionalReportingBillingJob();
+  startCobrancaAgentJob();
   server.listen(PORT, () => {
     logger.info(`Lastro API listening on http://localhost:${PORT} (WebSocket at /ws/market)`);
   });

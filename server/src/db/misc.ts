@@ -20,6 +20,16 @@ export function addNotification(userId: number, text: string, color: string, cat
   }
 }
 
+// Fan-out to every admin account — used by background jobs (the cobrança agent scan, the
+// onboarding pre-triage) that create something an admin needs to look at but have no
+// single "owner" to notify the way a normal user-triggered event does. No category, so it
+// never fires email/WhatsApp on its own — an admin sees it in the in-app bell, same as
+// checking the Agentes IA pending queue directly.
+export function notifyAdmins(text: string, color: string) {
+  const admins = db.prepare("SELECT id FROM users WHERE role = 'admin' AND deleted_at IS NULL").all() as { id: number }[];
+  for (const a of admins) addNotification(a.id, text, color);
+}
+
 export function listNotifications(userId: number, limit = 20) {
   return db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?').all(userId, limit) as {
     id: number;

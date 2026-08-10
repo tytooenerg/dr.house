@@ -1,4 +1,5 @@
 import type { AgentDefinition } from '../agentRuntime.js';
+import type { Role } from '../../db/types.js';
 import { emissaoAgent } from './emissao.js';
 import { underwritingAgent } from './underwriting.js';
 import { pldAgent } from './pld.js';
@@ -28,13 +29,23 @@ export const AGENTS: Record<string, AgentDefinition> = {
   [comercialAgent.id]: comercialAgent,
 };
 
-export function listAgentSummaries() {
-  return Object.values(AGENTS).map((a) => ({
-    id: a.id,
-    label: a.label,
-    description: a.description,
-    tools: a.tools.map((t) => ({ name: t.name, description: t.description, sensitive: !!t.sensitive })),
-  }));
+// Admins see every agent regardless of role. Everyone else only sees the ones whose
+// selfServiceRoles include their role — and only ever in the context of their own account,
+// enforced server-side in routes/agents.ts, never by what this listing merely omits.
+export function listAgentSummaries(role?: Role) {
+  return Object.values(AGENTS)
+    .filter((a) => !role || role === 'admin' || (a.selfServiceRoles ?? []).includes(role))
+    .map((a) => ({
+      id: a.id,
+      label: a.label,
+      description: a.description,
+      selfService: !!role && role !== 'admin',
+      tools: a.tools.map((t) => ({ name: t.name, description: t.description, sensitive: !!t.sensitive, selfApprovable: !!t.selfApprovable })),
+    }));
+}
+
+export function canRunSelfService(def: AgentDefinition, role: Role): boolean {
+  return (def.selfServiceRoles ?? []).includes(role);
 }
 
 export function getAgent(id: string): AgentDefinition | undefined {

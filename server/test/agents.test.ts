@@ -60,20 +60,84 @@ describe('agentic AI layer — API authorization', () => {
     expect(res.status).toBe(401);
   });
 
-  it('is forbidden for non-admin roles', async () => {
-    const reg = await request(app)
-      .post('/api/auth/register')
-      .send({ nome: 'Carlos', email: `ced-${unique()}@example.com`, password: 'senha123', companyName: 'C Ltda', role: 'cedente' });
-    const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${reg.body.token}`);
-    expect(res.status).toBe(403);
-  });
-
   it('lists all 10 agents for an admin', async () => {
     const tok = await adminToken();
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${tok}`);
     expect(res.status).toBe(200);
     expect(res.body.agents).toHaveLength(10);
     expect(typeof res.body.llmEnabled).toBe('boolean');
+  });
+});
+
+describe('agentic AI layer — self-service scoping (cedente/investidor)', () => {
+  async function registerAndLogin(role: 'cedente' | 'investidor') {
+    const email = `${role}-${unique()}@example.com`;
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ nome: 'Self Service', email, password: 'senha123', companyName: `${role} Ltda`, role });
+    return { token: reg.body.token as string, userId: reg.body.user.id as number, email };
+  }
+
+  it('only exposes the agent(s) allowed for that role, never the full 10', async () => {
+    const { token } = await registerAndLogin('cedente');
+    const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.agents.map((a: { id: string }) => a.id)).toEqual(['emissao']);
+
+    const inv = await registerAndLogin('investidor');
+    const res2 = await request(app).get('/api/agents').set('Authorization', `Bearer ${inv.token}`);
+    expect(res2.body.agents.map((a: { id: string }) => a.id)).toEqual(['autobid']);
+  });
+
+  it('lets a cedente run the emissão agent on itself, but not the pld agent', async () => {
+    const { token } = await registerAndLogin('cedente');
+    const ok = await request(app).post('/api/agents/emissao/run').set('Authorization', `Bearer ${token}`).send({ input: 'emita uma duplicata teste' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.mode).toBe('simulado'); // no ANTHROPIC_API_KEY in tests — still proves the route accepted the role
+
+    const blocked = await request(app).post('/api/agents/pld/run').set('Authorization', `Bearer ${token}`).send({ input: 'investigue essa empresa' });
+    expect(blocked.status).toBe(403);
+  });
+
+  it('ignores actingUserId from a non-admin caller — always forced onto their own account', async () => {
+    const { token, userId } = await registerAndLogin('cedente');
+    const other = await registerAndLogin('cedente');
+    const res = await request(app)
+      .post('/api/agents/emissao/run')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ input: 'teste', actingUserId: other.userId });
+    expect(res.status).toBe(200);
+    // The run was recorded under the caller's own id, not the id they tried to impersonate.
+    const runsRes = await request(app).get('/api/agents/runs').set('Authorization', `Bearer ${token}`);
+    expect(runsRes.body.runs[0].user_id).toBe(userId);
+    expect(runsRes.body.runs[0].user_id).not.toBe(other.userId);
+  });
+
+  it('lets the owning cedente approve their own selfApprovable pending action, but not another sensitive tool', async () => {
+    const { token, userId } = await registerAndLogin('cedente');
+    const runId = createAgentRun({ agentId: 'emissao', userId, subjectType: null, subjectId: null, input: 'teste', mode: 'llm' });
+    const ownPending = createPendingAction({
+      runId,
+      agentId: 'emissao',
+      toolName: 'emitir_duplicata',
+      input: { sacado: 'Teste Ltda', valor: '1.000,00', vencimento: '2030-01-01' },
+    });
+
+    // Another cedente cannot touch it.
+    const stranger = await registerAndLogin('cedente');
+    const strangerAttempt = await request(app).post(`/api/agents/pending/${ownPending}/approve`).set('Authorization', `Bearer ${stranger.token}`).send({});
+    expect(strangerAttempt.status).toBe(403);
+
+    // The owner can — same effect a manual "Emitir" submit would have.
+    const approved = await request(app).post(`/api/agents/pending/${ownPending}/approve`).set('Authorization', `Bearer ${token}`).send({});
+    expect(approved.status).toBe(200);
+    expect(approved.body.ok).toBe(true);
+
+    // A non-selfApprovable sensitive tool (even on the caller's own run) still requires admin.
+    const pldRunId = createAgentRun({ agentId: 'pld', userId, subjectType: null, subjectId: null, input: 'teste', mode: 'llm' });
+    const pldPending = createPendingAction({ runId: pldRunId, agentId: 'pld', toolName: 'sinalizar_pld', input: { userId, descricao: 'x' } });
+    const selfApproveAttempt = await request(app).post(`/api/agents/pending/${pldPending}/approve`).set('Authorization', `Bearer ${token}`).send({});
+    expect(selfApproveAttempt.status).toBe(403);
   });
 });
 

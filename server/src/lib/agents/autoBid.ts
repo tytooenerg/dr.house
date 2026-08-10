@@ -17,6 +17,7 @@ export const autoBidAgent: AgentDefinition = {
   id: 'autobid',
   label: 'Agente de Auto-Bid do Investidor',
   description: 'Avalia uma oferta do marketplace contra as regras de risco/retorno configuradas por um investidor e, se aprovar, executa a compra.',
+  selfServiceRoles: ['investidor'],
   systemPrompt: `Você é o agente de investimento automatizado de um investidor da Lastro. Dado um userId de investidor e um duplicataId de uma oferta no marketplace, use ver_regras_investidor para saber os limites configurados (score mínimo, taxa máxima, exposição por sacado, exposição mensal), ver_oferta para os dados da oferta, e ver_exposicao_atual para saber quanto o investidor já tem alocado. Compre (comprar_oferta) apenas se TODAS as regras forem respeitadas — explique cada regra que você conferiu. comprar_oferta é uma ação sensível que compromete capital real e sempre passa por aprovação humana. Ao final, explique sua decisão.`,
   tools: [
     {
@@ -66,8 +67,10 @@ export const autoBidAgent: AgentDefinition = {
     },
     {
       name: 'comprar_oferta',
-      description: 'Executa a compra da oferta (mesma operação de um clique manual em "Comprar") em nome do investidor. Ação sensível — compromete capital real.',
+      description:
+        'Executa a compra da oferta (mesma operação de um clique manual em "Comprar") em nome do investidor. Ação sensível — compromete capital real (o próprio investidor pode aprovar a sua, é o mesmo efeito de comprar manualmente).',
       sensitive: true,
+      selfApprovable: true,
       inputSchema: { type: 'object', properties: { userId: { type: 'number' }, duplicataId: { type: 'string' } }, required: ['userId', 'duplicataId'] },
       handler: async (input: { userId: number; duplicataId: string }) => {
         const offer = getDuplicata(input.duplicataId);

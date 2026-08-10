@@ -44,11 +44,32 @@ import { sumAddOnChargesByKind, listRecentAddOnCharges, type AddOnKind } from '.
 import { getIncludedCallsPerMonth, setIncludedCallsPerMonth, runApiOverageBilling } from '../lib/apiOverageBilling.js';
 import { runWhitelabelPlusBilling } from '../lib/whitelabelBilling.js';
 import { runInstitutionalReportingBilling } from '../lib/institutionalReporting.js';
+import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/agents.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
+
+// Surfaces the Onboarding agent's pre-triage (auto-triggered on KYB submission — see
+// routes/auth.ts POST /kyb) instead of making the admin re-run it: the most recent run
+// against this user, plus whether it already proposed an aprovar_kyb/rejeitar_kyb pending
+// action the admin can act on directly from this queue. Returns null when no run exists
+// yet (ANTHROPIC_API_KEY wasn't configured at submission time, or it's still running).
+function buildAiTriage(userId: number) {
+  const run = getLatestAgentRunForSubject('onboarding', 'user', String(userId));
+  if (!run) return null;
+  const pending = listPendingActionsForRun(run.id).find(
+    (p) => p.status === 'pendente' && (p.tool_name === 'aprovar_kyb' || p.tool_name === 'rejeitar_kyb')
+  );
+  return {
+    runId: run.id,
+    status: run.status,
+    summary: run.summary,
+    pendingActionId: pending?.id ?? null,
+    pendingActionTool: (pending?.tool_name as 'aprovar_kyb' | 'rejeitar_kyb' | undefined) ?? null,
+  };
+}
 
 adminRouter.get('/kyb', (_req, res) => {
   const pending = listPendingKyb().map((u) => {
@@ -63,6 +84,7 @@ adminRouter.get('/kyb', (_req, res) => {
       submittedAt: fmtRelative(u.created_at),
       pldStatus: u.pld_status,
       pldMatchNote: u.pld_match_note,
+      aiTriage: buildAiTriage(u.id),
     };
   });
   res.json({ pending });

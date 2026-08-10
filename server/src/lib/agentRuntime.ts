@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { askClaudeWithTools, claudeEnabled } from './claude.js';
 import { logger } from './logger.js';
 import { addAgentStep, createAgentRun, createPendingAction, finishAgentRun } from '../db/agents.js';
+import type { Role } from '../db/types.js';
 
 // The agentic layer: every other AI feature in this codebase (chat, NF-e extraction, risk
 // narrative, dispute copilot, etc — see lib/claude.ts) is one prompt in, one answer out.
@@ -28,6 +29,15 @@ export interface AgentToolDef<TInput = any> {
   // "the agent did something" — reserved for anything that moves money, changes a
   // compliance/KYB decision, or creates an official legal/regulatory record.
   sensitive?: boolean;
+  // Only meaningful on a sensitive tool. A self-service run (see AgentDefinition.selfServiceRoles)
+  // is always scoped to the acting user's own account (ctx.userId is forced server-side —
+  // see routes/agents.ts), so approving a selfApprovable tool is the agentic equivalent of
+  // an action that user could already take unassisted through the normal UI (emitting a
+  // duplicata themselves, clicking "Comprar" themselves) — the runtime lets the acting user
+  // approve/reject their own pending action instead of requiring an admin. Every other
+  // sensitive tool (a compliance/KYB decision, a legal escalation, anything about someone
+  // else's account) stays admin-only no matter what.
+  selfApprovable?: boolean;
   handler: (input: TInput, ctx: AgentRunContext) => Promise<unknown>;
 }
 
@@ -38,6 +48,10 @@ export interface AgentDefinition {
   systemPrompt: string;
   tools: AgentToolDef[];
   maxSteps?: number;
+  // Roles (besides admin, who can always run every agent) allowed to run this agent
+  // themselves — always forced to act on their own account, never another user's. Absent
+  // means admin-only, same as before this field existed.
+  selfServiceRoles?: Role[];
 }
 
 export interface AgentRunStepView {

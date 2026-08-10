@@ -15,6 +15,7 @@ interface PendingKyb {
   submittedAt: string;
   pldStatus: 'clear' | 'flagged';
   pldMatchNote: string;
+  aiTriage: { runId: number; status: string; summary: string | null; pendingActionId: number | null; pendingActionTool: 'aprovar_kyb' | 'rejeitar_kyb' | null } | null;
 }
 
 interface ForeignInvestorScreening {
@@ -215,6 +216,7 @@ export function AdminPage() {
   const [audit, setAudit] = useState<{ entries: AuditEntry[]; chain: { valid: boolean; brokenAt: number | null } } | null>(null);
   const [rejectingId, setRejectingId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [decidingTriageId, setDecidingTriageId] = useState<number | null>(null);
   const [noteById, setNoteById] = useState<Record<number, string>>({});
   const [aiSummaryById, setAiSummaryById] = useState<Record<number, { recommendation: string; reasoning: string } | null>>({});
   const [loadingAiId, setLoadingAiId] = useState<number | null>(null);
@@ -586,6 +588,16 @@ export function AdminPage() {
     loadAudit();
   };
 
+  const decideAiTriage = async (pendingActionId: number, action: 'approve' | 'reject') => {
+    setDecidingTriageId(pendingActionId);
+    try {
+      await api.post(`/agents/pending/${pendingActionId}/${action}`, {});
+      await loadKyb();
+    } finally {
+      setDecidingTriageId(null);
+    }
+  };
+
   const loadForeignScreenings = (userId: number) =>
     api.get<{ screenings: ForeignInvestorScreening[] }>(`/admin/kyb/${userId}/elegibilidade-estrangeiro`).then((d) => {
       setForeignScreeningsById((prev) => ({ ...prev, [userId]: d.screenings }));
@@ -701,6 +713,36 @@ export function AdminPage() {
                     <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">PL para alocação</div>
                     R$ {p.kybForm.pl || '—'}
                   </div>
+                </div>
+              )}
+
+              {p.aiTriage && (
+                <div className="rounded-[10px] p-4 mb-4" style={{ background: '#EEF3FF' }}>
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                    <div className="font-bold text-[13px] flex items-center gap-2">
+                      Pré-triagem do Agente de Onboarding (IA)
+                      <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-white text-blue">{p.aiTriage.status}</span>
+                    </div>
+                  </div>
+                  <div className="text-[12.5px] text-textSecondary whitespace-pre-wrap">{p.aiTriage.summary || 'Investigação em andamento…'}</div>
+                  {p.aiTriage.pendingActionId && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="text-[12px] font-bold">
+                        A IA recomenda: {p.aiTriage.pendingActionTool === 'aprovar_kyb' ? 'aprovar' : 'rejeitar'} — confirmar?
+                      </span>
+                      <Button size="sm" disabled={decidingTriageId === p.aiTriage.pendingActionId} onClick={() => decideAiTriage(p.aiTriage!.pendingActionId!, 'approve')}>
+                        Confirmar recomendação
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={decidingTriageId === p.aiTriage.pendingActionId}
+                        onClick={() => decideAiTriage(p.aiTriage!.pendingActionId!, 'reject')}
+                      >
+                        Ignorar
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 

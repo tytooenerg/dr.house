@@ -5,6 +5,7 @@ import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
 import { Input } from '../../components/ui/Input';
 import { Segmented } from '../../components/ui/Segmented';
+import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 
 interface AutomationData {
   autoBidEnabled: boolean;
@@ -57,6 +58,14 @@ export function AutomacaoPage() {
           {data.autoBidEnabled ? 'Automação ativa — participando dos leilões que atendem seus critérios' : 'Automação desligada — você só participa manualmente'}
         </div>
       </NavyCard>
+
+      <div className="mb-4">
+        <SelfServiceAgentCard
+          agentId="autobid"
+          title="Agente de Auto-Bid (IA)"
+          placeholder="Ex: avalie a oferta dup_9f2a contra minhas regras e compre se estiver dentro do meu perfil de risco"
+        />
+      </div>
 
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <Card>

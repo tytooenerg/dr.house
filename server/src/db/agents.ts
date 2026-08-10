@@ -79,6 +79,34 @@ export function listAgentRuns(limit = 50): AgentRunRow[] {
   return db.prepare('SELECT * FROM agent_runs ORDER BY id DESC LIMIT ?').all(limit) as AgentRunRow[];
 }
 
+// Self-service scoping (routes/agents.ts): a non-admin only ever sees runs where they were
+// the acting user — never another account's, and never a system-triggered run (user_id
+// null, e.g. the cobrança/onboarding background agents).
+export function listAgentRunsForUser(userId: number, limit = 50): AgentRunRow[] {
+  return db.prepare('SELECT * FROM agent_runs WHERE user_id = ? ORDER BY id DESC LIMIT ?').all(userId, limit) as AgentRunRow[];
+}
+
+// Most recent run of a given agent against a given subject (e.g. agent_id='onboarding',
+// subjectType='user', subjectId=String(userId)) — used to surface an already-computed
+// AI pre-triage instead of re-running it (routes/admin.ts KYB queue).
+export function getLatestAgentRunForSubject(agentId: string, subjectType: string, subjectId: string): AgentRunRow | undefined {
+  return db
+    .prepare('SELECT * FROM agent_runs WHERE agent_id = ? AND subject_type = ? AND subject_id = ? ORDER BY id DESC LIMIT 1')
+    .get(agentId, subjectType, subjectId) as AgentRunRow | undefined;
+}
+
+// Dedup guard for background jobs (cobrança agent scan) — skip a subject that was already
+// scanned recently regardless of outcome, so a job running every few hours doesn't re-spend
+// tokens investigating the same case over and over while nothing has changed.
+export function hasRecentAgentRun(agentId: string, subjectType: string, subjectId: string, hours: number): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 FROM agent_runs WHERE agent_id = ? AND subject_type = ? AND subject_id = ? AND created_at >= datetime('now', ?) LIMIT 1`
+    )
+    .get(agentId, subjectType, subjectId, `-${hours} hours`);
+  return !!row;
+}
+
 export function createPendingAction(input: { runId: number; agentId: string; toolName: string; input: unknown }): number {
   const info = db
     .prepare(`INSERT INTO agent_pending_actions (run_id, agent_id, tool_name, input) VALUES (?, ?, ?, ?)`)
@@ -92,6 +120,19 @@ export function getPendingAction(id: number): AgentPendingActionRow | undefined 
 
 export function listPendingActions(status: AgentPendingStatus = 'pendente'): AgentPendingActionRow[] {
   return db.prepare('SELECT * FROM agent_pending_actions WHERE status = ? ORDER BY id DESC').all(status) as AgentPendingActionRow[];
+}
+
+// Self-service scoping: a non-admin only ever sees pending actions from their own runs.
+export function listPendingActionsForUser(userId: number, status: AgentPendingStatus = 'pendente'): AgentPendingActionRow[] {
+  return db
+    .prepare(
+      `SELECT p.* FROM agent_pending_actions p JOIN agent_runs r ON r.id = p.run_id WHERE r.user_id = ? AND p.status = ? ORDER BY p.id DESC`
+    )
+    .all(userId, status) as AgentPendingActionRow[];
+}
+
+export function listPendingActionsForRun(runId: number): AgentPendingActionRow[] {
+  return db.prepare('SELECT * FROM agent_pending_actions WHERE run_id = ? ORDER BY id DESC').all(runId) as AgentPendingActionRow[];
 }
 
 export function decidePendingAction(id: number, status: 'aprovada' | 'rejeitada', decidedBy: number, result: unknown) {
