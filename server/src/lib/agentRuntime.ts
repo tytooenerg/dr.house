@@ -3,6 +3,7 @@ import { askClaudeWithTools, claudeEnabled } from './claude.js';
 import { logger } from './logger.js';
 import { addAgentStep, createAgentRun, createPendingAction, finishAgentRun, listAgentRunsForSubject } from '../db/agents.js';
 import { isAgentEnabled, isAgentOverBudget, getAgentDailyBudgetUsd, getDualApprovalThresholdBrl } from './agentGovernance.js';
+import { withSpan } from './tracing.js';
 import type { Role } from '../db/types.js';
 
 // The agentic layer: every other AI feature in this codebase (chat, NF-e extraction, risk
@@ -273,7 +274,10 @@ export async function runAgent(def: AgentDefinition, opts: RunAgentOptions): Pro
       }
 
       try {
-        const output = await toolDef.handler(block.input, ctx);
+        // Real span per tool call (lib/tracing.ts) — an agentic tool-use loop is exactly
+        // the kind of multi-step, multi-call flow distributed tracing exists to make
+        // legible: which tool ran, how long it took, and whether it failed, per step.
+        const output = await withSpan('agent.tool', { agent: def.id, tool: block.name, step }, () => toolDef.handler(block.input, ctx));
         addAgentStep(runId, step, 'ferramenta', block.name, { input: block.input, output });
         steps.push({ type: 'ferramenta', toolName: block.name, payload: { input: block.input, output } });
         resultBlocks.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(output ?? null) });

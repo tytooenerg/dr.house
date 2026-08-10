@@ -13,6 +13,7 @@ import { fmtBRL, parseBRLNumber } from './format.js';
 import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import { estimateRateBand } from './dynamicPricing.js';
+import { withSpan } from './tracing.js';
 import type { UserRow } from '../db/types.js';
 
 export const emitirFormSchema = z.object({
@@ -155,14 +156,21 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
     try {
       // Real HTTP round-trip when REGISTRADORA_<X>_API_URL/KEY is configured for the chosen
       // registradora; otherwise the same simulated delay + registro-number generation this
-      // always did (see lib/registradoras.ts).
-      const result = await registrarNaRegistradora({
-        registradoraKey: registradora.key,
-        duplicataId: `dup_pending_${Date.now()}`,
-        valor: valorNum + batchTotal,
-        sacadoCnpj: form.cnpj,
-        vencimento: form.vencimento,
-      });
+      // always did (see lib/registradoras.ts). Wrapped in a real span (lib/tracing.ts) —
+      // this network call is exactly the kind of external I/O boundary distributed
+      // tracing exists to make visible.
+      const result = await withSpan(
+        'registradora.registrar',
+        { registradora: registradora.key, valor: valorNum + batchTotal, sandbox: false },
+        () =>
+          registrarNaRegistradora({
+            registradoraKey: registradora.key,
+            duplicataId: `dup_pending_${Date.now()}`,
+            valor: valorNum + batchTotal,
+            sacadoCnpj: form.cnpj,
+            vencimento: form.vencimento,
+          })
+      );
       registro = result.registro;
       if (!result.simulado) {
         logger.info({ registradora: registradora.key, registro }, '[emitir] registro real confirmado pela registradora');
