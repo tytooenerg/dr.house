@@ -33,6 +33,155 @@ interface Preview {
   sacadoRecognized: boolean;
   sacadoRecognizedText: string;
 }
+interface LoteRowResult {
+  index: number;
+  sacado: string;
+  ok: boolean;
+  duplicataId?: string;
+  registro?: string;
+  error?: string;
+}
+interface LoteOutcome {
+  total: number;
+  sucesso: number;
+  falhas: number;
+  resultados: LoteRowResult[];
+}
+
+const CSV_TEMPLATE = 'sacado,cnpj,valor,vencimento,seguro\nGrupo Atlas Varejo,58.442.111/0001-27,50000,2026-12-31,0\n';
+
+// A CSV upload creating several separate duplicatas in one go, for cedentes with real
+// volume — distinct from the "Duplicatas adicionais deste sacado" rows above (which
+// consolidate several NF values into one single duplicata's total). Parsed entirely
+// client-side (no file leaves the browser as a raw upload — just the parsed rows as JSON,
+// same shape /emitir/submit already accepts) and posted to /emitir/lote, which emits each
+// row through the exact same submitEmitir() path as a manual single emission.
+function parseCsv(text: string): Record<string, string>[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return [];
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',').map((c) => c.trim());
+    const row: Record<string, string> = {};
+    header.forEach((h, i) => {
+      row[h] = cells[i] ?? '';
+    });
+    return row;
+  });
+}
+
+function LoteEmissaoCard() {
+  const [rows, setRows] = useState<Record<string, string>[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [outcome, setOutcome] = useState<LoteOutcome | null>(null);
+  const loteFileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    setError('');
+    setOutcome(null);
+    setFileName(file.name);
+    const text = await file.text();
+    const parsed = parseCsv(text);
+    if (parsed.length === 0) {
+      setError('Nenhuma linha reconhecida no arquivo. Use o modelo (cabeçalho: sacado,cnpj,valor,vencimento,seguro).');
+      setRows([]);
+      return;
+    }
+    setRows(parsed);
+  };
+
+  const enviarLote = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const payload = rows.map((r) => ({
+        sacado: r.sacado ?? '',
+        cnpj: r.cnpj ?? '',
+        valor: r.valor ?? '',
+        vencimento: r.vencimento ?? '',
+        seguro: r.seguro === '1' || r.seguro?.toLowerCase() === 'true',
+      }));
+      const data = await api.post<LoteOutcome>('/emitir/lote', { rows: payload });
+      setOutcome(data);
+      if (data.falhas === 0) {
+        setRows([]);
+        setFileName('');
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível processar o lote.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'modelo-emissao-lote.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card className="mt-4">
+      <div className="flex items-center justify-between mb-1">
+        <div className="font-bold text-[15px]">Emissão em lote (CSV)</div>
+        <button type="button" onClick={downloadTemplate} className="bg-transparent border-none text-blue text-xs font-bold cursor-pointer">
+          Baixar modelo CSV
+        </button>
+      </div>
+      <p className="text-[12.5px] text-textSecondary mb-3">
+        Para cedentes de alto volume — emite várias duplicatas separadas de uma vez (até 200 linhas), cada uma pelo mesmo caminho real de uma
+        emissão manual (mesmos limites, compliance, registradora e webhook). Colunas: <code>sacado,cnpj,valor,vencimento,seguro</code>.
+      </p>
+      <input
+        ref={loteFileRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => loteFileRef.current?.click()}
+        className="w-full border-2 border-dashed border-[#C7D0DE] rounded-xl p-4 text-center cursor-pointer bg-transparent mb-3"
+      >
+        <div className="font-bold text-[13px]">{fileName ? `${fileName} — ${rows.length} linha(s) reconhecida(s)` : 'Selecionar arquivo CSV'}</div>
+      </button>
+      {rows.length > 0 && (
+        <Button disabled={busy} onClick={enviarLote} className="mb-3">
+          {busy ? 'Emitindo lote…' : `Emitir ${rows.length} duplicata(s)`}
+        </Button>
+      )}
+      {error && <div className="px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold mb-3">{error}</div>}
+      {outcome && (
+        <div>
+          <div className="text-[12.5px] font-bold mb-2">
+            {outcome.sucesso} de {outcome.total} emitida(s) com sucesso{outcome.falhas > 0 ? ` — ${outcome.falhas} falha(s)` : ''}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {outcome.resultados.map((r) => (
+              <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md" style={{ background: r.ok ? '#EAF3EE' : '#F7E9E7' }}>
+                <span className="font-semibold">{r.sacado || `linha ${r.index + 1}`}</span>
+                <span style={{ color: r.ok ? '#0A5C36' : '#B03A2E' }}>{r.ok ? `Registrada — ${r.registro}` : r.error}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 function fmtBRL(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -318,6 +467,8 @@ export function EmitirPage() {
           </NavyCard>
         </div>
       </div>
+
+      <LoteEmissaoCard />
     </div>
   );
 }

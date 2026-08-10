@@ -245,3 +245,56 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
     },
   };
 }
+
+// Real batch emission for high-volume cedentes — a CSV upload (parsed client-side into rows,
+// see routes/emitir.ts's /lote) that emits several duplicatas in one go instead of one
+// EmitirPage submission at a time. Each row goes through the exact same submitEmitir() path
+// as a single manual emission (same limits, same compliance engine scoring, same
+// registradora routing, same webhook) — this is not a separate, lighter-weight code path
+// that skips real validation for speed.
+export const MAX_LOTE_ROWS = 200;
+
+export interface EmitirLoteRowResult {
+  index: number;
+  sacado: string;
+  ok: boolean;
+  duplicataId?: string;
+  registro?: string;
+  error?: string;
+}
+
+export interface EmitirLoteOutcome {
+  total: number;
+  sucesso: number;
+  falhas: number;
+  resultados: EmitirLoteRowResult[];
+}
+
+export async function submitEmitirLote(user: UserRow, rawRows: unknown[]): Promise<{ status: 200 | 400; body: EmitirLoteOutcome | { error: string; message: string } }> {
+  if (rawRows.length === 0) return { status: 400, body: { error: 'empty_batch', message: 'Envie ao menos uma linha.' } };
+  if (rawRows.length > MAX_LOTE_ROWS) {
+    return { status: 400, body: { error: 'batch_too_large', message: `Máximo de ${MAX_LOTE_ROWS} linhas por lote (recebido: ${rawRows.length}).` } };
+  }
+
+  const resultados: EmitirLoteRowResult[] = [];
+  for (let i = 0; i < rawRows.length; i++) {
+    const raw = rawRows[i] as Record<string, unknown> | undefined;
+    const sacadoLabel = typeof raw?.sacado === 'string' ? raw.sacado : `linha ${i + 1}`;
+    const parsed = emitirFormSchema.safeParse(raw);
+    if (!parsed.success) {
+      resultados.push({ index: i, sacado: sacadoLabel, ok: false, error: `Linha inválida: ${parsed.error.issues.map((issue) => issue.message).join('; ')}` });
+      continue;
+    }
+    // Sequential, not parallel — each emission checks the cedente's real monthly count
+    // (countByCedenteThisMonth), which would race under concurrency within the same batch.
+    const outcome = await submitEmitir(user, parsed.data);
+    if (outcome.status === 200) {
+      resultados.push({ index: i, sacado: parsed.data.sacado, ok: true, duplicataId: outcome.body.duplicataId, registro: outcome.body.registro });
+    } else {
+      resultados.push({ index: i, sacado: parsed.data.sacado, ok: false, error: outcome.body.message });
+    }
+  }
+
+  const sucesso = resultados.filter((r) => r.ok).length;
+  return { status: 200, body: { total: rawRows.length, sucesso, falhas: rawRows.length - sucesso, resultados } };
+}
