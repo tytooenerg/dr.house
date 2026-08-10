@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { api, ApiError, downloadFile } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -270,6 +270,9 @@ export function AdminPage() {
   const [scanningSar, setScanningSar] = useState(false);
   const [sarActionId, setSarActionId] = useState<number | null>(null);
   const [sarExternalRefById, setSarExternalRefById] = useState<Record<number, string>>({});
+  const [downloadingCoafId, setDownloadingCoafId] = useState<number | null>(null);
+  const [cvmPeriod, setCvmPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [downloadingCvm, setDownloadingCvm] = useState(false);
   const [foreignScreeningsById, setForeignScreeningsById] = useState<Record<number, ForeignInvestorScreening[]>>({});
   const [generatingMemoId, setGeneratingMemoId] = useState<number | null>(null);
   const [addonPrices, setAddonPrices] = useState<AddonPrice[]>([]);
@@ -450,6 +453,24 @@ export function AdminPage() {
       await loadAudit();
     } finally {
       setSarActionId(null);
+    }
+  };
+
+  const downloadCoafReport = async (id: number) => {
+    setDownloadingCoafId(id);
+    try {
+      await downloadFile(`/admin/pld/suspeitas/${id}/relatorio-coaf.pdf`, `coaf-sar-${id}.pdf`);
+    } finally {
+      setDownloadingCoafId(null);
+    }
+  };
+
+  const downloadCvmReport = async () => {
+    setDownloadingCvm(true);
+    try {
+      await downloadFile(`/admin/regulatorio/cvm-informe.pdf?period=${cvmPeriod}`, `cvm-informe-${cvmPeriod}.pdf`);
+    } finally {
+      setDownloadingCvm(false);
     }
   };
 
@@ -1040,10 +1061,32 @@ export function AdminPage() {
                   <Button size="sm" variant="ghost" disabled={sarActionId === s.id} onClick={() => dismissSar(s.id)}>
                     Descartar
                   </Button>
+                  <Button size="sm" variant="ghost" disabled={downloadingCoafId === s.id} onClick={() => downloadCoafReport(s.id)}>
+                    {downloadingCoafId === s.id ? 'Gerando…' : 'Relatório COAF (PDF)'}
+                  </Button>
                 </div>
               </div>
             ))}
             {sarReports.length === 0 && <EmptyState title="Nenhuma atividade suspeita em aberto" hint="Padrões de fracionamento ou passagem rápida de recursos aparecem aqui" />}
+          </div>
+
+          <div className="bg-white border border-border rounded-card p-5 mt-4">
+            <div className="font-bold text-[14px] mb-1">Informe mensal de atividade (CVM)</div>
+            <div className="text-textSecondary text-[12.5px] mb-3">
+              Agregados reais de emissão, negociação primária/secundária, sinistros e SARs — documento de apoio a compliance, não um protocolo formal
+              junto à CVM.
+            </div>
+            <div className="flex items-center gap-2.5">
+              <input
+                type="month"
+                className="px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+                value={cvmPeriod}
+                onChange={(e) => setCvmPeriod(e.target.value)}
+              />
+              <Button size="sm" variant="secondary" disabled={downloadingCvm} onClick={downloadCvmReport}>
+                {downloadingCvm ? 'Gerando…' : 'Baixar informe (PDF)'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

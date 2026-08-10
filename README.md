@@ -268,6 +268,13 @@ Every insurer used to quote the exact same flat `premioPct` for every duplicata 
 
 The marketplace's "Contratar seguro" picker now shows 3 **live, per-offer** quotes, cheapest flagged as recommended, instead of one static catalog. The premium actually charged at contract time is what gets recorded (`insurance_settlements`) and is what the UI keeps showing afterward — a sacado's score moving later never retroactively changes what an investor is shown as having already paid.
 
+### Relatório automático COAF/CVM (`lib/regulatoryReports.ts`)
+
+Neither COAF's SISCOAF portal nor CVM's reporting channels expose a public API this sandbox can call — both require a licensed institution's own government-issued credentials. What's real here is the actual document a compliance officer needs, correctly structured from real platform data, stopping exactly where a real government credential would be required — same honest-gap discipline as `docs/soc2-gap-assessment.md`:
+
+- **Relatório COAF por caso** (admin **Compliance** → cada SAR aberto por `lib/suspiciousActivityMonitor.ts`) — gera um PDF no formato de uma Comunicação de Operação Suspeita real: identificação do comunicante e do envolvido (nome/CNPJ declarado no KYB), o indicador de ocorrência oficial mapeado do tipo de alerta (ex. `9.1` fracionamento), a descrição e a evidência real dos lançamentos analisados. `GET /admin/pld/suspeitas/:id/relatorio-coaf.pdf`.
+- **Informe mensal CVM** (admin **Compliance**) — agrega dados reais do período (duplicatas emitidas, volume negociado no mercado primário e secundário, sinistros decididos, SARs abertos, base ativa de investidores/cedentes) em um PDF de apoio. `GET/admin/regulatorio/cvm-informe[.pdf]?period=YYYY-MM`.
+
 ### Marketing homepage
 
 `/` was previously just an alias for the login screen — there was no actual company website, and the public nav's own "Entrar"/"Falar com vendas" links pointed back at themselves. Added a real homepage (`pages/public/LandingPage.tsx`) covering the whole platform for a general audience (hero, problem/solution, the 5-step emission→liquidation flow, one card per participant — cedente/investidor/sacado/seguradora — product/compliance highlights, and a live stats band pulling real numbers from the same `GET /api/public/stats` the Transparência page uses, not fabricated marketing figures), reusing `PublicNav`/`PublicFooter` for visual consistency with the existing Developers/Preços/Transparência/Legal/Status pages. Login moved to `/login`; every internal link that used to point at `/` expecting the login/signup screen (nav, pricing/developers/embed/404 CTAs, the referral share link, `AppShell`'s auth redirect, the sidebar's logout redirect, and the e2e test suite) was updated to match.

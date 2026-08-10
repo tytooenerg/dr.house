@@ -49,6 +49,7 @@ import { trainModel, getModel, MIN_TRAINING_SAMPLES } from '../lib/mlScoring.js'
 import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 import { computeMetrics } from '../lib/metrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
+import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -737,6 +738,35 @@ adminRouter.post(
     res.json({ ok: true });
   })
 );
+
+// Real COAF/CVM report generation (lib/regulatoryReports.ts) — see that file's header
+// comment for why this stops at "the correctly-structured document to file manually"
+// instead of a real SISCOAF/CVM submission, which needs a licensed institution's own
+// government credentials.
+adminRouter.get('/pld/suspeitas/:id/relatorio-coaf.pdf', (req, res) => {
+  const ok = streamCoafReportPdf(res, Number(req.params.id));
+  if (!ok) res.status(404).json({ error: 'not_found' });
+});
+
+const cvmPeriodSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+
+function resolveCvmPeriod(raw: unknown): string {
+  const parsed = cvmPeriodSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  return new Date().toISOString().slice(0, 7);
+}
+
+adminRouter.get('/regulatorio/cvm-informe', (req, res) => {
+  const period = resolveCvmPeriod(req.query.period);
+  res.json(buildCvmPeriodStats(period));
+});
+
+adminRouter.get('/regulatorio/cvm-informe.pdf', (req, res) => {
+  const period = resolveCvmPeriod(req.query.period);
+  const stats = buildCvmPeriodStats(period);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.cvm_informe_gerado', { period });
+  streamCvmReportPdf(res, stats);
+});
 
 // Shared config/visibility for the 5 add-on revenue products (lib/addOnBilling.ts) —
 // pricing per kind and a combined recent-charges feed, reused across features 1-5.
