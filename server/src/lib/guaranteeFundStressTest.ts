@@ -1,7 +1,6 @@
 import { listActiveUninsuredPurchases } from '../db/duplicatas.js';
 import { getFundBalance } from '../db/guaranteeFund.js';
-import { predictDefaultProbability } from './mlScoring.js';
-import { ratingFromScore } from './riscoCore.js';
+import { estimateDefaultProbability } from './defaultProbability.js';
 import { fmtBRL } from './format.js';
 import { FUND_COVERAGE_PCT } from './guaranteeFund.js';
 import type { Rating } from '../data/seed.js';
@@ -11,15 +10,9 @@ import type { Rating } from '../data/seed.js';
 // actual uninsured book", not a static "coverage % vs balance" number. Simulates the whole
 // current real exposure (lib/guaranteeFund.ts's fund only ever covers active uninsured
 // positions — an insured one has its own seguradora claims path) thousands of times.
-//
-// Honesty about what's assumed vs measured: this platform is too young to have enough real
-// labeled defaults to fit a reliable per-position probability from data alone (same
-// MIN_TRAINING_SAMPLES constraint lib/mlScoring.ts already applies). Where a trained ML
-// model exists, its real predictDefaultProbability is used per position; where it doesn't
-// (the common case today), a documented assumed prior calibrated to typical NPL ranges for
-// Brazilian short-term trade receivables stands in — labeled as an assumption everywhere it
-// surfaces, never presented as measured history.
-const ASSUMED_PD_BY_RATING: Record<Rating, number> = { AA: 0.005, A: 0.015, B: 0.04, C: 0.09 };
+// Per-position default probability comes from lib/defaultProbability.ts — real ML when a
+// model is trained, a documented assumed prior by rating otherwise (see that module for the
+// honesty discipline; also used by lib/agents/underwriting.ts's ML tool).
 
 // Real defaults cluster (shared macro conditions, sector concentration) — treating every
 // position as an independent coin flip understates tail risk, a well-known modeling error.
@@ -83,13 +76,12 @@ interface ExposureItem {
 
 export function buildExposure(): ExposureItem[] {
   return listActiveUninsuredPurchases().map((p) => {
-    const ml = predictDefaultProbability(p.duplicata);
-    const rating = ratingFromScore(p.duplicata.score ?? 60);
+    const { pd, source, rating } = estimateDefaultProbability(p.duplicata);
     return {
       duplicataId: p.duplicata_id,
       valor: p.valor,
-      pd: ml ?? ASSUMED_PD_BY_RATING[rating],
-      pdSource: ml != null ? 'ml' : 'assumed',
+      pd,
+      pdSource: source,
       rating,
     };
   });
