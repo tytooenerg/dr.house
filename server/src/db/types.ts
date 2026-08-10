@@ -36,6 +36,12 @@ export interface UserSettings {
   playgroundEndpoint: string;
   playgroundParams: Record<string, string>;
   fidcPL: string;
+  // Opt-in, same "opt-in with rules" shape as autoBidEnabled/autoEmitEnabled — lets the
+  // Market Maker agent (lib/agents/marketMaker.ts) place liquidity-providing bids on this
+  // investor's behalf, capped by marketMakerMaxExposicao and marketMakerMinScore.
+  marketMakerEnabled: boolean;
+  marketMakerMaxExposicao: string;
+  marketMakerMinScore: string;
 }
 
 export function defaultSettings(): UserSettings {
@@ -69,6 +75,9 @@ export function defaultSettings(): UserSettings {
       url: 'https://webhook.seusistema.com.br/lastro', evento: 'duplicata.registrada',
     },
     fidcPL: '5.000.000',
+    marketMakerEnabled: false,
+    marketMakerMaxExposicao: '200.000',
+    marketMakerMinScore: '60',
   };
 }
 

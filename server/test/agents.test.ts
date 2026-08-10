@@ -19,9 +19,9 @@ async function adminToken() {
 }
 
 describe('agentic AI layer — registry', () => {
-  it('registers exactly the 10 agents, each with at least one tool and a description', () => {
+  it('registers exactly the 11 agents, each with at least one tool and a description', () => {
     const ids = Object.keys(AGENTS);
-    expect(ids).toHaveLength(10);
+    expect(ids).toHaveLength(11);
     for (const id of ids) {
       const def = AGENTS[id];
       expect(def.label.length).toBeGreaterThan(0);
@@ -45,6 +45,7 @@ describe('agentic AI layer — registry', () => {
       'comprar_oferta',
       'reenviar_lembrete_aceite',
       'registrar_nota_comercial',
+      'dar_lance_liquidez',
     ]);
     for (const def of Object.values(AGENTS)) {
       for (const tool of def.tools) {
@@ -60,11 +61,11 @@ describe('agentic AI layer — API authorization', () => {
     expect(res.status).toBe(401);
   });
 
-  it('lists all 10 agents for an admin', async () => {
+  it('lists all 11 agents for an admin', async () => {
     const tok = await adminToken();
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${tok}`);
     expect(res.status).toBe(200);
-    expect(res.body.agents).toHaveLength(10);
+    expect(res.body.agents).toHaveLength(11);
     expect(typeof res.body.llmEnabled).toBe('boolean');
   });
 });
@@ -78,7 +79,7 @@ describe('agentic AI layer — self-service scoping (cedente/investidor)', () =>
     return { token: reg.body.token as string, userId: reg.body.user.id as number, email };
   }
 
-  it('only exposes the agent(s) allowed for that role, never the full 10', async () => {
+  it('only exposes the agent(s) allowed for that role, never the full 11', async () => {
     const { token } = await registerAndLogin('cedente');
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
@@ -86,7 +87,7 @@ describe('agentic AI layer — self-service scoping (cedente/investidor)', () =>
 
     const inv = await registerAndLogin('investidor');
     const res2 = await request(app).get('/api/agents').set('Authorization', `Bearer ${inv.token}`);
-    expect(res2.body.agents.map((a: { id: string }) => a.id)).toEqual(['autobid']);
+    expect(res2.body.agents.map((a: { id: string }) => a.id)).toEqual(['autobid', 'market_maker']);
   });
 
   it('lets a cedente run the emissão agent on itself, but not the pld agent', async () => {

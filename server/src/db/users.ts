@@ -196,6 +196,13 @@ export function listActiveCedentes(): UserRow[] {
   return db.prepare("SELECT * FROM users WHERE role = 'cedente' AND deleted_at IS NULL").all() as UserRow[];
 }
 
+// Feeds lib/marketMakerAgentJob.ts — every investidor account is a candidate; the job
+// itself checks each one's settings.marketMakerEnabled (JSON, not a column) to decide who
+// actually opted in, same pattern as listActiveCedentes above.
+export function listActiveInvestidores(): UserRow[] {
+  return db.prepare("SELECT * FROM users WHERE role = 'investidor' AND deleted_at IS NULL AND kyb_status = 'approved'").all() as UserRow[];
+}
+
 export function setPldStatus(userId: number, status: 'clear' | 'flagged', note: string) {
   db.prepare('UPDATE users SET pld_status = ?, pld_match_note = ? WHERE id = ?').run(status, note, userId);
 }

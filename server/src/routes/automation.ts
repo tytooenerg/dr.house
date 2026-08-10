@@ -153,6 +153,9 @@ automationRouter.get('/', (req, res) => {
     diversification: settings.diversification,
     sectorDiversification: settings.sectorDiversification,
     autoBidActivity: listAutomationActivity(req.user!.id).map((a) => ({ text: a.text, color: a.color, time: fmtRelative(a.created_at) })),
+    marketMakerEnabled: settings.marketMakerEnabled,
+    marketMakerMaxExposicao: settings.marketMakerMaxExposicao,
+    marketMakerMinScore: settings.marketMakerMinScore,
   });
 });
 
@@ -199,4 +202,25 @@ automationRouter.post('/sector-diversification', (req, res) => {
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { sectorDiversification: { ...settings.sectorDiversification, [parsed.data.cls]: parsed.data.value } });
   res.json({ sectorDiversification: updated.sectorDiversification });
+});
+
+// Opt-in for lib/agents/marketMaker.ts (11th agent) — same "toggle + rules" shape as
+// autoBid above, but for the periodic liquidity-providing agent (lib/marketMakerAgentJob.ts)
+// instead of the rule-based auction auto-bid engine.
+automationRouter.post('/market-maker/toggle', (req, res) => {
+  const settings = getSettings(req.user!);
+  const updated = updateSettings(req.user!.id, { marketMakerEnabled: !settings.marketMakerEnabled });
+  res.json({ marketMakerEnabled: updated.marketMakerEnabled });
+});
+
+const marketMakerRuleSchema = z.object({ field: z.enum(['marketMakerMaxExposicao', 'marketMakerMinScore']), value: z.string() });
+
+automationRouter.post('/market-maker/rule', (req, res) => {
+  const parsed = marketMakerRuleSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const updated = updateSettings(req.user!.id, { [parsed.data.field]: parsed.data.value });
+  res.json({ marketMakerMaxExposicao: updated.marketMakerMaxExposicao, marketMakerMinScore: updated.marketMakerMinScore });
 });

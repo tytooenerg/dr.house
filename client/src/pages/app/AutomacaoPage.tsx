@@ -13,6 +13,9 @@ interface AutomationData {
   diversification: { AA: number; A: number; B: number; C: number };
   sectorDiversification: { varejo: number; industria: number; construcao: number; servicos: number };
   autoBidActivity: { text: string; color: string; time: string }[];
+  marketMakerEnabled: boolean;
+  marketMakerMaxExposicao: string;
+  marketMakerMinScore: string;
 }
 
 export function AutomacaoPage() {
@@ -41,6 +44,8 @@ export function AutomacaoPage() {
   const setRule = (field: string, value: string) => api.post<AutomationData>('/automacao/rule', { field, value }).then(setData);
   const setDiv = (cls: string, value: number) => api.post<AutomationData>('/automacao/diversification', { cls, value }).then(setData);
   const setSector = (cls: string, value: number) => api.post<AutomationData>('/automacao/sector-diversification', { cls, value }).then(setData);
+  const toggleMarketMaker = () => api.post<AutomationData>('/automacao/market-maker/toggle').then(setData);
+  const setMarketMakerRule = (field: string, value: string) => api.post<AutomationData>('/automacao/market-maker/rule', { field, value }).then(setData);
 
   const divTotal = data.diversification.AA + data.diversification.A + data.diversification.B + data.diversification.C;
   const sectorTotal = data.sectorDiversification.varejo + data.sectorDiversification.industria + data.sectorDiversification.construcao + data.sectorDiversification.servicos;
@@ -114,6 +119,41 @@ export function AutomacaoPage() {
           </div>
         </Card>
       </div>
+
+      <Card className="mb-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-1">
+          <div className="flex items-center gap-3">
+            <Toggle on={data.marketMakerEnabled} onClick={toggleMarketMaker} size="lg" />
+            <div className="font-bold text-[15px]">Market Maker (fornecer liquidez)</div>
+          </div>
+          <div className="text-[12.5px] font-semibold" style={{ color: data.marketMakerEnabled ? '#0A5C36' : '#8B97AC' }}>
+            {data.marketMakerEnabled ? 'Ativo — dando lances em anúncios sem liquidez a cada 6h' : 'Desligado'}
+          </div>
+        </div>
+        <div className="text-textSecondary text-[12.5px] mb-4">
+          Um agente de IA (`market_maker`) varre o mercado secundário periodicamente e propõe lances em anúncios de outros investidores que ainda não têm nenhum lance, dentro do
+          score mínimo e do limite de exposição abaixo. Cada lance proposto ainda precisa da sua aprovação em Agentes IA — nada compromete capital sem você confirmar.
+        </div>
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div>
+            <div className="text-xs font-bold text-textSecondary mb-1.5">Score mínimo do sacado para dar liquidez</div>
+            <Input mono value={data.marketMakerMinScore} onChange={(e) => setMarketMakerRule('marketMakerMinScore', e.target.value)} />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-textSecondary mb-1.5">Exposição máxima em lances de liquidez (R$)</div>
+            <Input mono value={data.marketMakerMaxExposicao} onChange={(e) => setMarketMakerRule('marketMakerMaxExposicao', e.target.value)} />
+          </div>
+        </div>
+        {data.marketMakerEnabled && (
+          <div className="mt-4">
+            <SelfServiceAgentCard
+              agentId="market_maker"
+              title="Agente Market Maker (IA)"
+              placeholder="Ex: avalie os anúncios sem lance no mercado secundário e proponha lances de liquidez dentro do meu limite"
+            />
+          </div>
+        )}
+      </Card>
 
       <Card className="mb-4">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2.5">
