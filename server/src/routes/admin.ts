@@ -51,6 +51,7 @@ import { computeMetrics } from '../lib/metrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
 import { buildFundOverview, listFundClaimsForAdmin, decideFundClaimOutcome, fundClaimDecisionSchema } from '../lib/guaranteeFund.js';
+import { runStressTest } from '../lib/guaranteeFundStressTest.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -779,6 +780,16 @@ adminRouter.get('/guarantee-fund', (_req, res) => {
 adminRouter.get('/guarantee-fund/claims', (req, res) => {
   const status = typeof req.query.status === 'string' ? (req.query.status as 'aberto' | 'aprovado' | 'negado') : undefined;
   res.json({ claims: listFundClaimsForAdmin(status) });
+});
+
+// Real Monte Carlo stress test over the fund's *current* actual uninsured exposure
+// (lib/guaranteeFundStressTest.ts) — "how likely is today's real book to exhaust today's
+// real balance", not a static ratio. simulations/correlation are optional, bounded knobs
+// for exploring the assumption space; defaults are sane for a real run.
+adminRouter.get('/guarantee-fund/stress-test', (req, res) => {
+  const simulations = req.query.simulations ? Number(req.query.simulations) : undefined;
+  const correlation = req.query.correlation ? Number(req.query.correlation) : undefined;
+  res.json(runStressTest({ simulations, correlation }));
 });
 
 adminRouter.post(

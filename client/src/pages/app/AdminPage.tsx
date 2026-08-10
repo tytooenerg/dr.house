@@ -157,6 +157,20 @@ interface FundClaim {
   createdAt: string;
 }
 
+interface StressTestResult {
+  simulations: number;
+  correlation: number;
+  fundBalanceFmt: string;
+  exposureCount: number;
+  exposureTotalFmt: string;
+  usingMlModel: boolean;
+  pDepletion: number;
+  expectedLossFmt: string;
+  var95Fmt: string;
+  var99Fmt: string;
+  expectedShortfallFmt: string;
+}
+
 const SAR_TIPO_LABELS: Record<string, string> = {
   fracionamento: 'Fracionamento',
   entrada_saida_rapida: 'Entrada/saída rápida',
@@ -289,6 +303,8 @@ export function AdminPage() {
   const [fundBalanceFmt, setFundBalanceFmt] = useState('');
   const [decidingFundClaimId, setDecidingFundClaimId] = useState<number | null>(null);
   const [fundNoteById, setFundNoteById] = useState<Record<number, string>>({});
+  const [stressResult, setStressResult] = useState<StressTestResult | null>(null);
+  const [runningStress, setRunningStress] = useState(false);
   const [foreignScreeningsById, setForeignScreeningsById] = useState<Record<number, ForeignInvestorScreening[]>>({});
   const [generatingMemoId, setGeneratingMemoId] = useState<number | null>(null);
   const [addonPrices, setAddonPrices] = useState<AddonPrice[]>([]);
@@ -488,6 +504,16 @@ export function AdminPage() {
       await loadAudit();
     } finally {
       setDecidingFundClaimId(null);
+    }
+  };
+
+  const runStressTest = async () => {
+    setRunningStress(true);
+    try {
+      const result = await api.get<StressTestResult>('/admin/guarantee-fund/stress-test?simulations=10000');
+      setStressResult(result);
+    } finally {
+      setRunningStress(false);
     }
   };
 
@@ -1170,6 +1196,52 @@ export function AdminPage() {
               </div>
             ))}
             {fundClaims.length === 0 && <EmptyState title="Nenhum acionamento em aberto" hint="Solicitações do fundo de garantia aparecem aqui" />}
+          </div>
+
+          <div className="bg-white border border-border rounded-card p-5 mt-4">
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-bold text-[14px]">Fundo de garantia — teste de estresse (Monte Carlo)</div>
+              <Button size="sm" variant="secondary" disabled={runningStress} onClick={runStressTest}>
+                {runningStress ? 'Simulando…' : 'Executar simulação'}
+              </Button>
+            </div>
+            <div className="text-textSecondary text-[12.5px] mb-3">
+              Simula a exposição real atual (posições ativas sem seguro) milhares de vezes contra um choque macro comum correlacionado — um
+              fator único (mesma ideia estrutural do modelo de Vasicek), não flips independentes ingênuos. Sem modelo de ML treinado, a
+              probabilidade de default por posição usa uma premissa assumida por rating (documentada em lib/guaranteeFundStressTest.ts), nunca
+              apresentada como histórico real medido.
+            </div>
+            {stressResult ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">P(esgotamento)</div>
+                  <div className="font-mono-num font-bold text-[15px]" style={{ color: stressResult.pDepletion > 0.05 ? '#B03A2E' : '#0A5C36' }}>
+                    {(stressResult.pDepletion * 100).toFixed(2)}%
+                  </div>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Perda esperada</div>
+                  <div className="font-mono-num font-bold text-[15px]">{stressResult.expectedLossFmt}</div>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">VaR 95% / 99%</div>
+                  <div className="font-mono-num font-bold text-[13px]">
+                    {stressResult.var95Fmt} / {stressResult.var99Fmt}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Shortfall esperado</div>
+                  <div className="font-mono-num font-bold text-[15px]">{stressResult.expectedShortfallFmt}</div>
+                </div>
+                <div className="col-span-2 md:col-span-4 text-[11.5px] text-textSecondary">
+                  {stressResult.simulations.toLocaleString('pt-BR')} simulações · correlação {(stressResult.correlation * 100).toFixed(0)}% ·
+                  exposição real {stressResult.exposureTotalFmt} em {stressResult.exposureCount} posições · saldo do fundo{' '}
+                  {stressResult.fundBalanceFmt} · {stressResult.usingMlModel ? 'usando modelo de ML treinado' : 'usando premissa assumida por rating (sem modelo de ML treinado ainda)'}
+                </div>
+              </div>
+            ) : (
+              <EmptyState title="Nenhuma simulação executada ainda" hint="Clique em “Executar simulação” para rodar o Monte Carlo" />
+            )}
           </div>
         </div>
       )}
