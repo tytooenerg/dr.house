@@ -1,0 +1,21 @@
+[project]
+name = "lastro-sdk"
+version = "1.0.0"
+description = "Official Python SDK for the Lastro Partner API (/api/v1)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "UNLICENSED" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lastro_sdk*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

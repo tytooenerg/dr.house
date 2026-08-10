@@ -16,6 +16,10 @@ jobs:
           node-version: 22
           cache: npm
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         run: npm install
 
@@ -25,11 +29,25 @@ jobs:
       - name: Typecheck client
         run: npm run typecheck -w client
 
+      - name: Typecheck Node SDK
+        run: npm run typecheck -w sdks/node
+
       - name: Run server test suite
         run: npm run test -w server
 
       - name: Run client test suite
         run: npm run test -w client
+
+      - name: Run Node SDK test suite (real, against the actual server in-process)
+        run: npm run test -w sdks/node
+
+      - name: Install Python SDK (editable, with dev deps)
+        run: pip install -e ".[dev]"
+        working-directory: sdks/python
+
+      - name: Run Python SDK test suite (real, against the actual server as a subprocess)
+        run: python -m pytest -v
+        working-directory: sdks/python
 
       - name: Build server
         run: npm run build -w server
