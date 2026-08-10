@@ -12,6 +12,13 @@ export interface LegalDocumentRow {
   reviewed_by: number | null;
   reviewed_at: string | null;
   created_at: string;
+  signature_status: 'none' | 'enviado' | 'assinado';
+  signature_envelope_id: string | null;
+  signature_url: string | null;
+  signer_name: string | null;
+  signer_email: string | null;
+  signature_sent_at: string | null;
+  signature_signed_at: string | null;
 }
 
 export function recordLegalDocument(opts: { type: LegalDocumentType; duplicataId?: string | null; content: string; generatedBy?: number }): LegalDocumentRow {
@@ -37,4 +44,18 @@ export function getLegalDocument(id: number): LegalDocumentRow | undefined {
 
 export function markLegalDocumentReviewed(id: number, reviewedBy: number) {
   db.prepare("UPDATE legal_documents SET reviewed = 1, reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?").run(reviewedBy, id);
+}
+
+export function markSentForSignature(id: number, opts: { envelopeId: string; signUrl: string | null; signerName: string; signerEmail: string }) {
+  db.prepare(
+    "UPDATE legal_documents SET signature_status = 'enviado', signature_envelope_id = ?, signature_url = ?, signer_name = ?, signer_email = ?, signature_sent_at = datetime('now') WHERE id = ?"
+  ).run(opts.envelopeId, opts.signUrl, opts.signerName, opts.signerEmail, id);
+}
+
+export function markSignatureStatus(id: number, status: 'enviado' | 'assinado') {
+  if (status === 'assinado') {
+    db.prepare("UPDATE legal_documents SET signature_status = 'assinado', signature_signed_at = datetime('now') WHERE id = ?").run(id);
+  } else {
+    db.prepare("UPDATE legal_documents SET signature_status = ? WHERE id = ?").run(status, id);
+  }
 }

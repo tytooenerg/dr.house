@@ -98,6 +98,9 @@ interface LegalDocRef {
   content: string;
   reviewed: boolean;
   quando?: string;
+  signatureStatus?: 'none' | 'enviado' | 'assinado';
+  signerName?: string | null;
+  signerEmail?: string | null;
 }
 
 interface OverdueCollectionItem {
@@ -281,6 +284,9 @@ export function AdminPage() {
   const [minutaContext, setMinutaContext] = useState('');
   const [generatingMinuta, setGeneratingMinuta] = useState(false);
   const [minutaError, setMinutaError] = useState('');
+  const [signerNameById, setSignerNameById] = useState<Record<number, string>>({});
+  const [signerEmailById, setSignerEmailById] = useState<Record<number, string>>({});
+  const [signingId, setSigningId] = useState<number | null>(null);
   const [regulatoryNotes, setRegulatoryNotes] = useState<RegulatoryNote[]>([]);
   const [regTitle, setRegTitle] = useState('');
   const [regText, setRegText] = useState('');
@@ -615,6 +621,32 @@ export function AdminPage() {
     await api.post(`/admin/juridico/documentos/${id}/revisar`);
     await loadMinutas();
     await loadAudit();
+  };
+
+  const sendMinutaForSignature = async (id: number) => {
+    const signerName = (signerNameById[id] ?? '').trim();
+    const signerEmail = (signerEmailById[id] ?? '').trim();
+    if (!signerName || !signerEmail) return;
+    setSigningId(id);
+    try {
+      await api.post(`/admin/juridico/documentos/${id}/assinatura`, { signerName, signerEmail });
+      await loadMinutas();
+      await loadCobrancaJuridica();
+      await loadAudit();
+    } finally {
+      setSigningId(null);
+    }
+  };
+
+  const checkMinutaSignature = async (id: number) => {
+    setSigningId(id);
+    try {
+      await api.post(`/admin/juridico/documentos/${id}/assinatura/status`);
+      await loadMinutas();
+      await loadCobrancaJuridica();
+    } finally {
+      setSigningId(null);
+    }
   };
 
   const submitMinuta = async (e: React.FormEvent) => {
@@ -1467,6 +1499,44 @@ export function AdminPage() {
                     <Button size="sm" variant="success" className="mt-2" onClick={() => reviewMinuta(doc.id)}>
                       Marcar como revisado por advogado
                     </Button>
+                  )}
+                  {doc.reviewed && (!doc.signatureStatus || doc.signatureStatus === 'none') && (
+                    <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                      <input
+                        placeholder="Nome do signatário"
+                        value={signerNameById[doc.id] ?? ''}
+                        onChange={(e) => setSignerNameById((prev) => ({ ...prev, [doc.id]: e.target.value }))}
+                        className="px-2.5 py-1.5 rounded-md border border-inputBorder text-[12.5px] w-44"
+                      />
+                      <input
+                        placeholder="Email do signatário"
+                        value={signerEmailById[doc.id] ?? ''}
+                        onChange={(e) => setSignerEmailById((prev) => ({ ...prev, [doc.id]: e.target.value }))}
+                        className="px-2.5 py-1.5 rounded-md border border-inputBorder text-[12.5px] w-56"
+                      />
+                      <Button
+                        size="sm"
+                        disabled={signingId === doc.id || !(signerNameById[doc.id] ?? '').trim() || !(signerEmailById[doc.id] ?? '').trim()}
+                        onClick={() => sendMinutaForSignature(doc.id)}
+                      >
+                        {signingId === doc.id ? 'Enviando…' : 'Enviar para assinatura eletrônica'}
+                      </Button>
+                    </div>
+                  )}
+                  {doc.signatureStatus === 'enviado' && (
+                    <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#FBF1E0] text-amber">
+                        Aguardando assinatura de {doc.signerName} ({doc.signerEmail})
+                      </span>
+                      <Button size="sm" variant="secondary" disabled={signingId === doc.id} onClick={() => checkMinutaSignature(doc.id)}>
+                        {signingId === doc.id ? 'Verificando…' : 'Verificar status'}
+                      </Button>
+                    </div>
+                  )}
+                  {doc.signatureStatus === 'assinado' && (
+                    <span className="mt-2.5 inline-block text-[11px] font-bold px-2 py-0.5 rounded-md bg-greenBg text-green">
+                      Assinado por {doc.signerName}
+                    </span>
                   )}
                 </details>
               ))}

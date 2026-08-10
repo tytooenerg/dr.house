@@ -24,7 +24,10 @@ import {
   listGeneralLegalDocuments,
   getLegalDocument,
   markLegalDocumentReviewed,
+  markSentForSignature,
+  markSignatureStatus,
 } from '../db/legalDocuments.js';
+import { sendForSignature, checkSignatureStatus, esignatureEnabled } from '../lib/esignature.js';
 import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } from '../db/regulatoryNotes.js';
 import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordRecovery } from '../lib/legalCollectionFee.js';
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
@@ -386,6 +389,9 @@ adminRouter.get('/juridico/cobranca', (_req, res) => {
         content: doc.content,
         reviewed: !!doc.reviewed,
         quando: fmtRelative(doc.created_at),
+        signatureStatus: doc.signature_status,
+        signerName: doc.signer_name,
+        signerEmail: doc.signer_email,
       })),
     };
   });
@@ -507,6 +513,9 @@ adminRouter.get('/juridico/minutas', (_req, res) => {
     content: doc.content,
     reviewed: !!doc.reviewed,
     quando: fmtRelative(doc.created_at),
+    signatureStatus: doc.signature_status,
+    signerName: doc.signer_name,
+    signerEmail: doc.signer_email,
   }));
   res.json({ documentos, disclaimer: LEGAL_DRAFT_DISCLAIMER });
 });
@@ -547,6 +556,66 @@ adminRouter.post(
     markLegalDocumentReviewed(doc.id, req.user!.id);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.documento_revisado', { documentId: doc.id, type: doc.type });
     res.json({ ok: true });
+  })
+);
+
+// Real e-signature (lib/esignature.ts) for any legal_documents row — a document must be
+// reviewed first (the same human-review gate every legal draft in this codebase enforces
+// before anything real happens to it), and the admin supplies who's actually signing;
+// nothing here auto-discovers a counterpart's email.
+const signatureSchema = z.object({ signerName: z.string().trim().min(2), signerEmail: z.string().trim().email() });
+
+adminRouter.post(
+  '/juridico/documentos/:id/assinatura',
+  asyncHandler(async (req, res) => {
+    const doc = getLegalDocument(Number(req.params.id));
+    if (!doc) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    if (!doc.reviewed) {
+      res.status(409).json({ error: 'not_reviewed', message: 'Revise o documento antes de enviar para assinatura.' });
+      return;
+    }
+    if (doc.signature_status !== 'none') {
+      res.status(409).json({ error: 'already_sent', message: 'Este documento já foi enviado para assinatura.' });
+      return;
+    }
+    const parsed = signatureSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const result = await sendForSignature({
+      documentKey: `legal-doc-${doc.id}`,
+      content: doc.content,
+      signerName: parsed.data.signerName,
+      signerEmail: parsed.data.signerEmail,
+    });
+    markSentForSignature(doc.id, { envelopeId: result.envelopeId, signUrl: result.signUrl, signerName: parsed.data.signerName, signerEmail: parsed.data.signerEmail });
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.documento_enviado_assinatura', { documentId: doc.id, simulado: result.simulado });
+    res.json({ ok: true, envelopeId: result.envelopeId, signUrl: result.signUrl, simulado: result.simulado, esignatureConfigured: esignatureEnabled });
+  })
+);
+
+adminRouter.post(
+  '/juridico/documentos/:id/assinatura/status',
+  asyncHandler(async (req, res) => {
+    const doc = getLegalDocument(Number(req.params.id));
+    if (!doc) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    if (doc.signature_status === 'none' || !doc.signature_envelope_id) {
+      res.status(409).json({ error: 'not_sent', message: 'Este documento ainda não foi enviado para assinatura.' });
+      return;
+    }
+    const status = await checkSignatureStatus(doc.signature_envelope_id);
+    markSignatureStatus(doc.id, status);
+    if (status === 'assinado' && doc.signature_status !== 'assinado') {
+      recordAuditEvent(req.user!.id, req.user!.company_name, 'juridico.documento_assinado', { documentId: doc.id });
+    }
+    res.json({ ok: true, signatureStatus: status });
   })
 );
 
