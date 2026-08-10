@@ -5,6 +5,8 @@ import { NavIcon } from '../components/NavIcon';
 import { GROUP_LABELS, NAV_ITEMS } from '../data/navConfig';
 import { useSession } from '../state/SessionContext';
 import { useIsMobile } from '../lib/useIsMobile';
+import { useLang } from '../lib/i18n';
+import { LanguageToggle } from '../components/LanguageToggle';
 
 const GROUPS: ('operacoes' | 'analise' | 'plataforma')[] = ['operacoes', 'analise', 'plataforma'];
 
@@ -14,6 +16,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const { t } = useLang();
 
   if (!user) return null;
   const allowed = new Set(user.navTabs);
@@ -60,7 +63,7 @@ export function Sidebar() {
                 className="flex items-center justify-between px-3 pt-3 pb-0.5 border-none bg-transparent cursor-pointer w-full"
                 onClick={() => setCollapsed((c) => ({ ...c, [group]: !c[group] }))}
               >
-                <span className="text-[10.5px] font-bold text-[#5C6B87] uppercase tracking-wider">{GROUP_LABELS[group]}</span>
+                <span className="text-[10.5px] font-bold text-[#5C6B87] uppercase tracking-wider">{t(`group.${group}`, GROUP_LABELS[group])}</span>
                 <span className="text-[9px] text-[#5C6B87]" aria-hidden="true">
                   {isOpen ? '▾' : '▸'}
                 </span>
@@ -78,7 +81,7 @@ export function Sidebar() {
                       style={{ background: active ? '#1E5EFF' : 'transparent', color: active ? '#fff' : '#B8C2D4' }}
                     >
                       <NavIcon tab={item.key} />
-                      {item.label}
+                      {t(`app.${item.key}`, item.label)}
                     </button>
                   );
                 })}
@@ -93,8 +96,9 @@ export function Sidebar() {
           <div className="text-white text-[13px] font-semibold truncate">{user.nome}</div>
           <div className="text-[#8B97AC] text-[11.5px]">{user.sessionLabel}{user.isTeamMember ? ' · somente leitura' : ''}</div>
         </div>
+        <LanguageToggle className="text-[#8B97AC]" />
         <button type="button" className="bg-transparent border-none text-[#8B97AC] text-[11.5px] font-bold cursor-pointer" onClick={handleLogout}>
-          Sair
+          {t('app.sair', 'Sair')}
         </button>
       </div>
     </nav>

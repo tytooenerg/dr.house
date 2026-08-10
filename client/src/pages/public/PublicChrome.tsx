@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import { Logo } from '../../components/Logo';
+import { LanguageToggle } from '../../components/LanguageToggle';
+import { useLang } from '../../lib/i18n';
 
 export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'legal' | 'transparencia' | 'status' }) {
+  const { t } = useLang();
   return (
     <div className="flex items-center justify-between px-14 py-5 border-b border-hairline">
       <div className="flex items-center gap-9">
@@ -10,28 +13,29 @@ export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'lega
         </Link>
         <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-[#3D4658]">
           <Link to="/developers" className={active === 'developers' ? 'text-navy' : 'text-[#3D4658]'}>
-            Desenvolvedores
+            {t('nav.developers', 'Desenvolvedores')}
           </Link>
           <Link to="/precos" className={active === 'precos' ? 'text-navy' : 'text-[#3D4658]'}>
-            Preços
+            {t('nav.precos', 'Preços')}
           </Link>
           <Link to="/transparencia" className={active === 'transparencia' ? 'text-navy' : 'text-[#3D4658]'}>
-            Transparência
+            {t('nav.transparencia', 'Transparência')}
           </Link>
           <Link to="/status" className={active === 'status' ? 'text-navy' : 'text-[#3D4658]'}>
-            Status
+            {t('nav.status', 'Status')}
           </Link>
           <Link to="/legal" className={active === 'legal' ? 'text-navy' : 'text-[#3D4658]'}>
-            Legal
+            {t('nav.legal', 'Legal')}
           </Link>
         </div>
       </div>
       <div className="flex items-center gap-5 text-sm font-semibold">
+        <LanguageToggle />
         <Link to="/login" className="text-[#3D4658]">
-          Entrar
+          {t('nav.entrar', 'Entrar')}
         </Link>
         <Link to="/legal#contato" className="px-4.5 py-2.5 rounded-lg bg-navy text-white">
-          Falar com vendas
+          {t('nav.falarVendas', 'Falar com vendas')}
         </Link>
       </div>
     </div>
@@ -39,22 +43,23 @@ export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'lega
 }
 
 export function PublicFooter() {
+  const { t } = useLang();
   return (
     <div className="px-14 py-8 border-t border-hairline">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <Logo size={20} />
         <div className="flex gap-5 text-[12.5px] text-textSecondary font-semibold">
           <Link to="/legal#termos" className="text-textSecondary">
-            Termos de uso
+            {t('footer.termos', 'Termos de uso')}
           </Link>
           <Link to="/legal#privacidade" className="text-textSecondary">
-            Privacidade
+            {t('footer.privacidade', 'Privacidade')}
           </Link>
           <Link to="/status" className="text-textSecondary">
-            Status
+            {t('footer.status', 'Status')}
           </Link>
           <Link to="/legal#contato" className="text-textSecondary">
-            Contato
+            {t('footer.contato', 'Contato')}
           </Link>
         </div>
       </div>
