@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { findActiveKeyByHash, incrementApiKeyUsage, touchApiKey } from '../db/apiKeys.js';
 import { getUserById } from '../db/users.js';
-import type { ApiKeyMode, ApiKeyRow, UserRow } from '../db/types.js';
+import type { ApiKeyMode, ApiKeyProduct, ApiKeyRow, Plan, UserRow } from '../db/types.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -61,17 +61,53 @@ export function requireWriteScope(req: Request, res: Response, next: NextFunctio
   next();
 }
 
+// Coarse backstop against unauthenticated/garbage-key spam, by IP — runs before
+// requireApiKey has had a chance to resolve who's actually calling, so it can't yet know
+// a real plan/product to size the limit against. Generous on purpose: this exists only to
+// bound the cost of hammering the auth lookup itself, not to be anyone's real budget — the
+// real, plan-aware limit is apiKeyRateLimiter below, which runs after authentication.
+export const apiKeyAbuseBackstop = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? 'anonymous'),
+  message: { error: 'rate_limited', message: 'Muitas requisições. Tente novamente em instantes.' },
+});
+
+// Real per-plan tiers, not one number for every partner. A standalone data-product key
+// (Score API / PLD Screening API) is billed per call regardless of the account's
+// subscription plan (see lib/addOnBilling.ts) — it gets its own tier, independent of
+// `plan`, since it isn't gated behind a subscription to begin with. A sandbox (test-mode)
+// key always gets the same modest exploration budget, whatever the account's real plan is,
+// since sandbox traffic never touches real data or costs the platform real money either way.
+const PLAN_LIMITS_PER_MIN: Record<Plan, number> = { basico: 60, pro: 150, empresarial: 400 };
+const PRODUCT_LIMITS_PER_MIN: Partial<Record<ApiKeyProduct, number>> = { score_api: 200, pld_screening_api: 200 };
+const TEST_MODE_LIMIT_PER_MIN = 60;
+
+export function computeApiKeyLimitPerMin(apiKey: ApiKeyRow, apiUser: UserRow): number {
+  // Explicit operator override always wins — e.g. server/.env.example's documented use
+  // for tuning in a real deployment, and how the test suite forces a small, deterministic
+  // limit to exercise the 429 path without waiting on (or faking) real tiered traffic.
+  const override = Number(process.env.API_RATE_LIMIT_PER_MIN);
+  if (Number.isFinite(override) && override > 0) return override;
+  if (apiKey.mode === 'test') return TEST_MODE_LIMIT_PER_MIN;
+  if (apiKey.product !== 'platform') return PRODUCT_LIMITS_PER_MIN[apiKey.product] ?? TEST_MODE_LIMIT_PER_MIN;
+  return PLAN_LIMITS_PER_MIN[apiUser.plan] ?? PLAN_LIMITS_PER_MIN.basico;
+}
+
 // Rate-limited by the raw key itself (not the caller's IP) — every partner integration
-// gets its own budget. Configurable so tests can exercise the 429 path deterministically
-// without waiting a real minute or spamming hundreds of requests.
+// gets its own budget, sized to what they actually pay for (computeApiKeyLimitPerMin
+// above). Must run after requireApiKey, which is what resolves req.apiKey/req.apiUser in
+// the first place.
 export const apiKeyRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: Number(process.env.API_RATE_LIMIT_PER_MIN) || 60,
+  limit: (req: Request) => (req.apiKey && req.apiUser ? computeApiKeyLimitPerMin(req.apiKey, req.apiUser) : TEST_MODE_LIMIT_PER_MIN),
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
     const header = req.headers.authorization;
     return header?.startsWith('Bearer ') ? header.slice(7) : ipKeyGenerator(req.ip ?? 'anonymous');
   },
-  message: { error: 'rate_limited', message: 'Limite de requisições da API excedido. Tente novamente em instantes.' },
+  message: { error: 'rate_limited', message: 'Limite de requisições da API excedido para o seu plano. Tente novamente em instantes.' },
 });

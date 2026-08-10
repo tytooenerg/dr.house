@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { apiKeyRateLimiter, requireApiKey, requireWriteScope } from '../auth/apiKey.js';
+import { apiKeyAbuseBackstop, apiKeyRateLimiter, requireApiKey, requireWriteScope } from '../auth/apiKey.js';
 import { emitirFormSchema, submitEmitir } from '../lib/emitirCore.js';
 import { aceiteStatusSchema, decideAceite, listAceitesForUser } from '../lib/aceiteCore.js';
 import { buildSeguradoraPayload, decideSinistro, sinistroDecisionSchema } from '../lib/seguradoraCore.js';
@@ -20,7 +20,10 @@ import { screenEntity } from '../db/sanctions.js';
 // internal /api/* used by the SPA, which is cookie/JWT-authenticated and not meant for
 // third parties. See GET /api/v1/openapi.json for the full machine-readable reference.
 export const v1Router = Router();
-v1Router.use(apiKeyRateLimiter, requireApiKey);
+// Order matters: the coarse IP backstop runs first (no identity resolved yet), then
+// requireApiKey resolves req.apiKey/req.apiUser, then the real plan-aware limiter (which
+// reads them) runs last — see auth/apiKey.ts for why each exists.
+v1Router.use(apiKeyAbuseBackstop, requireApiKey, apiKeyRateLimiter);
 
 // A narrow-product key (Score API / PLD screening API — features 2/3, sold standalone to
 // companies that aren't full Lastro partners) can only ever reach the one endpoint it was
