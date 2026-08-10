@@ -8,6 +8,7 @@ import { planAtLeast } from '../lib/billing.js';
 import { fmtAddOnPrice } from '../lib/addOnBilling.js';
 import { buildInstitutionalAnalytics, streamInstitutionalReportPdf } from '../lib/institutionalReporting.js';
 import { buildRebalanceView } from '../lib/portfolioRebalance.js';
+import { buildIncomeTaxStatement, streamIncomeTaxStatementPdf } from '../lib/incomeTaxStatement.js';
 import { fmtBRL, toIsoUtc } from '../lib/format.js';
 
 export const historicoRouter = Router();
@@ -160,4 +161,26 @@ historicoRouter.get('/institutional/report.pdf', (req, res) => {
 // purchases), same as GET /historico itself — no role check needed.
 historicoRouter.get('/rebalanceamento', (req, res) => {
   res.json(buildRebalanceView(effectiveOwnerId(req.user!)));
+});
+
+function resolveYear(raw: unknown): number {
+  const n = Number(raw);
+  const currentYear = new Date().getUTCFullYear();
+  if (Number.isInteger(n) && n >= 2020 && n <= currentYear) return n;
+  return currentYear;
+}
+
+// Central fiscal — informe de rendimentos (lib/incomeTaxStatement.ts). Free for every
+// investidor, same as the rebalancing suggestions above — no paid-subscription gate.
+historicoRouter.get('/informe-rendimentos', (req, res) => {
+  const owner = getUserById(effectiveOwnerId(req.user!))!;
+  const year = resolveYear(req.query.year);
+  res.json(buildIncomeTaxStatement(owner.id, owner.company_name, year));
+});
+
+historicoRouter.get('/informe-rendimentos.pdf', (req, res) => {
+  const owner = getUserById(effectiveOwnerId(req.user!))!;
+  const year = resolveYear(req.query.year);
+  const statement = buildIncomeTaxStatement(owner.id, owner.company_name, year);
+  streamIncomeTaxStatementPdf(res, statement);
 });

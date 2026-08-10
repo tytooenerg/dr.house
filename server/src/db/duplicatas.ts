@@ -186,12 +186,12 @@ export interface PurchaseRow {
 
 export function listPurchasesByInvestor(
   investorId: number
-): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number })[] {
+): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string })[] {
   return db
     .prepare(
-      `SELECT p.*, d.sacado_nome as sacado_nome, d.score as score, d.seguro as seguro FROM purchases p
+      `SELECT p.*, d.sacado_nome as sacado_nome, d.score as score, d.seguro as seguro, d.vencimento as vencimento FROM purchases p
        JOIN duplicatas d ON d.id = p.duplicata_id
        WHERE p.investor_id = ? ORDER BY p.created_at DESC`
     )
-    .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number })[];
+    .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string })[];
 }

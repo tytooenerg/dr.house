@@ -57,6 +57,8 @@ export function HistoricoPage() {
   const [institutionalError, setInstitutionalError] = useState('');
   const [exportingReport, setExportingReport] = useState(false);
   const [rebalance, setRebalance] = useState<RebalanceView | null>(null);
+  const [irYear, setIrYear] = useState(new Date().getFullYear());
+  const [exportingIr, setExportingIr] = useState(false);
 
   useEffect(() => {
     api.get<HistoricoData>(`/historico?page=${page}&pageSize=10`).then(setData);
@@ -103,6 +105,15 @@ export function HistoricoPage() {
       await downloadFile(`/historico/export.${format}`, `historico.${format}`);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const exportInformeRendimentos = async () => {
+    setExportingIr(true);
+    try {
+      await downloadFile(`/historico/informe-rendimentos.pdf?year=${irYear}`, `informe-rendimentos-${irYear}.pdf`);
+    } finally {
+      setExportingIr(false);
     }
   };
 
@@ -173,6 +184,29 @@ export function HistoricoPage() {
           )}
         </Card>
       )}
+
+      <Card className="mb-4 px-6 py-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+          <div className="font-bold text-[14.5px]">Central fiscal — informe de rendimentos</div>
+        </div>
+        <div className="text-textSecondary text-[12.5px] mb-3.5">
+          Estimativa de IRRF pela tabela regressiva sobre suas operações reais do ano-calendário — documento de apoio à sua declaração de IR, não uma
+          retenção automática (a Lastro ainda não retém imposto nas liquidações).
+        </div>
+        <div className="flex items-center gap-2.5">
+          <input
+            type="number"
+            min={2020}
+            max={new Date().getFullYear()}
+            className="w-24 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+            value={irYear}
+            onChange={(e) => setIrYear(Number(e.target.value) || new Date().getFullYear())}
+          />
+          <Button size="sm" variant="secondary" disabled={exportingIr} onClick={exportInformeRendimentos}>
+            {exportingIr ? 'Gerando…' : 'Baixar informe (PDF)'}
+          </Button>
+        </div>
+      </Card>
 
       <Card className="mb-4 px-6 py-5">
         <div className="font-bold text-[14.5px] mb-3.5">Saúde da carteira — mesma linguagem usada em FIDCs</div>
