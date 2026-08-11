@@ -125,13 +125,15 @@ v1Router.post(
 );
 
 // Seguradora-facing endpoints — a partner insurer's own systems can pull apólices/sinistros
-// and decide claims programmatically, mirroring /api/seguradora for the SPA.
+// and decide claims programmatically, mirroring /api/seguradora for the SPA. A test-mode
+// key only ever sees/decides its own sandbox sinistros (lib/sandboxData.ts's data plane),
+// never a real one — same isolation /v1/aceites and /v1/duplicatas/:id already enforce.
 v1Router.get('/seguradora', (req, res) => {
   if (req.apiUser!.role !== 'seguradora') {
     res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas seguradora podem acessar este recurso.' });
     return;
   }
-  res.json(buildSeguradoraPayload(req.apiUser!));
+  res.json(buildSeguradoraPayload(req.apiUser!, req.apiKey!.mode === 'test'));
 });
 
 v1Router.post(
@@ -147,12 +149,13 @@ v1Router.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
+    const sandbox = req.apiKey!.mode === 'test';
     const outcome = await withIdempotency(
       req.apiUser!.id,
       'POST /v1/seguradora/sinistro/:duplicataId/decidir',
       idempotencyHeader(req),
       req.body,
-      () => decideSinistro(req.apiUser!, req.params.duplicataId, parsed.data)
+      () => decideSinistro(req.apiUser!, req.params.duplicataId, parsed.data, sandbox)
     );
     res.status(outcome.status).json(outcome.body);
   })

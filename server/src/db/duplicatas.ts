@@ -127,17 +127,25 @@ export function setInsurer(id: string, insurerKey: string | null) {
   db.prepare('UPDATE duplicatas SET insurer_key = ? WHERE id = ?').run(insurerKey, id);
 }
 
-export function listInsuredByInsurerKey(insurerKey: string): DuplicataRow[] {
-  return db.prepare('SELECT * FROM duplicatas WHERE insurer_key = ? AND sandbox = 0 ORDER BY created_at DESC').all(insurerKey) as DuplicataRow[];
+// `sandbox` follows the same live/test data-plane split db/aceites.ts and db/disputes.ts
+// already use: the internal SPA never passes it (always sandbox=0, real data only); the v1
+// partner API's seguradora endpoints pass `req.apiKey!.mode === 'test'` so a test-mode
+// seguradora key only ever sees/decides sandbox sinistros, never a real one (and vice
+// versa) — previously hardcoded to sandbox=0 regardless of caller, a real isolation gap for
+// a partner-facing decision endpoint (see README "Known gaps").
+export function listInsuredByInsurerKey(insurerKey: string, sandbox = false): DuplicataRow[] {
+  return db
+    .prepare('SELECT * FROM duplicatas WHERE insurer_key = ? AND sandbox = ? ORDER BY created_at DESC')
+    .all(insurerKey, sandbox ? 1 : 0) as DuplicataRow[];
 }
 
 // A policy becomes claimable once its vencimento has passed and it was never sold —
 // i.e. the cedente never got paid by the market, which is exactly what the insurance covers.
-export function listClaimableByInsurerKey(insurerKey: string): DuplicataRow[] {
+export function listClaimableByInsurerKey(insurerKey: string, sandbox = false): DuplicataRow[] {
   const now = Date.now();
   return db
-    .prepare("SELECT * FROM duplicatas WHERE insurer_key = ? AND sandbox = 0 AND sinistro_status = 'none' AND status != 'vendida'")
-    .all(insurerKey)
+    .prepare("SELECT * FROM duplicatas WHERE insurer_key = ? AND sandbox = ? AND sinistro_status = 'none' AND status != 'vendida'")
+    .all(insurerKey, sandbox ? 1 : 0)
     .filter((d) => parseFlexibleDate((d as DuplicataRow).vencimento).getTime() < now) as DuplicataRow[];
 }
 

@@ -14,12 +14,13 @@ function insurerDef(insurerKey: string | null) {
   return INSURERS.find((i) => i.key === insurerKey) ?? null;
 }
 
-// Shared by the internal GET /api/seguradora route (used by the SPA) and the public
-// /api/v1/seguradora partner endpoint — same payload shape either way.
-export function buildSeguradoraPayload(user: UserRow) {
+// Shared by the internal GET /api/seguradora route (used by the SPA, always sandbox=false)
+// and the public /api/v1/seguradora partner endpoint (sandbox = a test-mode key's own
+// isolated data plane — see db/duplicatas.ts) — same payload shape either way.
+export function buildSeguradoraPayload(user: UserRow, sandbox = false) {
   const insurer = insurerDef(user.insurer_key);
-  const apolices = insurer ? listInsuredByInsurerKey(insurer.key) : [];
-  const claimable = insurer ? listClaimableByInsurerKey(insurer.key) : [];
+  const apolices = insurer ? listInsuredByInsurerKey(insurer.key, sandbox) : [];
+  const claimable = insurer ? listClaimableByInsurerKey(insurer.key, sandbox) : [];
   const totalPremio = apolices.reduce((sum, d) => sum + d.valor * ((insurer?.premioPct ?? 0) / 100), 0);
   const totalSegurado = apolices.reduce((sum, d) => sum + d.valor, 0);
 
@@ -54,14 +55,18 @@ export type DecideSinistroOutcome =
   | { status: 409; body: { error: 'no_insurer'; message: string } }
   | { status: 404; body: { error: 'not_found'; message: string } };
 
-// Shared by the internal POST /api/seguradora/sinistro/:duplicataId/decidir route and the
-// public /api/v1/seguradora/sinistros/:id partner endpoint — same side effects either way.
-export function decideSinistro(user: UserRow, duplicataId: string, input: SinistroDecisionInput): DecideSinistroOutcome {
+// Shared by the internal POST /api/seguradora/sinistro/:duplicataId/decidir route
+// (sandbox=false) and the public /api/v1/seguradora/sinistro/:duplicataId/decidir partner
+// endpoint (sandbox = the caller's key mode) — same side effects either way. `claimable` is
+// already scoped to the right data plane, so a test-mode key can never find (and decide) a
+// real sinistro's ID even if it guesses one correctly, and vice versa — same protection
+// GET /v1/duplicatas/:id already has (db/duplicatas.ts's sandbox filter).
+export function decideSinistro(user: UserRow, duplicataId: string, input: SinistroDecisionInput, sandbox = false): DecideSinistroOutcome {
   const insurer = insurerDef(user.insurer_key);
   if (!insurer) {
     return { status: 409, body: { error: 'no_insurer', message: 'Sua conta não está vinculada a uma seguradora parceira.' } };
   }
-  const claimable = listClaimableByInsurerKey(insurer.key);
+  const claimable = listClaimableByInsurerKey(insurer.key, sandbox);
   const target = claimable.find((d) => d.id === duplicataId);
   if (!target) {
     return { status: 404, body: { error: 'not_found', message: 'Sinistro não encontrado ou já decidido.' } };
@@ -83,5 +88,5 @@ export function decideSinistro(user: UserRow, duplicataId: string, input: Sinist
     });
   }
   recordAuditEvent(user.id, user.company_name, 'sinistro.decidido', { duplicataId: target.id, decision: input.decision });
-  return { status: 200, body: buildSeguradoraPayload(user) };
+  return { status: 200, body: buildSeguradoraPayload(user, sandbox) };
 }
