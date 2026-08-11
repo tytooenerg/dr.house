@@ -60,3 +60,30 @@ export function getInvestorPosition(investorId: number): number {
 export function markRedeemed(contributionId: number, valor: number) {
   db.prepare('UPDATE credit_line_fund_contributions SET valor_resgatado = valor_resgatado + ? WHERE id = ?').run(valor, contributionId);
 }
+
+export interface FundQuotaMovementRow {
+  id: number;
+  investor_id: number;
+  quotas: number;
+  cota_price: number;
+  created_at: string;
+}
+
+export function addQuotaMovement(investorId: number, quotas: number, cotaPrice: number): FundQuotaMovementRow {
+  const info = db
+    .prepare('INSERT INTO credit_line_fund_quota_movements (investor_id, quotas, cota_price) VALUES (?, ?, ?)')
+    .run(investorId, quotas, cotaPrice);
+  return db.prepare('SELECT * FROM credit_line_fund_quota_movements WHERE id = ?').get(info.lastInsertRowid) as FundQuotaMovementRow;
+}
+
+export function getInvestorQuotas(investorId: number): number {
+  const row = db
+    .prepare('SELECT COALESCE(SUM(quotas), 0) as total FROM credit_line_fund_quota_movements WHERE investor_id = ?')
+    .get(investorId) as { total: number };
+  return row.total;
+}
+
+export function getTotalQuotas(): number {
+  const row = db.prepare('SELECT COALESCE(SUM(quotas), 0) as total FROM credit_line_fund_quota_movements').get() as { total: number };
+  return row.total;
+}

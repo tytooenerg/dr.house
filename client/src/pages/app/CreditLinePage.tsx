@@ -34,7 +34,10 @@ interface FundLedgerRow {
 
 interface FundOverview {
   balanceFmt: string;
+  navFmt: string;
+  cotaPriceFmt: string;
   yourPositionFmt: string | null;
+  yourPrincipalAportadoFmt: string | null;
   yourAvailableToRedeemFmt: string | null;
   recentLedger: FundLedgerRow[];
 }
@@ -104,21 +107,27 @@ function FundCard() {
 
   return (
     <Card className="mb-6">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
         <div className="font-bold text-[15px]">Pool de fomento à linha de crédito</div>
-        <span className="text-[12.5px] font-bold text-textSecondary">Saldo do pool: {fund.balanceFmt}</span>
+        <span className="text-[12.5px] font-bold text-textSecondary">
+          Saldo do pool: {fund.balanceFmt} · NAV: {fund.navFmt} · Cota: {fund.cotaPriceFmt}
+        </span>
       </div>
       <p className="text-[12.5px] text-textSecondary mb-3">
         Capital real de investidores financia cada saque de cedente na linha de crédito rotativa — sem aporte no pool, não há saque possível.
-        Devoluções (principal + juros) voltam ao pool. Sua posição rastreia o principal aportado; o rendimento coletado dos cedentes cresce o
-        saldo geral do pool, sem uma atribuição precisa de cota por investidor.
+        Cada aporte compra cotas ao preço atual; devoluções (principal + juros) voltam ao pool sem emitir novas cotas, então o preço da cota sobe
+        para quem já está posicionado — o mesmo mecanismo de um FIDC real, atribuindo o rendimento proporcionalmente a cada investidor.
       </p>
       {isInvestor && (
         <>
-          <div className="grid grid-cols-2 gap-4 mb-3">
+          <div className="grid grid-cols-3 gap-4 mb-3">
             <div>
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Sua posição</div>
+              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Sua posição (com rendimento)</div>
               <div className="font-mono-num font-bold text-[15px]">{fund.yourPositionFmt}</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Principal aportado</div>
+              <div className="font-mono-num font-bold text-[15px] text-textSecondary">{fund.yourPrincipalAportadoFmt}</div>
             </div>
             <div>
               <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Disponível para resgate</div>

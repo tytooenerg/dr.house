@@ -56,6 +56,13 @@ export function listAllDraws(lineId: number): CreditLineDrawRow[] {
   return db.prepare('SELECT * FROM credit_line_draws WHERE credit_line_id = ? ORDER BY created_at DESC').all(lineId) as CreditLineDrawRow[];
 }
 
+// Every open draw across every cedente's line, regardless of owner — used by
+// lib/creditLineFund.ts to value the fund's real NAV (cash + the receivables it currently
+// owns), not scoped to one cedente like the functions above.
+export function listAllOpenDrawsGlobal(): CreditLineDrawRow[] {
+  return db.prepare("SELECT * FROM credit_line_draws WHERE status = 'aberto'").all() as CreditLineDrawRow[];
+}
+
 export function updateDrawBalance(drawId: number, saldoDevedor: number, lastAccrualAt: string) {
   db.prepare('UPDATE credit_line_draws SET saldo_devedor = ?, last_accrual_at = ? WHERE id = ?').run(saldoDevedor, lastAccrualAt, drawId);
 }

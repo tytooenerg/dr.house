@@ -164,10 +164,15 @@ describe('Credit line — draw and repay', () => {
     // Other tests in this file may have already contributed real liquidity to the pool
     // (test isolation here is per-file, not per-test) — read the real current balance
     // rather than assuming zero, and request comfortably more than that, still well within
-    // this cedente's own limit (a very large recent-emission volume).
+    // this cedente's own limit (a very large recent-emission volume). The ×20 multiplier
+    // (not ×2, which this test used to fail intermittently with) keeps `limite` comfortably
+    // above `drawValor` even under the *worst* real rating band (C, 0.15× multiplier) —
+    // ×2 only cleared it under the best band (AA, 0.6×), so a run whose duplicatas landed
+    // in a lower band (deterministic here, but still a real function of avgScore) could tip
+    // the assertion below even though nothing was actually wrong.
     const balanceBefore = getFundBalance();
     const { token, userId } = await registerCedente();
-    seedRecentDuplicatas(userId, 4, Math.max(500000, (balanceBefore + 100000) * 2));
+    seedRecentDuplicatas(userId, 4, Math.max(500000, (balanceBefore + 100000) * 20));
     const overview = await request(app).get('/api/credit-line').set('Authorization', `Bearer ${token}`);
     const limite = overview.body.limite as number;
     const drawValor = balanceBefore + 50000;
