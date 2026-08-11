@@ -202,6 +202,18 @@ export function DocsPage() {
       </div>
 
       <div className="px-14 pb-10 max-w-[900px]">
+        <div className="font-bold text-lg mb-2">Estabilidade e versionamento</div>
+        <div className="text-textSecondary text-[13.5px] leading-relaxed">
+          <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">/v1</code> nunca foi descontinuada — nenhum parceiro jamais recebeu um aviso de
+          migração. Se um dia isso mudar, uma futura <code className="font-mono-num">/v2</code> coexistirá com <code className="font-mono-num">/v1</code>{' '}
+          por no mínimo 12 meses antes de qualquer desligamento, e toda resposta de <code className="font-mono-num">/v1</code> passará a carregar
+          cabeçalhos reais <code className="font-mono-num">Deprecation</code>/<code className="font-mono-num">Sunset</code> (RFC 8594) — mecanismo já
+          implementado e testado hoje, só inativo porque nada foi de fato descontinuado ainda. Política completa (o que conta como mudança quebradora,
+          prazo de aviso, como uma v2 coexistiria) em <code className="font-mono-num">docs/api-versioning-policy.md</code> no repositório.
+        </div>
+      </div>
+
+      <div className="px-14 pb-10 max-w-[900px]">
         <div className="font-bold text-lg mb-2">Idempotência</div>
         <div className="text-textSecondary text-[13.5px] leading-relaxed">
           Todo endpoint de mutação aceita um cabeçalho opcional <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">Idempotency-Key</code>.

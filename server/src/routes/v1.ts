@@ -15,15 +15,20 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { chargePerCall } from '../lib/addOnBilling.js';
 import { screenEntity } from '../db/sanctions.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
+import { apiVersioningHeaders } from '../lib/apiVersioning.js';
 
 // Public, versioned, API-key-authenticated endpoints for external partners (ERPs, FIDCs,
 // securitizadoras, sacados, seguradoras…) to integrate with directly — distinct from the
 // internal /api/* used by the SPA, which is cookie/JWT-authenticated and not meant for
-// third parties. See GET /api/v1/openapi.json for the full machine-readable reference.
+// third parties. See GET /api/v1/openapi.json for the full machine-readable reference, and
+// docs/api-versioning-policy.md for how this version is maintained/deprecated over time.
 export const v1Router = Router();
-// Order matters: the coarse IP backstop runs first (no identity resolved yet), then
+// Real Deprecation/Sunset headers (lib/apiVersioning.ts) on every response, before auth
+// even resolves — a no-op today (v1 isn't deprecated), becomes real the moment an admin
+// sets a sunset date. Then the coarse IP backstop (no identity resolved yet), then
 // requireApiKey resolves req.apiKey/req.apiUser, then the real plan-aware limiter (which
 // reads them) runs last — see auth/apiKey.ts for why each exists.
+v1Router.use(apiVersioningHeaders);
 v1Router.use(apiKeyAbuseBackstop, requireApiKey, apiKeyRateLimiter);
 
 // A narrow-product key (Score API / PLD screening API — features 2/3, sold standalone to

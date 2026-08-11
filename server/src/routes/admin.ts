@@ -15,6 +15,7 @@ import { listPendingComplianceReview, resolveComplianceReview, type ComplianceBr
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { getClaudeUsageSummary } from '../db/claudeUsage.js';
 import { getSuspendThreshold, setSuspendThreshold, DEFAULT_SUSPEND_THRESHOLD } from '../lib/complianceEngine.js';
+import { getV1SunsetDate, setV1SunsetDate } from '../lib/apiVersioning.js';
 import { checkCollectionEligibility, generateCollectionDraft, LEGAL_DRAFT_DISCLAIMER, type CollectionDocType } from '../lib/legalCollection.js';
 import { generateLegalDraft, type LegalDraftType } from '../lib/legalDraftGenerator.js';
 import { analyzeRegulatoryText } from '../lib/regulatoryMonitor.js';
@@ -358,6 +359,35 @@ adminRouter.put(
     setSuspendThreshold(parsed.data.threshold, req.user!.id);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'compliance.threshold_updated', { threshold: parsed.data.threshold });
     res.json({ threshold: parsed.data.threshold });
+  })
+);
+
+// Real API versioning/deprecation controls for /api/v1 (lib/apiVersioning.ts) — see
+// docs/api-versioning-policy.md. Setting a sunset date here makes every /v1 response start
+// carrying real Deprecation/Sunset headers immediately, no deploy needed; clearing it
+// (null) removes them again. v1 has no sunset date by default — nothing has ever been
+// deprecated.
+adminRouter.get('/api-versioning', (_req, res) => {
+  res.json({ sunsetDate: getV1SunsetDate() });
+});
+
+const apiVersioningSchema = z.object({ sunsetDate: z.string().trim().min(1).nullable() });
+
+adminRouter.put(
+  '/api-versioning',
+  asyncHandler(async (req, res) => {
+    const parsed = apiVersioningSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    if (parsed.data.sunsetDate !== null && Number.isNaN(new Date(parsed.data.sunsetDate).getTime())) {
+      res.status(400).json({ error: 'validation_error', message: 'Data de sunset inválida.' });
+      return;
+    }
+    setV1SunsetDate(parsed.data.sunsetDate, req.user!.id);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'api_versioning.sunset_updated', { sunsetDate: parsed.data.sunsetDate });
+    res.json({ sunsetDate: parsed.data.sunsetDate });
   })
 );
 

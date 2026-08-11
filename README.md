@@ -410,6 +410,14 @@ Building this surfaced a real, pre-existing gap in the spec itself: `POST /pld/t
 
 `client/src/pages/public/DocsPage.test.tsx` (4 tests): the static getting-started content and rate-limit table render without depending on the network; the live spec is fetched and each endpoint (including a real request-body example value) renders from it, not from a hardcoded copy; the curl/Node/Python sample tabs actually switch; a network failure shows an honest error message instead of crashing. `server/test/partner-api-v2.test.ts` extended with an assertion that `/pld/triagem` is now present in the served spec.
 
+#### API versioning/deprecation policy — real mechanism, not just a document (`docs/api-versioning-policy.md`, `lib/apiVersioning.ts`)
+
+A real business isn't built on top of an API whose evolution is unpredictable — but a policy that's only prose, with nothing enforcing it, is exactly as trustworthy as no policy at all. `docs/api-versioning-policy.md` is the real, written policy (what's a breaking vs. non-breaking change, a 12-month minimum notice window, how a future `/v2` would coexist with `/v1` rather than replace it overnight, SDK semver rules) — and `lib/apiVersioning.ts` is the real mechanism behind it, not a promise with nothing backing it.
+
+`/v1` has never been deprecated — no partner has ever been told to migrate off it — so this mechanism is genuinely inert today, same "real-when-configured" discipline as the Compliance Engine's admin-tunable suspend threshold it reuses the pattern from (`platform_settings`, the same key-value table). The moment that changes for real: `PUT /admin/api-versioning` sets a real sunset date, and every single `/v1` response — mounted before authentication even resolves, so it applies uniformly including to a rejected/unauthenticated request — immediately starts carrying real `Deprecation: true` and `Sunset: <RFC 8594 HTTP-date>` headers (plus a `Link: </docs>; rel="deprecation"` pointing at the new docs page), no code deploy required. `GET /admin/api-versioning` reads the current date (`null` today); the new "Estabilidade e versionamento" section on `/docs` explains this to any partner reading the docs, including that the mechanism itself already exists and is tested even though it's inactive.
+
+`server/test/api-versioning.test.ts` (4 tests): no Deprecation/Sunset headers on `/v1` with no sunset date configured (today's real state); real headers appear on every `/v1` response — including an unauthenticated one — the instant a sunset date is set; the admin endpoint reads/writes the real date, rejects an invalid one, and clearing it removes the headers again; the admin endpoint requires auth.
+
 ## Running locally
 
 ```bash
