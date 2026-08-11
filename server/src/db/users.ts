@@ -14,6 +14,17 @@ export function getUserByReferralCode(code: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE referral_code = ?').get(code.toUpperCase().trim()) as UserRow | undefined;
 }
 
+// A duplicata's `sacado_nome` is free text on the cedente's side, matched to a real sacado
+// account (if one exists) by case-insensitive company name — same join `db/aceites.ts`'s
+// listAguardandoSemLembrete already uses to find who to WhatsApp-remind. Exposed standalone
+// here so lib/emitirCore.ts can notify that account the moment a new aceite needs their
+// action, not just once the reminder job's deadline threshold kicks in.
+export function getSacadoAccountByCompanyName(nome: string): UserRow | undefined {
+  return db.prepare("SELECT * FROM users WHERE role = 'sacado' AND lower(company_name) = lower(?) AND deleted_at IS NULL").get(nome) as
+    | UserRow
+    | undefined;
+}
+
 export function getUserByGoogleSub(googleSub: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE google_sub = ?').get(googleSub) as UserRow | undefined;
 }

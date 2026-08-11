@@ -5,6 +5,8 @@ import { recordComplianceResult } from '../db/complianceEngine.js';
 import { ensureAceite } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { createComplianceAlert } from '../db/complianceAlerts.js';
+import { addNotification } from '../db/misc.js';
+import { getSacadoAccountByCompanyName, getSettings } from '../db/users.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from './billing.js';
 import { platformFee } from './settlement.js';
@@ -197,6 +199,27 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
     sandbox: opts.sandbox,
   });
   ensureAceite(duplicata.id, '10 dias úteis restantes');
+  // Previously the sacado only ever found out a duplicata needed their aceite via the
+  // deadline-reminder WhatsApp job (lib/aceiteReminder.ts, only fires once ≤2 days remain)
+  // or by happening to log in and check themselves — a real gap for anyone without
+  // WhatsApp opted in. Notify immediately if a real sacado account matches the company
+  // name, gated behind sandbox to keep test-mode emissions from ever touching a real
+  // account's inbox. Branded with the cedente's White-label Plus name/logo when enabled —
+  // same substitution already applied to the WhatsApp reminder and the sacado's own
+  // in-app aceite view (lib/aceiteCore.ts's `view()`).
+  if (!opts.sandbox) {
+    const sacadoAccount = getSacadoAccountByCompanyName(form.sacado);
+    if (sacadoAccount) {
+      const brand = user.whitelabel_plus_enabled ? getSettings(user).whitelabelBrand?.nome ?? null : null;
+      addNotification(
+        sacadoAccount.id,
+        `Nova duplicata de ${fmtBRL(valorNum + batchTotal)} emitida por ${user.company_name} aguardando sua confirmação (Portal do Sacado).`,
+        COLORS.AMBER,
+        'aceite',
+        { brand }
+      );
+    }
+  }
   recordAuditEvent(user.id, user.company_name, 'duplicata.registrada', { duplicataId: duplicata.id, registro, registradora: registradora.key });
   void deliverWebhookEvent(user.id, 'duplicata.registrada', {
     duplicataId: duplicata.id,

@@ -9,21 +9,37 @@ import { logger } from '../lib/logger.js';
 // --- notifications ---
 // `category` is optional — pass it only for real events the user can toggle in
 // Perfil (leilão/aceite/disputa); seed/demo notifications skip it so they never trigger email.
-export function addNotification(userId: number, text: string, color: string, category?: 'leilao' | 'aceite' | 'disputa') {
+//
+// `opts.brand` extends white-label branding (Integrações ERP → White-label Plus) to the two
+// automated channels that previously always said "Lastro" regardless of which cedente the
+// notification is actually about — email subject and Web Push title — matching the
+// substitution already applied to the WhatsApp aceite reminder (lib/aceiteReminder.ts) and
+// the sacado's in-app aceite view (lib/aceiteCore.ts's `view()`). Only ever passed by a
+// caller that already resolved the relevant cedente's whitelabel_plus_enabled + brand —
+// this function never looks it up itself, since most calls have nothing to do with a
+// specific cedente's brand (e.g. an investidor being notified about their own purchase).
+export function addNotification(
+  userId: number,
+  text: string,
+  color: string,
+  category?: 'leilao' | 'aceite' | 'disputa',
+  opts?: { brand?: string | null }
+) {
   db.prepare('INSERT INTO notifications (user_id, text, color) VALUES (?, ?, ?)').run(userId, text, color);
   if (!category) return;
   const user = getUserById(userId);
   if (!user) return;
   const settings = getSettings(user);
-  if (settings.notifPrefs[category]) sendEmail(user.email, 'Lastro — nova atualização na sua conta', text);
+  const label = opts?.brand ? `${opts.brand} (via Lastro)` : 'Lastro';
+  if (settings.notifPrefs[category]) sendEmail(user.email, `${label} — nova atualização na sua conta`, text);
   if (settings.notifyViaWhatsapp && user.telefone) {
-    sendWhatsapp(user.telefone, `Lastro: ${text}`).catch((err) => logger.warn({ err, userId }, '[whatsapp] falha ao notificar'));
+    sendWhatsapp(user.telefone, `${label}: ${text}`).catch((err) => logger.warn({ err, userId }, '[whatsapp] falha ao notificar'));
   }
   // Real Web Push (lib/webPush.ts) — fires for every real, categorized in-app notification,
   // same choke point email/WhatsApp already use, so every existing call site across the app
   // gets it automatically. A no-op with no subscribed device (sendWebPush's own early
   // return), so this is silent for the vast majority of users who never opted in.
-  sendWebPush(userId, { title: 'Lastro', body: text }).catch((err) => logger.warn({ err, userId }, '[web-push] falha ao notificar'));
+  sendWebPush(userId, { title: label, body: text }).catch((err) => logger.warn({ err, userId }, '[web-push] falha ao notificar'));
 }
 
 // Fan-out to every admin account — used by background jobs (the cobrança agent scan, the
