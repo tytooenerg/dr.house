@@ -4,6 +4,7 @@ import { createDuplicata, dispararLeilao, setInsurer } from './duplicatas.js';
 import { ensureAceite, setAceiteStatus } from './aceites.js';
 import { addLedgerEntry, addNotification, inviteTeamMember } from './misc.js';
 import { hashPassword } from '../auth/password.js';
+import { logger } from '../lib/logger.js';
 import { OFFERS_RAW, MINHAS_RAW, ACEITES_RAW, HISTORICO_RAW, EXTRATO_RAW, TEAM_MEMBERS, NOTIFICATIONS } from '../data/seed.js';
 
 const STATUS_MAP: Record<string, string> = {
@@ -16,6 +17,22 @@ const STATUS_MAP: Record<string, string> = {
 export async function seedIfEmpty() {
   const count = (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n;
   if (count > 0) return;
+
+  // Demo accounts (including admin@lastro.demo) use a fixed, publicly-documented password
+  // (see README) — fine for local/dev/staging, a real vulnerability on an internet-facing
+  // production deployment with an empty database. Refuse to auto-create them there unless
+  // someone explicitly opts in (SEED_DEMO_DATA=true — e.g. a public sales-demo environment
+  // that happens to run with NODE_ENV=production). The real first admin account for a
+  // genuine production deployment should come from `npm run create-admin` instead (see
+  // server/src/scripts/createAdmin.ts and DEPLOY.md), which takes a real, operator-chosen
+  // password and is never documented publicly.
+  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_DATA !== 'true') {
+    logger.warn(
+      '[seed] Skipping demo data seed: NODE_ENV=production and SEED_DEMO_DATA is not "true". ' +
+        'The database has no users yet — create your own first admin account with `npm run create-admin` (see DEPLOY.md).'
+    );
+    return;
+  }
 
   const demoPassword = await hashPassword('demo1234');
 

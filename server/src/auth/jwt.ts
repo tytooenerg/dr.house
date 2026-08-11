@@ -3,8 +3,19 @@ import crypto from 'node:crypto';
 import type { Role } from '../db/types.js';
 import { logger } from '../lib/logger.js';
 
+// A warning that's easy to miss in a scrolling log is not a real safeguard for the single
+// most consequential secret in the app (it signs every access/refresh/2FA/OAuth/SAML
+// token) — in a real production deployment (NODE_ENV=production) an unset JWT_SECRET now
+// fails startup hard instead of silently running with a publicly-known default anyone
+// could forge tokens against. Development/test keep the soft warning + insecure fallback,
+// since neither needs a real secret to be useful.
 const SECRET = process.env.JWT_SECRET || 'lastro-dev-secret-change-in-production';
 if (!process.env.JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      '[auth] JWT_SECRET is required when NODE_ENV=production — refusing to start with a publicly-known default secret. Set a real value (e.g. `openssl rand -hex 32`).'
+    );
+  }
   logger.warn('[auth] JWT_SECRET not set — using an insecure development default. Set JWT_SECRET in production.');
 }
 

@@ -1,0 +1,16 @@
+# Real reverse proxy config for docker-compose.prod.yml — Caddy gets automatic,
+# auto-renewing HTTPS (Let's Encrypt) for free, with zero manual certbot/cron setup, as
+# long as {$APP_DOMAIN} actually resolves (DNS A/AAAA record) to this server and ports
+# 80/443 are reachable from the internet (see DEPLOY.md).
+{$APP_DOMAIN} {
+	reverse_proxy app:4000
+
+	# The API itself already sets its own security headers (helmet — see server/src/app.ts);
+	# these are the ones that only make sense set at the edge, in front of a reverse proxy.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+
+	encode gzip
+}

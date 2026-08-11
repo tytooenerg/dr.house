@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx src/scripts/migrate.ts",
-    "seed:demo": "tsx src/scripts/seed-investor-demo.ts"
+    "seed:demo": "tsx src/scripts/seed-investor-demo.ts",
+    "create-admin": "tsx src/scripts/createAdmin.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
