@@ -36,6 +36,7 @@ describe('OpenAPI spec', () => {
     expect(res.body.paths['/aceites']).toBeTruthy();
     expect(res.body.paths['/seguradora']).toBeTruthy();
     expect(res.body.paths['/sacados/{cnpj}/score']).toBeTruthy();
+    expect(res.body.paths['/pld/triagem']).toBeTruthy();
   });
 });
 

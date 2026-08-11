@@ -3,7 +3,7 @@ import { Logo } from '../../components/Logo';
 import { LanguageToggle } from '../../components/LanguageToggle';
 import { useLang } from '../../lib/i18n';
 
-export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'legal' | 'transparencia' | 'status' }) {
+export function PublicNav({ active }: { active?: 'developers' | 'docs' | 'precos' | 'legal' | 'transparencia' | 'status' }) {
   const { t } = useLang();
   return (
     <div className="flex items-center justify-between px-14 py-5 border-b border-hairline">
@@ -14,6 +14,9 @@ export function PublicNav({ active }: { active?: 'developers' | 'precos' | 'lega
         <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-[#3D4658]">
           <Link to="/developers" className={active === 'developers' ? 'text-navy' : 'text-[#3D4658]'}>
             {t('nav.developers', 'Desenvolvedores')}
+          </Link>
+          <Link to="/docs" className={active === 'docs' ? 'text-navy' : 'text-[#3D4658]'}>
+            {t('nav.docs', 'Docs')}
           </Link>
           <Link to="/precos" className={active === 'precos' ? 'text-navy' : 'text-[#3D4658]'}>
             {t('nav.precos', 'Preços')}

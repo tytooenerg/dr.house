@@ -41,6 +41,7 @@ const AssinaturaPage = lazy(() => import('./pages/app/AssinaturaPage').then((m) 
 const SeguradoraPage = lazy(() => import('./pages/app/SeguradoraPage').then((m) => ({ default: m.SeguradoraPage })));
 const LandingPage = lazy(() => import('./pages/public/LandingPage').then((m) => ({ default: m.LandingPage })));
 const DevelopersPage = lazy(() => import('./pages/public/DevelopersPage').then((m) => ({ default: m.DevelopersPage })));
+const DocsPage = lazy(() => import('./pages/public/DocsPage').then((m) => ({ default: m.DocsPage })));
 const PrecosPage = lazy(() => import('./pages/public/PrecosPage').then((m) => ({ default: m.PrecosPage })));
 const LegalPage = lazy(() => import('./pages/public/LegalPage').then((m) => ({ default: m.LegalPage })));
 const TransparenciaPage = lazy(() => import('./pages/public/TransparenciaPage').then((m) => ({ default: m.TransparenciaPage })));
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/completar-cadastro-google" element={<CompleteGoogleSignupPage />} />
           <Route path="/completar-cadastro-saml" element={<CompleteSamlSignupPage />} />
           <Route path="/developers" element={<DevelopersPage />} />
+          <Route path="/docs" element={<DocsPage />} />
           <Route path="/precos" element={<PrecosPage />} />
           <Route path="/legal" element={<LegalPage />} />
           <Route path="/transparencia" element={<TransparenciaPage />} />

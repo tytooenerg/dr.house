@@ -171,5 +171,31 @@ export const openApiSpec = {
         },
       },
     },
+    '/pld/triagem': {
+      post: {
+        summary: 'Triagem PLD/KYC — screening OFAC + Lista Consolidada do CS da ONU',
+        description:
+          'Reaproveita a mesma triagem real que toda submissão de KYB já passa (db/sanctions.ts): lista OFAC SDN, Lista Consolidada do Conselho de Segurança da ONU e a watchlist de demonstração. Disponível para qualquer chave (`platform` embutido na assinatura, sem custo adicional) ou vendida avulsa, por chamada, a uma chave dedicada `pld_screening_api` — nesse caso cada chamada é cobrada (ver Uso de IA/faturamento em Desenvolvedores).',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['nome'],
+                properties: {
+                  nome: { type: 'string', example: 'João da Silva Sanções' },
+                  documento: { type: 'string', example: '000.000.000-00' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Resultado da triagem — `flagged` e, se houver correspondência, `match` (nome/tipo/fonte).' },
+          '400': { description: 'Erro de validação.' },
+        },
+      },
+    },
   },
 };

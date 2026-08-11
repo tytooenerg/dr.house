@@ -58,9 +58,9 @@ export function DevelopersPage() {
             <Link to="/login" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
               Começar a integrar
             </Link>
-            <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer" className="px-6 py-3.5 rounded-lg border border-inputBorder text-navy font-bold text-[15px]">
+            <Link to="/docs" className="px-6 py-3.5 rounded-lg border border-inputBorder text-navy font-bold text-[15px]">
               Ver documentação
-            </a>
+            </Link>
           </div>
         </div>
 
