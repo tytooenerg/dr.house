@@ -17,6 +17,9 @@ function Probe() {
       <span data-testid="historico-title">{t('historico.title', 'Carteira & Histórico')}</span>
       <span data-testid="emitir-title">{t('emitir.title', 'Emitir Duplicata')}</span>
       <span data-testid="admin-title">{t('admin.title', 'Back-office')}</span>
+      <span data-testid="admin-tab-kyb">{t('admin.tab.kyb', 'Fila de KYB')}</span>
+      <span data-testid="admin-tab-juridico">{t('admin.tab.juridico', 'Jurídico')}</span>
+      <span data-testid="admin-tab-auditoria">{t('admin.tab.auditoria', 'Auditoria')}</span>
     </div>
   );
 }
@@ -66,6 +69,9 @@ describe('i18n', () => {
     expect(screen.getByTestId('historico-title').textContent).toBe('Portfolio & History');
     expect(screen.getByTestId('emitir-title').textContent).toBe('Issue Receivable');
     expect(screen.getByTestId('admin-title').textContent).toBe('Back Office');
+    expect(screen.getByTestId('admin-tab-kyb').textContent).toBe('KYB queue');
+    expect(screen.getByTestId('admin-tab-juridico').textContent).toBe('Legal');
+    expect(screen.getByTestId('admin-tab-auditoria').textContent).toBe('Audit trail');
   });
 
   it('falls back to the PT default for a key with no English translation yet, instead of rendering the raw key', async () => {

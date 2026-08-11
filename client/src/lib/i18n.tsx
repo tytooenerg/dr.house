@@ -125,9 +125,19 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'emitir.title': 'Issue Receivable',
     'emitir.subtitle': "Issue and register a receivable directly on Lastro — without leaving the platform",
 
-    // Back Office (admin) page header only — the panel's many tabs stay PT-BR
+    // Back Office (admin) page header and tab bar labels — the content *inside* each tab
+    // (KYB review, dispute detail, compliance queue rows, Jurídico panels, etc.) stays
+    // PT-BR, same scoping choice the rest of this file documents up top.
     'admin.title': 'Back Office',
     'admin.subtitle': 'Onboarding approval, dispute arbitration and the platform audit trail',
+    'admin.tab.kyb': 'KYB queue',
+    'admin.tab.disputas': 'Disputes',
+    'admin.tab.compliance': 'Compliance',
+    'admin.tab.juridico': 'Legal',
+    'admin.tab.ia': 'AI usage',
+    'admin.tab.agentes': 'AI Agents',
+    'admin.tab.flags': 'Feature flags',
+    'admin.tab.auditoria': 'Audit trail',
   },
 };
 // PT strings live inline in each component as the ptDefault argument to t() — the app's

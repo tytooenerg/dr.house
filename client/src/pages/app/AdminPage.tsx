@@ -787,14 +787,14 @@ export function AdminPage() {
 
       <div className="flex gap-1 mb-5 p-1 rounded-lg bg-bg w-fit">
         {([
-          ['kyb', `Fila de KYB (${pending.length})`],
-          ['disputas', `Disputas (${disputes.length})`],
-          ['compliance', `Compliance (${complianceQueue.length})`],
-          ['juridico', 'Jurídico'],
-          ['ia', 'Uso de IA'],
-          ['agentes', 'Agentes IA'],
-          ['flags', 'Feature flags'],
-          ['auditoria', 'Auditoria'],
+          ['kyb', `${t('admin.tab.kyb', 'Fila de KYB')} (${pending.length})`],
+          ['disputas', `${t('admin.tab.disputas', 'Disputas')} (${disputes.length})`],
+          ['compliance', `${t('admin.tab.compliance', 'Compliance')} (${complianceQueue.length})`],
+          ['juridico', t('admin.tab.juridico', 'Jurídico')],
+          ['ia', t('admin.tab.ia', 'Uso de IA')],
+          ['agentes', t('admin.tab.agentes', 'Agentes IA')],
+          ['flags', t('admin.tab.flags', 'Feature flags')],
+          ['auditoria', t('admin.tab.auditoria', 'Auditoria')],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
