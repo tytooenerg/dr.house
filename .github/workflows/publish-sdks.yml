@@ -1,0 +1,106 @@
+name: Publish SDKs
+
+# Manual-only (workflow_dispatch) — never fires on a push/PR/tag on its own, so adding this
+# file can never accidentally publish anything. Each job is additionally gated on the
+# relevant secret actually being present, so running this before those secrets are
+# configured is a real, safe no-op (the job's `if:` skips it) rather than a confusing
+# failure. See sdks/PUBLISHING.md for the full checklist of what a maintainer needs to set
+# up (real npm/PyPI accounts, name-availability check, a real license decision) before this
+# workflow does anything for real — none of that exists in this sandbox, which is why
+# neither SDK has ever actually been published, despite both being complete and tested.
+on:
+  workflow_dispatch:
+    inputs:
+      publish_node:
+        description: 'Publish @lastro/sdk to npm'
+        type: boolean
+        default: true
+      publish_python:
+        description: 'Publish lastro-sdk to PyPI'
+        type: boolean
+        default: true
+
+jobs:
+  publish-node:
+    if: ${{ inputs.publish_node }}
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck + test the Node SDK
+        run: |
+          npm run typecheck -w sdks/node
+          npm run test -w sdks/node
+
+      - name: Build
+        run: npm run build --workspace=sdks/node
+
+      - name: Fail loudly if NPM_TOKEN isn't configured
+        if: ${{ !secrets.NPM_TOKEN }}
+        run: |
+          echo "::error::NPM_TOKEN repo secret is not set — see sdks/PUBLISHING.md. Nothing was published."
+          exit 1
+
+      # package.json ships with "private": true as a real safety default (so a stray local
+      # `npm publish` can never accidentally publish it) — stripped only here, right before
+      # the one real, intentional publish step, never committed back to the repo.
+      - name: Publish to npm
+        working-directory: sdks/node
+        run: |
+          npm pkg delete private
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-python:
+    if: ${{ inputs.publish_python }}
+    runs-on: ubuntu-latest
+    environment: pypi-publish
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      # The Python SDK's tests spawn the real Lastro server (via tsx) as a subprocess for
+      # genuine end-to-end coverage (sdks/python/tests/conftest.py) — needs the server's own
+      # real dependencies installed, not just Python tooling.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install repo dependencies (server needed to run as a subprocess in tests)
+        run: npm install
+
+      - name: Install build tooling and dev dependencies
+        working-directory: sdks/python
+        run: python -m pip install build twine pytest
+
+      - name: Run the Python SDK's real test suite
+        working-directory: sdks/python
+        run: python -m pytest
+
+      - name: Build sdist + wheel
+        working-directory: sdks/python
+        run: python -m build
+
+      - name: Fail loudly if PYPI_API_TOKEN isn't configured
+        if: ${{ !secrets.PYPI_API_TOKEN }}
+        run: |
+          echo "::error::PYPI_API_TOKEN repo secret is not set — see sdks/PUBLISHING.md. Nothing was published."
+          exit 1
+
+      - name: Publish to PyPI
+        working-directory: sdks/python
+        run: python -m twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}

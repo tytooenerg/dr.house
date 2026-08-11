@@ -418,6 +418,12 @@ A real business isn't built on top of an API whose evolution is unpredictable �
 
 `server/test/api-versioning.test.ts` (4 tests): no Deprecation/Sunset headers on `/v1` with no sunset date configured (today's real state); real headers appear on every `/v1` response — including an unauthenticated one — the instant a sunset date is set; the admin endpoint reads/writes the real date, rejects an invalid one, and clearing it removes the headers again; the admin endpoint requires auth.
 
+#### SDK publish readiness (`.github/workflows/publish-sdks.yml`, `sdks/PUBLISHING.md`)
+
+The official Node and Python SDKs (see "Official SDKs" above) have been real and fully tested since they were built, but genuinely never published to npm/PyPI — this environment has no real registry account. Closing the *software* side of that gap: a real, manual-only (`workflow_dispatch`, never fires on its own) GitHub Actions workflow that typechecks, runs each SDK's real end-to-end test suite (including the Python suite, which spawns the actual server as a subprocess — needs the whole repo's `npm install`, not just Python tooling), builds, and publishes — gated on `NPM_TOKEN`/`PYPI_API_TOKEN` repo secrets that don't exist yet, so running it today is a safe, honest no-op with a clear error rather than a silent failure. `sdks/node/package.json` keeps `"private": true` as a real safety default against a stray local `npm publish`; the workflow strips that flag only in its own publish step, never committing the change back.
+
+What's deliberately **not** decided here, because they're real business/legal calls, not engineering ones: whether `@lastro/sdk`/`lastro-sdk` are actually available on their registries, and what real license to ship (`sdks/python/pyproject.toml` still declares `license = "UNLICENSED"` — meaning, legally, nobody may use it yet — a deliberate safe default, not a real decision made on a maintainer's behalf). `sdks/PUBLISHING.md` is the complete, honest checklist of what a maintainer with real npm/PyPI accounts still needs to do before this workflow does anything for real. Added real `repository`/`bugs`/`homepage` metadata to both package manifests in the meantime.
+
 ## Running locally
 
 ```bash
