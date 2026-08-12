@@ -55,6 +55,8 @@ export function resetDbForTests() {
     DELETE FROM agent_pending_actions;
     DELETE FROM agent_steps;
     DELETE FROM agent_runs;
+    DELETE FROM payables;
+    DELETE FROM reconciliation_flags;
     DELETE FROM users;
   `);
 }

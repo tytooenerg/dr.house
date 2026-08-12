@@ -11,8 +11,9 @@ import { autoBidAgent } from './autoBid.js';
 import { suporteAgent } from './suporte.js';
 import { comercialAgent } from './comercial.js';
 import { marketMakerAgent } from './marketMaker.js';
+import { reconciliationAgent } from './reconciliation.js';
 
-// The 11 agentic AI deployments — every one wraps real Lastro data/pipelines (never
+// The 12 agentic AI deployments — every one wraps real Lastro data/pipelines (never
 // fabricated tool results) behind the shared tool-use loop in lib/agentRuntime.ts. Any
 // write with real consequence (money, a compliance/KYB decision, an official legal or
 // regulatory record) is marked `sensitive` on its tool and gated behind human approval —
@@ -28,6 +29,7 @@ export const AGENTS: Record<string, AgentDefinition> = {
   [autoBidAgent.id]: autoBidAgent,
   [suporteAgent.id]: suporteAgent,
   [comercialAgent.id]: comercialAgent,
+  [reconciliationAgent.id]: reconciliationAgent,
   [marketMakerAgent.id]: marketMakerAgent,
 };
 

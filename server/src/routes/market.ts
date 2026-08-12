@@ -11,6 +11,7 @@ import { computeInsurerQuotePct } from '../lib/insuranceQuotes.js';
 import { checkFractionalEligibility, buyFractionalTokens, buyTokensSchema, buildOfferingView, listMyFractionalHoldings } from '../lib/fractionalOfferings.js';
 import { INSURERS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { explainFundingOffer } from '../lib/fundingExplainability.js';
 
 export const marketRouter = Router();
 marketRouter.use(requireAuth);
@@ -128,3 +129,18 @@ marketRouter.post(
 marketRouter.get('/minhas-cotas', (req, res) => {
   res.json({ holdings: listMyFractionalHoldings(req.user!.id) });
 });
+
+// "Por que essa oferta?" — funding-matching explainability. Assembles the same real
+// score/PD/liquidity/seguro signals already used to price the offer (see
+// lib/fundingExplainability.ts) into a reasoning any cedente/investidor on the offer can read.
+marketRouter.get(
+  '/:id/explicacao',
+  asyncHandler(async (req, res) => {
+    const explanation = await explainFundingOffer(req.params.id, req.user!.id);
+    if (!explanation) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    res.json(explanation);
+  })
+);

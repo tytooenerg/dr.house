@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { AgentesIaPanel } from './admin/AgentesIaPanel';
 import { FeatureFlagsPanel } from './admin/FeatureFlagsPanel';
+import { ReconciliacaoPanel } from './admin/ReconciliacaoPanel';
 
 interface PendingKyb {
   id: number;
@@ -242,7 +243,7 @@ const MINUTA_TYPE_LABELS: Record<string, string> = {
   notificacao_padrao: 'Notificação padrão',
 };
 
-type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | 'flags' | 'auditoria';
+type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | 'reconciliacao' | 'flags' | 'auditoria';
 type LegalSubTab = 'cobranca' | 'minutas' | 'regulatorio';
 
 export function AdminPage() {
@@ -793,6 +794,7 @@ export function AdminPage() {
           ['juridico', t('admin.tab.juridico', 'Jurídico')],
           ['ia', t('admin.tab.ia', 'Uso de IA')],
           ['agentes', t('admin.tab.agentes', 'Agentes IA')],
+          ['reconciliacao', t('admin.tab.reconciliacao', 'Reconciliação')],
           ['flags', t('admin.tab.flags', 'Feature flags')],
           ['auditoria', t('admin.tab.auditoria', 'Auditoria')],
         ] as [Tab, string][]).map(([key, label]) => (
@@ -1721,6 +1723,8 @@ export function AdminPage() {
       )}
 
       {tab === 'agentes' && <AgentesIaPanel />}
+
+      {tab === 'reconciliacao' && <ReconciliacaoPanel />}
 
       {tab === 'flags' && <FeatureFlagsPanel />}
 

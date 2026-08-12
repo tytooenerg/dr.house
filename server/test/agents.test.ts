@@ -19,9 +19,9 @@ async function adminToken() {
 }
 
 describe('agentic AI layer — registry', () => {
-  it('registers exactly the 11 agents, each with at least one tool and a description', () => {
+  it('registers exactly the 12 agents, each with at least one tool and a description', () => {
     const ids = Object.keys(AGENTS);
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(12);
     for (const id of ids) {
       const def = AGENTS[id];
       expect(def.label.length).toBeGreaterThan(0);
@@ -61,11 +61,11 @@ describe('agentic AI layer — API authorization', () => {
     expect(res.status).toBe(401);
   });
 
-  it('lists all 11 agents for an admin', async () => {
+  it('lists all 12 agents for an admin', async () => {
     const tok = await adminToken();
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${tok}`);
     expect(res.status).toBe(200);
-    expect(res.body.agents).toHaveLength(11);
+    expect(res.body.agents).toHaveLength(12);
     expect(typeof res.body.llmEnabled).toBe('boolean');
   });
 });

@@ -24,6 +24,8 @@ const AutomacaoPage = lazy(() => import('./pages/app/AutomacaoPage').then((m) =>
 const ComparadorPage = lazy(() => import('./pages/app/ComparadorPage').then((m) => ({ default: m.ComparadorPage })));
 const MinhasPage = lazy(() => import('./pages/app/MinhasPage').then((m) => ({ default: m.MinhasPage })));
 const CreditLinePage = lazy(() => import('./pages/app/CreditLinePage').then((m) => ({ default: m.CreditLinePage })));
+const ContasPagarPage = lazy(() => import('./pages/app/ContasPagarPage').then((m) => ({ default: m.ContasPagarPage })));
+const AiCfoPage = lazy(() => import('./pages/app/AiCfoPage').then((m) => ({ default: m.AiCfoPage })));
 const RiscoPage = lazy(() => import('./pages/app/RiscoPage').then((m) => ({ default: m.RiscoPage })));
 const HistoricoPage = lazy(() => import('./pages/app/HistoricoPage').then((m) => ({ default: m.HistoricoPage })));
 const ErpPage = lazy(() => import('./pages/app/ErpPage').then((m) => ({ default: m.ErpPage })));
@@ -85,6 +87,8 @@ export default function App() {
             <Route path="comparador" element={<Gate tab="comparador"><ComparadorPage /></Gate>} />
             <Route path="minhas" element={<Gate tab="minhas"><MinhasPage /></Gate>} />
             <Route path="linha-credito" element={<Gate tab="linha-credito"><CreditLinePage /></Gate>} />
+            <Route path="contas-pagar" element={<Gate tab="contas-pagar"><ContasPagarPage /></Gate>} />
+            <Route path="ai-cfo" element={<Gate tab="ai-cfo"><AiCfoPage /></Gate>} />
             <Route path="secundario" element={<Gate tab="secundario"><SecundarioPage /></Gate>} />
             <Route path="cestas" element={<Gate tab="cestas"><CestasPage /></Gate>} />
             <Route path="suitability" element={<Gate tab="suitability"><SuitabilityPage /></Gate>} />

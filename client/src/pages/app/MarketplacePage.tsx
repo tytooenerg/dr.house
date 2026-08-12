@@ -27,6 +27,19 @@ interface Bid {
   tagBg: string;
   tagColor: string;
 }
+interface ExplanationFactor {
+  label: string;
+  valor: string;
+  peso: 'alto' | 'médio' | 'informativo';
+}
+interface FundingExplanation {
+  duplicataId: string;
+  rating: string;
+  factors: ExplanationFactor[];
+  resumo: string;
+  narrativaIA: string | null;
+}
+
 interface FractionalOffering {
   duplicataId: string;
   totalTokens: number;
@@ -82,6 +95,9 @@ export function MarketplacePage() {
   const [fractionalTokensInput, setFractionalTokensInput] = useState('');
   const [fractionalBusy, setFractionalBusy] = useState(false);
   const [fractionalError, setFractionalError] = useState('');
+  const [explainFor, setExplainFor] = useState<string | null>(null);
+  const [explanation, setExplanation] = useState<FundingExplanation | null>(null);
+  const [explainLoading, setExplainLoading] = useState(false);
 
   useEffect(() => {
     if (!insurerPickerFor) return;
@@ -154,6 +170,22 @@ export function MarketplacePage() {
     }
   };
 
+  const toggleExplain = async (id: string) => {
+    if (explainFor === id) {
+      setExplainFor(null);
+      return;
+    }
+    setExplainFor(id);
+    setExplanation(null);
+    setExplainLoading(true);
+    try {
+      const data = await api.get<FundingExplanation>(`/market/${id}/explicacao`);
+      setExplanation(data);
+    } finally {
+      setExplainLoading(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -216,6 +248,13 @@ export function MarketplacePage() {
                     className="px-3 py-1.5 rounded-md border border-inputBorder cursor-pointer text-[12.5px] font-bold bg-white text-navy"
                   >
                     {isExpanded ? t('marketplace.closeAuction', 'Fechar leilão') : t('marketplace.viewAuction', 'Ver leilão')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleExplain(offer.id)}
+                    className="px-3 py-1.5 rounded-md border border-inputBorder cursor-pointer text-[12.5px] font-bold bg-white text-blue"
+                  >
+                    {explainFor === offer.id ? 'Fechar explicação' : 'Por que essa oferta?'}
                   </button>
                   <Button size="sm" disabled={!offer.canBuy || busyId === offer.id} onClick={() => buy(offer.id)}>
                     {busyId === offer.id ? t('marketplace.buying', 'Comprando…') : offer.btnLabel}
@@ -332,6 +371,36 @@ export function MarketplacePage() {
                   </div>
                 )}
               </div>
+
+              {explainFor === offer.id && (
+                <div className="px-5 pb-4 pt-2.5 bg-[#F7F8FA]">
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <AiTag label="Explicabilidade" />
+                    <div className="text-[11.5px] font-bold text-textSecondary uppercase tracking-wide">Por que essa oferta tem esse preço</div>
+                  </div>
+                  {explainLoading || !explanation ? (
+                    <div className="text-[12.5px] text-textSecondary">Analisando os fatores da oferta…</div>
+                  ) : (
+                    <>
+                      <p className="text-[13px] text-navy mb-3">{explanation.resumo}</p>
+                      <div className="flex flex-col gap-1.5 mb-3">
+                        {explanation.factors.map((f) => (
+                          <div key={f.label} className="flex items-center justify-between gap-3 text-[12.5px] bg-white rounded-lg px-3 py-2 border border-border">
+                            <span className="text-textSecondary">{f.label}</span>
+                            <span className="font-semibold text-right">{f.valor}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {explanation.narrativaIA && (
+                        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-chip">
+                          <AiTag />
+                          <div className="text-xs text-navy">{explanation.narrativaIA}</div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               {isExpanded && (
                 <div className="px-5 pb-4 pt-2.5 bg-[#F7F8FA]">
