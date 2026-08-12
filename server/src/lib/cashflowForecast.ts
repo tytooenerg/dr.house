@@ -24,6 +24,22 @@ export type Scenario = 'pessimista' | 'base' | 'otimista';
 // just a documented multiplier on the one real estimate that does exist.
 const PD_MULTIPLIER: Record<Scenario, number> = { otimista: 0.5, base: 1, pessimista: 1.75 };
 
+// A sacado paying slower than its stated vencimento is a real, distinct failure mode from
+// an outright default — until now every scenario shared the same due date and only varied
+// default risk, which meant "pessimista" never modeled "gets paid, just late". This shifts
+// the effective collection date per scenario (days added/subtracted before the horizon
+// comparison below), same documented-multiplier honesty as PD_MULTIPLIER: not a fitted
+// payment-delay distribution (no labeled history for that either), just a stated assumption.
+const RECEIVABLE_DELAY_DAYS: Record<Scenario, number> = { otimista: 0, base: 0, pessimista: 15 };
+
+// The other side of the same gap: every scenario used to vary only receivable risk, never
+// an unplanned hit to the payables side (an emergency repair, a tax reassessment, a
+// supplier price shock). Pessimista adds one, sized off the cedente's own real pending
+// obligations — not an arbitrary constant — so it scales with how big this cedente's
+// obligations already are; base/otimista assume no such shock.
+const UNPLANNED_EXPENSE_PCT_OF_PAYABLES: Record<Scenario, number> = { otimista: 0, base: 0, pessimista: 0.15 };
+const UNPLANNED_EXPENSE_DAY = 30;
+
 function startOfToday(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -109,14 +125,22 @@ export function buildCashflowForecast(cedenteId: number): CashflowForecast {
   }));
 
   const scenarios: ScenarioResult[] = (['pessimista', 'base', 'otimista'] as Scenario[]).map((scenario) => {
+    // Slower-paying-sacado risk shifts the effective collection date, not just the PD —
+    // so a receivable due just inside a horizon can fall just outside it in pessimista.
+    const delayDays = RECEIVABLE_DELAY_DAYS[scenario];
+    // An unplanned expense shock, sized off this cedente's own real pending obligations,
+    // lands once (at UNPLANNED_EXPENSE_DAY) and persists in every later horizon.
+    const unplannedExpense = totalContasAPagarPendentes * UNPLANNED_EXPENSE_PCT_OF_PAYABLES[scenario];
+
     const points: HorizonPoint[] = FORECAST_HORIZONS_DAYS.map((horizonDays) => {
       const receitaEsperada = receivableEntries
-        .filter((e) => e.days <= horizonDays)
+        .filter((e) => e.days + delayDays <= horizonDays)
         .reduce((sum, e) => {
           const pd = Math.min(1, estimateDefaultProbability(e.d).pd * PD_MULTIPLIER[scenario]);
           return sum + e.d.valor * (1 - pd);
         }, 0);
-      const despesaEsperada = payableOccurrences.filter((o) => o.days <= horizonDays).reduce((sum, o) => sum + o.valor, 0);
+      let despesaEsperada = payableOccurrences.filter((o) => o.days <= horizonDays).reduce((sum, o) => sum + o.valor, 0);
+      if (unplannedExpense > 0 && horizonDays >= UNPLANNED_EXPENSE_DAY) despesaEsperada += unplannedExpense;
       const saldoProjetado = receitaEsperada - despesaEsperada;
       return {
         days: horizonDays,

@@ -120,3 +120,51 @@ describe('Contas a Pagar', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('Contas a Pagar — importação em lote (CSV)', () => {
+  it('imports every valid row through the exact same path as a manual entry', async () => {
+    const { token } = await registerCedente();
+    const rows = [
+      { descricao: 'Aluguel', fornecedor: 'Imobiliária X', categoria: 'aluguel', valor: '5000', vencimento: '2026-12-01', recorrente: true },
+      { descricao: 'Fornecedor A', categoria: 'fornecedores', valor: '1.250,50', vencimento: '2026-11-15', recorrente: false },
+    ];
+    const res = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows });
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(2);
+    expect(res.body.sucesso).toBe(2);
+    expect(res.body.falhas).toBe(0);
+
+    const overview = await request(app).get('/api/payables').set('Authorization', `Bearer ${token}`);
+    expect(overview.body.items).toHaveLength(2);
+    const aluguel = overview.body.items.find((i: { descricao: string }) => i.descricao === 'Aluguel');
+    expect(aluguel.valor).toBe(5000);
+    expect(aluguel.recorrente).toBe(true);
+    const fornecedor = overview.body.items.find((i: { descricao: string }) => i.descricao === 'Fornecedor A');
+    expect(fornecedor.valor).toBe(1250.5);
+  });
+
+  it('reports per-row failures without failing the whole batch', async () => {
+    const { token } = await registerCedente();
+    const rows = [
+      { descricao: 'Válida', valor: '300', vencimento: '2026-12-01' },
+      { descricao: '', valor: '300', vencimento: '2026-12-01' }, // invalid: empty descricao
+      { descricao: 'Valor inválido', valor: '0', vencimento: '2026-12-01' }, // invalid: non-positive valor
+    ];
+    const res = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows });
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(3);
+    expect(res.body.sucesso).toBe(1);
+    expect(res.body.falhas).toBe(2);
+    expect(res.body.resultados.filter((r: { ok: boolean }) => !r.ok)).toHaveLength(2);
+  });
+
+  it('rejects an empty batch and a batch over the row limit', async () => {
+    const { token } = await registerCedente();
+    const empty = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows: [] });
+    expect(empty.status).toBe(400);
+
+    const tooMany = Array.from({ length: 201 }, (_, i) => ({ descricao: `Linha ${i}`, valor: '10', vencimento: '2026-12-01' }));
+    const over = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows: tooMany });
+    expect(over.status).toBe(400);
+  });
+});

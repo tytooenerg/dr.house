@@ -38,6 +38,12 @@ export const FEATURE_FLAG_DEFS: FeatureFlagDef[] = [
     description: 'Kill switch global do 11º agente (liquidez automatizada). Complementa o kill switch por conta em Automação — este desliga para todo mundo de uma vez, por exemplo durante uma instabilidade de mercado.',
     defaultEnabled: true,
   },
+  {
+    key: 'reconciliation_agent',
+    label: 'Reconciliação automática',
+    description: 'Liga/desliga a varredura periódica do Agente de Reconciliação (lib/reconciliationAgentJob.ts). O botão manual "Rodar reconciliação agora" no back-office continua funcionando mesmo desligada — este flag só pausa o cron de 6h.',
+    defaultEnabled: true,
+  },
 ];
 
 const DEF_BY_KEY = new Map(FEATURE_FLAG_DEFS.map((d) => [d.key, d]));

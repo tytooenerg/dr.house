@@ -8,7 +8,7 @@ import {
   markPayablePaid,
   type PayableRow,
 } from '../db/payables.js';
-import { fmtBRL } from './format.js';
+import { fmtBRL, parseBRLNumber } from './format.js';
 import { parseFlexibleDate } from './format.js';
 
 export const PAYABLE_CATEGORIAS = ['fornecedores', 'folha', 'impostos', 'aluguel', 'outros'] as const;
@@ -103,6 +103,62 @@ export function addPayable(cedenteId: number, input: z.infer<typeof createPayabl
     recorrente: !!input.recorrente,
   });
   return toView(row);
+}
+
+// CSV import — closes the gap called out in README's "AI CFO, Contas a Pagar..." section:
+// every payable used to be typed in one at a time, unlike duplicatas which already has
+// both manual emission and a CSV lote path (lib/emitirCore.ts's submitEmitirLote). Same
+// shape: parsed entirely client-side (no file leaves the browser as a raw upload, just
+// parsed rows as JSON), each row validated and created through the exact same addPayable()
+// a manual single entry uses — not a separate, lighter-weight path.
+export const MAX_LOTE_ROWS = 200;
+
+const importPayableRowSchema = createPayableSchema.extend({ valor: z.string().trim().min(1) });
+
+export interface PayableLoteRowResult {
+  index: number;
+  descricao: string;
+  ok: boolean;
+  id?: number;
+  error?: string;
+}
+
+export interface PayableLoteOutcome {
+  total: number;
+  sucesso: number;
+  falhas: number;
+  resultados: PayableLoteRowResult[];
+}
+
+export function importPayablesLote(
+  cedenteId: number,
+  rawRows: unknown[]
+): { status: 200 | 400; body: PayableLoteOutcome | { error: string; message: string } } {
+  if (rawRows.length === 0) return { status: 400, body: { error: 'empty_batch', message: 'Envie ao menos uma linha.' } };
+  if (rawRows.length > MAX_LOTE_ROWS) {
+    return { status: 400, body: { error: 'batch_too_large', message: `Máximo de ${MAX_LOTE_ROWS} linhas por lote (recebido: ${rawRows.length}).` } };
+  }
+
+  const resultados: PayableLoteRowResult[] = [];
+  for (let i = 0; i < rawRows.length; i++) {
+    const raw = rawRows[i] as Record<string, unknown> | undefined;
+    const label = typeof raw?.descricao === 'string' && raw.descricao ? raw.descricao : `linha ${i + 1}`;
+    const parsed = importPayableRowSchema.safeParse(raw);
+    if (!parsed.success) {
+      resultados.push({ index: i, descricao: label, ok: false, error: `Linha inválida: ${parsed.error.issues.map((issue) => issue.message).join('; ')}` });
+      continue;
+    }
+    const valorNum = parseBRLNumber(parsed.data.valor);
+    if (!valorNum || valorNum <= 0) {
+      resultados.push({ index: i, descricao: parsed.data.descricao, ok: false, error: 'Valor inválido.' });
+      continue;
+    }
+    const view = addPayable(cedenteId, { ...parsed.data, valor: valorNum });
+    resultados.push({ index: i, descricao: parsed.data.descricao, ok: true, id: view.id });
+  }
+
+  const sucesso = resultados.filter((r) => r.ok).length;
+  return { status: 200, body: { total: rawRows.length, sucesso, falhas: rawRows.length - sucesso, resultados } };
 }
 
 export type PayableActionOutcome =

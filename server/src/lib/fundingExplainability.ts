@@ -1,5 +1,5 @@
 import { getDuplicata } from '../db/duplicatas.js';
-import { computeLiquiditySignal, BASE_RATE_BANDS } from './dynamicPricing.js';
+import { computeLiquiditySignalForRating, BASE_RATE_BANDS } from './dynamicPricing.js';
 import { ratingFromScore } from './riscoCore.js';
 import { estimateDefaultProbability } from './defaultProbability.js';
 import { getRegistradora } from './registradoras.js';
@@ -32,7 +32,10 @@ export async function explainFundingOffer(duplicataId: string, userId?: number):
   const score = d.score ?? 60;
   const rating = ratingFromScore(score);
   const [minBand, maxBand] = BASE_RATE_BANDS[rating];
-  const liquidity = computeLiquiditySignal();
+  // Scoped to this offer's own rating bucket when there's enough real 30d volume in it to
+  // trust (falls back to the platform-wide signal — signal.segmented tells the caller
+  // which happened — rather than reporting a number this codebase doesn't trust yet).
+  const liquidity = computeLiquiditySignalForRating(rating);
   const pd = estimateDefaultProbability(d);
   const registradora = getRegistradora(d.registro);
 
@@ -41,11 +44,11 @@ export async function explainFundingOffer(duplicataId: string, userId?: number):
     { label: 'Probabilidade de default estimada', valor: `${(pd.pd * 100).toFixed(1)}% (${pd.source === 'ml' ? 'modelo treinado' : 'prior assumido por rating'})`, peso: 'alto' },
     { label: 'Faixa de deságio base para este rating', valor: `${minBand.toFixed(1)}% – ${maxBand.toFixed(1)}% a.m.`, peso: 'alto' },
     {
-      label: 'Condição de mercado (oferta × demanda, 30 dias)',
+      label: `Condição de mercado (rating ${rating}, 30 dias)`,
       valor:
         liquidity.ratio === Infinity
           ? 'demanda muito acima da oferta recente — taxas comprimidas'
-          : `multiplicador ${liquidity.multiplier.toFixed(2)}x sobre a faixa base (oferta ${fmtBRL(liquidity.supply30dBRL)} × demanda ${fmtBRL(liquidity.demand30dBRL)})`,
+          : `multiplicador ${liquidity.multiplier.toFixed(2)}x sobre a faixa base (oferta ${fmtBRL(liquidity.supply30dBRL)} × demanda ${fmtBRL(liquidity.demand30dBRL)}${liquidity.segmented ? `, apenas rating ${rating}` : ', mercado inteiro — volume recente do rating ainda é baixo demais para segmentar com confiança'})`,
       peso: 'médio',
     },
     { label: 'Seguro contratado', valor: d.seguro ? 'sim — reduz a perda esperada em caso de inadimplência' : 'não contratado', peso: 'médio' },

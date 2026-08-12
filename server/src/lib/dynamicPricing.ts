@@ -31,22 +31,59 @@ export interface LiquiditySignal {
 const MIN_MULTIPLIER = 0.85;
 const MAX_MULTIPLIER = 1.25;
 
-export function computeLiquiditySignal(): LiquiditySignal {
-  const supply = db
-    .prepare(`SELECT COALESCE(SUM(valor), 0) as v FROM duplicatas WHERE sandbox = 0 AND created_at >= datetime('now', '-30 days')`)
-    .get() as { v: number };
-  const demand = db.prepare(`SELECT COALESCE(SUM(valor), 0) as v FROM purchases WHERE created_at >= datetime('now', '-30 days')`).get() as { v: number };
-
-  const supply30dBRL = supply.v;
-  const demand30dBRL = demand.v;
+function computeMultiplier(supply30dBRL: number, demand30dBRL: number): LiquiditySignal {
   if (supply30dBRL <= 0) return { multiplier: 1, supply30dBRL, demand30dBRL, ratio: demand30dBRL > 0 ? Infinity : 1 };
-
   const ratio = demand30dBRL / supply30dBRL;
   // sqrt-dampened so a single large purchase/emission doesn't swing rates wildly —
   // clamped to a ±15-25% band around the base rate either direction.
   const raw = 1 / Math.sqrt(Math.max(ratio, 0.1));
   const multiplier = Math.max(MIN_MULTIPLIER, Math.min(MAX_MULTIPLIER, raw));
   return { multiplier, supply30dBRL, demand30dBRL, ratio };
+}
+
+export function computeLiquiditySignal(): LiquiditySignal {
+  const supply = db
+    .prepare(`SELECT COALESCE(SUM(valor), 0) as v FROM duplicatas WHERE sandbox = 0 AND created_at >= datetime('now', '-30 days')`)
+    .get() as { v: number };
+  const demand = db.prepare(`SELECT COALESCE(SUM(valor), 0) as v FROM purchases WHERE created_at >= datetime('now', '-30 days')`).get() as { v: number };
+  return computeMultiplier(supply.v, demand.v);
+}
+
+// score ranges that produce each rating out of ratingFromScore() (riscoCore.ts) — kept in
+// sync with it manually since duplicatas.score is stored as a raw number, not a rating.
+const SCORE_RANGE_BY_RATING: Record<Rating, [number, number]> = {
+  AA: [80, 999],
+  A: [65, 79],
+  B: [45, 64],
+  C: [-999, 44],
+};
+
+// A real liquidity floor below which a per-rating bucket's own 30-day supply is too thin to
+// mean anything (a single R$5k emission would otherwise swing a bucket's multiplier as hard
+// as a real imbalance) — falls back to the platform-wide signal rather than reporting a
+// number this codebase doesn't actually trust yet. Closes the honest gap called out in the
+// README: funding explainability's "condição de mercado" factor used to always read the
+// whole platform, never the specific rating this offer is actually in.
+const MIN_BUCKET_SUPPLY_BRL = 20000;
+
+export function computeLiquiditySignalForRating(rating: Rating): LiquiditySignal & { segmented: boolean } {
+  const [scoreMin, scoreMax] = SCORE_RANGE_BY_RATING[rating] ?? SCORE_RANGE_BY_RATING.A;
+  const supply = db
+    .prepare(
+      `SELECT COALESCE(SUM(valor), 0) as v FROM duplicatas
+       WHERE sandbox = 0 AND created_at >= datetime('now', '-30 days') AND score BETWEEN ? AND ?`
+    )
+    .get(scoreMin, scoreMax) as { v: number };
+  if (supply.v < MIN_BUCKET_SUPPLY_BRL) return { ...computeLiquiditySignal(), segmented: false };
+
+  const demand = db
+    .prepare(
+      `SELECT COALESCE(SUM(p.valor), 0) as v FROM purchases p
+       JOIN duplicatas d ON d.id = p.duplicata_id
+       WHERE p.created_at >= datetime('now', '-30 days') AND d.score BETWEEN ? AND ?`
+    )
+    .get(scoreMin, scoreMax) as { v: number };
+  return { ...computeMultiplier(supply.v, demand.v), segmented: true };
 }
 
 export function estimateRateBand(rating: Rating): { min: number; max: number; mid: number; signal: LiquiditySignal } {

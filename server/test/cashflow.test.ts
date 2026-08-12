@@ -70,7 +70,7 @@ describe('AI CFO — cashflow forecast', () => {
     expect(res.body.disponivelParaAntecipacao).toBeGreaterThan(0);
     const base = res.body.scenarios.find((s: { scenario: string }) => s.scenario === 'base');
     const point30 = base.points.find((p: { days: number }) => p.days === 30);
-    expect(point30.receitaEsperadaFmt).not.toBe('R$ 0,00');
+    expect(point30.saldoProjetado).toBeGreaterThan(0);
   });
 
   it('projects a deficit when payables due soon exceed expected receivables, and recommends antecipação', async () => {
@@ -121,5 +121,65 @@ describe('AI CFO — cashflow forecast', () => {
     const p30Pess = pessimista.points.find((p: { days: number }) => p.days === 30).saldoProjetado;
     const p30Otim = otimista.points.find((p: { days: number }) => p.days === 30).saldoProjetado;
     expect(p30Pess).toBeLessThanOrEqual(p30Otim);
+  });
+
+  it('pessimista delays collection (slower-paying sacado), pushing a near-horizon receivable out of the 7d window', async () => {
+    const { token, userId } = await registerCedente();
+    createDuplicata({
+      cedenteId: userId,
+      cedenteNome: 'Cedente Cashflow',
+      sacadoNome: 'Sacado Cashflow Atraso',
+      sacadoCnpj: '',
+      valor: 20000,
+      vencimento: isoDaysFromNow(5), // inside the 7d horizon on time, outside it once delayed
+      emissao: '10/08/2026',
+      status: 'aprovada',
+      lastroPct: 100,
+      seguro: false,
+    });
+
+    const res = await request(app).get('/api/cashflow/forecast').set('Authorization', `Bearer ${token}`);
+    const base = res.body.scenarios.find((s: { scenario: string }) => s.scenario === 'base');
+    const pessimista = res.body.scenarios.find((s: { scenario: string }) => s.scenario === 'pessimista');
+    const basePoint7 = base.points.find((p: { days: number }) => p.days === 7);
+    const pessPoint7 = pessimista.points.find((p: { days: number }) => p.days === 7);
+    // Base collects on time (day 5 <= 7); pessimista assumes the sacado pays 15 days late
+    // (day 5 + 15 = 20 > 7), so the same receivable shouldn't count yet at the 7d horizon.
+    // No payables in this test, so saldoProjetado === receita — comparing the raw number
+    // sidesteps the non-breaking space Intl.NumberFormat puts in the formatted BRL string.
+    expect(basePoint7.saldoProjetado).toBeGreaterThan(0);
+    expect(pessPoint7.saldoProjetado).toBe(0);
+  });
+
+  it('pessimista adds an unplanned-expense shock (sized off real pending payables) from day 30 onward', async () => {
+    const { token, userId } = await registerCedente();
+    createDuplicata({
+      cedenteId: userId,
+      cedenteNome: 'Cedente Cashflow',
+      sacadoNome: 'Sacado Cashflow Choque',
+      sacadoCnpj: '',
+      valor: 200000,
+      vencimento: isoDaysFromNow(1),
+      emissao: '10/08/2026',
+      status: 'aprovada',
+      lastroPct: 100,
+      seguro: false,
+    });
+    await request(app)
+      .post('/api/payables')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ descricao: 'Fornecedor recorrente', categoria: 'fornecedores', valor: 10000, vencimento: isoDaysFromNow(1) });
+
+    const res = await request(app).get('/api/cashflow/forecast').set('Authorization', `Bearer ${token}`);
+    const base = res.body.scenarios.find((s: { scenario: string }) => s.scenario === 'base');
+    const pessimista = res.body.scenarios.find((s: { scenario: string }) => s.scenario === 'pessimista');
+    const baseDespesa30 = base.points.find((p: { days: number }) => p.days === 30).despesaEsperadaFmt;
+    const pessDespesa30 = pessimista.points.find((p: { days: number }) => p.days === 30).despesaEsperadaFmt;
+    const baseDespesa7 = base.points.find((p: { days: number }) => p.days === 7).despesaEsperadaFmt;
+    const pessDespesa7 = pessimista.points.find((p: { days: number }) => p.days === 7).despesaEsperadaFmt;
+    // No shock yet before day 30 — both scenarios see the same real payable.
+    expect(pessDespesa7).toBe(baseDespesa7);
+    // From day 30 on, pessimista adds the shock on top of the same real payable.
+    expect(pessDespesa30).not.toBe(baseDespesa30);
   });
 });

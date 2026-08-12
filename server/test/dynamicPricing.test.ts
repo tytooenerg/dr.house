@@ -2,7 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata, createPurchase } from '../src/db/duplicatas.js';
 import { createUser } from '../src/db/users.js';
-import { computeLiquiditySignal, estimateRateBand, BASE_RATE_BANDS } from '../src/lib/dynamicPricing.js';
+import { computeLiquiditySignal, computeLiquiditySignalForRating, estimateRateBand, BASE_RATE_BANDS } from '../src/lib/dynamicPricing.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -48,6 +48,49 @@ describe('dynamic pricing — liquidity signal', () => {
     const after = computeLiquiditySignal();
     expect(after.demand30dBRL).toBeGreaterThan(before.demand30dBRL);
     expect(after.ratio).toBeGreaterThan(before.ratio);
+  });
+});
+
+describe('dynamic pricing — rating-scoped liquidity signal (funding explainability)', () => {
+  it('scopes supply to the requested rating bucket and reports segmented once real volume clears the trust floor', () => {
+    const cedente = createUser({ email: `dp-rating-ced-${unique()}@example.com`, passwordHash: 'x', nome: 'T', companyName: 'DP Rating Cedente', role: 'cedente' });
+    const before = computeLiquiditySignalForRating('AA');
+
+    // 'Grupo Atlas Varejo' is seeded with score 84 -> rating AA (data/seed.ts). Comfortably
+    // over MIN_BUCKET_SUPPLY_BRL (R$20.000) on its own, regardless of what other tests
+    // sharing this in-memory db have already created.
+    for (let i = 0; i < 3; i++) {
+      createDuplicata({
+        cedenteId: cedente.id,
+        cedenteNome: cedente.company_name,
+        sacadoNome: 'Grupo Atlas Varejo',
+        sacadoCnpj: '12.345.678/0001-90',
+        valor: 30_000,
+        vencimento: '2030-01-01',
+        emissao: '01/01/2026',
+        status: 'aprovada',
+        lastroPct: 90,
+        seguro: false,
+        id: `DUP-RATINGTEST-${unique()}-${i}`,
+      });
+    }
+
+    const after = computeLiquiditySignalForRating('AA');
+    expect(after.supply30dBRL).toBeGreaterThanOrEqual(before.supply30dBRL + 90_000);
+    expect(after.segmented).toBe(true);
+  });
+
+  it('falls back to the platform-wide signal (segmented: false) whenever a rating bucket lacks enough real 30-day supply to trust', () => {
+    const platform = computeLiquiditySignal();
+    const bucket = computeLiquiditySignalForRating('C');
+    if (!bucket.segmented) {
+      expect(bucket.multiplier).toBe(platform.multiplier);
+      expect(bucket.supply30dBRL).toBe(platform.supply30dBRL);
+    } else {
+      // Some other test in this run already pushed enough real C-rated volume — still a
+      // meaningful, honest state: the bucket cleared the floor on its own.
+      expect(bucket.supply30dBRL).toBeGreaterThanOrEqual(20_000);
+    }
   });
 });
 

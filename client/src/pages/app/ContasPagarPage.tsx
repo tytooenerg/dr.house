@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -41,11 +41,163 @@ const STATUS_STYLE: Record<PayableView['status'], { label: string; bg: string; c
   cancelado: { label: 'Cancelado', bg: '#F1F2F5', color: '#5B6472' },
 };
 
+interface LoteRowResult {
+  index: number;
+  descricao: string;
+  ok: boolean;
+  id?: number;
+  error?: string;
+}
+interface LoteOutcome {
+  total: number;
+  sucesso: number;
+  falhas: number;
+  resultados: LoteRowResult[];
+}
+
+const CSV_TEMPLATE = 'descricao,fornecedor,categoria,valor,vencimento,recorrente\nAluguel do escritório,Imobiliária X,aluguel,5000,2026-12-01,1\n';
+
+// Same client-side-parse-then-post-JSON pattern as EmitirPage's LoteEmissaoCard — no file
+// leaves the browser as a raw upload, just parsed rows posted as the same shape a manual
+// single entry uses, each row created through the exact same addPayable() path server-side.
+function parseCsv(text: string): Record<string, string>[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return [];
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',').map((c) => c.trim());
+    const row: Record<string, string> = {};
+    header.forEach((h, i) => {
+      row[h] = cells[i] ?? '';
+    });
+    return row;
+  });
+}
+
+function LoteImportCard({ onImported }: { onImported: () => void }) {
+  const [rows, setRows] = useState<Record<string, string>[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [outcome, setOutcome] = useState<LoteOutcome | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    setError('');
+    setOutcome(null);
+    setFileName(file.name);
+    const parsed = parseCsv(await file.text());
+    if (parsed.length === 0) {
+      setError('Nenhuma linha reconhecida no arquivo. Use o modelo (cabeçalho: descricao,fornecedor,categoria,valor,vencimento,recorrente).');
+      setRows([]);
+      return;
+    }
+    setRows(parsed);
+  };
+
+  const enviarLote = async () => {
+    setError('');
+    setBusy(true);
+    try {
+      const payload = rows.map((r) => ({
+        descricao: r.descricao ?? '',
+        fornecedor: r.fornecedor ?? '',
+        categoria: r.categoria || 'outros',
+        valor: r.valor ?? '',
+        vencimento: r.vencimento ?? '',
+        recorrente: r.recorrente === '1' || r.recorrente?.toLowerCase() === 'true',
+      }));
+      const data = await api.post<LoteOutcome>('/payables/lote', { rows: payload });
+      setOutcome(data);
+      if (data.falhas === 0) {
+        setRows([]);
+        setFileName('');
+        onImported();
+      } else {
+        await onImported();
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível processar o lote.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'modelo-contas-a-pagar-lote.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card className="mb-6">
+      <div className="flex items-center justify-between mb-1">
+        <div className="font-bold text-[15px]">Importar em lote (CSV)</div>
+        <button type="button" onClick={downloadTemplate} className="bg-transparent border-none text-blue text-xs font-bold cursor-pointer">
+          Baixar modelo CSV
+        </button>
+      </div>
+      <p className="text-[12.5px] text-textSecondary mb-3">
+        Para cedentes com muitas obrigações — importa várias contas de uma vez (até 200 linhas), cada uma pelo mesmo caminho de um lançamento
+        manual. Colunas: <code>descricao,fornecedor,categoria,valor,vencimento,recorrente</code>.
+      </p>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="w-full border-2 border-dashed border-[#C7D0DE] rounded-xl p-4 text-center cursor-pointer bg-transparent mb-3"
+      >
+        <div className="font-bold text-[13px]">{fileName ? `${fileName} — ${rows.length} linha(s) reconhecida(s)` : 'Selecionar arquivo CSV'}</div>
+      </button>
+      {rows.length > 0 && (
+        <Button disabled={busy} onClick={enviarLote} className="mb-3">
+          {busy ? 'Importando…' : `Importar ${rows.length} conta(s)`}
+        </Button>
+      )}
+      {error && <div className="px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold mb-3">{error}</div>}
+      {outcome && (
+        <div>
+          <div className="text-[12.5px] font-bold mb-2">
+            {outcome.sucesso} de {outcome.total} importada(s) com sucesso{outcome.falhas > 0 ? ` — ${outcome.falhas} falha(s)` : ''}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {outcome.resultados
+              .filter((r) => !r.ok)
+              .map((r) => (
+                <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md bg-[#F7E9E7]">
+                  <span className="font-semibold">{r.descricao || `linha ${r.index + 1}`}</span>
+                  <span className="text-red">{r.error}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function ContasPagarPage() {
   const [overview, setOverview] = useState<PayablesOverview | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showLote, setShowLote] = useState(false);
   const [form, setForm] = useState({ descricao: '', fornecedor: '', categoria: 'outros', valor: '', vencimento: '', recorrente: false });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -105,7 +257,14 @@ export function ContasPagarPage() {
       <PageHeader
         title="Contas a Pagar"
         subtitle="Suas obrigações reais (fornecedores, folha, impostos, aluguel) — a mesma base que alimenta a projeção de caixa em AI CFO"
-        right={<Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Fechar' : '+ Nova conta'}</Button>}
+        right={
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setShowLote((v) => !v)}>
+              {showLote ? 'Fechar importação' : 'Importar CSV'}
+            </Button>
+            <Button onClick={() => setShowForm((v) => !v)}>{showForm ? 'Fechar' : '+ Nova conta'}</Button>
+          </div>
+        }
       />
 
       {overview && (
@@ -122,6 +281,8 @@ export function ContasPagarPage() {
           </Card>
         </div>
       )}
+
+      {showLote && <LoteImportCard onImported={load} />}
 
       {showForm && (
         <Card className="mb-6">
