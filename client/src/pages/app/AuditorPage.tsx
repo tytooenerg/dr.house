@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useLang } from '../../lib/i18n';
 
 interface AuditorOverview {
   auditLog: {
@@ -16,6 +17,7 @@ interface AuditorOverview {
 // The entire 'auditor' role surface: one read-only screen, no action ever available here —
 // same data admin sees in Compliance/Reconciliação/PLD, just without any write control.
 export function AuditorPage() {
+  const { t } = useLang();
   const [data, setData] = useState<AuditorOverview | null>(null);
 
   useEffect(() => {
@@ -26,7 +28,10 @@ export function AuditorPage() {
 
   return (
     <div>
-      <PageHeader title="Painel de Auditoria" subtitle="Acesso somente-leitura — nenhuma ação de escrita está disponível neste papel" />
+      <PageHeader
+        title={t('auditor.title', 'Painel de Auditoria')}
+        subtitle={t('auditor.subtitle', 'Acesso somente-leitura — nenhuma ação de escrita está disponível neste papel')}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
@@ -52,7 +57,7 @@ export function AuditorPage() {
       </div>
 
       <Card className="mb-6">
-        <div className="font-bold text-[15px] mb-3">Trilha de auditoria (últimos 100 eventos)</div>
+        <div className="font-bold text-[15px] mb-3">{t('auditor.trail', 'Trilha de auditoria (últimos 100 eventos)')}</div>
         {data.auditLog.entries.length === 0 ? (
           <EmptyState title="Nenhum evento registrado ainda" hint="Ações sensíveis da plataforma vão aparecer aqui" />
         ) : (
@@ -72,7 +77,7 @@ export function AuditorPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
-          <div className="font-bold text-[15px] mb-3">Fila de compliance pendente</div>
+          <div className="font-bold text-[15px] mb-3">{t('auditor.complianceQueue', 'Fila de compliance pendente')}</div>
           {data.compliance.itens.length === 0 ? (
             <EmptyState title="Fila vazia" hint="Nenhuma duplicata suspensa para revisão" />
           ) : (
@@ -91,7 +96,7 @@ export function AuditorPage() {
           )}
         </Card>
         <Card>
-          <div className="font-bold text-[15px] mb-3">Reconciliação recente</div>
+          <div className="font-bold text-[15px] mb-3">{t('auditor.recentReconciliation', 'Reconciliação recente')}</div>
           {data.reconciliation.recentes.length === 0 ? (
             <EmptyState title="Nenhum evento" hint="Nenhuma divergência de pagamento recente" />
           ) : (

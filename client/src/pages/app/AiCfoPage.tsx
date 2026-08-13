@@ -3,6 +3,7 @@ import { api } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Segmented } from '../../components/ui/Segmented';
 import { AiTag } from '../../components/ui/Badge';
+import { useLang } from '../../lib/i18n';
 
 interface HorizonPoint {
   days: number;
@@ -75,6 +76,7 @@ function ForecastChart({ points }: { points: HorizonPoint[] }) {
 }
 
 export function AiCfoPage() {
+  const { t } = useLang();
   const [forecast, setForecast] = useState<CashflowForecast | null>(null);
   const [scenario, setScenario] = useState<ScenarioResult['scenario']>('base');
 
@@ -89,8 +91,11 @@ export function AiCfoPage() {
   return (
     <div>
       <PageHeader
-        title="AI CFO — Projeção de Caixa"
-        subtitle="Projeção baseada nos seus recebíveis reais (Minhas Duplicatas) e contas a pagar cadastradas — sem números inventados"
+        title={t('aiCfo.title', 'AI CFO — Projeção de Caixa')}
+        subtitle={t(
+          'aiCfo.subtitle',
+          'Projeção baseada nos seus recebíveis reais (Minhas Duplicatas) e contas a pagar cadastradas — sem números inventados',
+        )}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -110,7 +115,7 @@ export function AiCfoPage() {
 
       <Card className="mb-6">
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <div className="font-bold text-[15px]">Saldo de caixa projetado</div>
+          <div className="font-bold text-[15px]">{t('aiCfo.projectedBalance', 'Saldo de caixa projetado')}</div>
           <Segmented options={Object.values(SCENARIO_LABELS)} value={SCENARIO_LABELS[scenario]} onChange={(v) => {
             const found = (Object.entries(SCENARIO_LABELS).find(([, label]) => label === v)?.[0] ?? 'base') as ScenarioResult['scenario'];
             setScenario(found);
@@ -132,7 +137,7 @@ export function AiCfoPage() {
       <Card>
         <div className="flex items-center gap-2 mb-3">
           <AiTag />
-          <div className="font-bold text-[15px]">Insights</div>
+          <div className="font-bold text-[15px]">{t('aiCfo.insights', 'Insights')}</div>
         </div>
         <div className="flex flex-col gap-2.5">
           {forecast.insights.map((insight, i) => (

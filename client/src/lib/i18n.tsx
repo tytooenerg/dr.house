@@ -2,14 +2,18 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 // Real, functional i18n — not a fake "supports English" toggle. Scope is honest, not
 // exhaustive: the public marketing chrome (nav/footer), the app's own navigation (sidebar
-// labels), and now the static chrome of the two highest-traffic in-app screens (Dashboard,
-// Marketplace — headers, column labels, buttons, static hints) are genuinely bilingual;
-// most other in-app page bodies and forms still stay PT-BR, and so does every piece of
-// *data* that comes from the server (sacado names, offer amounts, rating labels, bid
-// activity) even on the two covered pages — translating the platform's actual business
-// data isn't in scope, only the surrounding UI chrome around it. Every key present here has
-// a real translation on both sides; t() falls back to the caller-supplied PT default for
-// anything not yet covered, so nothing ever renders a raw translation key.
+// labels), and the static chrome of most top-level in-app screens (Dashboard, Marketplace,
+// Minhas, Histórico, Emitir, Admin's header/tab bar, Contas a Pagar, AI CFO, Painel de
+// Auditoria — headers, column labels, buttons, static hints) are genuinely bilingual; most
+// page bodies, forms, and every piece of *data* that comes from the server (sacado names,
+// offer amounts, rating labels, bid activity, audit log entries) stay PT-BR even on covered
+// pages — translating the platform's actual business data isn't in scope, only the
+// surrounding UI chrome around it. Content *inside* Admin's tabs (KYB queue, disputes,
+// compliance queue, Jurídico, AI Agents, Feature flags, Auditores, Reconciliação, etc.) is
+// deliberately out of scope too, same reasoning — only the tab bar itself is translated, not
+// each tab's back-office internals. Every key present here has a real translation on both
+// sides; t() falls back to the caller-supplied PT default for anything not yet covered, so
+// nothing ever renders a raw translation key.
 export type Lang = 'pt' | 'en';
 
 const STORAGE_KEY = 'lastro_lang';
@@ -59,6 +63,9 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'app.perfil': 'Profile & Settings',
     'app.admin': 'Back Office',
     'app.seguradora': 'Insurer Panel',
+    'app.contas-pagar': 'Payables',
+    'app.ai-cfo': 'AI CFO',
+    'app.auditor': 'Audit Panel',
     'app.sair': 'Log out',
 
     // Dashboard page (static chrome only — KPI/chart data itself stays server-driven PT-BR)
@@ -138,6 +145,25 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'admin.tab.agentes': 'AI Agents',
     'admin.tab.flags': 'Feature flags',
     'admin.tab.auditoria': 'Audit trail',
+
+    // Payables page (static chrome only — the payables list and form stay PT-BR, same
+    // scoping choice already made for Emitir's own CSV batch-import card)
+    'contasPagar.title': 'Payables',
+    'contasPagar.subtitle': 'Your real obligations (suppliers, payroll, taxes, rent) — the same base that feeds the cash forecast in AI CFO',
+
+    // AI CFO page (static chrome only — the KPI figures and AI insight text stay PT-BR)
+    'aiCfo.title': 'AI CFO — Cash Flow Forecast',
+    'aiCfo.subtitle': "Forecast based on your real receivables (My Receivables) and registered payables — no invented numbers",
+    'aiCfo.projectedBalance': 'Projected cash balance',
+    'aiCfo.insights': 'Insights',
+
+    // Audit panel page (static chrome only — the read-only audit/compliance/reconciliation
+    // data itself stays PT-BR)
+    'auditor.title': 'Audit Panel',
+    'auditor.subtitle': 'Read-only access — no write action is available in this role',
+    'auditor.trail': 'Audit trail (last 100 events)',
+    'auditor.complianceQueue': 'Pending compliance queue',
+    'auditor.recentReconciliation': 'Recent reconciliation',
   },
 };
 // PT strings live inline in each component as the ptDefault argument to t() — the app's

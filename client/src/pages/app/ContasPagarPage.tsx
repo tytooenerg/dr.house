@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useLang } from '../../lib/i18n';
 
 interface PayableView {
   id: number;
@@ -193,6 +194,7 @@ function LoteImportCard({ onImported }: { onImported: () => void }) {
 }
 
 export function ContasPagarPage() {
+  const { t } = useLang();
   const [overview, setOverview] = useState<PayablesOverview | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -255,8 +257,11 @@ export function ContasPagarPage() {
   return (
     <div>
       <PageHeader
-        title="Contas a Pagar"
-        subtitle="Suas obrigações reais (fornecedores, folha, impostos, aluguel) — a mesma base que alimenta a projeção de caixa em AI CFO"
+        title={t('contasPagar.title', 'Contas a Pagar')}
+        subtitle={t(
+          'contasPagar.subtitle',
+          'Suas obrigações reais (fornecedores, folha, impostos, aluguel) — a mesma base que alimenta a projeção de caixa em AI CFO',
+        )}
         right={
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={() => setShowLote((v) => !v)}>
