@@ -14,6 +14,14 @@ const STATUS_MAP: Record<string, string> = {
   Aprovada: 'aprovada',
 };
 
+// Formats a date `dias` days from whenever seeding actually runs, DD/MM/YYYY to match
+// parseFlexibleDate() — see OFFERS_RAW/MINHAS_RAW in data/seed.ts for why this exists
+// instead of a hardcoded string: a fixed future date eventually becomes a fixed past one.
+function daysFromNow(dias: number): string {
+  const d = new Date(Date.now() + dias * 24 * 60 * 60 * 1000);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
 export async function seedIfEmpty() {
   const count = (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n;
   if (count > 0) return;
@@ -53,14 +61,15 @@ export async function seedIfEmpty() {
     1: 'aceita', 2: 'aguardando', 3: 'aceita', 4: 'contestada', 5: 'aceita', 6: 'aguardando',
   };
   for (const o of OFFERS_RAW) {
+    const vencimento = daysFromNow(o.vencimentoDiasOffset);
     const d = createDuplicata({
       cedenteId: null,
       cedenteNome: o.cedente,
       sacadoNome: o.sacado,
       sacadoCnpj: '',
       valor: o.valor,
-      vencimento: o.vencimento,
-      emissao: o.vencimento,
+      vencimento,
+      emissao: vencimento,
       status: 'aprovada',
       lastroPct: 100,
       seguro: o.id <= 2,
@@ -90,13 +99,14 @@ export async function seedIfEmpty() {
 
   // Cedente demo account's own issued duplicatas.
   for (const m of MINHAS_RAW) {
+    const vencimento = typeof m.vencimentoDiasOffset === 'number' ? daysFromNow(m.vencimentoDiasOffset) : m.vencimento!;
     const d = createDuplicata({
       cedenteId: cedente.id,
       cedenteNome: cedente.company_name,
       sacadoNome: m.sacado,
       sacadoCnpj: '',
       valor: m.valor,
-      vencimento: m.vencimento,
+      vencimento,
       emissao: m.emissao,
       status: STATUS_MAP[m.status] ?? 'pendente_analise',
       lastroPct: m.lastro,

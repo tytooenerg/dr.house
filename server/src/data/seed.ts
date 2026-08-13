@@ -97,13 +97,21 @@ export const INSURERS = [
   { key: 'junto', name: 'Junto Seguros', premioPct: 0.68, premioFmt: '0,68%', selo: 'Aprovação mais rápida' },
 ];
 
+// vencimentoDiasOffset (not a fixed date): these are demo marketplace offers seeded fresh
+// every time the database is empty, so their due dates are computed relative to whenever
+// that actually happens (db/seed.ts's daysFromNow()) — not hardcoded absolute dates. This
+// array used to carry literal 'DD/MM/YYYY' strings a fair distance in the future at the
+// time they were written; wall-clock time eventually caught up and passed them, which
+// silently broke every flow downstream of "is this receivable still before its due date"
+// (resale eligibility, most visibly — see server/test/growth-features.test.ts). Relative
+// offsets can't go stale the same way. Order/spacing mirrors the original absolute dates.
 export const OFFERS_RAW = [
-  { id: 1, sacado: 'Grupo Atlas Varejo', cedente: 'Fornecedor Lima Ltda', valor: 84500, desagio: '2,1%', vencimento: '12/08/2026', score: 84, countdownSec: 6120 },
-  { id: 2, sacado: 'Distribuidora Bom Preço', cedente: 'Indústria Nova Era', valor: 46200, desagio: '2,4%', vencimento: '05/09/2026', score: 76, countdownSec: 11100 },
-  { id: 3, sacado: 'Metalúrgica Serrana S.A.', cedente: 'Aços Regional', valor: 132000, desagio: '3,6%', vencimento: '20/08/2026', score: 61, countdownSec: 1080 },
-  { id: 4, sacado: 'Construtora Vale Norte', cedente: 'Materiais Cimento Sul', valor: 210000, desagio: '5,2%', vencimento: '02/10/2026', score: 38, countdownSec: 21000 },
-  { id: 5, sacado: 'Grupo Atlas Varejo', cedente: 'Têxtil Bandeira', valor: 31800, desagio: '2,0%', vencimento: '28/07/2026', score: 84, countdownSec: 7920 },
-  { id: 6, sacado: 'Distribuidora Bom Preço', cedente: 'Embalagens Prisma', valor: 58900, desagio: '2,6%', vencimento: '15/09/2026', score: 76, countdownSec: 16020 },
+  { id: 1, sacado: 'Grupo Atlas Varejo', cedente: 'Fornecedor Lima Ltda', valor: 84500, desagio: '2,1%', vencimentoDiasOffset: 21, score: 84, countdownSec: 6120 },
+  { id: 2, sacado: 'Distribuidora Bom Preço', cedente: 'Indústria Nova Era', valor: 46200, desagio: '2,4%', vencimentoDiasOffset: 45, score: 76, countdownSec: 11100 },
+  { id: 3, sacado: 'Metalúrgica Serrana S.A.', cedente: 'Aços Regional', valor: 132000, desagio: '3,6%', vencimentoDiasOffset: 29, score: 61, countdownSec: 1080 },
+  { id: 4, sacado: 'Construtora Vale Norte', cedente: 'Materiais Cimento Sul', valor: 210000, desagio: '5,2%', vencimentoDiasOffset: 72, score: 38, countdownSec: 21000 },
+  { id: 5, sacado: 'Grupo Atlas Varejo', cedente: 'Têxtil Bandeira', valor: 31800, desagio: '2,0%', vencimentoDiasOffset: 6, score: 84, countdownSec: 7920 },
+  { id: 6, sacado: 'Distribuidora Bom Preço', cedente: 'Embalagens Prisma', valor: 58900, desagio: '2,6%', vencimentoDiasOffset: 55, score: 76, countdownSec: 16020 },
 ];
 
 export const ACEITE_MAP: Record<number, 'aceita' | 'aguardando' | 'contestada'> = {
@@ -124,10 +132,16 @@ export const EXTRA_BIDDERS = [
   { name: 'Bradesco Corporate', initials: 'BC', tipo: 'Banco', avatarBg: COLORS.NAVY },
 ];
 
+// Same vencimentoDiasOffset reasoning as OFFERS_RAW above, and for the same reason: 'No
+// mercado' items are just as marketplace-visible (listMarketplace() matches on status, not
+// on which raw array a duplicata originally came from) and so just as exposed to the same
+// staleness bug once their fixed absolute date passed. 'Pendente análise'/'Aprovada'/'Paga'
+// items never enter the marketplace listing, so their emissao/vencimento can safely stay
+// fixed, historical-looking dates — no functional dependency on them still being "future".
 export const MINHAS_RAW = [
-  { id: 'm1', sacado: 'Grupo Atlas Varejo', valor: 84500, emissao: '10/06/2026', vencimento: '12/08/2026', status: 'No mercado', lastro: 100 },
+  { id: 'm1', sacado: 'Grupo Atlas Varejo', valor: 84500, emissao: '10/06/2026', vencimentoDiasOffset: 18, status: 'No mercado', lastro: 100 },
   { id: 'm2', sacado: 'Padaria Central Ltda', valor: 12300, emissao: '02/07/2026', vencimento: '30/07/2026', status: 'Pendente análise', lastro: 40 },
-  { id: 'm3', sacado: 'Distribuidora Bom Preço', valor: 46200, emissao: '18/05/2026', vencimento: '05/09/2026', status: 'No mercado', lastro: 100 },
+  { id: 'm3', sacado: 'Distribuidora Bom Preço', valor: 46200, emissao: '18/05/2026', vencimentoDiasOffset: 40, status: 'No mercado', lastro: 100 },
   { id: 'm4', sacado: 'Auto Peças Rio', valor: 9800, emissao: '22/04/2026', vencimento: '22/06/2026', status: 'Paga', lastro: 100 },
   { id: 'm5', sacado: 'Metalúrgica Serrana S.A.', valor: 132000, emissao: '30/06/2026', vencimento: '20/08/2026', status: 'Aprovada', lastro: 80 },
 ];
