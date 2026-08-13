@@ -14,6 +14,7 @@ import { AuditTrailPanel } from './admin/AuditTrailPanel';
 import { TedPendentesPanel } from './admin/TedPendentesPanel';
 import { BackupsPanel } from './admin/BackupsPanel';
 import { AddonRevenuePanel } from './admin/AddonRevenuePanel';
+import { DailyBriefingCard } from './admin/DailyBriefingCard';
 
 // This page used to be ~1900 lines with every tab's state, data-loading and JSX inlined —
 // each tab is now its own panel component under admin/, following the pattern already set
@@ -38,6 +39,8 @@ export function AdminPage() {
   return (
     <div>
       <PageHeader title={t('admin.title', 'Back-office')} subtitle={t('admin.subtitle', 'Aprovação de credenciamento, arbitragem de disputas e trilha de auditoria da plataforma')} />
+
+      <DailyBriefingCard onNavigate={(t) => setTab(t as Tab)} />
 
       <div className="flex gap-1 mb-5 p-1 rounded-lg bg-bg w-fit flex-wrap">
         {([

@@ -58,6 +58,7 @@ import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '..
 import { buildDarfSummary, streamDarfPdf } from '../lib/darfGenerator.js';
 import { buildFundOverview, listFundClaimsForAdmin, decideFundClaimOutcome, fundClaimDecisionSchema } from '../lib/guaranteeFund.js';
 import { runStressTest } from '../lib/guaranteeFundStressTest.js';
+import { peekDailyBriefing } from '../lib/dailyBriefing.js';
 
 const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
 
@@ -1108,3 +1109,11 @@ adminRouter.post(
     res.json({ flags: listFeatureFlagViews() });
   })
 );
+
+// The prioritized "where should my time go today" summary lib/dailyBriefing.ts emails and
+// notifies every admin about once a day — this route lets the back-office show the same
+// thing live, on demand, without waiting for or triggering that scheduled send (peekDailyBriefing
+// only reads, it never calls notifyAdmins/sendEmail).
+adminRouter.get('/daily-briefing', (_req, res) => {
+  res.json(peekDailyBriefing());
+});
