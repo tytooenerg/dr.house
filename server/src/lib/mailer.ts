@@ -15,13 +15,19 @@ const transporter = host
 if (transporter) logger.info('[mail] SMTP transport configured — notification emails will be sent for real');
 else logger.info('[mail] SMTP_HOST not set — notification emails will be logged instead of sent');
 
-export async function sendEmail(to: string, subject: string, text: string) {
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
+export async function sendEmail(to: string, subject: string, text: string, attachments?: EmailAttachment[]) {
   if (!transporter) {
-    logger.info({ to, subject, text }, '[mail] (dev) would send email');
+    logger.info({ to, subject, text, attachments: attachments?.map((a) => a.filename) }, '[mail] (dev) would send email');
     return;
   }
   try {
-    await transporter.sendMail({ from: process.env.SMTP_FROM || 'Lastro <no-reply@lastro.demo>', to, subject, text });
+    await transporter.sendMail({ from: process.env.SMTP_FROM || 'Lastro <no-reply@lastro.demo>', to, subject, text, attachments });
   } catch (err) {
     logger.error({ err, to, subject }, '[mail] failed to send email');
   }
