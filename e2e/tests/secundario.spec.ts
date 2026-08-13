@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, dismissOnboardingIfPresent } from './fixtures';
 
 test('demo investidor can buy an offer, then list it for resale on the mercado secundário', async ({ page }) => {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
@@ -6,10 +6,10 @@ test('demo investidor can buy an offer, then list it for resale on the mercado s
   await page.getByPlaceholder('••••••••').fill('demo1234');
   await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\/dashboard/);
-  const skipOnboarding = page.getByRole('button', { name: 'Pular' });
-  if (await skipOnboarding.isVisible().catch(() => false)) await skipOnboarding.click();
+  await dismissOnboardingIfPresent(page);
 
   await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
   await expect(page.getByText('Atualizações ao vivo')).toBeVisible({ timeout: 15_000 });
   const buyButton = page.getByRole('button', { name: 'Comprar' }).first();
   if (await buyButton.isVisible().catch(() => false)) {

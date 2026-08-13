@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, dismissOnboardingIfPresent } from './fixtures';
 
 async function loginAsInvestidor(page: import('@playwright/test').Page) {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
@@ -6,14 +6,13 @@ async function loginAsInvestidor(page: import('@playwright/test').Page) {
   await page.getByPlaceholder('••••••••').fill('demo1234');
   await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\/dashboard/);
-
-  const skipOnboarding = page.getByRole('button', { name: 'Pular' });
-  if (await skipOnboarding.isVisible().catch(() => false)) await skipOnboarding.click();
+  await dismissOnboardingIfPresent(page);
 }
 
 test('investidor can browse the live marketplace and buy an offer', async ({ page }) => {
   await loginAsInvestidor(page);
   await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
 
   await expect(page.getByText('Atualizações ao vivo')).toBeVisible({ timeout: 15_000 });
 
@@ -27,6 +26,7 @@ test('investidor can browse the live marketplace and buy an offer', async ({ pag
 test('investidor opens funding-matching explainability ("Por que essa oferta?") on a live offer', async ({ page }) => {
   await loginAsInvestidor(page);
   await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
   await expect(page.getByText('Atualizações ao vivo')).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Por que essa oferta?' }).first().click();

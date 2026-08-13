@@ -33,7 +33,10 @@ test('a cedente can emit a duplicata and the matching sacado can confirm it', as
   await dismissOnboardingIfPresent(page);
 
   await page.getByPlaceholder('ex: Grupo Atlas Varejo').fill(sacadoCompany);
-  await page.getByPlaceholder('50.000').fill('42.000');
+  // Plain getByPlaceholder('50.000') is ambiguous: the AI-assistant prompt textarea's own
+  // placeholder text also contains "R$ 50.000" as an example. The Field label gives this
+  // input a real accessible name, so target that instead of the (non-unique) placeholder.
+  await page.getByRole('textbox', { name: 'Valor (R$)' }).fill('42.000');
   await page.locator('input[type="date"]').fill('2026-12-31');
 
   // The submit endpoint randomly simulates a CERC outage ~12% of the time — retry through it.
