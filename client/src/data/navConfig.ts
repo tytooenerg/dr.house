@@ -32,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'perfil', label: 'Perfil & Configurações', path: '/app/perfil', group: 'plataforma' },
   { key: 'admin', label: 'Back-office', path: '/app/admin', group: 'plataforma' },
   { key: 'seguradora', label: 'Painel da Seguradora', path: '/app/seguradora', group: 'operacoes' },
+  { key: 'auditor', label: 'Painel de Auditoria', path: '/app/auditor', group: 'plataforma' },
 ];
 
 export const GROUP_LABELS: Record<string, string> = {
@@ -46,4 +47,5 @@ export const DEFAULT_TAB_BY_ROLE: Record<string, string> = {
   sacado: 'sacado',
   admin: 'admin',
   seguradora: 'seguradora',
+  auditor: 'auditor',
 };

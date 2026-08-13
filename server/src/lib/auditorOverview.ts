@@ -1,0 +1,48 @@
+import { listAuditLog, verifyAuditChain } from '../db/audit.js';
+import { listFlags } from '../db/reconciliation.js';
+import { listSuspiciousActivityReports } from '../db/suspiciousActivity.js';
+import { listPendingComplianceReview } from '../db/complianceEngine.js';
+import { fmtBRL, fmtRelative } from './format.js';
+
+// Read-only aggregation for the 'auditor' role (routes/auditor.ts) — every number here is
+// assembled from the exact same tables the admin back-office already reads (audit_log,
+// reconciliation_flags, suspicious_activity_reports, compliance_engine_results), just
+// without any of the write endpoints admin gets alongside them. No new data, no new
+// computation — this module only exists to draw a read-only line through data that
+// otherwise lives behind admin-only routes.
+export interface AuditorOverview {
+  auditLog: { entries: { id: number; actor: string; action: string; quando: string; hash: string }[]; chain: { valid: boolean; brokenAt: number | null } };
+  compliance: { pendentes: number; itens: { duplicataId: string; sacadoNome: string; valorFmt: string; score: number }[] };
+  reconciliation: { abertas: number; resolvidas: number; recentes: { tipo: string; empresa: string; valorFmt: string; status: string; quando: string }[] };
+  sars: { aberto: number; descartado: number; reportado_coaf: number };
+}
+
+export function buildAuditorOverview(): AuditorOverview {
+  const auditRows = listAuditLog(100);
+  const auditLog = {
+    entries: auditRows.map((e) => ({ id: e.id, actor: e.actor_label, action: e.action, quando: fmtRelative(e.created_at), hash: e.hash.slice(0, 12) })),
+    chain: verifyAuditChain(),
+  };
+
+  const complianceRows = listPendingComplianceReview();
+  const compliance = {
+    pendentes: complianceRows.length,
+    itens: complianceRows.slice(0, 30).map((c) => ({ duplicataId: c.duplicata_id, sacadoNome: c.sacado_nome, valorFmt: fmtBRL(c.valor), score: c.score })),
+  };
+
+  const allFlags = listFlags();
+  const reconciliation = {
+    abertas: allFlags.filter((f) => f.status === 'aberta').length,
+    resolvidas: allFlags.filter((f) => f.status === 'resolvida').length,
+    recentes: allFlags.slice(0, 20).map((f) => ({ tipo: f.tipo, empresa: f.company_name, valorFmt: fmtBRL(f.valor), status: f.status, quando: fmtRelative(f.created_at) })),
+  };
+
+  const allSars = listSuspiciousActivityReports();
+  const sars = {
+    aberto: allSars.filter((r) => r.status === 'aberto').length,
+    descartado: allSars.filter((r) => r.status === 'descartado').length,
+    reportado_coaf: allSars.filter((r) => r.status === 'reportado_coaf').length,
+  };
+
+  return { auditLog, compliance, reconciliation, sars };
+}

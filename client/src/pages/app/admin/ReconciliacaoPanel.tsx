@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 
 interface ReconciliationFlag {
   id: number;
-  tipo: 'pix' | 'boleto' | 'ted';
+  tipo: 'pix' | 'boleto' | 'ted' | 'extrato_bancario';
   referencia: string;
   company_name: string;
   valor: number;
@@ -15,7 +15,80 @@ interface ReconciliationFlag {
   resolved_at: string | null;
 }
 
-const TIPO_LABEL: Record<ReconciliationFlag['tipo'], string> = { pix: 'Pix', boleto: 'Boleto', ted: 'TED' };
+const TIPO_LABEL: Record<ReconciliationFlag['tipo'], string> = { pix: 'Pix', boleto: 'Boleto', ted: 'TED', extrato_bancario: 'Extrato bancário' };
+
+interface BankReconciliationResult {
+  transacoes: number;
+  conferidas: number;
+  semLancamento: number;
+}
+
+function BankStatementUploadCard({ onReconciled }: { onReconciled: () => void }) {
+  const [email, setEmail] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [ofxText, setOfxText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<BankReconciliationResult | null>(null);
+  const [error, setError] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    setFileName(file.name);
+    setOfxText(await file.text());
+    setResult(null);
+    setError('');
+  };
+
+  const submit = async () => {
+    setError('');
+    setResult(null);
+    if (!email.trim() || !ofxText) {
+      setError('Informe o e-mail da conta e selecione um arquivo OFX.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await api.post<BankReconciliationResult>('/reconciliation/extrato', { email, ofxText });
+      setResult(data);
+      onReconciled();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível processar o extrato.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border border-border rounded-xl p-4">
+      <div className="font-bold text-[14px] text-navy mb-1">Reconciliar extrato bancário real (OFX)</div>
+      <p className="text-[12.5px] text-navy/60 mb-3 max-w-2xl">
+        Compara um extrato OFX real (exportado do banco da conta) contra o próprio extrato Lastro dessa conta — pega divergências que a
+        reconciliação interna (Pix/boleto/TED) nunca alcança, porque essa nunca lê o banco de verdade.
+      </p>
+      <div className="flex items-center gap-2.5 flex-wrap mb-2.5">
+        <input
+          placeholder="E-mail da conta"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="border border-border rounded-md px-3 py-2 text-sm w-64"
+        />
+        <input ref={fileRef} type="file" accept=".ofx,.qfx,text/plain" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+        <button type="button" onClick={() => fileRef.current?.click()} className="px-3 py-2 rounded-md border border-inputBorder text-[12.5px] font-bold bg-white text-navy cursor-pointer">
+          {fileName || 'Selecionar arquivo OFX'}
+        </button>
+        <Button size="sm" disabled={busy} onClick={submit}>
+          {busy ? 'Processando…' : 'Reconciliar'}
+        </Button>
+      </div>
+      {error && <p className="text-[12.5px] text-red font-semibold">{error}</p>}
+      {result && (
+        <div className="text-[12.5px] text-navy/70 bg-bg rounded-lg px-3.5 py-2.5 w-fit">
+          {result.transacoes} transações do extrato · {result.conferidas} conferidas · {result.semLancamento} sem lançamento correspondente
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ReconciliacaoPanel() {
   const [flags, setFlags] = useState<ReconciliationFlag[]>([]);
@@ -88,6 +161,8 @@ export function ReconciliacaoPanel() {
         </div>
       )}
       {error && <p className="text-[12.5px] text-red font-semibold">{error}</p>}
+
+      <BankStatementUploadCard onReconciled={load} />
 
       <div>
         <div className="text-[13px] font-bold text-navy mb-2">Alertas abertos ({open.length})</div>

@@ -296,8 +296,12 @@ export const CHAT_ANSWERS: Record<string, string> = {
 
 export const KYB_TIPOS = ['Banco comercial', 'Fundo (FIDC)', 'Fintech de crédito', 'Family office'];
 
-export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora', { title: string; body: string }[]> = {
+export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor', { title: string; body: string }[]> = {
   admin: [],
+  auditor: [
+    { title: 'Bem-vinda, auditoria', body: 'Você tem acesso somente-leitura à trilha de auditoria, fila de compliance, reconciliação e relatórios regulatórios da plataforma.' },
+    { title: 'Trilha de auditoria', body: 'Todo evento sensível fica em um log encadeado por hash — qualquer alteração retroativa quebra a cadeia de forma detectável.' },
+  ],
   seguradora: [
     { title: 'Bem-vinda, parceira', body: 'Você está entrando como Seguradora parceira da Lastro. Vamos te mostrar o essencial.' },
     { title: 'Acompanhe suas apólices', body: 'Toda duplicata segurada pela sua seguradora aparece com prêmio e status em um só lugar.' },
@@ -320,8 +324,9 @@ export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'adm
   ],
 };
 
-export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora', string[]> = {
+export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor', string[]> = {
   admin: ['admin', 'perfil'],
+  auditor: ['auditor', 'perfil'],
   seguradora: ['seguradora', 'perfil'],
   investidor: ['dashboard', 'marketplace', 'secundario', 'cestas', 'suitability', 'automacao', 'linha-credito', 'risco', 'historico', 'comparador', 'compliance', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
   cedente: ['dashboard', 'erp', 'emitir', 'minhas', 'linha-credito', 'contas-pagar', 'ai-cfo', 'aceite', 'risco', 'historico', 'compliance', 'dev', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],

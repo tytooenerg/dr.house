@@ -17,9 +17,26 @@ import type { DuplicataRow } from '../db/types.js';
 // there's real repayment history to learn from, it never replaces the deterministic
 // baseline.
 
+export interface MlpWeights {
+  w1: number[][]; // hidden units x input features
+  b1: number[];
+  w2: number[]; // output x hidden
+  b2: number;
+}
+
+export interface FeatureImportance {
+  name: string;
+  importance: number; // 0-1, relative — see computeFeatureImportance's permutation method
+}
+
 export interface MLModel {
-  weights: number[];
-  bias: number;
+  // 'logistic' (the only kind that ever existed until now) below MIN_NEURAL_NET_SAMPLES;
+  // 'mlp' once there's real enough volume to justify one — see the module comment below.
+  kind: 'logistic' | 'mlp';
+  weights?: number[]; // logistic only
+  bias?: number; // logistic only
+  mlp?: MlpWeights; // mlp only
+  featureImportance?: FeatureImportance[]; // mlp only — logistic's own weights already ARE its importances
   featureNames: string[];
   // Per-feature mean/std used to standardize both training and inference inputs.
   featureMeans: number[];
@@ -32,6 +49,16 @@ export interface MLModel {
 
 const MODEL_KEY = 'ml_scoring_model_v1';
 export const MIN_TRAINING_SAMPLES = 12;
+// Below this, a neural net would overfit a handful of parameters onto noise (this is a
+// demo-scale dataset today — see the opinion given in chat when asked "vale a pena colocar
+// uma rede neural no sistema?"). Logistic regression stays the only model below this line,
+// exactly as it always was; the MLP only ever kicks in with real volume to justify it, and
+// falls back to logistic automatically if volume ever drops back below the line (e.g. after
+// a database reset). Same "real when the precondition is met, honest fallback otherwise"
+// discipline as every real-when-configured integration elsewhere in this codebase — the
+// precondition here is data volume, not an env var.
+export const MIN_NEURAL_NET_SAMPLES = 500;
+const HIDDEN_UNITS = 6;
 const FEATURE_NAMES = ['compliance_score', 'valor_log10', 'lastro_pct', 'seguro', 'sacado_score_base'];
 
 function sigmoid(z: number): number {
@@ -103,6 +130,69 @@ function trainLogisticRegression(X: number[][], y: number[], epochs = 800, lr = 
   return { weights, bias };
 }
 
+// One hidden layer, sigmoid activations throughout, plain backprop — same "no external ML
+// dependency, auditable line by line" reasoning as trainLogisticRegression above. Only
+// ever invoked once trainModel() has confirmed real volume (MIN_NEURAL_NET_SAMPLES).
+function trainMlp(X: number[][], y: number[], epochs = 600, lr = 0.15, l2 = 0.01): MlpWeights {
+  const n = X.length;
+  const d = X[0].length;
+  const h = HIDDEN_UNITS;
+  const w1 = Array.from({ length: h }, () => Array.from({ length: d }, () => (Math.random() - 0.5) * Math.sqrt(2 / d)));
+  const b1 = new Array(h).fill(0);
+  const w2 = Array.from({ length: h }, () => (Math.random() - 0.5) * Math.sqrt(2 / h));
+  let b2 = 0;
+
+  for (let epoch = 0; epoch < epochs; epoch++) {
+    const gW1 = w1.map((row) => row.map(() => 0));
+    const gB1 = new Array(h).fill(0);
+    const gW2 = new Array(h).fill(0);
+    let gB2 = 0;
+    for (let i = 0; i < n; i++) {
+      const x = X[i];
+      const aHidden = w1.map((row, k) => sigmoid(row.reduce((s, wv, j) => s + wv * x[j], b1[k])));
+      const pred = sigmoid(aHidden.reduce((s, a, k) => s + a * w2[k], b2));
+      const errOut = pred - y[i];
+      for (let k = 0; k < h; k++) gW2[k] += errOut * aHidden[k];
+      gB2 += errOut;
+      for (let k = 0; k < h; k++) {
+        const dHidden = errOut * w2[k] * aHidden[k] * (1 - aHidden[k]);
+        for (let j = 0; j < d; j++) gW1[k][j] += dHidden * x[j];
+        gB1[k] += dHidden;
+      }
+    }
+    for (let k = 0; k < h; k++) {
+      for (let j = 0; j < d; j++) w1[k][j] -= lr * (gW1[k][j] / n + l2 * w1[k][j]);
+      b1[k] -= lr * (gB1[k] / n);
+      w2[k] -= lr * (gW2[k] / n + l2 * w2[k]);
+    }
+    b2 -= lr * (gB2 / n);
+  }
+  return { w1, b1, w2, b2 };
+}
+
+function predictMlp(mlp: MlpWeights, xStd: number[]): number {
+  const aHidden = mlp.w1.map((row, k) => sigmoid(row.reduce((s, wv, j) => s + wv * xStd[j], mlp.b1[k])));
+  return sigmoid(aHidden.reduce((s, a, k) => s + a * mlp.w2[k], mlp.b2));
+}
+
+// Real (if simple) explainability for the MLP: permutation importance — replace one
+// feature at a time with the sample mean (0 in standardized space, i.e. "no information
+// from this feature") across every row, measure how much mean absolute prediction shift
+// that causes, normalize to sum to 1. Not SHAP, but a real, honestly-computed number, not
+// a guess — the same "explainable, not a black box" bar this codebase already holds
+// logistic regression's own coefficients to.
+function computeFeatureImportance(mlp: MlpWeights, Xs: number[][]): FeatureImportance[] {
+  const basePreds = Xs.map((row) => predictMlp(mlp, row));
+  const shifts = FEATURE_NAMES.map((_, j) => {
+    const permuted = Xs.map((row) => row.map((v, k) => (k === j ? 0 : v)));
+    const permutedPreds = permuted.map((row) => predictMlp(mlp, row));
+    const meanShift = permutedPreds.reduce((s, p, i) => s + Math.abs(p - basePreds[i]), 0) / permutedPreds.length;
+    return meanShift;
+  });
+  const total = shifts.reduce((s, v) => s + v, 0) || 1;
+  return FEATURE_NAMES.map((name, j) => ({ name, importance: shifts[j] / total })).sort((a, b) => b.importance - a.importance);
+}
+
 export interface TrainResult {
   trained: boolean;
   reason?: string;
@@ -122,25 +212,44 @@ export function trainModel(): TrainResult {
   }
 
   const { Xs, means, stds } = standardize(X);
-  const { weights, bias } = trainLogisticRegression(Xs, y);
 
-  const predictions = Xs.map((row) => (sigmoid(row.reduce((s, x, j) => s + x * weights[j], bias)) >= 0.5 ? 1 : 0));
-  const correct = predictions.filter((p, i) => p === y[i]).length;
-  const trainAccuracy = correct / y.length;
+  let model: MLModel;
+  if (rows.length >= MIN_NEURAL_NET_SAMPLES) {
+    const mlp = trainMlp(Xs, y);
+    const predictions = Xs.map((row) => (predictMlp(mlp, row) >= 0.5 ? 1 : 0));
+    const trainAccuracy = predictions.filter((p, i) => p === y[i]).length / y.length;
+    model = {
+      kind: 'mlp',
+      mlp,
+      featureImportance: computeFeatureImportance(mlp, Xs),
+      featureNames: FEATURE_NAMES,
+      featureMeans: means,
+      featureStds: stds,
+      nSamples: rows.length,
+      nPositive,
+      trainAccuracy,
+      trainedAt: new Date().toISOString(),
+    };
+  } else {
+    const { weights, bias } = trainLogisticRegression(Xs, y);
+    const predictions = Xs.map((row) => (sigmoid(row.reduce((s, x, j) => s + x * weights[j], bias)) >= 0.5 ? 1 : 0));
+    const trainAccuracy = predictions.filter((p, i) => p === y[i]).length / y.length;
+    model = {
+      kind: 'logistic',
+      weights,
+      bias,
+      featureNames: FEATURE_NAMES,
+      featureMeans: means,
+      featureStds: stds,
+      nSamples: rows.length,
+      nPositive,
+      trainAccuracy,
+      trainedAt: new Date().toISOString(),
+    };
+  }
 
-  const model: MLModel = {
-    weights,
-    bias,
-    featureNames: FEATURE_NAMES,
-    featureMeans: means,
-    featureStds: stds,
-    nSamples: rows.length,
-    nPositive,
-    trainAccuracy,
-    trainedAt: new Date().toISOString(),
-  };
   setPlatformSetting(MODEL_KEY, JSON.stringify(model));
-  logger.info({ nSamples: rows.length, nPositive, trainAccuracy }, '[ml-scoring] modelo retreinado');
+  logger.info({ nSamples: rows.length, nPositive, trainAccuracy: model.trainAccuracy, kind: model.kind }, '[ml-scoring] modelo retreinado');
   return { trained: true, model };
 }
 
@@ -161,6 +270,7 @@ export function predictDefaultProbability(d: DuplicataRow): number | null {
   if (!model) return null;
   const features = extractFeatures(d);
   const standardized = features.map((v, j) => (v - model.featureMeans[j]) / model.featureStds[j]);
-  const z = standardized.reduce((s, x, j) => s + x * model.weights[j], model.bias);
+  if (model.kind === 'mlp' && model.mlp) return predictMlp(model.mlp, standardized);
+  const z = standardized.reduce((s, x, j) => s + x * (model.weights?.[j] ?? 0), model.bias ?? 0);
   return sigmoid(z);
 }

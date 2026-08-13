@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api, getRefreshToken, getToken, setSessionTokens, setUnauthorizedHandler } from '../lib/api';
 
-export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora';
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor';
 export type Plan = 'basico' | 'pro' | 'empresarial';
 
 export interface OnboardingStep {

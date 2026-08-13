@@ -22,6 +22,7 @@ import { startCobrancaAgentJob } from './lib/cobrancaAgentJob.js';
 import { startPldAgentJob } from './lib/pldAgentJob.js';
 import { startMarketMakerAgentJob } from './lib/marketMakerAgentJob.js';
 import { startReconciliationAgentJob } from './lib/reconciliationAgentJob.js';
+import { startCoafSubmissionReminderJob } from './lib/coafSubmissionReminder.js';
 import { logger } from './lib/logger.js';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
@@ -43,6 +44,7 @@ async function main() {
   startPldAgentJob();
   startMarketMakerAgentJob();
   startReconciliationAgentJob();
+  startCoafSubmissionReminderJob();
   server.listen(PORT, () => {
     logger.info(`Lastro API listening on http://localhost:${PORT} (WebSocket at /ws/market)`);
   });

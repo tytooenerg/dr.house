@@ -1,4 +1,4 @@
-export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora';
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor';
 export type KybStatus = 'none' | 'pending' | 'approved' | 'rejected';
 export type Plan = 'basico' | 'pro' | 'empresarial';
 export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';

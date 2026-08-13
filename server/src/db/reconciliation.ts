@@ -1,8 +1,10 @@
 import { db } from './index.js';
 
+export type ReconciliationFlagTipo = 'pix' | 'boleto' | 'ted' | 'extrato_bancario';
+
 export interface ReconciliationFlagRow {
   id: number;
-  tipo: 'pix' | 'boleto' | 'ted';
+  tipo: ReconciliationFlagTipo;
   referencia: string;
   user_id: number;
   valor: number;
@@ -15,7 +17,7 @@ export interface ReconciliationFlagRow {
 
 // INSERT OR IGNORE: a flag is unique per (tipo, referencia), so re-running reconciliation
 // over the same lookback window never duplicates an already-raised flag.
-export function raiseFlag(input: { tipo: 'pix' | 'boleto' | 'ted'; referencia: string; userId: number; valor: number; descricao: string }): boolean {
+export function raiseFlag(input: { tipo: ReconciliationFlagTipo; referencia: string; userId: number; valor: number; descricao: string }): boolean {
   const info = db
     .prepare('INSERT OR IGNORE INTO reconciliation_flags (tipo, referencia, user_id, valor, descricao) VALUES (?, ?, ?, ?, ?)')
     .run(input.tipo, input.referencia, input.userId, input.valor, input.descricao);

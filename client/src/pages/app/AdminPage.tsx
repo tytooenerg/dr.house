@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { AgentesIaPanel } from './admin/AgentesIaPanel';
 import { FeatureFlagsPanel } from './admin/FeatureFlagsPanel';
 import { ReconciliacaoPanel } from './admin/ReconciliacaoPanel';
+import { AuditoresPanel } from './admin/AuditoresPanel';
 
 interface PendingKyb {
   id: number;
@@ -66,7 +67,17 @@ interface ComplianceQueueItem {
 
 interface MlScoringStatus {
   minTrainingSamples: number;
-  model: { nSamples: number; nPositive: number; trainAccuracy: number; trainedAt: string; featureNames: string[]; weights: number[] } | null;
+  minNeuralNetSamples: number;
+  model: {
+    kind: 'logistic' | 'mlp';
+    nSamples: number;
+    nPositive: number;
+    trainAccuracy: number;
+    trainedAt: string;
+    featureNames: string[];
+    weights: number[] | null;
+    featureImportance: { name: string; importance: number }[] | null;
+  } | null;
 }
 
 interface AiUsageSummary {
@@ -1666,9 +1677,29 @@ export function AdminPage() {
               </div>
               {mlScoring.model ? (
                 <div className="text-[12.5px] text-textSecondary">
+                  <div>
+                    Modelo: <b>{mlScoring.model.kind === 'mlp' ? 'rede neural (MLP)' : 'regressão logística'}</b>
+                    {mlScoring.model.kind === 'logistic' && (
+                      <> — vira rede neural automaticamente a partir de {mlScoring.minNeuralNetSamples} amostras (poucas para isso hoje, ver Agentes IA)</>
+                    )}
+                  </div>
                   Treinado em {new Date(mlScoring.model.trainedAt).toLocaleString('pt-BR')} com {mlScoring.model.nSamples} amostras (
                   {mlScoring.model.nPositive} com resultado ruim) — acurácia de treino {(mlScoring.model.trainAccuracy * 100).toFixed(0)}%. Usado pelo
                   Agente de Underwriting (ferramenta <code>prever_probabilidade_ml</code>).
+                  {mlScoring.model.featureImportance && (
+                    <div className="mt-2">
+                      <div className="font-bold text-navy mb-1">Importância por variável (permutação)</div>
+                      {mlScoring.model.featureImportance.map((f) => (
+                        <div key={f.name} className="flex items-center gap-2">
+                          <span className="w-40">{f.name}</span>
+                          <div className="flex-1 h-2 bg-bg rounded-full overflow-hidden">
+                            <div className="h-full bg-blue" style={{ width: `${(f.importance * 100).toFixed(0)}%` }} />
+                          </div>
+                          <span className="font-mono-num">{(f.importance * 100).toFixed(0)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-[12.5px] text-textSecondary">
@@ -1753,6 +1784,8 @@ export function AdminPage() {
           {audit && audit.entries.length === 0 && <EmptyState title="Nenhum evento registrado ainda" hint="Ações sensíveis da plataforma vão aparecer aqui" />}
         </div>
       )}
+
+      {tab === 'auditoria' && <AuditoresPanel />}
 
       {tab === 'auditoria' && (
         <div className="bg-white border border-border rounded-card overflow-hidden mt-5">

@@ -201,6 +201,14 @@ export function listPendingKyb(): UserRow[] {
   return db.prepare("SELECT * FROM users WHERE role = 'investidor' AND kyb_status = 'pending' ORDER BY created_at ASC").all() as UserRow[];
 }
 
+// Used by the back-office's auditor-account management (routes/admin.ts) — 'auditor' is
+// the only role deliberately never self-registerable (see routes/auth.ts's registerSchema),
+// same reasoning as 'admin': listing them here lets an existing admin see who already has
+// read-only access without a separate table.
+export function listUsersByRole(role: Role): UserRow[] {
+  return db.prepare('SELECT * FROM users WHERE role = ? AND deleted_at IS NULL ORDER BY created_at DESC').all(role) as UserRow[];
+}
+
 // Feeds lib/autoEmitJob.ts — every cedente account is a candidate; the job itself checks
 // each one's settings.autoEmitEnabled (JSON, not a column) to decide who actually opted in.
 export function listActiveCedentes(): UserRow[] {

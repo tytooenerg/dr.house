@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../auth/middleware.js';
-import { approveKyb, listPendingKyb, rejectKyb, getUserById } from '../db/users.js';
+import { approveKyb, listPendingKyb, rejectKyb, getUserById, listUsersByRole } from '../db/users.js';
+import { createAuditorAccount, CreateAuditorError } from '../lib/createAuditorAccount.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
@@ -49,7 +50,7 @@ import { getIncludedCallsPerMonth, setIncludedCallsPerMonth, runApiOverageBillin
 import { runWhitelabelPlusBilling } from '../lib/whitelabelBilling.js';
 import { runInstitutionalReportingBilling } from '../lib/institutionalReporting.js';
 import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/agents.js';
-import { trainModel, getModel, MIN_TRAINING_SAMPLES } from '../lib/mlScoring.js';
+import { trainModel, getModel, MIN_TRAINING_SAMPLES, MIN_NEURAL_NET_SAMPLES } from '../lib/mlScoring.js';
 import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 import { computeMetrics } from '../lib/metrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
@@ -310,8 +311,18 @@ adminRouter.get('/ml-scoring', (_req, res) => {
   const model = getModel();
   res.json({
     minTrainingSamples: MIN_TRAINING_SAMPLES,
+    minNeuralNetSamples: MIN_NEURAL_NET_SAMPLES,
     model: model
-      ? { nSamples: model.nSamples, nPositive: model.nPositive, trainAccuracy: model.trainAccuracy, trainedAt: model.trainedAt, featureNames: model.featureNames, weights: model.weights }
+      ? {
+          kind: model.kind,
+          nSamples: model.nSamples,
+          nPositive: model.nPositive,
+          trainAccuracy: model.trainAccuracy,
+          trainedAt: model.trainedAt,
+          featureNames: model.featureNames,
+          weights: model.weights ?? null,
+          featureImportance: model.featureImportance ?? null,
+        }
       : null,
   });
 });
@@ -723,6 +734,38 @@ adminRouter.get('/audit', (_req, res) => {
   }));
   res.json({ entries, chain: verifyAuditChain() });
 });
+
+// Auditor accounts (read-only external/internal audit access, routes/auditor.ts) can only
+// be created by an existing admin — see lib/createAuditorAccount.ts for why this is not a
+// public self-register role.
+const auditorSchema = z.object({ nome: z.string().trim().min(1), email: z.string().trim().email(), password: z.string().min(8), companyName: z.string().trim().optional() });
+
+adminRouter.get('/auditores', (_req, res) => {
+  const auditores = listUsersByRole('auditor').map((u) => ({ id: u.id, nome: u.nome, email: u.email, companyName: u.company_name, criadoEm: fmtRelative(u.created_at) }));
+  res.json({ auditores });
+});
+
+adminRouter.post(
+  '/auditores',
+  asyncHandler(async (req, res) => {
+    const parsed = auditorSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    try {
+      const auditor = await createAuditorAccount(parsed.data);
+      recordAuditEvent(req.user!.id, req.user!.company_name, 'auditor.create', { id: auditor.id, email: auditor.email });
+      res.status(201).json({ id: auditor.id, nome: auditor.nome, email: auditor.email, companyName: auditor.company_name });
+    } catch (err) {
+      if (err instanceof CreateAuditorError) {
+        res.status(400).json({ error: 'validation_error', message: err.message });
+        return;
+      }
+      throw err;
+    }
+  })
+);
 
 // TED deposits have no self-service confirmation (see lib/tedRail.ts) — an admin matches
 // each pending reference against the real bank statement by hand, same as ops would at

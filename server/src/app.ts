@@ -43,6 +43,7 @@ import { referralRouter } from './routes/referral.js';
 import { payablesRouter } from './routes/payables.js';
 import { cashflowRouter } from './routes/cashflow.js';
 import { reconciliationRouter } from './routes/reconciliation.js';
+import { auditorRouter } from './routes/auditor.js';
 import { publicRouter } from './routes/public.js';
 import { agentsRouter } from './routes/agents.js';
 
@@ -118,6 +119,7 @@ app.use('/api/credit-line', creditLineRouter);
 app.use('/api/payables', payablesRouter);
 app.use('/api/cashflow', cashflowRouter);
 app.use('/api/reconciliation', reconciliationRouter);
+app.use('/api/auditor', auditorRouter);
 app.use('/api/credit-line-fund', creditLineFundRouter);
 app.use('/api/referral', referralRouter);
 app.use('/api/public', publicRouter);
