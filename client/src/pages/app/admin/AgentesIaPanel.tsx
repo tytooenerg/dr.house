@@ -24,6 +24,7 @@ export function AgentesIaPanel() {
   const [lastRun, setLastRun] = useState<AgentRunOutcome | null>(null);
   const [pending, setPending] = useState<PendingActionRow[]>([]);
   const [decidingId, setDecidingId] = useState<number | null>(null);
+  const [bulkApproving, setBulkApproving] = useState(false);
   const [showGovernance, setShowGovernance] = useState(false);
   const [governance, setGovernance] = useState<{ dualApprovalThresholdBrl: number; agents: AgentGovernanceEntry[] } | null>(null);
   const [thresholdInput, setThresholdInput] = useState('');
@@ -114,6 +115,23 @@ export function AgentesIaPanel() {
     }
   };
 
+  // Still one explicit human click per execution under the hood (see the route's own
+  // comment) — this just fires all of them from a single button instead of clicking
+  // "Aprovar e executar" once per row on an otherwise-obviously-clean queue.
+  const approveAllPending = async () => {
+    setBulkApproving(true);
+    try {
+      await api.post<{ total: number; sucesso: number; resultados: { id: number; ok: boolean; error?: string }[] }>('/agents/pending/approve-bulk', {
+        ids: pending.map((p) => p.id),
+      });
+      await loadPending();
+    } catch (err) {
+      setRunError(err instanceof ApiError ? err.message : 'Falha ao aprovar em lote.');
+    } finally {
+      setBulkApproving(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-5">
       <div className="text-textSecondary text-[12.5px]">
@@ -175,7 +193,14 @@ export function AgentesIaPanel() {
 
       {pending.length > 0 && (
         <div className="bg-white border border-[#F1C889] rounded-card overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border font-bold text-[14px] bg-[#FBF1E0]">Ações pendentes de aprovação ({pending.length})</div>
+          <div className="px-5 py-3.5 border-b border-border font-bold text-[14px] bg-[#FBF1E0] flex items-center justify-between gap-3 flex-wrap">
+            <span>Ações pendentes de aprovação ({pending.length})</span>
+            {pending.length > 1 && (
+              <Button size="sm" variant="secondary" disabled={bulkApproving} onClick={approveAllPending}>
+                {bulkApproving ? 'Aprovando…' : `Aprovar todas (${pending.length})`}
+              </Button>
+            )}
+          </div>
           {pending.map((p) => (
             <div key={p.id} className="px-5 py-3.5 border-b border-[#F5F7FA] last:border-b-0 flex items-start justify-between gap-4">
               <div>

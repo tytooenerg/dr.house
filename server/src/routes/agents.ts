@@ -170,60 +170,88 @@ agentsRouter.post(
 
 const decisionSchema = z.object({ note: z.string().trim().max(1000).optional() });
 
+// Shared by the single-approve route and the admin-only bulk-approve route below — same
+// exact checks and same call to executeApprovedTool either way. Bulk approval is not a way
+// around "a sensitive tool never executes automatically" (see agentRuntime.ts): a human
+// still explicitly triggers every individual execution here, it's just N of them fired by
+// one click instead of N separate ones — the real toil this removes is clicking through an
+// obviously-clean queue one row at a time, not the human-in-the-loop requirement itself.
+type ApproveOutcome =
+  | { httpStatus: 200; body: { ok: true; output: unknown } }
+  | { httpStatus: 200; body: { ok: true; waitingForMoreApprovals: true; approvalsSoFar: number; approvalsRequired: number } }
+  | { httpStatus: 404; body: { error: 'not_found' } }
+  | { httpStatus: 409; body: { error: 'already_decided'; status: string } | { error: 'already_approved_by_you' } }
+  | { httpStatus: 403; body: { error: 'forbidden'; message: string } }
+  | { httpStatus: 500; body: { error: 'agent_missing' | 'execution_failed'; message: string } };
+
+async function approveOnePendingAction(id: number, actingUserId: number, actingRole: string): Promise<ApproveOutcome> {
+  const pending = getPendingAction(id);
+  if (!pending) return { httpStatus: 404, body: { error: 'not_found' } };
+  if (pending.status !== 'pendente') return { httpStatus: 409, body: { error: 'already_decided', status: pending.status } };
+  const def = getAgent(pending.agent_id);
+  if (!def) return { httpStatus: 500, body: { error: 'agent_missing', message: `Agente "${pending.agent_id}" não está mais registrado.` } };
+  const run = getAgentRun(pending.run_id);
+  const admin = isAdmin(actingRole);
+  if (!admin) {
+    const tool = def.tools.find((t) => t.name === pending.tool_name);
+    const isOwn = !!run && run.user_id === actingUserId;
+    if (!isOwn || !tool?.selfApprovable) {
+      return { httpStatus: 403, body: { error: 'forbidden', message: 'Apenas um admin pode decidir esta ação.' } };
+    }
+  } else if (pending.approvals_required > 1) {
+    const recorded = recordApproval(id, actingUserId);
+    if (!recorded) return { httpStatus: 409, body: { error: 'already_approved_by_you' } };
+    const approvalsSoFar = countApprovals(id);
+    if (approvalsSoFar < pending.approvals_required) {
+      return { httpStatus: 200, body: { ok: true, waitingForMoreApprovals: true, approvalsSoFar, approvalsRequired: pending.approvals_required } };
+    }
+  }
+  try {
+    const input = JSON.parse(pending.input);
+    const output = await executeApprovedTool(def, pending.tool_name, input, { runId: pending.run_id, userId: run?.user_id ?? actingUserId });
+    decidePendingAction(id, 'aprovada', actingUserId, { ok: true, output });
+    return { httpStatus: 200, body: { ok: true, output } };
+  } catch (err) {
+    decidePendingAction(id, 'aprovada', actingUserId, { ok: false, error: String(err) });
+    return { httpStatus: 500, body: { error: 'execution_failed', message: String(err) } };
+  }
+}
+
 agentsRouter.post(
   '/pending/:id/approve',
   aiFeatureLimiter,
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
-    const pending = getPendingAction(id);
-    if (!pending) {
-      res.status(404).json({ error: 'not_found' });
-      return;
-    }
-    if (pending.status !== 'pendente') {
-      res.status(409).json({ error: 'already_decided', status: pending.status });
-      return;
-    }
     decisionSchema.safeParse(req.body);
-    const def = getAgent(pending.agent_id);
-    if (!def) {
-      res.status(500).json({ error: 'agent_missing', message: `Agente "${pending.agent_id}" não está mais registrado.` });
+    const outcome = await approveOnePendingAction(id, req.user!.id, req.user!.role);
+    res.status(outcome.httpStatus).json(outcome.body);
+  })
+);
+
+const bulkApproveSchema = z.object({ ids: z.array(z.number().int().positive()).min(1).max(50) });
+
+// Admin-only — bulk approval only ever makes sense for the admin queue (KYB, compliance,
+// PLD, legal escalation); a self-service user only ever has at most one or two pending
+// actions of their own, never a queue worth batching. Each id gets the exact same
+// single-action path (and its own audit_log entry via decidePendingAction/executeApprovedTool)
+// — this is a UI-level convenience for "approve these N obviously-clean rows", not a new
+// execution path.
+agentsRouter.post(
+  '/pending/approve-bulk',
+  requireRole('admin'),
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = bulkApproveSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
-    const run = getAgentRun(pending.run_id);
-    const admin = isAdmin(req.user!.role);
-    if (!admin) {
-      const tool = def.tools.find((t) => t.name === pending.tool_name);
-      const isOwn = !!run && run.user_id === req.user!.id;
-      if (!isOwn || !tool?.selfApprovable) {
-        res.status(403).json({ error: 'forbidden', message: 'Apenas um admin pode decidir esta ação.' });
-        return;
-      }
-    } else if (pending.approvals_required > 1) {
-      // Dual approval: self-service never reaches here (isOwn/selfApprovable is checked
-      // above and executes immediately without this branch) — this only applies to an
-      // admin approving a high-value action. Record this admin's vote; only execute once
-      // enough distinct admins have approved.
-      const recorded = recordApproval(id, req.user!.id);
-      if (!recorded) {
-        res.status(409).json({ error: 'already_approved_by_you' });
-        return;
-      }
-      const approvalsSoFar = countApprovals(id);
-      if (approvalsSoFar < pending.approvals_required) {
-        res.json({ ok: true, waitingForMoreApprovals: true, approvalsSoFar, approvalsRequired: pending.approvals_required });
-        return;
-      }
+    const results: { id: number; ok: boolean; error?: string }[] = [];
+    for (const id of parsed.data.ids) {
+      const outcome = await approveOnePendingAction(id, req.user!.id, req.user!.role);
+      results.push({ id, ok: outcome.httpStatus === 200 && 'ok' in outcome.body && outcome.body.ok === true, error: 'error' in outcome.body ? outcome.body.error : undefined });
     }
-    try {
-      const input = JSON.parse(pending.input);
-      const output = await executeApprovedTool(def, pending.tool_name, input, { runId: pending.run_id, userId: run?.user_id ?? req.user!.id });
-      decidePendingAction(id, 'aprovada', req.user!.id, { ok: true, output });
-      res.json({ ok: true, output });
-    } catch (err) {
-      decidePendingAction(id, 'aprovada', req.user!.id, { ok: false, error: String(err) });
-      res.status(500).json({ error: 'execution_failed', message: String(err) });
-    }
+    res.json({ total: results.length, sucesso: results.filter((r) => r.ok).length, resultados: results });
   })
 );
 
