@@ -107,6 +107,19 @@ CREATE TABLE IF NOT EXISTS webhooks (
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_webhooks_user_event ON webhooks(user_id, event);
 `,
+  // 0045 and 0046 both widen a CHECK constraint the same way 0006 above already does — SQLite
+  // needs the whole-table-rebuild dance (see the migration's own comment), Postgres just
+  // drops and re-adds the named constraint. These two were hand-written directly into
+  // migrations-postgres/ when they were added and never registered here, which meant running
+  // this generator would silently regenerate them back to the uglier, auto-translated
+  // table-rebuild port instead of leaving the correct native version alone — a real bug this
+  // comment exists to prevent from recurring for the next constraint-widening migration.
+  '0045_auditor_role.sql': `ALTER TABLE users DROP CONSTRAINT users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('investidor','cedente','sacado','admin','seguradora','auditor'));
+`,
+  '0046_bank_statement_reconciliation.sql': `ALTER TABLE reconciliation_flags DROP CONSTRAINT reconciliation_flags_tipo_check;
+ALTER TABLE reconciliation_flags ADD CONSTRAINT reconciliation_flags_tipo_check CHECK (tipo IN ('pix', 'boleto', 'ted', 'extrato_bancario'));
+`,
 };
 
 const files = readdirSync(srcDir).filter((f) => f.endsWith('.sql')).sort();
