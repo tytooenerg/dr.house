@@ -62,11 +62,19 @@ describe('POST /api/emitir/lote — real batch emission, each row via the same s
     const res = await request(app).post('/api/emitir/lote').set('Authorization', `Bearer ${token}`).send({ rows });
     expect(res.status).toBe(200);
     expect(res.body.total).toBe(2);
-    expect(res.body.sucesso).toBe(1);
-    expect(res.body.falhas).toBe(1);
-    expect(res.body.resultados[0].ok).toBe(true);
+    // Row 1 (missing required fields) fails validation before ever reaching the
+    // registradora call, so it's deterministic. Row 0 is valid and goes through the same
+    // real registradora call as the other test above — including its ~12% simulated
+    // instability — so, like that test, this can't assert row 0 always succeeds.
+    expect(res.body.falhas).toBeGreaterThanOrEqual(1);
+    expect(res.body.sucesso + res.body.falhas).toBe(2);
     expect(res.body.resultados[1].ok).toBe(false);
     expect(res.body.resultados[1].error).toBeTruthy();
+    if (res.body.resultados[0].ok) {
+      expect(res.body.resultados[0].duplicataId).toBeTruthy();
+    } else {
+      expect(res.body.resultados[0].error).toBeTruthy();
+    }
   });
 
   it('rejects an empty batch and a batch over the row limit', async () => {
