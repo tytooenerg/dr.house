@@ -79,11 +79,11 @@ describe('agentic AI layer — self-service scoping (cedente/investidor)', () =>
     return { token: reg.body.token as string, userId: reg.body.user.id as number, email };
   }
 
-  it('only exposes the agent(s) allowed for that role, never the full 11', async () => {
+  it('only exposes the agent(s) allowed for that role, never the full 12', async () => {
     const { token } = await registerAndLogin('cedente');
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.agents.map((a: { id: string }) => a.id)).toEqual(['emissao']);
+    expect(res.body.agents.map((a: { id: string }) => a.id).sort()).toEqual(['emissao', 'suporte']);
 
     const inv = await registerAndLogin('investidor');
     const res2 = await request(app).get('/api/agents').set('Authorization', `Bearer ${inv.token}`);
