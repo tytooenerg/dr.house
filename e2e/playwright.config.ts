@@ -34,6 +34,14 @@ export default defineConfig({
       PORT: '4000',
       // The client is served by this same process here, so its own origin must be allowed.
       CORS_ORIGINS: 'http://localhost:4000',
+      // The "produção real" pass (db/seed.ts) made seedIfEmpty() refuse to create the
+      // publicly-documented demo accounts under NODE_ENV=production unless explicitly opted
+      // into via this exact flag — the documented escape hatch for "a non-production
+      // environment that happens to set NODE_ENV=production" is precisely what this webServer
+      // is. Without this, admin@lastro.demo/investidor@lastro.demo/etc. never get created and
+      // every spec here that logs into a demo account (login/marketplace/billing/seguradora)
+      // fails at the login step, not at whatever it's actually meant to test.
+      SEED_DEMO_DATA: 'true',
     },
   },
 });

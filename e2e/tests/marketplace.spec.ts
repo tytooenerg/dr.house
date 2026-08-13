@@ -23,3 +23,14 @@ test('investidor can browse the live marketplace and buy an offer', async ({ pag
 
   await expect(page.getByRole('button', { name: 'Comprada' }).first()).toBeVisible({ timeout: 10_000 });
 });
+
+test('investidor opens funding-matching explainability ("Por que essa oferta?") on a live offer', async ({ page }) => {
+  await loginAsInvestidor(page);
+  await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('Atualizações ao vivo')).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole('button', { name: 'Por que essa oferta?' }).first().click();
+  await expect(page.getByText('Por que essa oferta tem esse preço')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Score de risco do sacado')).toBeVisible();
+  await expect(page.getByText(/Condição de mercado/)).toBeVisible();
+});
