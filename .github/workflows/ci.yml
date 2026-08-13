@@ -4,6 +4,16 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Catches the kind of drift that only shows up because real time passed, not because any
+  # code changed — e.g. the seed data's vencimento dates silently going stale once the
+  # wall clock caught up to them (fixed in db/data/seed.ts, see the "o que podemos
+  # melhorar" README section), which no push/pull_request run could ever have caught since
+  # nothing was pushed the day it broke. A scheduled run against main every night, with
+  # GitHub's own default failure-email-to-watchers behavior, means that class of bug gets
+  # caught by CI itself instead of by whoever next happens to run the suite by hand.
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
 
 jobs:
   build-and-test:
