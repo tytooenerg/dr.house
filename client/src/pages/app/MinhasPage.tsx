@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
+import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 
 interface Duplicata {
@@ -37,6 +38,14 @@ export function MinhasPage() {
   return (
     <div>
       <PageHeader title={t('minhas.title', 'Minhas Duplicatas')} subtitle={t('minhas.subtitle', 'Cadastre e acompanhe suas duplicatas enviadas ao mercado')} />
+
+      <div className="mb-6">
+        <SelfServiceAgentCard
+          agentId="suporte"
+          title="Pergunte à IA sobre uma duplicata ou aceite"
+          placeholder="Ex: qual o status do aceite da duplicata dup_9f2a? Pode reenviar o lembrete pro sacado?"
+        />
+      </div>
 
       <div className="border-2 border-dashed border-[#C7D0DE] rounded-card p-9 text-center bg-white mb-6">
         <div className="w-11 h-11 rounded-[10px] border-2 border-blue mx-auto mb-3.5 flex items-center justify-center relative">
