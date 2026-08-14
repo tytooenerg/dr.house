@@ -131,10 +131,17 @@ export function effectiveOwnerId(user: UserRow): number {
 }
 
 export function getSettings(user: UserRow): UserSettings {
+  const defaults = defaultSettings();
   try {
-    return { ...defaultSettings(), ...JSON.parse(user.settings) };
+    const stored = JSON.parse(user.settings);
+    // notifPrefs merges one level deeper than the rest of settings — a top-level spread
+    // alone would let an account whose stored notifPrefs predates a newly added key (e.g.
+    // `digest`, added after this account's settings were first saved) silently come back
+    // as `undefined` instead of that key's real default, since the stored nested object
+    // would otherwise replace the default one wholesale rather than fill the gap in it.
+    return { ...defaults, ...stored, notifPrefs: { ...defaults.notifPrefs, ...stored.notifPrefs } };
   } catch {
-    return defaultSettings();
+    return defaults;
   }
 }
 

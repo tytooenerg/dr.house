@@ -9,7 +9,7 @@ import { useSession } from '../../state/SessionContext';
 
 interface ProfileData {
   profileForm: { nome: string; email: string; telefone: string };
-  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean };
+  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean; digest: boolean };
   notifyViaWhatsapp: boolean;
   whatsappEnabled: boolean;
   teamMembers: { id: number; nome: string; email: string; papel: string; status: 'pending' | 'active' | 'revoked' }[];
@@ -59,8 +59,17 @@ const NOTIF_ROWS: { key: keyof ProfileData['notifPrefs']; label: string; hint: s
   { key: 'marketing', label: 'Novidades e produto', hint: 'Comunicados de marketing' },
 ];
 
+// Only means anything for an admin account (the back-office's own Resumo diário —
+// lib/dailyBriefing.ts) — kept out of NOTIF_ROWS so a cedente/investidor/sacado never
+// sees a toggle for an email they could never receive in the first place.
+const DIGEST_ROW: { key: keyof ProfileData['notifPrefs']; label: string; hint: string } = {
+  key: 'digest',
+  label: 'Resumo diário do back-office',
+  hint: 'KYB, disputas, compliance e outras filas pendentes, uma vez por dia',
+};
+
 export function PerfilPage() {
-  const { logout } = useSession();
+  const { logout, user } = useSession();
   const [data, setData] = useState<ProfileData | null>(null);
   const [saved, setSaved] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -275,7 +284,7 @@ export function PerfilPage() {
         <Card>
           <div className="font-bold text-[15px] mb-4">Preferências de notificação</div>
           <div className="flex flex-col gap-4">
-            {NOTIF_ROWS.map((row) => (
+            {(user?.role === 'admin' ? [...NOTIF_ROWS, DIGEST_ROW] : NOTIF_ROWS).map((row) => (
               <div key={row.key} className="flex items-center justify-between">
                 <div>
                   <div className="font-semibold text-[13.5px]">{row.label}</div>

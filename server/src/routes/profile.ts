@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
-import { getSettings, updateProfile, updateSettings } from '../db/users.js';
+import { getSettings, getUserById, updateProfile, updateSettings } from '../db/users.js';
 import { inviteTeamMember, listTeam, revokeTeamMember } from '../db/misc.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { twilioEnabled } from '../lib/smsNotifier.js';
@@ -52,7 +52,7 @@ profileRouter.post(
   })
 );
 
-const notifPrefSchema = z.object({ key: z.enum(['leilao', 'aceite', 'disputa', 'marketing']) });
+const notifPrefSchema = z.object({ key: z.enum(['leilao', 'aceite', 'disputa', 'marketing', 'digest']) });
 
 profileRouter.post('/notif-pref', (req, res) => {
   const parsed = notifPrefSchema.safeParse(req.body);
@@ -62,13 +62,17 @@ profileRouter.post('/notif-pref', (req, res) => {
   }
   const settings = getSettings(req.user!);
   updateSettings(req.user!.id, { notifPrefs: { ...settings.notifPrefs, [parsed.data.key]: !settings.notifPrefs[parsed.data.key] } });
-  res.json(payload(req));
+  // req.user! was read once at the top of the request pipeline (requireAuth), before the
+  // write above — building the response from it would echo back the pre-toggle value
+  // instead of the one that was just saved. Re-read the row so the response (and the
+  // client state PerfilPage.tsx sets directly from it) reflects what's actually on disk.
+  res.json(payloadForUser(getUserById(req.user!.id)!));
 });
 
 profileRouter.post('/notify-whatsapp-toggle', (req, res) => {
   const settings = getSettings(req.user!);
   updateSettings(req.user!.id, { notifyViaWhatsapp: !settings.notifyViaWhatsapp });
-  res.json(payload(req));
+  res.json(payloadForUser(getUserById(req.user!.id)!));
 });
 
 const inviteSchema = z.object({ nome: z.string().trim().min(2), email: z.string().trim().email() });

@@ -5,7 +5,10 @@ export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' 
 
 export interface UserSettings {
   onboardingSeen: boolean;
-  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean };
+  // digest only means anything for an admin account (Resumo diário do back-office —
+  // lib/dailyBriefing.ts) but lives on the same shared shape every role's notifPrefs
+  // already uses, same as marketing being irrelevant-but-present for every role.
+  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean; digest: boolean };
   // WhatsApp/SMS is opt-in and separate from email prefs — a real deployment pays per
   // message (Twilio), so it shouldn't default to on the way free email notifications do.
   notifyViaWhatsapp: boolean;
@@ -47,7 +50,7 @@ export interface UserSettings {
 export function defaultSettings(): UserSettings {
   return {
     onboardingSeen: false,
-    notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false },
+    notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false, digest: true },
     notifyViaWhatsapp: false,
     autoBidEnabled: false,
     autoBidRules: { scoreMin: 'A', taxaMax: '2.5', exposicaoSacado: '150.000', exposicaoMensal: '2.000.000' },
