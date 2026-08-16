@@ -35,6 +35,7 @@ import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordReco
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
 import { runBackup, listBackups, backupEnabled } from '../lib/backup.js';
 import { listPendingTedDeposits, getTedDeposit, concludeTedDeposit } from '../db/ted.js';
+import { listPendingStablecoinDeposits, getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
 import {
   listSuspiciousActivityReports,
   getSuspiciousActivityReport,
@@ -797,6 +798,45 @@ adminRouter.post('/ted/:referencia/confirmar', (req, res) => {
   concludeTedDeposit(deposito.referencia, req.user!.id);
   addLedgerEntry(deposito.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via TED confirmado (ref. ${deposito.referencia})`, deposito.valor);
   recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.ted_confirmado', { referencia: deposito.referencia, valor: deposito.valor });
+  res.json({ ok: true });
+});
+
+// Same reasoning as TED above (lib/stablecoinRail.ts): no self-service confirmation —
+// an admin matches each pending reference against the real chain explorer (or the
+// custodial/VASP provider's own dashboard) by hand, optionally recording the tx hash.
+adminRouter.get('/stablecoin/pendentes', (_req, res) => {
+  const pendentes = listPendingStablecoinDeposits().map((s) => ({
+    referencia: s.referencia,
+    empresa: s.company_name,
+    valorFmt: fmtBRL(s.valor),
+    asset: s.asset,
+    network: s.network,
+    endereco: s.endereco,
+    quando: fmtRelative(s.created_at),
+  }));
+  res.json({ pendentes });
+});
+
+const confirmStablecoinSchema = z.object({ txHash: z.string().trim().max(120).optional() });
+
+adminRouter.post('/stablecoin/:referencia/confirmar', (req, res) => {
+  const deposito = getStablecoinDeposit(req.params.referencia);
+  if (!deposito) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  if (deposito.status !== 'ativo') {
+    res.status(409).json({ error: 'already_settled' });
+    return;
+  }
+  const parsed = confirmStablecoinSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  concludeStablecoinDeposit(deposito.referencia, req.user!.id, parsed.data.txHash ?? null);
+  addLedgerEntry(deposito.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via ${deposito.asset} confirmado (ref. ${deposito.referencia})`, deposito.valor);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.stablecoin_confirmado', { referencia: deposito.referencia, valor: deposito.valor, txHash: parsed.data.txHash ?? null });
   res.json({ ok: true });
 });
 

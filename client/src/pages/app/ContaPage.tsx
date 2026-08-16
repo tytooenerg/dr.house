@@ -51,6 +51,15 @@ interface TedContaBancaria {
   titularNome: string;
   titularCnpj: string;
 }
+interface StablecoinDeposit {
+  referencia: string;
+  valorFmt: string;
+  status: 'ativo' | 'recebido' | 'expirado';
+  simulado: boolean;
+  asset: string;
+  network: string;
+  endereco: string;
+}
 interface AccountData {
   kycChecklist: KycItem[];
   bankAccountDisplay: string;
@@ -64,6 +73,12 @@ interface AccountData {
   tedInstructionsAvailable: boolean;
   tedContaBancaria: TedContaBancaria | null;
   tedDeposits: TedDeposit[];
+  stablecoinEnabled: boolean;
+  stablecoinInstructionsAvailable: boolean;
+  stablecoinAsset: string;
+  stablecoinNetwork: string;
+  stablecoinWalletEndereco: string | null;
+  stablecoinDeposits: StablecoinDeposit[];
   settlementSpeed: 'd0' | 'd1';
   extrato: ExtratoRow[];
 }
@@ -77,6 +92,9 @@ export function ContaPage() {
   const [tedDepositValor, setTedDepositValor] = useState('');
   const [tedWithdrawValor, setTedWithdrawValor] = useState('');
   const [tedContaForm, setTedContaForm] = useState<TedContaBancaria>({ banco: '', agencia: '', conta: '', tipoConta: 'corrente', titularNome: '', titularCnpj: '' });
+  const [stablecoinDepositValor, setStablecoinDepositValor] = useState('');
+  const [stablecoinWithdrawValor, setStablecoinWithdrawValor] = useState('');
+  const [stablecoinWalletInput, setStablecoinWalletInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -232,6 +250,53 @@ export function ContaPage() {
       setData(d);
       setTedWithdrawValor('');
       setNotice('Saque solicitado via TED.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const gerarDepositoStablecoin = async () => {
+    const valor = Number(stablecoinDepositValor.replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setBusy(true);
+    try {
+      const res = await api.post<AccountData & { instrucao: { simulado: boolean; asset: string; network: string; endereco: string; referencia: string } }>(
+        '/account/deposit/stablecoin',
+        { valor }
+      );
+      setData(res);
+      setStablecoinDepositValor('');
+      setNotice(
+        res.instrucao.simulado
+          ? 'Endereço de depósito gerado em modo simulado — configure STABLECOIN_PSP_* ou LASTRO_STABLECOIN_WALLET_ADDRESS para exibir um endereço real.'
+          : `Envie ${res.instrucao.asset} (rede ${res.instrucao.network}) para ${res.instrucao.endereco}, referência ${res.instrucao.referencia} — a confirmação não é automática sem um custodiante configurado, aguarde nossa equipe validar o recebimento na blockchain.`
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveWalletStablecoin = async () => {
+    if (!stablecoinWalletInput.trim()) return;
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>('/account/kyc/wallet-stablecoin', { endereco: stablecoinWalletInput.trim() });
+      setData(d);
+      setStablecoinWalletInput('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sacarStablecoin = async () => {
+    const valor = Number(stablecoinWithdrawValor.replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setBusy(true);
+    try {
+      const d = await api.post<AccountData>('/account/withdraw/stablecoin', { valor });
+      setData(d);
+      setStablecoinWithdrawValor('');
+      setNotice(`Saque solicitado via ${data.stablecoinAsset}.`);
     } finally {
       setBusy(false);
     }
@@ -526,6 +591,81 @@ export function ContaPage() {
                   className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
                 />
                 <Button variant="primary" disabled={busy || !tedWithdrawValor} onClick={sacarTed}>
+                  Sacar
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-bold text-[15px]">Depositar via {data.stablecoinAsset}</div>
+            <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
+          </div>
+          <div className="text-[12px] text-textSecondary mb-3">
+            {data.stablecoinEnabled
+              ? `Endereço de depósito dedicado gerado via custodiante real — confirmação automática por webhook. Rede ${data.stablecoinNetwork}.`
+              : data.stablecoinInstructionsAvailable
+              ? `Envio para a carteira real da Lastro (rede ${data.stablecoinNetwork}) — confirmação manual pelo nosso time após validar a transação na blockchain (não é instantânea).`
+              : `Modo simulado — nenhum provedor real configurado (STABLECOIN_PSP_* ou LASTRO_STABLECOIN_WALLET_ADDRESS). Endereço abaixo é fictício.`}
+          </div>
+          <div className="flex gap-2 mb-4">
+            <input
+              value={stablecoinDepositValor}
+              onChange={(e) => setStablecoinDepositValor(e.target.value)}
+              placeholder="Valor (R$)"
+              inputMode="decimal"
+              className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+            />
+            <Button variant="primary" disabled={busy || !stablecoinDepositValor} onClick={gerarDepositoStablecoin}>
+              Gerar endereço
+            </Button>
+          </div>
+          {data.stablecoinDeposits
+            .filter((s) => s.status === 'ativo')
+            .map((s) => (
+              <div key={s.referencia} className="p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+                <div className="font-semibold">{s.valorFmt}</div>
+                <div className="break-all text-textSecondary">
+                  {s.asset} ({s.network}): {s.endereco}
+                </div>
+                <div className="text-textTertiary text-[11px] mt-1">Ref. {s.referencia} · aguardando confirmação{s.simulado ? ' (simulado)' : ''}</div>
+              </div>
+            ))}
+        </Card>
+
+        <Card>
+          <div className="font-bold text-[15px] mb-4">Sacar via {data.stablecoinAsset}</div>
+          {!data.stablecoinWalletEndereco ? (
+            <div className="flex gap-2">
+              <input
+                value={stablecoinWalletInput}
+                onChange={(e) => setStablecoinWalletInput(e.target.value)}
+                placeholder={`Endereço da carteira (rede ${data.stablecoinNetwork})`}
+                className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+              />
+              <Button variant="primary" disabled={busy || !stablecoinWalletInput.trim()} onClick={saveWalletStablecoin}>
+                Salvar
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="break-all text-[12.5px] text-textSecondary mb-3">
+                Enviado para {data.stablecoinWalletEndereco}
+                {!data.stablecoinEnabled && ' (simulado)'}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={stablecoinWithdrawValor}
+                  onChange={(e) => setStablecoinWithdrawValor(e.target.value)}
+                  placeholder="Valor (R$)"
+                  inputMode="decimal"
+                  className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
+                />
+                <Button variant="primary" disabled={busy || !stablecoinWithdrawValor} onClick={sacarStablecoin}>
                   Sacar
                 </Button>
               </div>

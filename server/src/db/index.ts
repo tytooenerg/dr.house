@@ -83,6 +83,8 @@ export function resetDbForTests() {
     DELETE FROM regulatory_notes;
     DELETE FROM sacado_network_signals;
     DELETE FROM sanctions_watchlist_demo;
+    DELETE FROM stablecoin_deposits;
+    DELETE FROM stablecoin_payouts;
     DELETE FROM suitability_assessments;
     DELETE FROM suspicious_activity_reports;
     DELETE FROM system_health_checks;

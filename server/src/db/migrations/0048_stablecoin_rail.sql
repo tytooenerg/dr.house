@@ -1,0 +1,36 @@
+-- Real stablecoin settlement rail (lib/stablecoinRail.ts) — a fourth deposit/withdraw
+-- method alongside Pix, boleto and TED. Modeled on ted_deposits/ted_payouts
+-- (0024_ted_rail.sql), not pix_charges/boletos: like TED, there is no self-service
+-- "confirm (simulado)" flow — reconciliation is always either a real custodial/VASP
+-- provider's webhook (STABLECOIN_PSP_*) or an admin manually matching an on-chain
+-- explorer (confirmed_by_admin_id), never the depositing user self-attesting receipt.
+CREATE TABLE IF NOT EXISTS stablecoin_deposits (
+  referencia TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  valor REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK(status IN ('ativo', 'recebido', 'expirado')),
+  simulado INTEGER NOT NULL DEFAULT 1,
+  asset TEXT NOT NULL,
+  network TEXT NOT NULL,
+  endereco TEXT NOT NULL,
+  tx_hash TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  confirmed_at TEXT,
+  confirmed_by_admin_id INTEGER REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_stablecoin_deposits_user ON stablecoin_deposits(user_id);
+CREATE INDEX IF NOT EXISTS idx_stablecoin_deposits_status ON stablecoin_deposits(status);
+
+CREATE TABLE IF NOT EXISTS stablecoin_payouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  valor REAL NOT NULL,
+  asset TEXT NOT NULL,
+  network TEXT NOT NULL,
+  endereco TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'concluido' CHECK(status IN ('concluido', 'falhou')),
+  simulado INTEGER NOT NULL DEFAULT 1,
+  tx_hash TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_stablecoin_payouts_user ON stablecoin_payouts(user_id);

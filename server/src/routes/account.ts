@@ -19,6 +19,8 @@ import { boletoEnabled, emitirBoleto } from '../lib/boletoRail.js';
 import { createBoleto, getBoleto, concludeBoleto, listBoletosByUser } from '../db/boletos.js';
 import { tedEnabled, lastroStaticAccountConfigured, emitirInstrucaoTed, enviarTed } from '../lib/tedRail.js';
 import { createTedDeposit, listTedDepositsByUser, recordTedPayout } from '../db/ted.js';
+import { stablecoinEnabled, lastroStaticWalletConfigured, stablecoinAsset, stablecoinNetwork, emitirInstrucaoStablecoin, enviarStablecoin } from '../lib/stablecoinRail.js';
+import { createStablecoinDeposit, listStablecoinDepositsByUser, recordStablecoinPayout } from '../db/stablecoin.js';
 import { randomUUID } from 'node:crypto';
 
 export const accountRouter = Router();
@@ -100,6 +102,22 @@ function payload(req: import('express').Request) {
         agencia: t.agencia,
         conta: t.conta,
         favorecidoNome: t.favorecido_nome,
+      })),
+    stablecoinEnabled,
+    stablecoinInstructionsAvailable: stablecoinEnabled || lastroStaticWalletConfigured,
+    stablecoinAsset,
+    stablecoinNetwork,
+    stablecoinWalletEndereco: settings.stablecoinWalletEndereco,
+    stablecoinDeposits: listStablecoinDepositsByUser(req.user!.id)
+      .slice(0, 10)
+      .map((s) => ({
+        referencia: s.referencia,
+        valorFmt: fmtBRL(s.valor),
+        status: s.status,
+        simulado: !!s.simulado,
+        asset: s.asset,
+        network: s.network,
+        endereco: s.endereco,
       })),
     settlementSpeed: settings.settlementSpeed,
     extrato: extratoView(req.user!.id),
@@ -368,6 +386,91 @@ accountRouter.post(
       req.user!.id,
       new Date().toLocaleDateString('pt-BR'),
       `Saque via TED para ${conta.banco} ag. ${conta.agencia}${payout.simulado ? ' (simulado)' : ''}`,
+      -parsed.data.valor
+    );
+    res.json(payload(req));
+  })
+);
+
+// Real stablecoin rail (lib/stablecoinRail.ts) — a fourth deposit/withdraw method,
+// modeled on TED rather than Pix/boleto: no self-service "confirm (simulado)" flow, since
+// a user self-attesting an on-chain transfer landed can't be trusted any more than a user
+// self-attesting a TED did. Reconciliation is either a real custodial/VASP webhook
+// (POST /public/stablecoin-webhook) or an admin matching the chain explorer by hand
+// (POST /admin/stablecoin/:referencia/confirmar).
+const depositStablecoinSchema = z.object({ valor: z.number().positive().max(10_000_000) });
+
+accountRouter.post(
+  '/deposit/stablecoin',
+  asyncHandler(async (req, res) => {
+    const parsed = depositStablecoinSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const referencia = `SC${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
+    const instrucao = await emitirInstrucaoStablecoin({ referencia, valor: parsed.data.valor });
+    createStablecoinDeposit({
+      referencia: instrucao.referencia,
+      userId: req.user!.id,
+      valor: parsed.data.valor,
+      simulado: instrucao.simulado,
+      asset: instrucao.asset,
+      network: instrucao.network,
+      endereco: instrucao.endereco,
+    });
+    res.json({ instrucao, ...payload(req) });
+  })
+);
+
+const stablecoinWalletSchema = z.object({ endereco: z.string().trim().min(10).max(120) });
+
+accountRouter.post('/kyc/wallet-stablecoin', (req, res) => {
+  const parsed = stablecoinWalletSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  req.user!.settings = JSON.stringify(updateSettings(req.user!.id, { stablecoinWalletEndereco: parsed.data.endereco }));
+  res.json(payload(req));
+});
+
+accountRouter.post(
+  '/withdraw/stablecoin',
+  asyncHandler(async (req, res) => {
+    const parsed = withdrawSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const settings = getSettings(req.user!);
+    if (!settings.stablecoinWalletEndereco) {
+      res.status(409).json({ error: 'no_stablecoin_wallet', message: 'Cadastre um endereço de carteira antes de sacar.' });
+      return;
+    }
+    const disponivel = saldoDisponivel(req.user!.id);
+    if (parsed.data.valor > disponivel) {
+      res.status(409).json({ error: 'insufficient_balance', message: `Saldo disponível: ${fmtBRL(disponivel)}` });
+      return;
+    }
+    const payout = await enviarStablecoin({
+      enderecoDestino: settings.stablecoinWalletEndereco,
+      valor: parsed.data.valor,
+      descricao: `Saque Lastro — ${req.user!.company_name}`,
+    });
+    recordStablecoinPayout({
+      userId: req.user!.id,
+      valor: parsed.data.valor,
+      asset: stablecoinAsset,
+      network: stablecoinNetwork,
+      endereco: settings.stablecoinWalletEndereco,
+      simulado: payout.simulado,
+      txHash: payout.txHash,
+    });
+    addLedgerEntry(
+      req.user!.id,
+      new Date().toLocaleDateString('pt-BR'),
+      `Saque via ${stablecoinAsset} para ${settings.stablecoinWalletEndereco}${payout.simulado ? ' (simulado)' : ''}`,
       -parsed.data.valor
     );
     res.json(payload(req));

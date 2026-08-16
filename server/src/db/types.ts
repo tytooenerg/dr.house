@@ -33,6 +33,11 @@ export interface UserSettings {
   // Destination bank account for TED withdrawals — a separate field from pixChave
   // because TED needs full banking coordinates (banco/agência/conta), not a Pix key.
   tedContaBancaria: { banco: string; agencia: string; conta: string; tipoConta: 'corrente' | 'poupanca'; titularNome: string; titularCnpj: string } | null;
+  // Destination wallet address for stablecoin withdrawals — same role as pixChave/
+  // tedContaBancaria but for lib/stablecoinRail.ts. Only the address is stored; asset
+  // and network are a platform-wide choice (STABLECOIN_ASSET/STABLECOIN_NETWORK), not
+  // per-user, since Lastro settles in one stablecoin/network combination at a time.
+  stablecoinWalletEndereco: string | null;
   kycDocsUploaded: boolean;
   kycDocsRejected: boolean;
   kycDocsAttempts: number;
@@ -68,6 +73,7 @@ export function defaultSettings(): UserSettings {
     kycBankConnected: false,
     pixChave: null,
     tedContaBancaria: null,
+    stablecoinWalletEndereco: null,
     kycDocsUploaded: false,
     kycDocsRejected: false,
     kycDocsAttempts: 0,

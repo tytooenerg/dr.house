@@ -11,6 +11,8 @@ import { parseWebhookBoletoPago } from '../lib/boletoRail.js';
 import { getBoleto, concludeBoleto } from '../db/boletos.js';
 import { parseWebhookTedRecebido } from '../lib/tedRail.js';
 import { getTedDeposit, concludeTedDeposit } from '../db/ted.js';
+import { parseWebhookStablecoinRecebido } from '../lib/stablecoinRail.js';
+import { getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
@@ -21,7 +23,7 @@ import { isFeatureEnabled } from '../lib/featureFlags.js';
 // (a partner's own site, an anonymous visitor) so none of them require login.
 export const publicRouter = Router();
 
-// Rate limiter shared by the three payment-rail webhook targets below. Their real
+// Rate limiter shared by the four payment-rail webhook targets below. Their real
 // anti-spoofing story is mTLS/IP-allowlisting at the PSP/infra level (see each route's own
 // comment) plus the fact that txid/nossoNumero/referencia are all crypto.randomUUID()-grade
 // unguessable — but neither of those is a reason to leave an unauthenticated POST endpoint
@@ -79,6 +81,22 @@ publicRouter.post('/ted-webhook', paymentWebhookLimiter, (req, res) => {
     concludeTedDeposit(deposito.referencia, null);
     addLedgerEntry(deposito.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via TED confirmado — ${fmtBRL(deposito.valor)}`, deposito.valor);
     logger.info({ referencia: deposito.referencia, userId: deposito.user_id }, '[ted] depósito confirmado via webhook');
+  }
+  res.status(200).json({ received: recebidos.length });
+});
+
+// Real custodial/VASP webhook target for "stablecoin recebido" notifications, only ever
+// called by a STABLECOIN_PSP_*-configured provider (lib/stablecoinRail.ts) — the static-
+// wallet path is always confirmed by an admin instead (POST
+// /admin/stablecoin/:referencia/confirmar), never here.
+publicRouter.post('/stablecoin-webhook', paymentWebhookLimiter, (req, res) => {
+  const recebidos = parseWebhookStablecoinRecebido(req.body);
+  for (const r of recebidos) {
+    const deposito = getStablecoinDeposit(r.referencia);
+    if (!deposito || deposito.status !== 'ativo') continue;
+    concludeStablecoinDeposit(deposito.referencia, null, r.txHash);
+    addLedgerEntry(deposito.user_id, new Date().toLocaleDateString('pt-BR'), `Depósito via ${deposito.asset} confirmado — ${fmtBRL(deposito.valor)}`, deposito.valor);
+    logger.info({ referencia: deposito.referencia, userId: deposito.user_id }, '[stablecoin] depósito confirmado via webhook');
   }
   res.status(200).json({ received: recebidos.length });
 });
