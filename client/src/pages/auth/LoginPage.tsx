@@ -22,11 +22,12 @@ const SAML_ERROR_LABELS: Record<string, string> = {
   falha_saml: 'Não foi possível confirmar sua identidade com o provedor de SSO — tente novamente.',
 };
 
-export const ROLES: { key: Role; title: string; desc: string; shape: 'circle' | 'square' | 'diamond' | 'triangle' }[] = [
+export const ROLES: { key: Role; title: string; desc: string; shape: 'circle' | 'square' | 'diamond' | 'triangle' | 'hex' }[] = [
   { key: 'investidor', title: 'Investidor / Financiador', desc: 'Comprar duplicatas, gerir carteira e risco', shape: 'circle' },
   { key: 'cedente', title: 'Empresa (cedente)', desc: 'Emitir e antecipar suas duplicatas', shape: 'square' },
   { key: 'sacado', title: 'Empresa (sacado)', desc: 'Confirmar ou contestar duplicatas recebidas', shape: 'diamond' },
   { key: 'seguradora', title: 'Seguradora parceira', desc: 'Acompanhar apólices e decidir sinistros', shape: 'triangle' },
+  { key: 'api_partner', title: 'Só quero a API', desc: 'Score API e PLD Screening API, sem passar pelo marketplace', shape: 'hex' },
 ];
 
 // Mirrors server/src/data/seed.ts INSURERS — needed here because registration happens
@@ -37,9 +38,12 @@ export const INSURER_OPTIONS = [
   { key: 'junto', name: 'Junto Seguros' },
 ];
 
-export function RoleShape({ shape }: { shape: 'circle' | 'square' | 'diamond' | 'triangle' }) {
+export function RoleShape({ shape }: { shape: 'circle' | 'square' | 'diamond' | 'triangle' | 'hex' }) {
   if (shape === 'triangle') {
     return <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '11px solid #1E5EFF' }} />;
+  }
+  if (shape === 'hex') {
+    return <div style={{ width: 13, height: 13, background: '#1E5EFF', clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' }} />;
   }
   const style: React.CSSProperties = { width: 12, height: 12, border: '2px solid #1E5EFF' };
   if (shape === 'circle') style.borderRadius = '50%';
@@ -50,7 +54,8 @@ export function RoleShape({ shape }: { shape: 'circle' | 'square' | 'diamond' | 
 export function LoginPage() {
   const { user, loading, login, verifyTwoFactor, register, authError } = useSession();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const initialParams = new URLSearchParams(window.location.search);
+  const [mode, setMode] = useState<'login' | 'register'>(initialParams.get('mode') === 'register' ? 'register' : 'login');
   const [submitting, setSubmitting] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState('');
@@ -62,12 +67,22 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [role, setRole] = useState<Role | null>(null);
+  // Deep-link support (?mode=register&role=api_partner) — used by the Score/PLD API
+  // marketing sections (PrecosPage/DevelopersPage) so "Quero só a API" lands directly on
+  // the right pre-selected registration option instead of a generic /login.
+  const initialRole = ROLES.some((r) => r.key === initialParams.get('role')) ? (initialParams.get('role') as Role) : null;
+  const [role, setRole] = useState<Role | null>(initialRole);
   const [insurerKey, setInsurerKey] = useState<string | null>(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [samlEnabled, setSamlEnabled] = useState(false);
   const [samlError, setSamlError] = useState<string | null>(null);
+  // White-label com domínio próprio (server/src/routes/public.ts GET /brand) — resolvido
+  // pelo Host real do request, então funciona sem login: um visitante que chega pelo
+  // domínio de um parceiro Empresarial (White-label Plus) vê a marca dele já na tela de
+  // login. { brand: null } é a resposta normal (não um erro) para todo domínio padrão da
+  // Lastro — a maioria das visitas nunca vai bater num domínio com marca configurada.
+  const [brand, setBrand] = useState<{ nome: string; corPrimaria: string; logoUrl: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -87,6 +102,16 @@ export function LoginPage() {
     api.get<{ enabled: boolean }>('/auth/saml/config').then((d) => setSamlEnabled(d.enabled)).catch(() => setSamlEnabled(false));
     const code = new URLSearchParams(window.location.search).get('samlError');
     if (code) setSamlError(SAML_ERROR_LABELS[code] || 'Não foi possível entrar com o SSO corporativo.');
+  }, []);
+
+  useEffect(() => {
+    api
+      .get<{ brand: { nome: string; corPrimaria: string; logoUrl: string } | null }>('/public/brand')
+      .then((d) => {
+        setBrand(d.brand);
+        if (d.brand?.nome) document.title = d.brand.nome;
+      })
+      .catch(() => setBrand(null));
   }, []);
 
   const continueWithGoogle = () => {
@@ -155,7 +180,14 @@ export function LoginPage() {
       <div className="w-full min-h-screen flex items-center justify-center bg-bg p-6">
         <div className="w-full max-w-[420px] bg-white border border-border rounded-2xl p-9">
           <div className="flex items-center gap-2.5 mb-7">
-            <Logo />
+            {brand ? (
+              <>
+                <img src={brand.logoUrl} alt={brand.nome} style={{ height: 26 }} />
+                <span className="font-extrabold tracking-tight text-lg text-navy">{brand.nome}</span>
+              </>
+            ) : (
+              <Logo />
+            )}
           </div>
           <form onSubmit={handleVerifyTwoFactor}>
             <div className="text-xl font-extrabold mb-1">Verificação em duas etapas</div>
@@ -174,7 +206,7 @@ export function LoginPage() {
               </Field>
             </div>
             {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
-            <Button type="submit" className="w-full" disabled={submitting || !twoFactorCode.trim()}>
+            <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting || !twoFactorCode.trim()}>
               {submitting ? 'Verificando…' : 'Confirmar'}
             </Button>
             <button
@@ -197,7 +229,14 @@ export function LoginPage() {
     <div className="w-full min-h-screen flex items-center justify-center bg-bg p-6">
       <div className="w-full max-w-[420px] bg-white border border-border rounded-2xl p-9">
         <div className="flex items-center gap-2.5 mb-7">
-          <Logo />
+          {brand ? (
+            <>
+              <img src={brand.logoUrl} alt={brand.nome} style={{ height: 26 }} />
+              <span className="font-extrabold tracking-tight text-lg text-navy">{brand.nome}</span>
+            </>
+          ) : (
+            <Logo />
+          )}
         </div>
 
         <div className="flex gap-1 mb-6 p-1 rounded-lg bg-bg w-fit">
@@ -273,7 +312,7 @@ export function LoginPage() {
               </Field>
             </div>
             {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting}>
               {submitting ? 'Entrando…' : 'Entrar'}
             </Button>
             <div className="mt-5 p-3.5 rounded-lg bg-bg text-[12px] text-textSecondary leading-relaxed">
@@ -347,7 +386,7 @@ export function LoginPage() {
             </div>
 
             {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
-            <Button type="submit" className="w-full" disabled={!role || (role === 'seguradora' && !insurerKey) || submitting}>
+            <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={!role || (role === 'seguradora' && !insurerKey) || submitting}>
               {submitting ? 'Criando conta…' : 'Criar conta e entrar'}
             </Button>
           </form>

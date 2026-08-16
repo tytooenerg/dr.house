@@ -13,6 +13,7 @@ import { parseWebhookTedRecebido } from '../lib/tedRail.js';
 import { getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { parseWebhookStablecoinRecebido } from '../lib/stablecoinRail.js';
 import { getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
+import { getUserByWhitelabelDomain } from '../db/users.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
@@ -22,6 +23,29 @@ import { isFeatureEnabled } from '../lib/featureFlags.js';
 // the embeddable rate simulator widget — all meant to be called from outside the app
 // (a partner's own site, an anonymous visitor) so none of them require login.
 export const publicRouter = Router();
+
+// White-label com domínio próprio (erp.ts's POST /whitelabel/domain) — the SPA calls this
+// once at boot, before any login, so a visitor arriving at a whitelabeled bank's own
+// domain sees that bank's nome/corPrimaria/logoUrl on the login screen itself instead of
+// "Lastro". req.get('host') is the same pattern already used for the Google OAuth/SAML
+// redirect URL (routes/auth.ts) — the real Host header the browser sent, port included if
+// non-standard. { brand: null } (not an error) is the correct, expected response for
+// every visitor on the default Lastro domain — this is not a lookup failure.
+publicRouter.get('/brand', (req, res) => {
+  const host = (req.get('host') || '').toLowerCase().split(':')[0];
+  const owner = host ? getUserByWhitelabelDomain(host) : undefined;
+  if (!owner || !owner.whitelabel_plus_enabled) {
+    res.json({ brand: null });
+    return;
+  }
+  let brand: { nome: string; corPrimaria: string; logoUrl: string } | null = null;
+  try {
+    brand = JSON.parse(owner.settings || '{}').whitelabelBrand ?? null;
+  } catch {
+    brand = null;
+  }
+  res.json({ brand });
+});
 
 // Rate limiter shared by the four payment-rail webhook targets below. Their real
 // anti-spoofing story is mTLS/IP-allowlisting at the PSP/infra level (see each route's own

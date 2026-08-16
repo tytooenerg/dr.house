@@ -310,8 +310,12 @@ export const CHAT_ANSWERS: Record<string, string> = {
 
 export const KYB_TIPOS = ['Banco comercial', 'Fundo (FIDC)', 'Fintech de crédito', 'Family office'];
 
-export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor', { title: string; body: string }[]> = {
+export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor' | 'api_partner', { title: string; body: string }[]> = {
   admin: [],
+  api_partner: [
+    { title: 'Bem-vindo(a) — acesso só de API', body: 'Sua conta dá acesso direto ao Score API e ao PLD Screening API, sem passar pela esteira de KYB/marketplace da Lastro.' },
+    { title: 'Gere sua chave em Desenvolvedores', body: 'Cada chave já cobra por chamada, no valor mostrado na tela — sem mensalidade fixa e sem contrato mínimo.' },
+  ],
   auditor: [
     { title: 'Bem-vinda, auditoria', body: 'Você tem acesso somente-leitura à trilha de auditoria, fila de compliance, reconciliação e relatórios regulatórios da plataforma.' },
     { title: 'Trilha de auditoria', body: 'Todo evento sensível fica em um log encadeado por hash — qualquer alteração retroativa quebra a cadeia de forma detectável.' },
@@ -338,9 +342,12 @@ export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'adm
   ],
 };
 
-export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor', string[]> = {
+export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor' | 'api_partner', string[]> = {
   admin: ['admin', 'perfil'],
   auditor: ['auditor', 'perfil'],
+  // No 'assinatura' — api_partner doesn't have plans (Básico/Pro/Empresarial), it pays
+  // per-call via addOnBilling.ts, no subscription tier gate on the data products.
+  api_partner: ['dev', 'conta', 'perfil'],
   seguradora: ['seguradora', 'perfil'],
   investidor: ['dashboard', 'marketplace', 'secundario', 'cestas', 'suitability', 'automacao', 'linha-credito', 'risco', 'historico', 'comparador', 'compliance', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
   cedente: ['dashboard', 'erp', 'emitir', 'minhas', 'linha-credito', 'contas-pagar', 'ai-cfo', 'aceite', 'risco', 'historico', 'compliance', 'dev', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],

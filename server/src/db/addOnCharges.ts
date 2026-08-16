@@ -1,6 +1,6 @@
 import { db } from './index.js';
 
-export type AddOnKind = 'api_overage' | 'score_api' | 'pld_screening_api' | 'whitelabel_plus' | 'institutional_reporting';
+export type AddOnKind = 'api_overage' | 'score_api' | 'pld_screening_api' | 'registro_api' | 'whitelabel_plus' | 'institutional_reporting';
 
 export interface AddOnChargeRow {
   id: number;

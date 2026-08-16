@@ -56,9 +56,10 @@ function payload(userId: number, settings: ReturnType<typeof getSettings>, playg
       pricePerCallFmt: fmtAddOnPrice('api_overage'),
       estimatedChargeFmt: fmtBRL(Math.max(0, platformCallsThisMonth - included) * getAddOnPrice('api_overage')),
     },
-    // Features 2/3 — standalone data-product keys and what they've cost so far.
+    // Features 2/3/4 — standalone data-product keys and what they've cost so far.
     scoreApiPriceFmt: fmtAddOnPrice('score_api'),
     pldScreeningApiPriceFmt: fmtAddOnPrice('pld_screening_api'),
+    registroApiPriceFmt: fmtAddOnPrice('registro_api'),
     addonCharges: listAddOnChargesByUser(userId, 20).map((c) => ({
       id: c.id,
       kind: c.kind,
@@ -86,7 +87,7 @@ const generateKeySchema = z.object({
   // 'score_api'/'pld_screening_api' are standalone, pay-per-call data products (features
   // 2/3) — deliberately NOT gated behind Empresarial the way the full 'platform' product
   // is, since they're sold on their own, billed per call, not part of the subscription.
-  product: z.enum(['platform', 'score_api', 'pld_screening_api']).optional().default('platform'),
+  product: z.enum(['platform', 'score_api', 'pld_screening_api', 'registro_api']).optional().default('platform'),
 });
 
 devRouter.post('/keys/generate', (req, res) => {
@@ -96,6 +97,14 @@ devRouter.post('/keys/generate', (req, res) => {
     return;
   }
   const { mode, scope, product } = parsed.data;
+  // A conta "só-API" (api_partner) nunca é dona de duplicatas/leilões — o produto
+  // 'platform' pressupõe um participante do marketplace agindo em nome próprio, o que
+  // uma conta só-API nunca é. Bloqueado aqui, não só escondido no client, porque é uma
+  // garantia real do produto ("só a API, nunca o marketplace"), não só UX.
+  if (product === 'platform' && req.user!.role === 'api_partner') {
+    res.status(403).json({ error: 'role_not_allowed', message: 'Contas só-API têm acesso apenas ao Score API e ao PLD Screening API.' });
+    return;
+  }
   if (mode === 'live' && product === 'platform' && !planAtLeast(req.user!.plan, 'empresarial')) {
     res.status(402).json({
       error: 'plan_required',
@@ -105,7 +114,7 @@ devRouter.post('/keys/generate', (req, res) => {
     return;
   }
   const { rawKey, keyHash, keyPrefix } = generateApiKey(mode);
-  const productLabel: Record<ApiKeyProduct, string> = { platform: '', score_api: 'Score API', pld_screening_api: 'PLD Screening API' };
+  const productLabel: Record<ApiKeyProduct, string> = { platform: '', score_api: 'Score API', pld_screening_api: 'PLD Screening API', registro_api: 'Registro API' };
   const label = product === 'platform' ? (mode === 'test' ? 'Chave de teste (sandbox)' : 'Chave de produção') : `${productLabel[product]} (${mode === 'test' ? 'teste' : 'produção'})`;
   createApiKey(req.user!.id, keyHash, keyPrefix, label, mode, scope, product);
   if (mode === 'test' && product === 'platform') ensureSandboxDataset(req.user!);

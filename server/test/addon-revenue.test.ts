@@ -162,6 +162,50 @@ describe('Feature 3 — PLD/KYC screening as a service', () => {
   });
 });
 
+describe('Feature — Registro API (compliance-as-a-service)', () => {
+  it('bills a narrow registro_api key per call, restricts it to the registro endpoint only, and returns a real registro number', async () => {
+    const { token } = await registerCedente(`Cedente Registro ${unique()} Ltda`); // basico plan — narrow products aren't plan-gated
+    const key = await generateKey(token, { mode: 'live', scope: 'read_write', product: 'registro_api' });
+
+    const admin = await adminToken();
+    const before = await addonSummary(admin, 'registro_api');
+
+    const res = await request(app)
+      .post('/api/v1/registro')
+      .set('Authorization', `Bearer ${key}`)
+      .send({ referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
+    expect(res.status).toBe(200);
+    expect(res.body.registro).toBeTypeOf('string');
+    expect(res.body.registradora).toBeTypeOf('string');
+    expect(res.body).toHaveProperty('duplicidadeConfirmada');
+
+    const after = await addonSummary(admin, 'registro_api');
+    expect(after.count).toBe(before.count + 1);
+
+    // A narrow product key can't reach any other v1 endpoint.
+    const forbidden = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('never double-bills a full platform key for the same registration, and rejects an invalid payload', async () => {
+    const { token } = await registerCedente(`Cedente Registro Platform ${unique()} Ltda`, 'empresarial');
+    const key = await generateKey(token, { mode: 'live', scope: 'read_write', product: 'platform' });
+
+    const admin = await adminToken();
+    const before = await addonSummary(admin, 'registro_api');
+    const res = await request(app)
+      .post('/api/v1/registro')
+      .set('Authorization', `Bearer ${key}`)
+      .send({ referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
+    expect(res.status).toBe(200);
+    const after = await addonSummary(admin, 'registro_api');
+    expect(after.count).toBe(before.count);
+
+    const invalid = await request(app).post('/api/v1/registro').set('Authorization', `Bearer ${key}`).send({ referenciaExterna: 'x' });
+    expect(invalid.status).toBe(400);
+  });
+});
+
 describe('Feature 4 — White-label licensing expansion (White-label Plus)', () => {
   it('requires a brand and the Empresarial plan, extends branding to the sacado aceite view, and bills monthly', async () => {
     const sacadoNome = `Fornecedor Whitelabel ${unique()} Ltda`;
@@ -201,6 +245,78 @@ describe('Feature 4 — White-label licensing expansion (White-label Plus)', () 
     expect(run.body.charged).toBeGreaterThanOrEqual(1);
     const after = await addonSummary(admin, 'whitelabel_plus');
     expect(after.count).toBeGreaterThan(before.count);
+  });
+});
+
+describe('White-label com domínio próprio', () => {
+  it('requires a brand before accepting a domain, rejects a malformed domain, and resolves the brand publicly by Host header once White-label Plus is on', async () => {
+    const domain = `creditos-${unique()}.example.com`;
+    const { token } = await registerCedente(`Cedente Domínio ${unique()} Ltda`, 'empresarial');
+
+    // No brand yet.
+    const denied = await request(app).post('/api/erp/whitelabel/domain').set('Authorization', `Bearer ${token}`).send({ domain });
+    expect(denied.status).toBe(409);
+    expect(denied.body.error).toBe('brand_required');
+
+    await request(app)
+      .post('/api/erp/whitelabel/brand')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nome: 'Marca Domínio', corPrimaria: '#1E5EFF', logoUrl: 'https://example.com/logo.png' });
+
+    const invalid = await request(app).post('/api/erp/whitelabel/domain').set('Authorization', `Bearer ${token}`).send({ domain: 'não é um domínio' });
+    expect(invalid.status).toBe(400);
+
+    // Brand exists but White-label Plus isn't on yet — GET /public/brand stays null.
+    const set = await request(app).post('/api/erp/whitelabel/domain').set('Authorization', `Bearer ${token}`).send({ domain });
+    expect(set.status).toBe(200);
+    expect(set.body.whitelabelCustomDomain).toBe(domain);
+    const beforePlus = await request(app).get('/api/public/brand').set('Host', domain);
+    expect(beforePlus.body.brand).toBeNull();
+
+    await request(app).post('/api/erp/whitelabel/plus').set('Authorization', `Bearer ${token}`).send({ enabled: true });
+
+    const resolved = await request(app).get('/api/public/brand').set('Host', domain);
+    expect(resolved.status).toBe(200);
+    expect(resolved.body.brand).toEqual({ nome: 'Marca Domínio', corPrimaria: '#1E5EFF', logoUrl: 'https://example.com/logo.png' });
+
+    // A host with a port, or an unrelated/default host, never resolves to someone else's brand.
+    const withPort = await request(app).get('/api/public/brand').set('Host', `${domain}:4000`);
+    expect(withPort.body.brand).toEqual({ nome: 'Marca Domínio', corPrimaria: '#1E5EFF', logoUrl: 'https://example.com/logo.png' });
+    const unrelated = await request(app).get('/api/public/brand').set('Host', 'app.lastro.demo');
+    expect(unrelated.body.brand).toBeNull();
+  });
+
+  it('rejects a domain already claimed by another Empresarial account', async () => {
+    const domain = `dup-${unique()}.example.com`;
+    const { token: token1 } = await registerCedente(`Cedente Domínio A ${unique()} Ltda`, 'empresarial');
+    await request(app)
+      .post('/api/erp/whitelabel/brand')
+      .set('Authorization', `Bearer ${token1}`)
+      .send({ nome: 'A', corPrimaria: '#1E5EFF', logoUrl: 'https://example.com/a.png' });
+    await request(app).post('/api/erp/whitelabel/domain').set('Authorization', `Bearer ${token1}`).send({ domain });
+
+    const { token: token2 } = await registerCedente(`Cedente Domínio B ${unique()} Ltda`, 'empresarial');
+    await request(app)
+      .post('/api/erp/whitelabel/brand')
+      .set('Authorization', `Bearer ${token2}`)
+      .send({ nome: 'B', corPrimaria: '#0A5C36', logoUrl: 'https://example.com/b.png' });
+    const clash = await request(app).post('/api/erp/whitelabel/domain').set('Authorization', `Bearer ${token2}`).send({ domain });
+    expect(clash.status).toBe(409);
+    expect(clash.body.error).toBe('domain_taken');
+  });
+
+  it('removes the domain', async () => {
+    const domain = `remove-${unique()}.example.com`;
+    const { token } = await registerCedente(`Cedente Domínio Remove ${unique()} Ltda`, 'empresarial');
+    await request(app)
+      .post('/api/erp/whitelabel/brand')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nome: 'C', corPrimaria: '#1E5EFF', logoUrl: 'https://example.com/c.png' });
+    await request(app).post('/api/erp/whitelabel/domain').set('Authorization', `Bearer ${token}`).send({ domain });
+
+    const removed = await request(app).post('/api/erp/whitelabel/domain/remove').set('Authorization', `Bearer ${token}`);
+    expect(removed.status).toBe(200);
+    expect(removed.body.whitelabelCustomDomain).toBeNull();
   });
 });
 
@@ -255,7 +371,7 @@ describe('Admin add-on pricing config', () => {
     const admin = await adminToken();
     const list = await request(app).get('/api/admin/addons/precos').set('Authorization', `Bearer ${admin}`);
     expect(list.status).toBe(200);
-    expect(list.body.precos.length).toBe(5);
+    expect(list.body.precos.length).toBe(6);
 
     const update = await request(app).put('/api/admin/addons/precos').set('Authorization', `Bearer ${admin}`).send({ kind: 'score_api', preco: 2.5 });
     expect(update.status).toBe(200);

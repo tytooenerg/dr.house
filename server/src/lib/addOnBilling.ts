@@ -13,6 +13,7 @@ const DEFAULT_PRICES: Record<AddOnKind, number> = {
   api_overage: 0.05, // per call beyond the included monthly quota
   score_api: 1.5, // per consulta via a standalone Score API key
   pld_screening_api: 2.0, // per triagem via a standalone PLD screening API key
+  registro_api: 3.5, // per registro via a standalone Registro API key — pricier than a read (score/PLD) since it's a real write to an external registry
   whitelabel_plus: 490, // flat monthly recurring fee
   institutional_reporting: 690, // flat monthly recurring fee
 };

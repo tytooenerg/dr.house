@@ -51,6 +51,16 @@ export function setInstitutionalReportingEnabled(userId: number, enabled: boolea
   db.prepare('UPDATE users SET institutional_reporting_enabled = ? WHERE id = ?').run(enabled ? 1 : 0, userId);
 }
 
+// White-label com domínio próprio — resolvido POR valor a cada request público
+// (routes/public.ts GET /brand), então precisa de uma busca direta, não passar pelo dono.
+export function getUserByWhitelabelDomain(domain: string): UserRow | undefined {
+  return db.prepare('SELECT * FROM users WHERE whitelabel_custom_domain = ? AND deleted_at IS NULL').get(domain.toLowerCase().trim()) as UserRow | undefined;
+}
+
+export function setWhitelabelCustomDomain(userId: number, domain: string | null) {
+  db.prepare('UPDATE users SET whitelabel_custom_domain = ? WHERE id = ?').run(domain, userId);
+}
+
 export function listUsersWithWhitelabelPlus(): UserRow[] {
   return db.prepare('SELECT * FROM users WHERE whitelabel_plus_enabled = 1 AND deleted_at IS NULL').all() as UserRow[];
 }

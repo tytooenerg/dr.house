@@ -132,6 +132,9 @@ describe('checkForeignInvestorEligibility — deterministic memo', () => {
     expect(result.jurisdicaoFavorecida).toBe(true);
     expect(result.memo).toContain(FOREIGN_INVESTOR_DISCLAIMER);
     expect(result.memo).toContain('SIM — consta na lista');
+    // Stablecoin settlement rail (lib/stablecoinRail.ts) — unconfigured in tests, so the
+    // memo must say so honestly instead of claiming a real funding channel exists.
+    expect(result.memo).toContain('Via de liquidação para aporte: Nenhum rail de stablecoin configurado');
   });
 
   it('leaves classification unresolved for a non-institutional type and clears a normal jurisdiction', async () => {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
-import { getSettings, updateSettings, getUserById, setWhitelabelPlusEnabled } from '../db/users.js';
+import { getSettings, updateSettings, getUserById, setWhitelabelPlusEnabled, getUserByWhitelabelDomain, setWhitelabelCustomDomain } from '../db/users.js';
 import { ERP_CONNECTORS_META } from '../data/seed.js';
 import { testOmieConnection, listarContasReceberOmie } from '../lib/erpConnectors/omie.js';
 import { testSapConnection, listarContasReceberSap } from '../lib/erpConnectors/sap.js';
@@ -42,6 +42,9 @@ function payload(settings: ReturnType<typeof getSettings>, userId: number) {
     // brandLabel — lib/aceiteCore.ts). Independent of the plan tier.
     whitelabelPlusEnabled: !!user?.whitelabel_plus_enabled,
     whitelabelPlusPriceFmt: fmtAddOnPrice('whitelabel_plus'),
+    // White-label com domínio próprio — a marca aparece na tela de login/shell público de
+    // quem visita esse domínio, antes de qualquer autenticação (routes/public.ts GET /brand).
+    whitelabelCustomDomain: user?.whitelabel_custom_domain ?? null,
   };
 }
 
@@ -283,6 +286,53 @@ erpRouter.post('/whitelabel/brand/remove', (req, res) => {
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { whitelabelBrand: null, erpConnections: { ...settings.erpConnections, whitelabel: false } });
   res.json(payload(updated, req.user!.id));
+});
+
+const whitelabelDomainSchema = z.object({
+  domain: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(253)
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/, 'Informe um domínio ou subdomínio válido, ex. creditos.suaempresa.com.br.'),
+});
+
+// White-label com domínio próprio — o passo além da marca cosmética acima (nome/cor numa
+// única tela): um domínio real, resolvido em GET /public/brand por req.get('host') a cada
+// visita pública, então a marca aparece já na tela de login, antes de qualquer
+// autenticação. Requer whitelabelBrand já configurado (nome/cor/logo) — o domínio sozinho
+// não tem o que exibir. O apontamento DNS + certificado HTTPS em si é responsabilidade de
+// infraestrutura do cliente (ver DEPLOY.md), não algo que esta rota provisiona.
+erpRouter.post(
+  '/whitelabel/domain',
+  asyncHandler(async (req, res) => {
+    if (req.user!.plan !== 'empresarial') {
+      res.status(402).json({ error: 'plan_required', requiredPlan: 'empresarial', message: 'White-label está disponível a partir do plano Empresarial.' });
+      return;
+    }
+    const settings = getSettings(req.user!);
+    if (!settings.whitelabelBrand) {
+      res.status(409).json({ error: 'brand_required', message: 'Configure nome, cor e logo em White-label antes de vincular um domínio.' });
+      return;
+    }
+    const parsed = whitelabelDomainSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const existing = getUserByWhitelabelDomain(parsed.data.domain);
+    if (existing && existing.id !== req.user!.id) {
+      res.status(409).json({ error: 'domain_taken', message: 'Este domínio já está vinculado a outra conta.' });
+      return;
+    }
+    setWhitelabelCustomDomain(req.user!.id, parsed.data.domain);
+    res.json(payload(settings, req.user!.id));
+  })
+);
+
+erpRouter.post('/whitelabel/domain/remove', (req, res) => {
+  setWhitelabelCustomDomain(req.user!.id, null);
+  res.json(payload(getSettings(req.user!), req.user!.id));
 });
 
 const whitelabelPlusSchema = z.object({ enabled: z.boolean() });

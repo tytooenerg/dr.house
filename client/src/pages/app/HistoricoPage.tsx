@@ -43,6 +43,13 @@ interface FundEligiblePosition {
   valorFmt: string;
   vencimento: string;
 }
+interface TrancheOverview {
+  classe: 'senior' | 'junior';
+  navFmt: string;
+  cotaPriceFmt: string;
+  yieldAprFmt: string;
+  minhaPosicaoFmt: string | null;
+}
 interface RebalanceView {
   totalInvestidoFmt: string;
   posicoesAtivas: number;
@@ -82,6 +89,10 @@ export function HistoricoPage() {
   const [filingClaimId, setFilingClaimId] = useState<string | null>(null);
   const [fundClaimError, setFundClaimError] = useState('');
   const [fundClaimSuccessIds, setFundClaimSuccessIds] = useState<Set<string>>(new Set());
+  const [tranches, setTranches] = useState<{ senior: TrancheOverview; junior: TrancheOverview } | null>(null);
+  const [trancheValor, setTrancheValor] = useState<Record<'senior' | 'junior', string>>({ senior: '', junior: '' });
+  const [trancheBusy, setTrancheBusy] = useState<'senior' | 'junior' | null>(null);
+  const [trancheError, setTrancheError] = useState('');
   const [performance, setPerformance] = useState<PerformanceDashboard | null>(null);
   const [riskFreeInput, setRiskFreeInput] = useState(0);
 
@@ -118,6 +129,44 @@ export function HistoricoPage() {
       setFundClaimError(err instanceof ApiError ? err.message : 'Não foi possível acionar o fundo de garantia.');
     } finally {
       setFilingClaimId(null);
+    }
+  };
+
+  const loadTranches = () => api.get<{ senior: TrancheOverview; junior: TrancheOverview }>('/guarantee-fund/tranches').then(setTranches);
+
+  useEffect(() => {
+    loadTranches();
+  }, []);
+
+  const aportarTranche = async (classe: 'senior' | 'junior') => {
+    const valor = Number(trancheValor[classe].replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setTrancheError('');
+    setTrancheBusy(classe);
+    try {
+      const d = await api.post<{ senior: TrancheOverview; junior: TrancheOverview }>('/guarantee-fund/tranches/aportar', { classe, valor });
+      setTranches(d);
+      setTrancheValor((prev) => ({ ...prev, [classe]: '' }));
+    } catch (err) {
+      setTrancheError(err instanceof ApiError ? err.message : 'Não foi possível aportar no fundo.');
+    } finally {
+      setTrancheBusy(null);
+    }
+  };
+
+  const resgatarTranche = async (classe: 'senior' | 'junior') => {
+    const valor = Number(trancheValor[classe].replace(',', '.'));
+    if (!valor || valor <= 0) return;
+    setTrancheError('');
+    setTrancheBusy(classe);
+    try {
+      const d = await api.post<{ senior: TrancheOverview; junior: TrancheOverview }>('/guarantee-fund/tranches/resgatar', { classe, valor });
+      setTranches(d);
+      setTrancheValor((prev) => ({ ...prev, [classe]: '' }));
+    } catch (err) {
+      setTrancheError(err instanceof ApiError ? err.message : 'Não foi possível resgatar — verifique o valor disponível.');
+    } finally {
+      setTrancheBusy(null);
     }
   };
 
@@ -264,6 +313,47 @@ export function HistoricoPage() {
                   Acionamento registrado para {id} — um admin vai revisar.
                 </div>
               ))}
+          </div>
+        </Card>
+      )}
+
+      {tranches && (
+        <Card className="mb-4 px-6 py-5">
+          <div className="font-bold text-[14.5px] mb-1">Investir no fundo de garantia</div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">
+            Duas classes de cota, mesmo fundo real: a sênior só é atingida por uma perda depois que o capital-base da Lastro e a júnior já
+            zeraram — mais protegida, yield menor. A júnior absorve perda primeiro — mais risco, yield maior.
+          </div>
+          {trancheError && <div className="mb-3 text-red text-[12.5px] font-semibold">{trancheError}</div>}
+          <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            {(['senior', 'junior'] as const).map((classe) => {
+              const t = tranches[classe];
+              return (
+                <div key={classe} className="bg-[#F7F8FA] border border-border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-[13px]">{classe === 'senior' ? 'Sênior' : 'Júnior'}</span>
+                    <span className="font-mono-num text-[12px] font-bold text-blue">{t.yieldAprFmt}</span>
+                  </div>
+                  <div className="text-[11.5px] text-textTertiary mb-0.5">NAV da classe: {t.navFmt} · cota {t.cotaPriceFmt}</div>
+                  {t.minhaPosicaoFmt && <div className="text-[11.5px] text-textSecondary mb-2.5">Sua posição: {t.minhaPosicaoFmt}</div>}
+                  <div className="flex gap-1.5">
+                    <input
+                      value={trancheValor[classe]}
+                      onChange={(e) => setTrancheValor((prev) => ({ ...prev, [classe]: e.target.value }))}
+                      placeholder="Valor (R$)"
+                      inputMode="decimal"
+                      className="flex-1 border border-inputBorder rounded-md px-2.5 py-1.5 text-[12px]"
+                    />
+                    <Button size="sm" variant="secondary" disabled={trancheBusy === classe || !trancheValor[classe]} onClick={() => aportarTranche(classe)}>
+                      Aportar
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={trancheBusy === classe || !trancheValor[classe]} onClick={() => resgatarTranche(classe)}>
+                      Resgatar
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

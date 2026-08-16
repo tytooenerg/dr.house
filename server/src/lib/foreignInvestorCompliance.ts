@@ -2,6 +2,7 @@ import { isLowTaxJurisdiction } from '../data/lowTaxJurisdictions.js';
 import { screenEntity } from '../db/sanctions.js';
 import { recordForeignInvestorScreening, type ForeignInvestorScreeningRow } from '../db/foreignInvestorScreenings.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { stablecoinEnabled, lastroStaticWalletConfigured, stablecoinAsset, stablecoinNetwork } from './stablecoinRail.js';
 import type { UserRow } from '../db/types.js';
 
 // Real regulatory groundwork for opening the marketplace to non-resident (INR) banks and
@@ -53,6 +54,15 @@ function buildMemo(opts: {
     ? 'SIM — consta na lista de jurisdições de tributação favorecida (IN RFB 1.037/2010). A isenção de IRRF da Lei 11.312/2006 NÃO se aplica; tributação padrão (15–22,5%, ou 25% se em regime fiscal privilegiado).'
     : 'Não consta na lista de jurisdições de tributação favorecida (IN RFB 1.037/2010) — elegível, em tese, à alíquota zero de IRRF da Lei 11.312/2006 (estendida pela MP 1.137/2022), sujeito a confirmação jurídica.';
   const pldLabel = opts.pldStatus === 'clear' ? 'Sem correspondência nas listas de sanções triadas (OFAC, ONU/CSNU).' : `Possível correspondência encontrada: ${opts.pldDetail}`;
+  // Same disclaimer boundary as FOREIGN_INVESTOR_DISCLAIMER above, applied specifically to
+  // funding: a stablecoin deposit (lib/stablecoinRail.ts) avoids a traditional
+  // international wire, but it does NOT substitute for, or bypass, any exigência acima —
+  // Lastro remains without BCB authorization to operate câmbio either way.
+  const liquidacaoLabel = stablecoinEnabled
+    ? `Rail de stablecoin real habilitado (${stablecoinAsset}, rede ${stablecoinNetwork}) — aporte pode ser feito sem uma transferência bancária internacional tradicional. Não dispensa nenhuma das exigências acima nem confere à Lastro autorização para operar câmbio.`
+    : lastroStaticWalletConfigured
+      ? `Carteira real da Lastro configurada para receber ${stablecoinAsset} (rede ${stablecoinNetwork}) — depósito confirmado manualmente pelo time, mesma ressalva regulatória acima.`
+      : 'Nenhum rail de stablecoin configurado neste ambiente — aporte seguiria hoje por transferência bancária tradicional, fora do escopo automatizável deste memorando.';
 
   return [
     `MEMORANDO DE ELEGIBILIDADE — INVESTIDOR NÃO RESIDENTE`,
@@ -64,6 +74,7 @@ function buildMemo(opts: {
     `Classificação de investidor: ${classificacaoLabel}`,
     `Jurisdição de tributação favorecida: ${jurisdicaoLabel}`,
     `Triagem PLD reforçada (Res. CVM 50/2021 art. 8, GAFI/jurisdição de risco): ${pldLabel}`,
+    `Via de liquidação para aporte: ${liquidacaoLabel}`,
     ``,
     FOREIGN_INVESTOR_DISCLAIMER,
   ].join('\n');

@@ -53,6 +53,51 @@ export function PrecosPage() {
           ))}
         </div>
 
+        <div className="mb-16">
+          <div className="text-center mb-8">
+            <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Produtos de dados</div>
+            <div className="text-[26px] font-extrabold tracking-tight mb-2">Só precisa dos dados, não do marketplace?</div>
+            <div className="text-textSecondary text-[15px] max-w-[560px] mx-auto">Score de risco, triagem PLD e roteamento de registro vendidos avulsos, por chamada — sem virar cliente da plataforma, sem plano, sem contrato mínimo.</div>
+          </div>
+          <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Score API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 1,50</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por consulta — GET /v1/sacados/:cnpj/score</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Score interno + sinais de rede entre CNPJs</div>
+                <div>✓ Chave sandbox grátis pra testar</div>
+                <div>✓ Sem mensalidade, cobrado só o que usar</div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">PLD Screening API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 2,00</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por triagem — POST /v1/pld/triagem</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Checagem contra listas OFAC/ONU (quando habilitado)</div>
+                <div>✓ Segunda opinião de IA em casos ambíguos</div>
+                <div>✓ Sem mensalidade, cobrado só o que usar</div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Registro API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 3,50</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por registro — POST /v1/registro</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Roteamento inteligente entre CERC/B3/Núclea/Grafeno</div>
+                <div>✓ Checagem de duplicidade na registradora escolhida</div>
+                <div>✓ Nunca entra no seu marketplace nem cria conta cedente</div>
+              </div>
+            </div>
+          </div>
+          <div className="text-center mt-6">
+            <Link to="/login?mode=register&role=api_partner" className="px-5.5 py-3 rounded-lg bg-blue text-white font-bold text-sm inline-block">
+              Criar conta só-API
+            </Link>
+          </div>
+        </div>
+
         <div className="bg-bg rounded-2xl p-8 flex items-center justify-between flex-wrap gap-5">
           <div>
             <div className="font-bold text-[17px] mb-1.5">Seguro sobre o recebível</div>

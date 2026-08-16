@@ -1,4 +1,10 @@
-export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor';
+// 'api_partner' is a self-service, no-KYB role for a company that only wants the
+// standalone data products (Score API / PLD Screening API — see lib/addOnBilling.ts and
+// routes/v1.ts) without becoming a marketplace participant (cedente/investidor/sacado/
+// seguradora) — see "Score/PLD API como produto standalone" in README. It never touches
+// duplicatas, never needs KYB (needsKyb below is investidor-only by design), and its only
+// tabs are Desenvolvedores/Conta/Assinatura/Perfil.
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor' | 'api_partner';
 export type KybStatus = 'none' | 'pending' | 'approved' | 'rejected';
 export type Plan = 'basico' | 'pro' | 'empresarial';
 export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
@@ -124,6 +130,7 @@ export interface UserRow {
   auth_provider: 'password' | 'google' | 'saml';
   whitelabel_plus_enabled: number;
   institutional_reporting_enabled: number;
+  whitelabel_custom_domain: string | null;
 }
 
 export interface DuplicataRow {
@@ -171,7 +178,10 @@ export type ApiKeyScope = 'read_only' | 'read_write';
 // 'platform' is the full partner API (today's only behavior); 'score_api' and
 // 'pld_screening_api' are narrow, standalone data-product keys (lib/addOnBilling.ts) —
 // sellable to a company that isn't a Lastro cedente/investidor/sacado at all.
-export type ApiKeyProduct = 'platform' | 'score_api' | 'pld_screening_api';
+// 'registro_api' — feature "compliance-as-a-service": the multi-registradora smart
+// routing (lib/registradoras.ts) exposed for the first time to a third party that isn't
+// a Lastro cedente, standalone and pay-per-call, same shape as score_api/pld_screening_api.
+export type ApiKeyProduct = 'platform' | 'score_api' | 'pld_screening_api' | 'registro_api';
 
 export interface ApiKeyRow {
   id: number;

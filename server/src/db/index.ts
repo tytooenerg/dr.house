@@ -61,6 +61,8 @@ export function resetDbForTests() {
     DELETE FROM fractional_offerings;
     DELETE FROM guarantee_fund_claims;
     DELETE FROM guarantee_fund_ledger;
+    DELETE FROM guarantee_fund_tranche_ledger;
+    DELETE FROM guarantee_fund_tranche_quota_movements;
     DELETE FROM insurance_settlements;
     DELETE FROM legal_collection_fees;
     DELETE FROM legal_documents;

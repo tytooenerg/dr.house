@@ -107,6 +107,33 @@ curl -s https://app.suaempresa.com.br/api/health
 
 Se isso devolver o JSON acima com HTTPS válido, a stack está no ar.
 
+### White-label com domínio próprio (opcional)
+
+Uma conta Empresarial com White-label Plus pode vincular um domínio real
+(`POST /api/erp/whitelabel/domain`) — a partir daí, `GET /api/public/brand` resolve a marca
+(nome/cor/logo) pelo `Host` do request, e a SPA aplica isso já na tela de login, antes de
+qualquer autenticação (ver `client/src/pages/auth/LoginPage.tsx`). O que essa rota **não**
+faz é provisionar o domínio em si — isso é configuração de infraestrutura, feita uma vez por
+cliente:
+
+1. O cliente aponta um **CNAME** do domínio dele (ex. `creditos.clientex.com.br`) pro
+   mesmo host onde o Caddy desta stack já está.
+2. Adicione um bloco novo no `Caddyfile` pra esse domínio, apontando pro mesmo `app:4000`:
+   ```
+   creditos.clientex.com.br {
+     reverse_proxy app:4000
+   }
+   ```
+   e redeploy (`docker compose -f docker-compose.prod.yml up -d`) — o Caddy emite o
+   certificado HTTPS desse domínio automaticamente, do mesmo jeito que faz para
+   `{$APP_DOMAIN}`.
+3. Para não editar o `Caddyfile` a cada cliente novo, a alternativa que escala é o
+   [`on_demand_tls`](https://caddyserver.com/docs/caddyfile/options#on-demand-tls) do
+   Caddy, validando contra `GET /api/public/brand` (só emite certificado pra um domínio que
+   essa rota realmente reconhece) — não configurado por padrão aqui porque é uma decisão de
+   infraestrutura melhor tomada quando o primeiro cliente white-label real existir, não
+   especulativamente.
+
 ## 6. Criar a primeira conta admin
 
 Um banco de dados novo em produção **não** vem com as contas de demonstração

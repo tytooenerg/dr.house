@@ -197,5 +197,34 @@ export const openApiSpec = {
         },
       },
     },
+    '/registro': {
+      post: {
+        summary: 'Registro de recebível — roteamento inteligente entre CERC/B3/Núclea/Grafeno',
+        description:
+          'Envolve o mesmo motor de roteamento que a Lastro usa internamente pra escolher a registradora de cada duplicata que emite (lib/registradoras.ts), exposto pela primeira vez pra um parceiro externo — nunca cria uma duplicata na Lastro nem entra no marketplace. Retorna qual registradora foi escolhida, o número de registro real (ou simulado, se nenhuma REGISTRADORA_*_API_URL estiver configurada) e, quando possível, se já existe registro duplicado pra esse sacado/valor/vencimento na registradora escolhida. Disponível em qualquer chave `platform` sem custo adicional, ou vendido avulso por chamada a uma chave dedicada `registro_api`.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['referenciaExterna', 'sacadoCnpj', 'valor', 'vencimento'],
+                properties: {
+                  referenciaExterna: { type: 'string', example: 'nf-90210' },
+                  sacadoCnpj: { type: 'string', example: '12.345.678/0001-90' },
+                  valor: { type: 'number', example: 84500.0 },
+                  vencimento: { type: 'string', example: '2026-08-12' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '`registradora`, `registro`, `simulado` e `duplicidadeConfirmada` (true/false/null — null quando a registradora não pôde ser consultada).' },
+          '400': { description: 'Erro de validação.' },
+          '503': { description: 'Registradora escolhida indisponível no momento — tente novamente.' },
+        },
+      },
+    },
   },
 };

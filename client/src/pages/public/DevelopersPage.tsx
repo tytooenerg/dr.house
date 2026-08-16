@@ -231,6 +231,41 @@ export function DevelopersPage() {
         </div>
       </div>
 
+      <div className="px-14 py-16 max-w-[1360px] mx-auto">
+        <div className="max-w-[640px] mb-10">
+          <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Sem virar cliente do marketplace</div>
+          <div className="text-[30px] font-extrabold tracking-tight">Só precisa do dado, não da esteira inteira.</div>
+          <div className="text-textSecondary text-[15px] mt-3 leading-relaxed">
+            Score de risco, triagem PLD e roteamento de registro são vendidos avulsos, por chamada — uma conta "só-API" gera a chave em minutos, sem passar pelo cadastro de cedente/investidor nem por KYB.
+          </div>
+        </div>
+        <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-green mb-2">GET</div>
+            <div className="font-bold text-base mb-2">Score API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Score interno + sinais de rede entre CNPJs, na hora — R$ 1,50 por consulta.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">GET /v1/sacados/:cnpj/score</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
+            <div className="font-bold text-base mb-2">PLD Screening API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Checagem contra listas de sanções, com segunda opinião de IA em casos ambíguos — R$ 2,00 por triagem.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/pld/triagem</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
+            <div className="font-bold text-base mb-2">Registro API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">O mesmo roteamento inteligente entre CERC/B3/Núclea/Grafeno que a Lastro usa internamente, sem entrar no marketplace — R$ 3,50 por registro.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/registro</div>
+          </div>
+        </div>
+        <div className="mt-6">
+          <Link to="/login?mode=register&role=api_partner" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px] inline-block">
+            Criar conta só-API
+          </Link>
+        </div>
+      </div>
+
       <div className="px-14 py-20 text-center bg-[#F7F8FA]">
         <div className="text-[32px] font-extrabold tracking-tight">Pronto para construir sobre a Lastro?</div>
         <div className="text-textSecondary text-[15px] mt-2.5">Chaves de teste em minutos, sem burocracia.</div>

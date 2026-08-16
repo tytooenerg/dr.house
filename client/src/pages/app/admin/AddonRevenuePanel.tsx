@@ -3,7 +3,7 @@ import { api } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 
-type AddOnKind = 'api_overage' | 'score_api' | 'pld_screening_api' | 'whitelabel_plus' | 'institutional_reporting';
+type AddOnKind = 'api_overage' | 'score_api' | 'pld_screening_api' | 'registro_api' | 'whitelabel_plus' | 'institutional_reporting';
 
 interface AddonPrice {
   kind: AddOnKind;
@@ -32,6 +32,7 @@ const ADDON_KIND_LABELS: Record<AddOnKind, string> = {
   api_overage: 'Excedente de uso da API (por chamada)',
   score_api: 'Score API avulsa (por chamada)',
   pld_screening_api: 'PLD Screening API avulsa (por chamada)',
+  registro_api: 'Registro API avulsa (por chamada)',
   whitelabel_plus: 'White-label Plus (mensal)',
   institutional_reporting: 'Relatórios Institucionais (mensal)',
 };

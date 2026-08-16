@@ -62,7 +62,7 @@ export function LandingPage() {
           </div>
           <div className="text-[52px] font-extrabold leading-[1.05] tracking-tight">Do recebível travado ao caixa em minutos.</div>
           <div className="text-lg text-textSecondary mt-5 leading-relaxed max-w-[520px]">
-            A Lastro conecta empresas, investidores, sacados e seguradoras em um único fluxo digital — emissão, registro eletrônico, leilão e liquidação real via Pix, TED e boleto.
+            A Lastro conecta empresas, investidores, sacados e seguradoras em um único fluxo digital — emissão, registro eletrônico, leilão e liquidação real via Pix, TED, boleto ou stablecoin, para investidor institucional local ou estrangeiro.
           </div>
           <div className="flex gap-3 mt-8">
             <Link to="/legal#contato" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">

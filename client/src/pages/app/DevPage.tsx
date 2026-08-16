@@ -4,6 +4,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { useSession } from '../../state/SessionContext';
 
 interface ApiKeyView {
   id: number;
@@ -11,7 +12,7 @@ interface ApiKeyView {
   label: string;
   mode: 'live' | 'test';
   scope: 'read_only' | 'read_write';
-  product: 'platform' | 'score_api' | 'pld_screening_api';
+  product: 'platform' | 'score_api' | 'pld_screening_api' | 'registro_api';
   callsThisMonth: number;
   createdAt: string;
   lastUsed: string;
@@ -45,6 +46,7 @@ interface DevData {
   apiOverage: { includedCallsPerMonth: number; callsThisMonth: number; overageThisMonth: number; pricePerCallFmt: string; estimatedChargeFmt: string };
   scoreApiPriceFmt: string;
   pldScreeningApiPriceFmt: string;
+  registroApiPriceFmt: string;
   addonCharges: AddonChargeView[];
   webhooks: WebhookView[];
   apiLog: { status: string; method: string; path: string; time: string }[];
@@ -57,6 +59,10 @@ interface DevData {
 }
 
 export function DevPage() {
+  const { user } = useSession();
+  // A conta "só-API" (api_partner) nunca alcança o plano Empresarial (não tem aba
+  // Assinatura) — a chave de "API completa" existe só pra quem participa do marketplace.
+  const isApiPartner = user?.role === 'api_partner';
   const [data, setData] = useState<DevData | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -65,7 +71,7 @@ export function DevPage() {
   const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
   const [keyMode, setKeyMode] = useState<'live' | 'test'>('live');
   const [keyScope, setKeyScope] = useState<'read_write' | 'read_only'>('read_write');
-  const [keyProduct, setKeyProduct] = useState<'platform' | 'score_api' | 'pld_screening_api'>('platform');
+  const [keyProduct, setKeyProduct] = useState<'platform' | 'score_api' | 'pld_screening_api' | 'registro_api'>(isApiPartner ? 'score_api' : 'platform');
   const [openDeliveriesFor, setOpenDeliveriesFor] = useState<number | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryView[]>([]);
   const [keyError, setKeyError] = useState('');
@@ -177,7 +183,7 @@ export function DevPage() {
                     </span>
                     {k.product !== 'platform' && (
                       <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: '#EAF0FB', color: '#1B4DB1' }}>
-                        {k.product === 'score_api' ? 'Score API' : 'PLD Screening API'}
+                        {k.product === 'score_api' ? 'Score API' : k.product === 'pld_screening_api' ? 'PLD Screening API' : 'Registro API'}
                       </span>
                     )}
                   </div>
@@ -202,9 +208,10 @@ export function DevPage() {
               <option value="read_only">Somente leitura</option>
             </Select>
             <Select value={keyProduct} onChange={(e) => setKeyProduct(e.target.value as typeof keyProduct)} className="text-[12.5px]">
-              <option value="platform">API completa (plataforma)</option>
+              {!isApiPartner && <option value="platform">API completa (plataforma)</option>}
               <option value="score_api">Score API — {data.scoreApiPriceFmt}/chamada</option>
               <option value="pld_screening_api">PLD Screening API — {data.pldScreeningApiPriceFmt}/chamada</option>
+              <option value="registro_api">Registro API — {data.registroApiPriceFmt}/registro</option>
             </Select>
           </div>
           <Button size="sm" variant="secondary" onClick={generateKey}>

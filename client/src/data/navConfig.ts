@@ -48,4 +48,5 @@ export const DEFAULT_TAB_BY_ROLE: Record<string, string> = {
   admin: 'admin',
   seguradora: 'seguradora',
   auditor: 'auditor',
+  api_partner: 'dev',
 };

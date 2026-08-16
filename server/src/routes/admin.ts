@@ -58,10 +58,12 @@ import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
 import { buildDarfSummary, streamDarfPdf } from '../lib/darfGenerator.js';
 import { buildFundOverview, listFundClaimsForAdmin, decideFundClaimOutcome, fundClaimDecisionSchema } from '../lib/guaranteeFund.js';
+import { buildTrancheOverview, runTrancheYieldDistribution, getYieldApr, setYieldApr } from '../lib/guaranteeFundTranches.js';
+import type { TrancheClasse } from '../db/guaranteeFundTranches.js';
 import { runStressTest } from '../lib/guaranteeFundStressTest.js';
 import { peekDailyBriefing } from '../lib/dailyBriefing.js';
 
-const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'whitelabel_plus', 'institutional_reporting'];
+const ADDON_KINDS: AddOnKind[] = ['api_overage', 'score_api', 'pld_screening_api', 'registro_api', 'whitelabel_plus', 'institutional_reporting'];
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole('admin'));
@@ -1009,6 +1011,33 @@ adminRouter.post(
     res.status(outcome.status).json(outcome.body);
   })
 );
+
+// Tranches investíveis do fundo de garantia (lib/guaranteeFundTranches.ts) — visão
+// administrativa das duas classes, e o job (admin-triggered, mesmo padrão de
+// runApiOverageBilling/runWhitelabelPlusBilling) que distribui rendimento periodicamente,
+// financiado pelo capital-base da própria Lastro.
+adminRouter.get('/guarantee-fund/tranches', (_req, res) => {
+  res.json({ senior: buildTrancheOverview('senior'), junior: buildTrancheOverview('junior') });
+});
+
+adminRouter.post('/guarantee-fund/tranches/distribuir-rendimento', (req, res) => {
+  const result = runTrancheYieldDistribution(req.user!.id);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.guarantee_fund_yield_distribuido', { ...result });
+  res.json({ ...result, senior: buildTrancheOverview('senior'), junior: buildTrancheOverview('junior') });
+});
+
+const trancheYieldAprSchema = z.object({ classe: z.enum(['senior', 'junior']), apr: z.number().min(0).max(1) });
+
+adminRouter.put('/guarantee-fund/tranches/yield-apr', (req, res) => {
+  const parsed = trancheYieldAprSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  setYieldApr(parsed.data.classe as TrancheClasse, parsed.data.apr, req.user!.id);
+  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.guarantee_fund_yield_apr_updated', parsed.data);
+  res.json({ classe: parsed.data.classe, apr: getYieldApr(parsed.data.classe as TrancheClasse) });
+});
 
 // Shared config/visibility for the 5 add-on revenue products (lib/addOnBilling.ts) —
 // pricing per kind and a combined recent-charges feed, reused across features 1-5.

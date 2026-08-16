@@ -12,6 +12,7 @@ import {
 import { getDuplicata, listPurchasesByInvestor } from '../db/duplicatas.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { fmtBRL, parseFlexibleDate } from './format.js';
+import { allocateClaimLoss } from './guaranteeFundTranches.js';
 import type { UserRow } from '../db/types.js';
 
 // A real pooled reserve, funded by a slice of Lastro's own platform fee — never an extra
@@ -112,6 +113,11 @@ export function decideFundClaimOutcome(adminId: number, claimId: number, decisio
   const valorPago = Math.max(0, Math.min(maxCoverage, balance));
   decideFundClaim(claimId, 'aprovado', valorPago, adminId, note);
   if (valorPago > 0) {
+    // Attribution (base capital first, then júnior, then sênior) has to run against the
+    // pre-payout balances — it reads getFundBalance()/getTrancheNav() itself, so it must
+    // happen before the debit below changes what those return, or the waterfall would be
+    // computed against an already-reduced balance and shift loss onto the wrong layer.
+    allocateClaimLoss(valorPago, claim.duplicata_id);
     addFundLedgerEntry('sinistro_pago', -valorPago, `Pagamento de acionamento #${claimId} — duplicata ${claim.duplicata_id}`, claim.duplicata_id);
     addLedgerEntry(claim.investor_id, new Date().toLocaleDateString('pt-BR'), `Fundo de garantia — indenização parcial da duplicata ${claim.duplicata_id}`, valorPago);
   }

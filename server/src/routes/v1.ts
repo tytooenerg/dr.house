@@ -6,7 +6,7 @@ import { aceiteStatusSchema, decideAceite, listAceitesForUser } from '../lib/ace
 import { buildSeguradoraPayload, decideSinistro, sinistroDecisionSchema } from '../lib/seguradoraCore.js';
 import { buildBlendedRiscoView } from '../lib/riscoCore.js';
 import { addSignal } from '../db/networkSignals.js';
-import { getRegistradora } from '../lib/registradoras.js';
+import { getRegistradora, chooseRegistradora, registrarNaRegistradora, checkDuplicidadeNaRegistradora, RegistroIndisponivelError } from '../lib/registradoras.js';
 import { withIdempotency } from '../lib/idempotency.js';
 import { getDuplicata, listMarketplace, listBySacadoNome } from '../db/duplicatas.js';
 import { buildOfferView } from '../lib/marketCompute.js';
@@ -43,11 +43,12 @@ v1Router.use((req, res, next) => {
   }
   const isScoreRoute = product === 'score_api' && req.method === 'GET' && /^\/sacados\/[^/]+\/score$/.test(req.path);
   const isPldRoute = product === 'pld_screening_api' && req.method === 'POST' && req.path === '/pld/triagem';
-  if (isScoreRoute || isPldRoute) {
+  const isRegistroRoute = product === 'registro_api' && req.method === 'POST' && req.path === '/registro';
+  if (isScoreRoute || isPldRoute || isRegistroRoute) {
     next();
     return;
   }
-  res.status(403).json({ error: 'forbidden', message: 'Esta chave é válida apenas para o produto contratado (Score API ou PLD Screening API).' });
+  res.status(403).json({ error: 'forbidden', message: 'Esta chave é válida apenas para o produto contratado (Score API, PLD Screening API ou Registro API).' });
 });
 
 function idempotencyHeader(req: import('express').Request): string | undefined {
@@ -255,6 +256,66 @@ v1Router.post(
       nome: parsed.data.nome,
       flagged: !!match,
       match: match ? { nome: match.nome, tipo: match.tipo, fonte: match.fonte } : null,
+    });
+  })
+);
+
+const registroSchema = z.object({
+  referenciaExterna: z.string().trim().min(1).max(80),
+  sacadoCnpj: z.string().trim().min(11).max(20),
+  valor: z.number().positive().max(50_000_000),
+  vencimento: z.string().trim().min(8).max(10),
+});
+
+// Feature "compliance-as-a-service": the multi-registradora smart routing
+// (lib/registradoras.ts) — until now only ever called from inside Lastro's own emissão
+// flow (lib/emitirCore.ts) — exposed for the first time to a third party that isn't a
+// Lastro cedente. A partner sends its own receivable (never touches the `duplicatas`
+// table, never enters the marketplace) and gets back which registradora Lastro's own
+// routing chose plus the real registro number — the exact "which registradora, and did
+// anyone else already register this" problem every platform has to solve independently
+// during the duplicata escritural transition. A 'platform' key can call this too, bundled
+// at no extra charge; only a dedicated registro_api key gets billed per call.
+v1Router.post(
+  '/registro',
+  asyncHandler(async (req, res) => {
+    const parsed = registroSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const { referenciaExterna, sacadoCnpj, valor, vencimento } = parsed.data;
+    const escolhida = chooseRegistradora(valor);
+    let duplicidadeConfirmada: boolean | null = null;
+    try {
+      const dup = await checkDuplicidadeNaRegistradora(escolhida.key, sacadoCnpj, valor, vencimento);
+      duplicidadeConfirmada = dup?.duplicidadeEncontrada ?? null;
+    } catch {
+      // Same honesty as lib/dupCheck.ts: a failed external check stays null (unknown),
+      // never silently reported as "confirmado limpo".
+    }
+    let registro: string;
+    let simulado: boolean;
+    try {
+      const result = await registrarNaRegistradora({ registradoraKey: escolhida.key, duplicataId: referenciaExterna, valor, sacadoCnpj, vencimento });
+      registro = result.registro;
+      simulado = result.simulado;
+    } catch (err) {
+      if (err instanceof RegistroIndisponivelError) {
+        res.status(503).json({ error: 'registradora_indisponivel', message: 'A registradora escolhida está indisponível no momento — tente novamente.' });
+        return;
+      }
+      throw err;
+    }
+    if (req.apiKey!.product === 'registro_api') {
+      await chargePerCall(req.apiUser!.id, 'registro_api', `Registro via API — ref. ${referenciaExterna}, registro ${registro} (${escolhida.name})`);
+    }
+    res.json({
+      referenciaExterna,
+      registradora: escolhida.name,
+      registro,
+      simulado,
+      duplicidadeConfirmada,
     });
   })
 );
