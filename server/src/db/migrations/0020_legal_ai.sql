@@ -1,0 +1,38 @@
+-- Legal AI modules: cobrança jurídica (collection document drafts), minutas jurídicas
+-- gerais, and a regulatory-change monitor. Every document generated here is explicitly a
+-- draft — lib/legalCollection.ts and lib/legalDraftGenerator.ts always prepend a fixed,
+-- deterministic disclaimer (never left to the LLM to remember) stating it requires review
+-- and signature by a licensed advogado (OAB) before any formal use — protocolo judicial,
+-- notificação oficial ou envio a terceiros. Nothing here is ever auto-filed, auto-sent or
+-- auto-protocolled; this is drafting assistance, not legal practice.
+
+CREATE TABLE IF NOT EXISTS legal_documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL CHECK(type IN ('notificacao_cobranca', 'minuta_protesto', 'peticao_execucao', 'resposta_lgpd', 'termos_atualizacao', 'notificacao_padrao')),
+  duplicata_id TEXT REFERENCES duplicatas(id),
+  content TEXT NOT NULL,
+  generated_by INTEGER REFERENCES users(id),
+  reviewed INTEGER NOT NULL DEFAULT 0,
+  reviewed_by INTEGER REFERENCES users(id),
+  reviewed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_legal_documents_duplicata ON legal_documents(duplicata_id);
+
+-- An admin pastes/uploads a normative text (resolução BACEN, circular, etc.) and Claude
+-- summarizes it + flags impact areas — deliberately not an automated scraper/feed (no
+-- reliable, honest source to poll), so every note here traces back to a real text a human
+-- actually supplied, not a fabricated "monitoring" claim.
+CREATE TABLE IF NOT EXISTS regulatory_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  source_text TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  impact_areas_json TEXT NOT NULL,
+  recommended_actions TEXT NOT NULL,
+  submitted_by INTEGER REFERENCES users(id),
+  acknowledged INTEGER NOT NULL DEFAULT 0,
+  acknowledged_by INTEGER REFERENCES users(id),
+  acknowledged_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

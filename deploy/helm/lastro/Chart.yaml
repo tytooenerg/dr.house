@@ -1,0 +1,16 @@
+apiVersion: v2
+name: lastro
+description: >-
+  Lastro — plataforma de antecipação de duplicatas escriturais. Empacota o mesmo processo
+  único descrito em ../../../Dockerfile e docker-compose.yml (server Express serve tanto a
+  API quanto o build estático do client) como um Deployment Kubernetes real.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/tytooenerg/dr.house
+keywords:
+  - fintech
+  - duplicatas
+  - receivables
+maintainers:
+  - name: Lastro

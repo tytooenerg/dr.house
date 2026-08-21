@@ -1,0 +1,40 @@
+services:
+  app:
+    build: .
+    ports:
+      - '4000:4000'
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DB_PATH: /app/server/data/lastro.db
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4000}
+      REDIS_URL: redis://redis:6379
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_EMPRESARIAL: ${STRIPE_PRICE_EMPRESARIAL:-}
+    volumes:
+      - lastro-data:/app/server/data
+      - lastro-uploads:/app/server/uploads
+    depends_on:
+      - redis
+
+  # Optional — the app runs fine with a single `app` instance and no Redis at all
+  # (REDIS_URL just won't resolve to anything meaningful). It's wired in here to
+  # demonstrate the multi-instance WebSocket relay path from ws.ts.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+volumes:
+  lastro-data:
+  lastro-uploads:

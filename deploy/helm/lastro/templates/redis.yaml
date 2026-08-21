@@ -1,0 +1,49 @@
+{{/*
+Bare demo Redis, mirroring docker-compose.yml's optional `redis` service — a single
+replica, no persistence, no auth. Fine for demonstrating the multi-instance WebSocket
+relay path (server/src/ws.ts); not production-grade HA Redis. Point REDIS_URL at a real
+managed Redis instead for anything that matters (and leave this disabled).
+*/}}
+{{- if .Values.redis.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lastro.fullname" . }}-redis
+  labels:
+    {{- include "lastro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "lastro.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "lastro.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          ports:
+            - containerPort: 6379
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "lastro.fullname" . }}-redis
+  labels:
+    {{- include "lastro.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+  selector:
+    {{- include "lastro.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+{{- end }}

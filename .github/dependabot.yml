@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # npm workspaces (server, client, sdks/node) share one root package-lock.json — a single
+  # "npm" entry rooted at "/" covers all three, same as `npm install` from the repo root
+  # already does.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Security patches land immediately as their own PR; routine version bumps get
+      # batched weekly into one PR per major/minor|patch tier so they don't flood the PR
+      # list — ci.yml (typecheck+test+build+e2e across all 3 workspaces) runs on every one
+      # either way, so a human only has to review+merge, not chase down what broke.
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: pip
+    directory: "/sdks/python"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Keeps the CI/publish workflows' own actions/*, setup-node, setup-python etc. current —
+  # the same category of "someone has to remember to check" toil as an npm/pip CVE, just
+  # for the pipeline itself instead of the app.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

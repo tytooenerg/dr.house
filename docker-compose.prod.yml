@@ -1,0 +1,92 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # `:?message` (real Docker Compose syntax) refuses to even start the stack if these
+      # aren't set in .env — no insecure fallback in production, unlike the dev-oriented
+      # docker-compose.yml. See DEPLOY.md for exactly how to generate/obtain each one.
+      JWT_SECRET: ${JWT_SECRET:?Set a real JWT_SECRET in .env — e.g. `openssl rand -hex 32`}
+      APP_URL: ${APP_URL:?Set APP_URL in .env — e.g. https://app.suaempresa.com.br}
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env — usually the same value as APP_URL}
+      DB_PATH: /app/server/data/lastro.db
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env — e.g. `openssl rand -hex 24`}@redis:6379
+      # Everything below is genuinely optional — the app runs fully (with honest simulated
+      # fallbacks) without any of it. Uncomment/set in .env only the integrations you've
+      # actually contracted — see server/.env.example for what each one unlocks.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_EMPRESARIAL: ${STRIPE_PRICE_EMPRESARIAL:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      BACKUP_OFFSITE_CMD: ${BACKUP_OFFSITE_CMD:-}
+    volumes:
+      - lastro-data:/app/server/data
+      - lastro-uploads:/app/server/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4000/api/health']
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    # No ports published to the host — only reachable through the caddy service on this
+    # same internal Compose network, which is what actually terminates HTTPS. Never expose
+    # the raw app port to the internet directly.
+    expose:
+      - '4000'
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Password-protected and never published to the host — a bare `redis:7-alpine` with an
+    # exposed, unauthenticated port is a real, common way production Redis instances get
+    # compromised. This one is internal-only (no `ports:`) and requires the same
+    # REDIS_PASSWORD the app authenticates with above.
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}']
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:?}', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Real, automatic HTTPS (Let's Encrypt, auto-renewed) terminating in front of `app` — the
+  # one piece a bare `docker compose up` can't give you: a real production deployment needs
+  # a real domain pointed at this server (DNS A/AAAA record) and port 80/443 reachable from
+  # the internet for the ACME challenge. See DEPLOY.md for the exact DNS/firewall steps.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      APP_DOMAIN: ${APP_URL:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  lastro-data:
+  lastro-uploads:
+  caddy-data:
+  caddy-config:

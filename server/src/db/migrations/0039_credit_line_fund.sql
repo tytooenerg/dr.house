@@ -1,0 +1,30 @@
+-- Abre a linha de crédito rotativa (0038_credit_line.sql) para funding de investidor — até
+-- aqui, todo saque de um cedente saía implicitamente do capital da própria Lastro. Agora um
+-- pool real, fundeado por investidores, é a fonte de cada saque: sem aporte de investidor no
+-- pool, não há saque possível. Devoluções (principal + juros) do cedente voltam ao pool,
+-- disponíveis para financiar o próximo saque ou para resgate do investidor.
+CREATE TABLE IF NOT EXISTS credit_line_fund_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL CHECK(tipo IN ('aporte', 'resgate', 'saque_financiado', 'retorno')),
+  valor REAL NOT NULL, -- positive = money into the pool, negative = money out
+  descricao TEXT NOT NULL,
+  investor_id INTEGER REFERENCES users(id),
+  draw_id INTEGER REFERENCES credit_line_draws(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Principal contributed, tracked separately from the ledger (which mixes principal, yield
+-- returns and draws) so an investor's own "ainda no fundo" position is a simple, real sum —
+-- deliberately does NOT track a per-investor share of accumulated yield (that needs a real
+-- cota/NAV pricing model, out of scope for this pass — see lib/creditLineFund.ts). Interest
+-- collected from cedentes grows the pool's overall balance, benefiting whoever holds a
+-- position in it when it happens, rather than being attributed precisely per-contributor.
+CREATE TABLE IF NOT EXISTS credit_line_fund_contributions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  investor_id INTEGER NOT NULL REFERENCES users(id),
+  valor_aportado REAL NOT NULL,
+  valor_resgatado REAL NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_line_fund_contributions_investor ON credit_line_fund_contributions(investor_id);

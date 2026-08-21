@@ -1,0 +1,25 @@
+-- Automated suspicious-activity monitoring (lib/suspiciousActivityMonitor.ts) — a
+-- COAF-style ("Comunicação de Operação Suspeita" / RAIF) detection layer on top of the
+-- ledger, beyond the emission-time value-anomaly/NF-e-reuse alerts already in
+-- lib/fraudDetection.ts. Detection itself is real and automated (deterministic rules,
+-- same "deterministic core" principle as the Compliance AI Engine); actual submission to
+-- COAF's SISCOAP gateway requires a licensed institution's real credentials this repo
+-- can't have, so a flagged report is reviewed by an admin who either dismisses it or
+-- records that they reported it externally (external_reference holds the real COAF
+-- protocol number once that happens) — never a fabricated automatic submission.
+CREATE TABLE IF NOT EXISTS suspicious_activity_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  tipo TEXT NOT NULL CHECK(tipo IN ('fracionamento', 'entrada_saida_rapida')),
+  severidade TEXT NOT NULL DEFAULT 'atencao' CHECK(severidade IN ('atencao', 'critico')),
+  descricao TEXT NOT NULL,
+  evidencia TEXT NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'aberto' CHECK(status IN ('aberto', 'descartado', 'reportado_coaf')),
+  external_reference TEXT,
+  review_note TEXT,
+  reviewed_by INTEGER REFERENCES users(id),
+  reviewed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sar_status ON suspicious_activity_reports(status);
+CREATE INDEX IF NOT EXISTS idx_sar_user ON suspicious_activity_reports(user_id);

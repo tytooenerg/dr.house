@@ -1,0 +1,352 @@
+import { COLORS, SACADOS, type Rating, type Sacado, type SacadoFactor } from '../data/seed.js';
+import { normalizeCnpj, ratingColors, scoreColorFor, fmtBRL } from './format.js';
+import { summarizeSignals, type SignalSummary } from '../db/networkSignals.js';
+import { consultarBureau } from './creditBureau.js';
+import { consultarFluxoDeCaixa, type OpenFinanceCashFlowSignal } from './openFinance.js';
+import { askClaude, claudeEnabled, extractJson } from './claude.js';
+import { logger } from './logger.js';
+
+const AI_SIGNALS: Record<number, { text: string; color: string }[]> = {
+  1: [
+    { text: 'Notícias públicas: nenhuma menção negativa nos últimos 90 dias', color: COLORS.GREEN },
+    { text: 'Tendência de pagamento: estável, sem aceleração de atrasos', color: COLORS.GREEN },
+    { text: 'Exposição setorial: dentro da média do setor', color: COLORS.GREEN },
+  ],
+  2: [
+    { text: 'Notícias públicas: menção a reestruturação de fornecedores', color: COLORS.AMBER },
+    { text: 'Tendência de pagamento: leve aumento no prazo médio de quitação', color: COLORS.AMBER },
+    { text: 'Exposição setorial: acima da média, setor sob pressão de custos', color: COLORS.AMBER },
+  ],
+  3: [
+    { text: 'Notícias públicas: menção a disputa judicial em andamento', color: COLORS.RED },
+    { text: 'Tendência de pagamento: aceleração de atrasos nos últimos 60 dias', color: COLORS.RED },
+    { text: 'Exposição setorial: concentração de risco acima do limite recomendado', color: COLORS.RED },
+  ],
+};
+
+const PD12M_BY_RATING: Record<Rating, string> = { AA: '0,8%', A: '1,4%', B: '4,1%', C: '9,7%' };
+
+export function ratingFromScore(score: number): Rating {
+  if (score >= 80) return 'AA';
+  if (score >= 65) return 'A';
+  if (score >= 45) return 'B';
+  return 'C';
+}
+
+export interface SinaisDeRedeView {
+  total: number;
+  pontual: number;
+  atraso: number;
+  protesto: number;
+  contestacao: number;
+  confianca: 'baixa' | 'média' | 'alta';
+  scoreDeRede: number;
+}
+
+export interface RiscoView {
+  name: string;
+  cnpj: string;
+  score: number;
+  rating: Rating;
+  factors: SacadoFactor[];
+  scoreColor: string;
+  ratingBg: string;
+  ratingColor: string;
+  gaugeScore: number;
+  stageLabel: string;
+  stageBg: string;
+  stageColor: string;
+  stageDesc: string;
+  aiSignals: { text: string; color: string }[];
+  trendIcon: string;
+  trendColor: string;
+  trendDelta: string;
+  pd12m: string;
+  hasAlerta: boolean;
+  alerta: string | null;
+  fonte: 'interno' | 'rede' | 'combinado';
+  sinaisDeRede: SinaisDeRedeView | null;
+  bureau: { score: number; fonte: string } | null;
+  openFinance: { receitaMediaMensalFmt: string; volatilidadePct: number; fonte: string } | null;
+}
+
+// Shared by the internal /api/risco/:name route (used by the SPA) and the public
+// /api/v1 partner score endpoint — same scoring model either way.
+export function buildRiscoView(name: string, s: Sacado): RiscoView {
+  const sc = scoreColorFor(s.score);
+  const rc = ratingColors(s.rating);
+  const stage = s.score >= 75 ? 1 : s.score >= 55 ? 2 : 3;
+  const stageMeta = {
+    1: { label: 'Estágio 1', bg: '#EAF3EE', color: COLORS.GREEN, desc: 'Risco normal — provisão cobre apenas os próximos 12 meses.' },
+    2: { label: 'Estágio 2', bg: '#FBF1E0', color: COLORS.AMBER, desc: 'Aumento relevante de risco — provisão pela vida útil do contrato (Lifetime ECL).' },
+    3: { label: 'Estágio 3', bg: '#F7E9E7', color: COLORS.RED, desc: 'Inadimplência efetiva — exige provisão integral do valor exposto.' },
+  }[stage];
+
+  return {
+    name,
+    cnpj: s.cnpj,
+    score: s.score,
+    rating: s.rating,
+    factors: s.factors,
+    scoreColor: sc,
+    ratingBg: rc.bg,
+    ratingColor: rc.color,
+    gaugeScore: s.score,
+    stageLabel: stageMeta.label,
+    stageBg: stageMeta.bg,
+    stageColor: stageMeta.color,
+    stageDesc: stageMeta.desc,
+    aiSignals: AI_SIGNALS[stage],
+    trendIcon: s.trend === 'up' ? '▲' : s.trend === 'down' ? '▼' : '—',
+    trendColor: s.trend === 'up' ? COLORS.GREEN : s.trend === 'down' ? COLORS.RED : '#5B6472',
+    trendDelta: s.trendDelta,
+    pd12m: s.pd12m,
+    hasAlerta: !!s.alerta,
+    alerta: s.alerta,
+    fonte: 'interno',
+    sinaisDeRede: null,
+    bureau: null,
+    openFinance: null,
+  };
+}
+
+export function findSacadoByName(name: string): { name: string; sacado: Sacado } | null {
+  const s = SACADOS[name];
+  return s ? { name, sacado: s } : null;
+}
+
+export function findSacadoByCnpj(cnpj: string): { name: string; sacado: Sacado } | null {
+  const target = normalizeCnpj(cnpj);
+  if (!target) return null;
+  const entry = Object.entries(SACADOS).find(([, s]) => normalizeCnpj(s.cnpj) === target);
+  return entry ? { name: entry[0], sacado: entry[1] } : null;
+}
+
+function confidenceFor(total: number): 'baixa' | 'média' | 'alta' {
+  if (total < 3) return 'baixa';
+  if (total < 10) return 'média';
+  return 'alta';
+}
+
+const CONFIDENCE_WEIGHT: Record<'baixa' | 'média' | 'alta', number> = { baixa: 0.1, média: 0.2, alta: 0.35 };
+
+// The score a CNPJ would get purely from what partners (via the public API) and Lastro's
+// own real aceite outcomes have reported about it — independent of whether it has ever
+// been SACADOS-matched internally. This is what lets a CNPJ that never transacted
+// directly on Lastro still get a real, if low-confidence, score.
+function networkView(summary: SignalSummary): SinaisDeRedeView | null {
+  if (summary.total === 0) return null;
+  const raw = 70 - summary.protesto * 15 - summary.atraso * 5 - summary.contestacao * 8 + summary.pontual * 3;
+  const scoreDeRede = Math.max(5, Math.min(98, Math.round(raw)));
+  return {
+    total: summary.total,
+    pontual: summary.pontual,
+    atraso: summary.atraso,
+    protesto: summary.protesto,
+    contestacao: summary.contestacao,
+    confianca: confidenceFor(summary.total),
+    scoreDeRede,
+  };
+}
+
+// The real "fragmentation fix" entry point: blends Lastro's own SACADOS profile (if the
+// CNPJ matches one) with cross-platform network signals reported by API partners. A CNPJ
+// with only network signals (never transacted on Lastro) still gets a real score; a CNPJ
+// with both gets the internal score nudged by the network's confidence-weighted evidence.
+export async function buildBlendedRiscoView(cnpj: string, userId?: number): Promise<RiscoView | null> {
+  const view = buildBlendedRiscoViewSync(cnpj);
+  if (!view) return null;
+  const withBureau = await applyBureauBlend(view, cnpj);
+  const withOpenFinance = await applyOpenFinanceBlend(withBureau, cnpj);
+  return applyAiNarrative(withOpenFinance, userId);
+}
+
+// A real bureau score (Serasa/Boa Vista/Quod — see lib/creditBureau.ts) is combined the
+// same way network signals are: a fixed weight nudging whatever internal/network score
+// was already computed, never fully replacing it. No-op when BUREAU_API_URL/KEY isn't
+// configured, so this only changes behavior once you actually have a bureau contract.
+const BUREAU_WEIGHT = 0.3;
+
+async function applyBureauBlend(view: RiscoView, cnpj: string): Promise<RiscoView> {
+  let bureau: { score: number; fonte: string } | null = null;
+  try {
+    bureau = await consultarBureau(cnpj);
+  } catch (err) {
+    logger.warn({ err }, '[risco] falha ao consultar bureau de crédito externo');
+  }
+  if (!bureau) return view;
+
+  const blendedScore = Math.round(view.score * (1 - BUREAU_WEIGHT) + bureau.score * BUREAU_WEIGHT);
+  const rating = ratingFromScore(blendedScore);
+  return {
+    ...view,
+    score: blendedScore,
+    rating,
+    scoreColor: scoreColorFor(blendedScore),
+    ratingBg: ratingColors(rating).bg,
+    ratingColor: ratingColors(rating).color,
+    gaugeScore: blendedScore,
+    pd12m: PD12M_BY_RATING[rating],
+    factors: [...view.factors, { label: `Score externo (${bureau.fonte})`, value: `${bureau.score}`, barPct: `${bureau.score}%`, barColor: scoreColorFor(bureau.score) }],
+    bureau,
+  };
+}
+
+// Real Open Finance cash-flow data (lib/openFinance.ts) blended the same way — a fixed
+// weight nudging whatever score was already computed, never fully replacing it. Lower
+// revenue volatility (a more predictable cash flow) pulls the score up; higher volatility
+// pulls it down. No-op when OPEN_FINANCE_API_URL/KEY isn't configured or no consent is on
+// file for this CNPJ yet.
+const OPEN_FINANCE_WEIGHT = 0.25;
+
+async function applyOpenFinanceBlend(view: RiscoView, cnpj: string): Promise<RiscoView> {
+  let signal: OpenFinanceCashFlowSignal | null = null;
+  try {
+    signal = await consultarFluxoDeCaixa(cnpj);
+  } catch (err) {
+    logger.warn({ err }, '[risco] falha ao consultar sinal de fluxo de caixa via Open Finance');
+  }
+  if (!signal) return view;
+
+  const openFinanceScore = Math.max(5, Math.min(98, Math.round(100 - signal.volatilidadePct)));
+  const blendedScore = Math.round(view.score * (1 - OPEN_FINANCE_WEIGHT) + openFinanceScore * OPEN_FINANCE_WEIGHT);
+  const rating = ratingFromScore(blendedScore);
+  return {
+    ...view,
+    score: blendedScore,
+    rating,
+    scoreColor: scoreColorFor(blendedScore),
+    ratingBg: ratingColors(rating).bg,
+    ratingColor: ratingColors(rating).color,
+    gaugeScore: blendedScore,
+    pd12m: PD12M_BY_RATING[rating],
+    factors: [
+      ...view.factors,
+      { label: 'Fluxo de caixa (Open Finance)', value: `${fmtBRL(signal.receitaMediaMensal)}/mês, volatilidade ${signal.volatilidadePct}%`, barPct: `${openFinanceScore}%`, barColor: scoreColorFor(openFinanceScore) },
+    ],
+    openFinance: { receitaMediaMensalFmt: fmtBRL(signal.receitaMediaMensal), volatilidadePct: signal.volatilidadePct, fonte: signal.fonte },
+  };
+}
+
+const AI_SIGNAL_SYSTEM = `Você é um analista de crédito que resume o perfil de risco de uma empresa sacada (devedora de duplicatas) para um investidor decidir se compra a operação. Com base nos dados reais fornecidos (nunca invente fatos que não estão nos dados), escreva de 2 a 4 observações curtas e objetivas, em português, sobre tendência de pagamento, concentração/exposição e qualquer sinal de alerta real presente nos dados.
+Responda APENAS com um JSON válido no formato exato:
+{"signals": [{"text": "observação objetiva, 1 frase", "severity": "ok"|"atencao"|"critico"}]}
+Não mencione "notícias públicas" nem invente fontes externas que não foram fornecidas — baseie-se só nos dados dados a seguir.`;
+
+const SEVERITY_TO_COLOR: Record<'ok' | 'atencao' | 'critico', string> = { ok: COLORS.GREEN, atencao: COLORS.AMBER, critico: COLORS.RED };
+
+// Replaces the static AI_SIGNALS canned copy (same 3 fixed lines per stage, regardless of
+// which sacado) with a real Claude-generated read of this specific sacado's actual score,
+// rating, factors, network signals and bureau data (when present). Falls back to the
+// original canned text — not a fabricated narrative — when ANTHROPIC_API_KEY isn't set or
+// the call fails, so behavior without a key is unchanged from before this feature existed.
+async function applyAiNarrative(view: RiscoView, userId?: number): Promise<RiscoView> {
+  if (!claudeEnabled) return view;
+  try {
+    const context = [
+      `Sacado: ${view.name}`,
+      `Score: ${view.score} (rating ${view.rating})`,
+      `Tendência: ${view.trendDelta}`,
+      `Probabilidade de default 12m: ${view.pd12m}`,
+      `Fatores conhecidos: ${view.factors.map((f) => `${f.label} = ${f.value}`).join('; ')}`,
+      view.sinaisDeRede ? `Sinais de rede reportados por parceiros: ${JSON.stringify(view.sinaisDeRede)}` : null,
+      view.bureau ? `Score de bureau externo: ${view.bureau.score} (fonte: ${view.bureau.fonte})` : null,
+      view.alerta ? `Alerta ativo: ${view.alerta}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const text = await askClaude(AI_SIGNAL_SYSTEM, context, 400, { feature: 'risco_narrative', userId });
+    if (!text) return view;
+    const parsed = extractJson<{ signals: { text: string; severity: 'ok' | 'atencao' | 'critico' }[] }>(text);
+    if (!parsed || !Array.isArray(parsed.signals) || parsed.signals.length === 0) return view;
+    return { ...view, aiSignals: parsed.signals.slice(0, 4).map((s) => ({ text: s.text, color: SEVERITY_TO_COLOR[s.severity] || COLORS.AMBER })) };
+  } catch (err) {
+    logger.warn({ err }, '[risco] falha ao gerar narrativa de IA — mantendo texto padrão');
+    return view;
+  }
+}
+
+// Exported so risco.ts can apply the same real narrative to the internal-only fallback
+// path (buildRiscoView without any network/bureau blend), not just the blended view.
+export { applyAiNarrative };
+
+function buildBlendedRiscoViewSync(cnpj: string): RiscoView | null {
+  const internal = findSacadoByCnpj(cnpj);
+  const rede = networkView(summarizeSignals(cnpj));
+
+  if (!internal && !rede) return null;
+
+  if (internal && !rede) {
+    return buildRiscoView(internal.name, internal.sacado);
+  }
+
+  if (!internal && rede) {
+    const rating = ratingFromScore(rede.scoreDeRede);
+    const alerta =
+      rede.protesto > 0
+        ? `${rede.protesto} protesto(s) reportado(s) por parceiros da rede.`
+        : rede.contestacao > 0
+          ? `${rede.contestacao} contestação(ões) reportada(s) por parceiros da rede.`
+          : null;
+    return {
+      name: normalizeCnpj(cnpj),
+      cnpj,
+      score: rede.scoreDeRede,
+      rating,
+      factors: [
+        { label: 'Sinais de rede — pagamentos pontuais', value: `${rede.pontual}`, barPct: '60%', barColor: COLORS.GREEN },
+        { label: 'Sinais de rede — atrasos', value: `${rede.atraso}`, barPct: '40%', barColor: COLORS.AMBER },
+        { label: 'Sinais de rede — protestos/contestações', value: `${rede.protesto + rede.contestacao}`, barPct: '20%', barColor: COLORS.RED },
+      ],
+      scoreColor: scoreColorFor(rede.scoreDeRede),
+      ratingBg: ratingColors(rating).bg,
+      ratingColor: ratingColors(rating).color,
+      gaugeScore: rede.scoreDeRede,
+      stageLabel: rede.scoreDeRede >= 75 ? 'Estágio 1' : rede.scoreDeRede >= 55 ? 'Estágio 2' : 'Estágio 3',
+      stageBg: rede.scoreDeRede >= 75 ? '#EAF3EE' : rede.scoreDeRede >= 55 ? '#FBF1E0' : '#F7E9E7',
+      stageColor: rede.scoreDeRede >= 75 ? COLORS.GREEN : rede.scoreDeRede >= 55 ? COLORS.AMBER : COLORS.RED,
+      stageDesc: 'Score calculado exclusivamente a partir de sinais reportados por parceiros da rede — este CNPJ não tem histórico direto na Lastro.',
+      aiSignals: [],
+      trendIcon: '—',
+      trendColor: '#5B6472',
+      trendDelta: `confiança ${rede.confianca} (${rede.total} sinal(is))`,
+      pd12m: PD12M_BY_RATING[rating],
+      hasAlerta: !!alerta,
+      alerta,
+      fonte: 'rede',
+      sinaisDeRede: rede,
+      bureau: null,
+    openFinance: null,
+    };
+  }
+
+  // both internal and network data exist — blend, weighted by network confidence.
+  const base = buildRiscoView(internal!.name, internal!.sacado);
+  const weight = CONFIDENCE_WEIGHT[rede!.confianca];
+  const blendedScore = Math.round(base.score * (1 - weight) + rede!.scoreDeRede * weight);
+  const rating = ratingFromScore(blendedScore);
+  return {
+    ...base,
+    score: blendedScore,
+    rating,
+    scoreColor: scoreColorFor(blendedScore),
+    ratingBg: ratingColors(rating).bg,
+    ratingColor: ratingColors(rating).color,
+    gaugeScore: blendedScore,
+    pd12m: PD12M_BY_RATING[rating],
+    factors: [
+      ...base.factors,
+      {
+        label: 'Sinais de rede (parceiros)',
+        value: `${rede!.total} sinal(is), confiança ${rede!.confianca}`,
+        barPct: `${Math.round(weight * 100)}%`,
+        barColor: rede!.protesto + rede!.contestacao > rede!.pontual ? COLORS.AMBER : COLORS.GREEN,
+      },
+    ],
+    fonte: 'combinado',
+    sinaisDeRede: rede,
+    bureau: null,
+    openFinance: null,
+  };
+}

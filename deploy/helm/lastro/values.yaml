@@ -1,0 +1,122 @@
+# Default values for the lastro chart.
+
+image:
+  # No public registry publish happened from this sandbox (same honest-gap reasoning as
+  # sdks/README.md not being published to npm/PyPI) — point this at wherever you build
+  # and push the image from ../../../Dockerfile (e.g. `docker build -t your-registry/lastro:1.0.0 .`).
+  repository: your-registry/lastro
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+# IMPORTANT — read before changing this: the app persists to SQLite (better-sqlite3,
+# see server/src/db/index.ts), a single-writer embedded database. Every replica would
+# write to the same file on a shared volume, and SQLite's WAL mode supports one writer at
+# a time — running replicas > 1 against the same DB_PATH will corrupt data or silently
+# drop writes under real concurrent load. Keep this at 1 until the app is migrated to
+# Postgres per ../../../docs/postgres-migration.md (that document is itself honest that
+# the migration isn't implemented yet). Horizontal scaling for read-heavy traffic without
+# that migration would need a from-scratch design (e.g. a read replica pattern), not this
+# chart as written.
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 4000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: lastro.example.com
+  tls:
+    enabled: false
+    secretName: lastro-tls
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# Persistent storage for the SQLite database file and uploaded documents (NF-e, KYB docs)
+# — matches the two named volumes in ../../../docker-compose.yml (lastro-data,
+# lastro-uploads). ReadWriteOnce is correct and sufficient exactly because replicaCount
+# is pinned to 1 above.
+persistence:
+  data:
+    enabled: true
+    size: 2Gi
+    storageClassName: ""
+    accessMode: ReadWriteOnce
+  uploads:
+    enabled: true
+    size: 5Gi
+    storageClassName: ""
+    accessMode: ReadWriteOnce
+
+# Config that isn't secret — same defaults as .env.example / docker-compose.yml.
+env:
+  NODE_ENV: production
+  PORT: "4000"
+  DB_PATH: /app/server/data/lastro.db
+  UPLOADS_DIR: /app/server/uploads
+  CORS_ORIGINS: "https://lastro.example.com"
+
+# Everything secret (JWT_SECRET, ANTHROPIC_API_KEY, STRIPE_*, SMTP_*, TWILIO_*,
+# REGISTRADORA_*, PIX_PSP_*, GOOGLE_OAUTH_*, SAML_*, OTEL_*, and every other real-when-
+# configured integration key documented in ../../../server/.env.example) is deliberately
+# NOT enumerated here as individual values — that's ~40 keys and growing, most deployments
+# only set a handful, and hardcoding secret *values* into a values.yaml is itself a bad
+# practice this chart shouldn't encourage. Bring your own Kubernetes Secret (created
+# however your organization already manages secrets — sealed-secrets, external-secrets,
+# a plain `kubectl create secret generic`, …) with the keys you need as its data keys, and
+# point the chart at it here; every key in that Secret becomes an env var via envFrom.
+existingSecret: "" # e.g. "lastro-secrets" — leave empty to run with `env` above only
+
+redis:
+  # Optional — see ../../../docker-compose.yml's comment: the app runs fine with this
+  # disabled (REDIS_URL just won't resolve to anything meaningful, WebSocket relay stays
+  # single-instance-only, which is consistent with replicaCount: 1 anyway). Enable this
+  # only if you're pointing REDIS_URL at a real external Redis instead (in which case set
+  # redis.enabled: false and pass REDIS_URL via existingSecret/env yourself) — this chart's
+  # own bundled Redis is a bare single-replica demo instance, not production-grade HA Redis.
+  enabled: false
+  image: redis:7-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+# Real liveness/readiness probes against the actual public status endpoint
+# (GET /api/public/status, routes/public.ts) — not a fabricated /healthz that doesn't
+# exist in the app.
+probes:
+  path: /api/public/status
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+
+autoscaling:
+  # Disabled by default for the same reason replicaCount is pinned — see the comment
+  # above. Enabling this without first migrating off SQLite will cause data corruption
+  # under concurrent writes the moment more than one pod is scheduled.
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 70
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

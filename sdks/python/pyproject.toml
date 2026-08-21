@@ -1,0 +1,30 @@
+[project]
+name = "lastro-sdk"
+version = "1.0.0"
+description = "Official Python SDK for the Lastro Partner API (/api/v1)."
+readme = "README.md"
+requires-python = ">=3.9"
+# UNLICENSED is a deliberate safe default, not a real decision made on a maintainer's
+# behalf — legally, nobody may use a package under this "license". Choosing a real
+# open-source license is step 2 of sdks/PUBLISHING.md's checklist, required before an
+# actual publish.
+license = { text = "UNLICENSED" }
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/tytooenerg/dr.house/tree/main/sdks/python#readme"
+Repository = "https://github.com/tytooenerg/dr.house"
+Issues = "https://github.com/tytooenerg/dr.house/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lastro_sdk*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

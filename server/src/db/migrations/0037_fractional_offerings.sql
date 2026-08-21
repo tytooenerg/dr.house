@@ -1,0 +1,24 @@
+-- Tokenização/fracionamento de duplicatas grandes — a real, purely additive investment
+-- vehicle alongside the existing whole-position purchase flow (db/duplicatas.ts's
+-- purchases table is never touched by this). Only duplicatas above a value threshold are
+-- eligible, and only one path (whole purchase OR fractional offering) can ever win for a
+-- given duplicata — see lib/fractionalOfferings.ts for the mutual-exclusion checks.
+CREATE TABLE IF NOT EXISTS fractional_offerings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  duplicata_id TEXT NOT NULL UNIQUE REFERENCES duplicatas(id),
+  total_tokens INTEGER NOT NULL,
+  token_valor REAL NOT NULL,
+  tokens_vendidos INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK(status IN ('aberta', 'concluida')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS fractional_holdings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  offering_id INTEGER NOT NULL REFERENCES fractional_offerings(id),
+  investor_id INTEGER NOT NULL REFERENCES users(id),
+  tokens INTEGER NOT NULL,
+  valor_investido REAL NOT NULL,
+  retorno REAL NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Catches the kind of drift that only shows up because real time passed, not because any
+  # code changed — e.g. the seed data's vencimento dates silently going stale once the
+  # wall clock caught up to them (fixed in db/data/seed.ts, see the "o que podemos
+  # melhorar" README section), which no push/pull_request run could ever have caught since
+  # nothing was pushed the day it broke. A scheduled run against main every night, with
+  # GitHub's own default failure-email-to-watchers behavior, means that class of bug gets
+  # caught by CI itself instead of by whoever next happens to run the suite by hand.
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck server
+        run: npm run typecheck -w server
+
+      - name: Typecheck client
+        run: npm run typecheck -w client
+
+      - name: Typecheck Node SDK
+        run: npm run typecheck -w sdks/node
+
+      - name: Run server test suite
+        run: npm run test -w server
+
+      - name: Run client test suite
+        run: npm run test -w client
+
+      - name: Run Node SDK test suite (real, against the actual server in-process)
+        run: npm run test -w sdks/node
+
+      - name: Install Python SDK (editable, with dev deps)
+        run: pip install -e ".[dev]"
+        working-directory: sdks/python
+
+      - name: Run Python SDK test suite (real, against the actual server as a subprocess)
+        run: python -m pytest -v
+        working-directory: sdks/python
+
+      - name: Build server
+        run: npm run build -w server
+
+      - name: Build client
+        run: npm run build -w client
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      - name: Run E2E test suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+  # Keeps server/src/db/migrations-postgres/ honest: scripts/postgres/generate-schema.mjs's
+  # translation is only worth anything if it's actually re-verified against a real Postgres
+  # whenever a migration changes, not just the one time it was done by hand (see
+  # docs/postgres-migration.md and scripts/postgres/README.md). A real postgres:16 service
+  # container, not a mock — the same check that was run manually while building this.
+  postgres-schema-check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Translate SQLite migrations to Postgres
+        run: node scripts/postgres/generate-schema.mjs
+
+      - name: Validate translated schema against a real Postgres 16
+        run: bash scripts/postgres/validate-schema.sh
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres

@@ -1,0 +1,24 @@
+{
+  "name": "lastro-platform",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "client",
+    "server",
+    "e2e",
+    "sdks/node"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w server && npm run build -w client",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client && npm run typecheck -w sdks/node",
+    "test": "npm run test -w server && npm run test -w client && npm run test -w sdks/node",
+    "test:e2e": "npm run test -w e2e",
+    "loadtest": "node scripts/loadtest/run.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
