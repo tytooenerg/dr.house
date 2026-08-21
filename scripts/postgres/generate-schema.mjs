@@ -120,6 +120,15 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('investidor','
   '0046_bank_statement_reconciliation.sql': `ALTER TABLE reconciliation_flags DROP CONSTRAINT reconciliation_flags_tipo_check;
 ALTER TABLE reconciliation_flags ADD CONSTRAINT reconciliation_flags_tipo_check CHECK (tipo IN ('pix', 'boleto', 'ted', 'extrato_bancario'));
 `,
+  // Same rebuild idiom again (0049 widens users.role, 0050 widens addon_charges.kind) —
+  // registered here from the start this time, unlike 0045/0046 above, precisely because
+  // that comment already warned this would keep happening otherwise.
+  '0049_api_partner_role.sql': `ALTER TABLE users DROP CONSTRAINT users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('investidor','cedente','sacado','admin','seguradora','auditor','api_partner'));
+`,
+  '0050_registro_api_addon_kind.sql': `ALTER TABLE addon_charges DROP CONSTRAINT addon_charges_kind_check;
+ALTER TABLE addon_charges ADD CONSTRAINT addon_charges_kind_check CHECK (kind IN ('api_overage', 'score_api', 'pld_screening_api', 'registro_api', 'whitelabel_plus', 'institutional_reporting'));
+`,
 };
 
 const files = readdirSync(srcDir).filter((f) => f.endsWith('.sql')).sort();
