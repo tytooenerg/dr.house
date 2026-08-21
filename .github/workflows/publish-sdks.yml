@@ -27,7 +27,7 @@ jobs:
     environment: npm-publish
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -73,7 +73,7 @@ jobs:
       # The Python SDK's tests spawn the real Lastro server (via tsx) as a subprocess for
       # genuine end-to-end coverage (sdks/python/tests/conftest.py) — needs the server's own
       # real dependencies installed, not just Python tooling.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
