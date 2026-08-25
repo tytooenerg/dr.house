@@ -16,6 +16,8 @@ import { chargePerCall } from '../lib/addOnBilling.js';
 import { screenEntity } from '../db/sanctions.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { apiVersioningHeaders } from '../lib/apiVersioning.js';
+import { listByCedente as listPayablesByCedente } from '../db/payables.js';
+import { buildCashflowForecast } from '../lib/cashflowForecast.js';
 
 // Public, versioned, API-key-authenticated endpoints for external partners (ERPs, FIDCs,
 // securitizadoras, sacados, seguradoras…) to integrate with directly — distinct from the
@@ -104,6 +106,44 @@ v1Router.get('/duplicatas/:id', (req, res) => {
 // the real, live offers other partners' live keys operate on.
 v1Router.get('/marketplace', (req, res) => {
   res.json({ offers: listMarketplace(req.apiKey!.mode === 'test').map(buildOfferView) });
+});
+
+// Cedente-facing financial endpoints — a cedente's own back-office (ERP, or a separate
+// financial-management product like a "CFO digital") can pull its contas a pagar and cash
+// flow projection the same way the SPA's /app/contas-pagar and /app/ai-cfo do, just over
+// the versioned partner API instead of a cookie session. Read-only, no requireWriteScope.
+// A test-mode key sees nothing here today (payables/duplicatas used for the forecast
+// aren't seeded per sandbox key) — same non-forgery posture as every other v1 endpoint,
+// just nothing to show yet for sandbox.
+v1Router.get('/payables', (req, res) => {
+  if (req.apiUser!.role !== 'cedente') {
+    res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas cedente podem acessar este recurso.' });
+    return;
+  }
+  const payables = listPayablesByCedente(req.apiUser!.id).map((p) => ({
+    id: p.id,
+    descricao: p.descricao,
+    fornecedor: p.fornecedor,
+    categoria: p.categoria,
+    valorFmt: fmtBRL(p.valor),
+    valor: p.valor,
+    vencimento: p.vencimento,
+    status: p.status,
+    recorrente: !!p.recorrente,
+  }));
+  res.json({ payables });
+});
+
+// Same projection lib/cashflowForecast.ts feeds into the SPA's AI CFO tab
+// (client/src/pages/app/AiCfoPage.tsx) — exposed here so an external product can build
+// its own cash-flow view/agent on top of Lastro's real receivables + payables data instead
+// of re-deriving it, or having a human re-key it from the dashboard.
+v1Router.get('/cashflow/forecast', (req, res) => {
+  if (req.apiUser!.role !== 'cedente') {
+    res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas cedente podem acessar este recurso.' });
+    return;
+  }
+  res.json(buildCashflowForecast(req.apiUser!.id));
 });
 
 // Sacado-facing aceite endpoints — a sacado's ERP can list pending aceites and

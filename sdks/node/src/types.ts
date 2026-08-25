@@ -94,3 +94,44 @@ export interface PldTriagemResult {
   flagged: boolean;
   match: { nome: string; tipo: string; fonte: string } | null;
 }
+
+export interface PayableView {
+  id: number;
+  descricao: string;
+  fornecedor: string;
+  categoria: string;
+  valorFmt: string;
+  valor: number;
+  vencimento: string;
+  status: 'pendente' | 'pago' | 'cancelado';
+  recorrente: boolean;
+}
+
+export interface CashflowHorizonPoint {
+  days: number;
+  receitaEsperadaFmt: string;
+  despesaEsperadaFmt: string;
+  saldoProjetadoFmt: string;
+  saldoProjetado: number;
+  deficit: boolean;
+}
+
+export interface CashflowScenarioResult {
+  scenario: 'pessimista' | 'base' | 'otimista';
+  points: CashflowHorizonPoint[];
+}
+
+export interface CashflowInsight {
+  tipo: 'deficit' | 'antecipacao_recomendada' | 'ok';
+  mensagem: string;
+}
+
+export interface CashflowForecast {
+  disponivelParaAntecipacaoFmt: string;
+  disponivelParaAntecipacao: number;
+  totalRecebiveisPendentesFmt: string;
+  totalContasAPagarPendentesFmt: string;
+  scenarios: CashflowScenarioResult[];
+  insights: CashflowInsight[];
+  geradoEm: string;
+}
