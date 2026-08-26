@@ -38,6 +38,12 @@ export const openApiSpec = {
   },
   paths: {
     '/duplicatas': {
+      get: {
+        summary: 'Listar todas as duplicatas do cedente dono da chave (somente contas cedente)',
+        description:
+          'Todas as duplicatas do cedente, qualquer status — não só a elegível pra antecipação. Pensado pra um parceiro calcular DSO, aging, concentração por sacado e inadimplência esperada sem N chamadas a GET /duplicatas/{id}.',
+        responses: { '200': { description: 'Lista de duplicatas.' }, '403': { description: 'Chave não pertence a uma conta cedente.' } },
+      },
       post: {
         summary: 'Emitir uma duplicata escriturada (somente contas cedente)',
         parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],

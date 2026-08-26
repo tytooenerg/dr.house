@@ -38,6 +38,23 @@ export interface DuplicataView {
   seguro: boolean;
 }
 
+// Retornado por GET /duplicatas (lista) — mais completo que DuplicataView (que espelha
+// GET /duplicatas/:id): traz valor numérico, sacadoCnpj, emissão e score, pensado pra
+// cálculos de DSO/aging/concentração no lado do parceiro, não só exibição.
+export interface DuplicataListItem {
+  id: string;
+  status: string;
+  sacado: string;
+  sacadoCnpj: string;
+  valor: number;
+  valorFmt: string;
+  emissao: string;
+  vencimento: string;
+  lastroPct: number;
+  seguro: boolean;
+  score: number | null;
+}
+
 export interface MarketplaceOffer {
   id: string;
   sacado: string;

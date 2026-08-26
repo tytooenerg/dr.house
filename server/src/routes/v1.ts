@@ -8,7 +8,7 @@ import { buildBlendedRiscoView } from '../lib/riscoCore.js';
 import { addSignal } from '../db/networkSignals.js';
 import { getRegistradora, chooseRegistradora, registrarNaRegistradora, checkDuplicidadeNaRegistradora, RegistroIndisponivelError } from '../lib/registradoras.js';
 import { withIdempotency } from '../lib/idempotency.js';
-import { getDuplicata, listMarketplace, listBySacadoNome } from '../db/duplicatas.js';
+import { getDuplicata, listMarketplace, listBySacadoNome, listByCedenteAndMode as listDuplicatasByCedente } from '../db/duplicatas.js';
 import { buildOfferView } from '../lib/marketCompute.js';
 import { fmtBRL } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -78,6 +78,33 @@ v1Router.post(
     res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
   })
 );
+
+// Lista as duplicatas do próprio cedente (todas, não só a elegível pra antecipação) — pra
+// um parceiro (ERP, ou um produto externo de gestão financeira como um "CFO digital")
+// calcular DSO, aging, concentração por sacado e inadimplência esperada sem precisar
+// re-derivar isso de N chamadas a GET /v1/duplicatas/:id. Sandbox-aware, mesma isolação
+// que /v1/duplicatas/:id e /v1/marketplace já garantem: uma chave test só vê seu próprio
+// dataset seedado (lib/sandboxData.ts), uma chave live só vê dados reais.
+v1Router.get('/duplicatas', (req, res) => {
+  if (req.apiUser!.role !== 'cedente') {
+    res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas cedente podem acessar este recurso.' });
+    return;
+  }
+  const duplicatas = listDuplicatasByCedente(req.apiUser!.id, req.apiKey!.mode === 'test').map((d) => ({
+    id: d.id,
+    status: d.status,
+    sacado: d.sacado_nome,
+    sacadoCnpj: d.sacado_cnpj,
+    valor: d.valor,
+    valorFmt: fmtBRL(d.valor),
+    emissao: d.emissao,
+    vencimento: d.vencimento,
+    lastroPct: d.lastro_pct,
+    seguro: !!d.seguro,
+    score: d.score,
+  }));
+  res.json({ duplicatas });
+});
 
 // A test-mode key can only ever see sandbox=1 rows, and a live key only sandbox=0 —
 // enforced here (not just at listing time) so a partner can't probe for a real

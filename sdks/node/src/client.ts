@@ -4,6 +4,7 @@ import type {
   AceiteView,
   CashflowForecast,
   DecidirSinistroInput,
+  DuplicataListItem,
   DuplicataView,
   EmitirDuplicataInput,
   EmitirDuplicataResult,
@@ -93,6 +94,11 @@ export class LastroClient {
 
   getDuplicata(id: string): Promise<DuplicataView> {
     return this.request('GET', `/duplicatas/${encodeURIComponent(id)}`);
+  }
+
+  /** Todas as duplicatas do cedente dono da chave — pensado pra cálculos de DSO/aging/concentração. */
+  listDuplicatas(): Promise<{ duplicatas: DuplicataListItem[] }> {
+    return this.request('GET', '/duplicatas');
   }
 
   // --- Marketplace ---

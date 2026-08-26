@@ -68,6 +68,12 @@ describe('LastroClient — real end-to-end against the live server', () => {
 
     const { offers } = await client.listMarketplace();
     expect(Array.isArray(offers)).toBe(true);
+
+    const { duplicatas } = await client.listDuplicatas();
+    const listed = duplicatas.find((d) => d.id === emitted.duplicataId);
+    expect(listed).toBeTruthy();
+    expect(listed!.valor).toBeGreaterThan(0);
+    expect(typeof listed!.emissao).toBe('string');
   });
 
   it('is idempotent: replaying the same Idempotency-Key + body returns the original result instead of emitting twice', async () => {

@@ -147,6 +147,45 @@ describe('GET /v1/payables and GET /v1/cashflow/forecast', () => {
   });
 });
 
+describe('GET /v1/duplicatas', () => {
+  it("lists the cedente's own duplicatas with numeric valor/emissao, for DSO/aging calculations", async () => {
+    const { token } = await registerEmpresarialCedente();
+    const gen = await generateKey(token, { mode: 'test' });
+
+    let emit = { status: 0, body: {} as { duplicataId?: string } };
+    for (let attempt = 0; attempt < 8 && emit.status !== 200; attempt++) {
+      emit = await request(app)
+        .post('/api/v1/duplicatas')
+        .set('Authorization', `Bearer ${gen.rawKey}`)
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '12.345,00', vencimento: '2026-12-31', seguro: false });
+    }
+    expect(emit.status).toBe(200);
+
+    const res = await request(app).get('/api/v1/duplicatas').set('Authorization', `Bearer ${gen.rawKey}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.duplicatas)).toBe(true);
+    const created = res.body.duplicatas.find((d: { id: string }) => d.id === emit.body.duplicataId);
+    expect(created).toBeTruthy();
+    expect(created.sacado).toBe('Grupo Atlas Varejo');
+    expect(created.sacadoCnpj).toBe('12.345.678/0001-90');
+    expect(created.valor).toBe(12345);
+    expect(typeof created.valorFmt).toBe('string');
+    expect(typeof created.emissao).toBe('string');
+    expect(typeof created.vencimento).toBe('string');
+  });
+
+  it('forbids a non-cedente key', async () => {
+    const email = `inv-dups-${unique()}@example.com`;
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ nome: 'Investidor Dups', email, password: 'senha123', companyName: `Investidor Dups ${unique()}`, role: 'investidor' });
+    const gen = await generateKey(reg.body.token, { mode: 'test' });
+    const res = await request(app).get('/api/v1/duplicatas').set('Authorization', `Bearer ${gen.rawKey}`);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('forbidden');
+  });
+});
+
 describe('Idempotency-Key on mutating v1 endpoints', () => {
   it('replays the same response for a repeated key + body, and 409s on a reused key with a different body', async () => {
     const { token } = await registerEmpresarialCedente();
