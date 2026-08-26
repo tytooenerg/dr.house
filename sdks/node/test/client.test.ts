@@ -68,6 +68,12 @@ describe('LastroClient — real end-to-end against the live server', () => {
 
     const { offers } = await client.listMarketplace();
     expect(Array.isArray(offers)).toBe(true);
+
+    const { duplicatas } = await client.listDuplicatas();
+    const listed = duplicatas.find((d) => d.id === emitted.duplicataId);
+    expect(listed).toBeTruthy();
+    expect(listed!.valor).toBeGreaterThan(0);
+    expect(typeof listed!.emissao).toBe('string');
   });
 
   it('is idempotent: replaying the same Idempotency-Key + body returns the original result instead of emitting twice', async () => {
@@ -121,6 +127,25 @@ describe('LastroClient — real end-to-end against the live server', () => {
     const result = await client.screenPld({ nome: 'Pessoa Comum Sem Restrições' });
     expect(result.nome).toBe('Pessoa Comum Sem Restrições');
     expect(typeof result.flagged).toBe('boolean');
+  });
+
+  it('lists payables and returns a cashflow forecast for a cedente key', async () => {
+    const apiKey = await registerAndGenerateKey('cedente');
+    const client = new LastroClient({ apiKey, baseUrl });
+
+    const { payables } = await client.listPayables();
+    expect(Array.isArray(payables)).toBe(true);
+
+    const forecast = await client.getCashflowForecast();
+    expect(forecast.scenarios.map((s) => s.scenario).sort()).toEqual(['base', 'otimista', 'pessimista']);
+    expect(Array.isArray(forecast.insights)).toBe(true);
+  });
+
+  it('forbids a non-cedente key from reading payables or the cashflow forecast', async () => {
+    const apiKey = await registerAndGenerateKey('investidor');
+    const client = new LastroClient({ apiKey, baseUrl });
+    await expect(client.listPayables()).rejects.toMatchObject({ name: 'LastroApiError', status: 403 });
+    await expect(client.getCashflowForecast()).rejects.toMatchObject({ name: 'LastroApiError', status: 403 });
   });
 
   it('returns an empty aceites list for a role that has none (structural, not role-specific)', async () => {

@@ -38,6 +38,23 @@ export interface DuplicataView {
   seguro: boolean;
 }
 
+// Retornado por GET /duplicatas (lista) — mais completo que DuplicataView (que espelha
+// GET /duplicatas/:id): traz valor numérico, sacadoCnpj, emissão e score, pensado pra
+// cálculos de DSO/aging/concentração no lado do parceiro, não só exibição.
+export interface DuplicataListItem {
+  id: string;
+  status: string;
+  sacado: string;
+  sacadoCnpj: string;
+  valor: number;
+  valorFmt: string;
+  emissao: string;
+  vencimento: string;
+  lastroPct: number;
+  seguro: boolean;
+  score: number | null;
+}
+
 export interface MarketplaceOffer {
   id: string;
   sacado: string;
@@ -93,4 +110,46 @@ export interface PldTriagemResult {
   nome: string;
   flagged: boolean;
   match: { nome: string; tipo: string; fonte: string } | null;
+}
+
+export interface PayableView {
+  id: number;
+  descricao: string;
+  fornecedor: string;
+  categoria: string;
+  valorFmt: string;
+  valor: number;
+  vencimento: string;
+  criadoEm: string;
+  status: 'pendente' | 'pago' | 'cancelado';
+  recorrente: boolean;
+}
+
+export interface CashflowHorizonPoint {
+  days: number;
+  receitaEsperadaFmt: string;
+  despesaEsperadaFmt: string;
+  saldoProjetadoFmt: string;
+  saldoProjetado: number;
+  deficit: boolean;
+}
+
+export interface CashflowScenarioResult {
+  scenario: 'pessimista' | 'base' | 'otimista';
+  points: CashflowHorizonPoint[];
+}
+
+export interface CashflowInsight {
+  tipo: 'deficit' | 'antecipacao_recomendada' | 'ok';
+  mensagem: string;
+}
+
+export interface CashflowForecast {
+  disponivelParaAntecipacaoFmt: string;
+  disponivelParaAntecipacao: number;
+  totalRecebiveisPendentesFmt: string;
+  totalContasAPagarPendentesFmt: string;
+  scenarios: CashflowScenarioResult[];
+  insights: CashflowInsight[];
+  geradoEm: string;
 }

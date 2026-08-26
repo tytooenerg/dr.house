@@ -38,6 +38,12 @@ export const openApiSpec = {
   },
   paths: {
     '/duplicatas': {
+      get: {
+        summary: 'Listar todas as duplicatas do cedente dono da chave (somente contas cedente)',
+        description:
+          'Todas as duplicatas do cedente, qualquer status — não só a elegível pra antecipação. Pensado pra um parceiro calcular DSO, aging, concentração por sacado e inadimplência esperada sem N chamadas a GET /duplicatas/{id}.',
+        responses: { '200': { description: 'Lista de duplicatas.' }, '403': { description: 'Chave não pertence a uma conta cedente.' } },
+      },
       post: {
         summary: 'Emitir uma duplicata escriturada (somente contas cedente)',
         parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
@@ -78,6 +84,22 @@ export const openApiSpec = {
     },
     '/marketplace': {
       get: { summary: 'Listar ofertas ativas no marketplace', responses: { '200': { description: 'Lista de ofertas.' } } },
+    },
+    '/payables': {
+      get: {
+        summary: 'Listar contas a pagar do cedente (somente contas cedente)',
+        description:
+          'As mesmas contas a pagar geridas em /app/contas-pagar na SPA — pra um parceiro (ERP, ou um produto externo de gestão financeira) ler sem precisar de sessão de login.',
+        responses: { '200': { description: 'Lista de contas a pagar.' }, '403': { description: 'Chave não pertence a uma conta cedente.' } },
+      },
+    },
+    '/cashflow/forecast': {
+      get: {
+        summary: 'Projeção de fluxo de caixa (somente contas cedente)',
+        description:
+          'A mesma projeção (cenários pessimista/base/otimista, múltiplos horizontes) que alimenta a aba AI CFO na SPA (client/src/pages/app/AiCfoPage.tsx), calculada a partir dos recebíveis e contas a pagar reais do cedente.',
+        responses: { '200': { description: 'Projeção de fluxo de caixa.' }, '403': { description: 'Chave não pertence a uma conta cedente.' } },
+      },
     },
     '/aceites': {
       get: {

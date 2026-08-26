@@ -15,6 +15,15 @@ export function listByCedente(cedenteId: number): DuplicataRow[] {
   return db.prepare('SELECT * FROM duplicatas WHERE cedente_id = ? AND sandbox = 0 ORDER BY created_at DESC').all(cedenteId) as DuplicataRow[];
 }
 
+// Same data, but sandbox-aware — used by GET /v1/duplicatas (a partner-facing endpoint,
+// where a test-mode key must see its own seeded sandbox dataset, not silently see nothing,
+// the same isolation /v1/duplicatas/:id and /v1/marketplace already enforce).
+export function listByCedenteAndMode(cedenteId: number, sandbox: boolean): DuplicataRow[] {
+  return db
+    .prepare('SELECT * FROM duplicatas WHERE cedente_id = ? AND sandbox = ? ORDER BY created_at DESC')
+    .all(cedenteId, sandbox ? 1 : 0) as DuplicataRow[];
+}
+
 // Training set for lib/mlScoring.ts — every real (non-sandbox) duplicata, regardless of
 // status, so the trainer can derive whatever label it needs from real state transitions
 // (sinistro_status, status='paga' via legal recovery) rather than a curated subset.

@@ -2,11 +2,14 @@ import { LastroApiError, LastroNetworkError } from './errors.js';
 import type {
   AceiteStatus,
   AceiteView,
+  CashflowForecast,
   DecidirSinistroInput,
+  DuplicataListItem,
   DuplicataView,
   EmitirDuplicataInput,
   EmitirDuplicataResult,
   MarketplaceOffer,
+  PayableView,
   PldTriagemInput,
   PldTriagemResult,
   ReportSignalInput,
@@ -93,10 +96,27 @@ export class LastroClient {
     return this.request('GET', `/duplicatas/${encodeURIComponent(id)}`);
   }
 
+  /** Todas as duplicatas do cedente dono da chave — pensado pra cálculos de DSO/aging/concentração. */
+  listDuplicatas(): Promise<{ duplicatas: DuplicataListItem[] }> {
+    return this.request('GET', '/duplicatas');
+  }
+
   // --- Marketplace ---
 
   listMarketplace(): Promise<{ offers: MarketplaceOffer[] }> {
     return this.request('GET', '/marketplace');
+  }
+
+  // --- Financeiro (cedente accounts) ---
+
+  /** Contas a pagar do cedente dono da chave — mesma listagem de /app/contas-pagar na SPA. */
+  listPayables(): Promise<{ payables: PayableView[] }> {
+    return this.request('GET', '/payables');
+  }
+
+  /** Projeção de fluxo de caixa (cenários + insights) — mesma projeção da aba AI CFO na SPA. */
+  getCashflowForecast(): Promise<CashflowForecast> {
+    return this.request('GET', '/cashflow/forecast');
   }
 
   // --- Aceites (sacado accounts) ---

@@ -74,6 +74,8 @@ Every endpoint in `server/src/routes/v1.ts` has a corresponding method:
 | `emitirDuplicata` | `POST /duplicatas` |
 | `getDuplicata` | `GET /duplicatas/:id` |
 | `listMarketplace` | `GET /marketplace` |
+| `listPayables` | `GET /payables` |
+| `getCashflowForecast` | `GET /cashflow/forecast` |
 | `listAceites` | `GET /aceites` |
 | `decideAceite` | `POST /aceites/:id/status` |
 | `getSeguradoraPayload` | `GET /seguradora` |
