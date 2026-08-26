@@ -155,6 +155,7 @@ v1Router.get('/payables', (req, res) => {
     valorFmt: fmtBRL(p.valor),
     valor: p.valor,
     vencimento: p.vencimento,
+    criadoEm: p.created_at,
     status: p.status,
     recorrente: !!p.recorrente,
   }));

@@ -120,6 +120,7 @@ export interface PayableView {
   valorFmt: string;
   valor: number;
   vencimento: string;
+  criadoEm: string;
   status: 'pendente' | 'pago' | 'cancelado';
   recorrente: boolean;
 }

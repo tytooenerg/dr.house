@@ -117,6 +117,7 @@ describe('GET /v1/payables and GET /v1/cashflow/forecast', () => {
     expect(created).toBeTruthy();
     expect(created.status).toBe('pendente');
     expect(typeof created.valorFmt).toBe('string');
+    expect(typeof created.criadoEm).toBe('string');
   });
 
   it('returns a real cashflow forecast for a cedente key', async () => {
