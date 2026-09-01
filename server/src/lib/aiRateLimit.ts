@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // Every internal route that calls the real Anthropic API (chat, dispute/sinistro
 // copilots, NF-e/contract analysis, risk narrative, PLD second opinion via KYB) shares
@@ -12,6 +12,9 @@ export const aiFeatureLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => !!process.env.VITEST,
-  keyGenerator: (req) => (req.user ? `user:${req.user.id}` : req.ip || 'anon'),
+  // ipKeyGenerator normalizes IPv6 addresses (which have many equivalent textual forms)
+  // before using them as a fallback key — a raw `req.ip` here would let the same client
+  // dodge the limit just by varying how its address is written.
+  keyGenerator: (req) => (req.user ? `user:${req.user.id}` : req.ip ? ipKeyGenerator(req.ip) : 'anon'),
   message: { error: 'rate_limited', message: 'Muitas solicitações de IA em pouco tempo — aguarde alguns minutos e tente novamente.' },
 });
