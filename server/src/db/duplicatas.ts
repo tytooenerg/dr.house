@@ -15,6 +15,21 @@ export function listByCedente(cedenteId: number): DuplicataRow[] {
   return db.prepare('SELECT * FROM duplicatas WHERE cedente_id = ? AND sandbox = 0 ORDER BY created_at DESC').all(cedenteId) as DuplicataRow[];
 }
 
+// Feature "AI CFO — DRE simplificado (Empresarial)": revenue the cedente actually received
+// via Lastro in a period — a duplicata only counts once an investor's purchase actually
+// settled it (purchases.created_at), not when it was merely emitted/listed. Face value
+// (d.valor), not netted for Lastro's platform fee/deságio — see lib/cashflowForecast.ts
+// for why this DRE is explicitly labeled "simplificado" rather than a real accounting DRE.
+export function listSettledByCedenteSince(cedenteId: number, sinceIso: string): { valor: number; settledAt: string }[] {
+  return db
+    .prepare(
+      `SELECT d.valor as valor, p.created_at as settledAt FROM purchases p
+       JOIN duplicatas d ON d.id = p.duplicata_id
+       WHERE d.cedente_id = ? AND d.sandbox = 0 AND p.created_at >= ?`
+    )
+    .all(cedenteId, sinceIso) as { valor: number; settledAt: string }[];
+}
+
 // Training set for lib/mlScoring.ts — every real (non-sandbox) duplicata, regardless of
 // status, so the trainer can derive whatever label it needs from real state transitions
 // (sinistro_status, status='paga' via legal recovery) rather than a curated subset.

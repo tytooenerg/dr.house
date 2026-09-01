@@ -37,6 +37,13 @@ test('a cedente adds a payable, marks it paid, and sees it reflected in the AI C
   await page.getByRole('button', { name: 'Marcar pago' }).click();
   await expect(page.getByText('Pago')).toBeVisible({ timeout: 10_000 });
 
+  // AI CFO requires at least the Pro plan (feature "CFO fica atrás de Pro/Empresarial") —
+  // a fresh Básico account upgrades through the real Assinatura flow first.
+  await page.goto('/app/assinatura', { waitUntil: 'domcontentloaded' });
+  const proCard = page.getByText('Pro', { exact: true }).locator('..');
+  await proCard.getByRole('button', { name: 'Fazer upgrade' }).click();
+  await expect(page.getByText(/Plano pro ativado/i)).toBeVisible({ timeout: 10_000 });
+
   // AI CFO: the forecast page loads and renders real projected-balance data (not blank).
   await page.goto('/app/ai-cfo', { waitUntil: 'domcontentloaded' });
   await dismissOnboardingIfPresent(page);

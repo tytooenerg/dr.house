@@ -30,6 +30,7 @@ interface ErpData {
   autoEmitEnabled: boolean;
   autoEmitMaxValor: string;
   hasErpConnected: boolean;
+  companyCnpj: string;
 }
 interface ContaReceber {
   id?: string;
@@ -77,10 +78,14 @@ export function ErpPage() {
 
   const [whitelabelPlusError, setWhitelabelPlusError] = useState('');
 
+  const [companyCnpjInput, setCompanyCnpjInput] = useState('');
+  const [savingCompanyCnpj, setSavingCompanyCnpj] = useState(false);
+
   const load = () =>
     api.get<ErpData>('/erp').then((d) => {
       setData(d);
       setAutoEmitMaxInput(d.autoEmitMaxValor);
+      setCompanyCnpjInput(d.companyCnpj);
       if (d.whitelabelBrand) {
         setBrandNome(d.whitelabelBrand.nome);
         setBrandCor(d.whitelabelBrand.corPrimaria);
@@ -174,6 +179,16 @@ export function ErpPage() {
       setAutoEmitError(err instanceof ApiError ? err.message : 'Não foi possível atualizar a emissão automática.');
     } finally {
       setSavingAutoEmit(false);
+    }
+  };
+
+  const saveCompanyCnpj = async () => {
+    setSavingCompanyCnpj(true);
+    try {
+      const d = await api.post<ErpData>('/erp/company-cnpj', { cnpj: companyCnpjInput });
+      setData(d);
+    } finally {
+      setSavingCompanyCnpj(false);
     }
   };
 
@@ -338,6 +353,24 @@ export function ErpPage() {
           </Button>
         </div>
         {autoEmitError && <div className="text-red text-[12px] font-semibold mt-2">{autoEmitError}</div>}
+      </Card>
+
+      <Card className="mb-4">
+        <div className="font-bold text-[15px] mb-1">CNPJ da empresa</div>
+        <div className="text-textSecondary text-[12.5px] mb-3">
+          Usado só pelo AI CFO (plano Empresarial) pra consultar seu saldo bancário real via Open Finance — não é o CNPJ do sacado.
+        </div>
+        <div className="flex items-center gap-2.5">
+          <input
+            className="w-64 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
+            placeholder="00.000.000/0000-00"
+            value={companyCnpjInput}
+            onChange={(e) => setCompanyCnpjInput(e.target.value)}
+          />
+          <Button size="sm" variant="secondary" disabled={savingCompanyCnpj || companyCnpjInput === data.companyCnpj} onClick={saveCompanyCnpj}>
+            {savingCompanyCnpj ? 'Salvando…' : 'Salvar'}
+          </Button>
+        </div>
       </Card>
 
       <NavyCard className="mb-4">

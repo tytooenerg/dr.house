@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Segmented } from '../../components/ui/Segmented';
 import { AiTag } from '../../components/ui/Badge';
 import { useLang } from '../../lib/i18n';
+import { useSession } from '../../state/SessionContext';
 
 interface HorizonPoint {
   days: number;
@@ -18,15 +20,39 @@ interface ScenarioResult {
   points: HorizonPoint[];
 }
 interface CashflowInsight {
-  tipo: 'deficit' | 'antecipacao_recomendada' | 'ok';
+  tipo: 'deficit' | 'antecipacao_recomendada' | 'ok' | 'concentracao';
   mensagem: string;
+}
+interface DreSimplificado {
+  periodoDias: number;
+  receitaRealizadaFmt: string;
+  despesaRealizadaFmt: string;
+  resultadoFmt: string;
+  resultado: number;
+}
+interface SaldoBancarioReal {
+  saldoMedioFmt: string;
+  receitaMediaMensalFmt: string;
+  volatilidadePct: number;
+  fonte: string;
+}
+interface MarketBenchmark {
+  seuRatingMedio: 'AA' | 'A' | 'B' | 'C' | null;
+  suaTaxaInadimplenciaPct: number | null;
+  mercadoTaxaInadimplenciaPct: number | null;
+  comparacao: 'melhor' | 'pior' | 'igual' | null;
 }
 interface CashflowForecast {
   disponivelParaAntecipacaoFmt: string;
   totalRecebiveisPendentesFmt: string;
   totalContasAPagarPendentesFmt: string;
+  recebiveisExternosFmt: string;
+  recebiveisExternos: number;
   scenarios: ScenarioResult[];
   insights: CashflowInsight[];
+  dre: DreSimplificado | null;
+  saldoBancarioReal: SaldoBancarioReal | null;
+  benchmark: MarketBenchmark | null;
   geradoEm: string;
 }
 
@@ -75,8 +101,17 @@ function ForecastChart({ points }: { points: HorizonPoint[] }) {
   );
 }
 
+const INSIGHT_STYLE: Record<CashflowInsight['tipo'], { background: string; color: string }> = {
+  deficit: { background: '#FBEAE8', color: '#B3261E' },
+  antecipacao_recomendada: { background: '#E9EEFB', color: '#1E5EFF' },
+  concentracao: { background: '#FBF1E0', color: '#8A5A00' },
+  ok: { background: '#EAF3EE', color: '#0A5C36' },
+};
+
 export function AiCfoPage() {
   const { t } = useLang();
+  const { user } = useSession();
+  const isEmpresarial = user?.plan === 'empresarial';
   const [forecast, setForecast] = useState<CashflowForecast | null>(null);
   const [scenario, setScenario] = useState<ScenarioResult['scenario']>('base');
 
@@ -94,11 +129,11 @@ export function AiCfoPage() {
         title={t('aiCfo.title', 'AI CFO — Projeção de Caixa')}
         subtitle={t(
           'aiCfo.subtitle',
-          'Projeção baseada nos seus recebíveis reais (Minhas Duplicatas) e contas a pagar cadastradas — sem números inventados',
+          'Projeção baseada nos seus recebíveis reais (Minhas Duplicatas + ERP conectado) e contas a pagar cadastradas — sem números inventados',
         )}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Disponível para antecipar hoje</div>
           <div className="font-mono-num font-bold text-lg text-blue">{forecast.disponivelParaAntecipacaoFmt}</div>
@@ -110,6 +145,15 @@ export function AiCfoPage() {
         <Card>
           <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Total a pagar (pendente)</div>
           <div className="font-mono-num font-bold text-lg">{forecast.totalContasAPagarPendentesFmt}</div>
+        </Card>
+        <Card>
+          <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Recebíveis externos (ERP)</div>
+          <div className="font-mono-num font-bold text-lg">{forecast.recebiveisExternosFmt}</div>
+          {forecast.recebiveisExternos === 0 && (
+            <div className="text-[11px] text-textTertiary mt-1">
+              Conecte um ERP em <Link to="/app/erp" className="text-blue">Integrações ERP</Link> pra somar aqui o que você recebe fora da Lastro.
+            </div>
+          )}
         </Card>
       </div>
 
@@ -141,19 +185,106 @@ export function AiCfoPage() {
         </div>
         <div className="flex flex-col gap-2.5">
           {forecast.insights.map((insight, i) => (
-            <div
-              key={i}
-              className="text-[13px] px-3.5 py-2.5 rounded-lg"
-              style={{
-                background: insight.tipo === 'deficit' ? '#FBEAE8' : insight.tipo === 'antecipacao_recomendada' ? '#E9EEFB' : '#EAF3EE',
-                color: insight.tipo === 'deficit' ? '#B3261E' : insight.tipo === 'antecipacao_recomendada' ? '#1E5EFF' : '#0A5C36',
-              }}
-            >
+            <div key={i} className="text-[13px] px-3.5 py-2.5 rounded-lg" style={INSIGHT_STYLE[insight.tipo]}>
               {insight.mensagem}
             </div>
           ))}
         </div>
       </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <Card>
+          <div className="font-bold text-[14px] mb-3">DRE simplificado (90 dias)</div>
+          {forecast.dre ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Receita realizada</span>
+                <span className="font-mono-num font-bold text-green">{forecast.dre.receitaRealizadaFmt}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Despesa realizada</span>
+                <span className="font-mono-num font-bold text-red">{forecast.dre.despesaRealizadaFmt}</span>
+              </div>
+              <div className="h-px bg-hairline my-1" />
+              <div className="flex justify-between text-[13px] font-bold">
+                <span>Resultado</span>
+                <span className="font-mono-num" style={{ color: forecast.dre.resultado >= 0 ? '#0A5C36' : '#B3261E' }}>{forecast.dre.resultadoFmt}</span>
+              </div>
+              <div className="text-[11px] text-textTertiary mt-1">Valor bruto, sem descontar taxa/deságio da Lastro — visão simplificada, não substitui sua contabilidade.</div>
+            </div>
+          ) : (
+            <EmpresarialUpsell isEmpresarial={isEmpresarial} />
+          )}
+        </Card>
+
+        <Card>
+          <div className="font-bold text-[14px] mb-3">Saldo bancário real</div>
+          {forecast.saldoBancarioReal ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Saldo médio</span>
+                <span className="font-mono-num font-bold">{forecast.saldoBancarioReal.saldoMedioFmt}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Receita média mensal</span>
+                <span className="font-mono-num font-bold">{forecast.saldoBancarioReal.receitaMediaMensalFmt}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Volatilidade</span>
+                <span className="font-mono-num font-bold">{forecast.saldoBancarioReal.volatilidadePct}%</span>
+              </div>
+              <div className="text-[11px] text-textTertiary mt-1">Via Open Finance ({forecast.saldoBancarioReal.fonte}), com seu consentimento.</div>
+            </div>
+          ) : isEmpresarial ? (
+            <div className="text-[13px] text-textSecondary">
+              Cadastre o CNPJ da sua empresa em <Link to="/app/erp" className="text-blue">Integrações ERP</Link> pra habilitar o saldo bancário real via Open Finance.
+            </div>
+          ) : (
+            <EmpresarialUpsell isEmpresarial={isEmpresarial} />
+          )}
+        </Card>
+
+        <Card>
+          <div className="font-bold text-[14px] mb-3">Benchmark de mercado</div>
+          {forecast.benchmark ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Rating médio da sua carteira</span>
+                <span className="font-mono-num font-bold">{forecast.benchmark.seuRatingMedio ?? '—'}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Sua inadimplência</span>
+                <span className="font-mono-num font-bold">{forecast.benchmark.suaTaxaInadimplenciaPct ?? '—'}%</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-textSecondary">Média do mercado (mesmo rating)</span>
+                <span className="font-mono-num font-bold">{forecast.benchmark.mercadoTaxaInadimplenciaPct ?? '—'}%</span>
+              </div>
+              {forecast.benchmark.comparacao && (
+                <div
+                  className="text-[12px] font-bold mt-1"
+                  style={{ color: forecast.benchmark.comparacao === 'melhor' ? '#0A5C36' : forecast.benchmark.comparacao === 'pior' ? '#B3261E' : '#5B6472' }}
+                >
+                  Você está {forecast.benchmark.comparacao === 'melhor' ? 'melhor' : forecast.benchmark.comparacao === 'pior' ? 'pior' : 'igual'} que a média do mercado (Lastro Index)
+                </div>
+              )}
+            </div>
+          ) : (
+            <EmpresarialUpsell isEmpresarial={isEmpresarial} />
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function EmpresarialUpsell({ isEmpresarial }: { isEmpresarial: boolean }) {
+  if (isEmpresarial) {
+    return <div className="text-[13px] text-textSecondary">Ainda não há dados suficientes pra calcular isto.</div>;
+  }
+  return (
+    <div className="text-[13px] text-textSecondary">
+      Disponível a partir do plano Empresarial. <Link to="/app/assinatura" className="text-blue font-bold">Ver planos</Link>
     </div>
   );
 }

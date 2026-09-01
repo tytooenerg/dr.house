@@ -27,14 +27,19 @@ export const PLANS: Record<Plan, PlanDef> = {
     label: 'Pro',
     priceFmt: 'R$ 299/mês',
     priceIdEnv: 'STRIPE_PRICE_PRO',
-    features: ['Tudo do Básico', 'Emissões ilimitadas', 'Automação de Lances'],
+    features: ['Tudo do Básico', 'Emissões ilimitadas', 'Automação de Lances', 'AI CFO — projeção de caixa com dados do seu ERP'],
   },
   empresarial: {
     key: 'empresarial',
     label: 'Empresarial',
     priceFmt: 'R$ 999/mês',
     priceIdEnv: 'STRIPE_PRICE_EMPRESARIAL',
-    features: ['Tudo do Pro', 'Ambiente de Desenvolvedores (API, webhooks)', 'Suporte prioritário'],
+    features: [
+      'Tudo do Pro',
+      'AI CFO completo — DRE, saldo bancário real e benchmark de mercado',
+      'Ambiente de Desenvolvedores (API, webhooks)',
+      'Suporte prioritário',
+    ],
   },
 };
 

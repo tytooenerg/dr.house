@@ -89,7 +89,14 @@ export default function App() {
             <Route path="minhas" element={<Gate tab="minhas"><MinhasPage /></Gate>} />
             <Route path="linha-credito" element={<Gate tab="linha-credito"><CreditLinePage /></Gate>} />
             <Route path="contas-pagar" element={<Gate tab="contas-pagar"><ContasPagarPage /></Gate>} />
-            <Route path="ai-cfo" element={<Gate tab="ai-cfo"><AiCfoPage /></Gate>} />
+            <Route
+              path="ai-cfo"
+              element={
+                <Gate tab="ai-cfo" requiredPlan="pro" feature="AI CFO">
+                  <AiCfoPage />
+                </Gate>
+              }
+            />
             <Route path="secundario" element={<Gate tab="secundario"><SecundarioPage /></Gate>} />
             <Route path="cestas" element={<Gate tab="cestas"><CestasPage /></Gate>} />
             <Route path="suitability" element={<Gate tab="suitability"><SuitabilityPage /></Gate>} />

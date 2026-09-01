@@ -56,6 +56,11 @@ export interface UserSettings {
   marketMakerEnabled: boolean;
   marketMakerMaxExposicao: string;
   marketMakerMinScore: string;
+  // CNPJ da própria empresa (não do sacado) — usado só pelo AI CFO (plano Empresarial)
+  // pra consultar o saldo bancário real via lib/openFinance.ts, que já existe e é
+  // consultado por CNPJ, mas até aqui só era chamado com o CNPJ de um sacado (na análise
+  // de risco), nunca com o CNPJ do próprio cedente.
+  companyCnpj: string;
 }
 
 export function defaultSettings(): UserSettings {
@@ -93,6 +98,7 @@ export function defaultSettings(): UserSettings {
     marketMakerEnabled: false,
     marketMakerMaxExposicao: '200.000',
     marketMakerMinScore: '60',
+    companyCnpj: '',
   };
 }
 
