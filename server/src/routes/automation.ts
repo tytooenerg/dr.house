@@ -10,7 +10,7 @@ import { settlePurchase } from '../lib/settlement.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { ratingFromScore } from '../lib/riscoCore.js';
 import { SACADOS } from '../data/seed.js';
-import type { UserRow } from '../db/types.js';
+import type { UserRow, UserSettings } from '../db/types.js';
 
 export const automationRouter = Router();
 automationRouter.use(requireAuth, requirePlan('pro'));
@@ -144,25 +144,39 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   addAutomationActivity(user.id, `Oferta de ${offer.sacado_nome} (${fmtBRL(offer.valor)}) ignorada — ${reason}`, '#5B6472');
 }
 
-automationRouter.get('/', (req, res) => {
-  const settings = getSettings(req.user!);
-  maybeTick(req.user!, settings);
-  res.json({
+// Every route below hands the client the exact same AutomationData shape the client's
+// `AutomacaoPage.tsx` keeps as its whole page state (each mutation handler does
+// `api.post(...).then(setData)` — replacing all of it, not merging a partial patch in). A
+// handler that responded with just the field it changed would leave every other field
+// `undefined` in the client's state, and the next render (e.g. `data.diversification.AA`)
+// would throw and take down the whole page. Build the payload from the `settings` object
+// each handler already has — never from `req.user!` again after an `updateSettings` call:
+// `req.user` was loaded once at the top of the request by the auth middleware, so its
+// `.settings` JSON is a snapshot from before the write and `getSettings(req.user!)` would
+// silently hand back the pre-update values instead of what was just saved.
+function buildAutomationPayload(userId: number, settings: UserSettings) {
+  return {
     autoBidEnabled: settings.autoBidEnabled,
     autoBidRules: settings.autoBidRules,
     diversification: settings.diversification,
     sectorDiversification: settings.sectorDiversification,
-    autoBidActivity: listAutomationActivity(req.user!.id).map((a) => ({ text: a.text, color: a.color, time: fmtRelative(a.created_at) })),
+    autoBidActivity: listAutomationActivity(userId).map((a) => ({ text: a.text, color: a.color, time: fmtRelative(a.created_at) })),
     marketMakerEnabled: settings.marketMakerEnabled,
     marketMakerMaxExposicao: settings.marketMakerMaxExposicao,
     marketMakerMinScore: settings.marketMakerMinScore,
-  });
+  };
+}
+
+automationRouter.get('/', (req, res) => {
+  const settings = getSettings(req.user!);
+  maybeTick(req.user!, settings);
+  res.json(buildAutomationPayload(req.user!.id, settings));
 });
 
 automationRouter.post('/toggle', (req, res) => {
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { autoBidEnabled: !settings.autoBidEnabled });
-  res.json({ autoBidEnabled: updated.autoBidEnabled });
+  res.json(buildAutomationPayload(req.user!.id, updated));
 });
 
 const ruleSchema = z.object({ field: z.enum(['scoreMin', 'taxaMax', 'exposicaoSacado', 'exposicaoMensal']), value: z.string() });
@@ -175,7 +189,7 @@ automationRouter.post('/rule', (req, res) => {
   }
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { autoBidRules: { ...settings.autoBidRules, [parsed.data.field]: parsed.data.value } });
-  res.json({ autoBidRules: updated.autoBidRules });
+  res.json(buildAutomationPayload(req.user!.id, updated));
 });
 
 const divSchema = z.object({ cls: z.enum(['AA', 'A', 'B', 'C']), value: z.number().min(0).max(100) });
@@ -188,7 +202,7 @@ automationRouter.post('/diversification', (req, res) => {
   }
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { diversification: { ...settings.diversification, [parsed.data.cls]: parsed.data.value } });
-  res.json({ diversification: updated.diversification });
+  res.json(buildAutomationPayload(req.user!.id, updated));
 });
 
 const sectorSchema = z.object({ cls: z.enum(['varejo', 'industria', 'construcao', 'servicos']), value: z.number().min(0).max(100) });
@@ -201,7 +215,7 @@ automationRouter.post('/sector-diversification', (req, res) => {
   }
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { sectorDiversification: { ...settings.sectorDiversification, [parsed.data.cls]: parsed.data.value } });
-  res.json({ sectorDiversification: updated.sectorDiversification });
+  res.json(buildAutomationPayload(req.user!.id, updated));
 });
 
 // Opt-in for lib/agents/marketMaker.ts (11th agent) — same "toggle + rules" shape as
@@ -210,7 +224,7 @@ automationRouter.post('/sector-diversification', (req, res) => {
 automationRouter.post('/market-maker/toggle', (req, res) => {
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { marketMakerEnabled: !settings.marketMakerEnabled });
-  res.json({ marketMakerEnabled: updated.marketMakerEnabled });
+  res.json(buildAutomationPayload(req.user!.id, updated));
 });
 
 const marketMakerRuleSchema = z.object({ field: z.enum(['marketMakerMaxExposicao', 'marketMakerMinScore']), value: z.string() });
@@ -222,5 +236,5 @@ automationRouter.post('/market-maker/rule', (req, res) => {
     return;
   }
   const updated = updateSettings(req.user!.id, { [parsed.data.field]: parsed.data.value });
-  res.json({ marketMakerMaxExposicao: updated.marketMakerMaxExposicao, marketMakerMinScore: updated.marketMakerMinScore });
+  res.json(buildAutomationPayload(req.user!.id, updated));
 });

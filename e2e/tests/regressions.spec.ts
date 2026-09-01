@@ -58,3 +58,37 @@ test('sacado can open Carteira & Histórico without the guarantee-fund tranche c
   expect(forbidden).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+test('investidor can edit an auto-bid rule on Automação de Lances without the page crashing', async ({ page }) => {
+  // Every POST /automacao/* route replied with only the field it had just changed (e.g.
+  // { autoBidRules: ... }), but AutomacaoPage.tsx does `api.post(...).then(setData)` —
+  // replacing its *entire* page state with that response. Every other field went
+  // `undefined`, and the next render (`data.diversification.AA`, `data.autoBidActivity.map`)
+  // threw and took the whole page down behind the ErrorBoundary — reproducing exactly what
+  // an investor hit typing into "Taxa máxima a oferecer" or toggling "Lance automático".
+  const pageErrors: string[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err.message));
+
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.getByPlaceholder('voce@empresa.com.br').fill('investidor@lastro.demo');
+  await page.getByPlaceholder('••••••••').fill('demo1234');
+  await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//, { timeout: 15_000 });
+  await dismissOnboardingIfPresent(page);
+
+  await page.goto('/app/automacao', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
+
+  // Deliberately not toggling "Lance automático" itself here — the demo investidor account
+  // is shared with other e2e specs running in parallel, and flipping it on would start the
+  // real auto-purchase engine against the live marketplace those specs depend on. The rule
+  // and diversification routes hit the identical buggy code path without that side effect.
+  const taxaField = page.locator('div', { hasText: 'Taxa máxima a oferecer (% a.m.)' }).locator('input').first();
+  await taxaField.fill('4,25');
+  await expect(page.getByText('Algo deu errado nesta tela')).not.toBeVisible();
+
+  await page.locator('input[type="range"]').first().fill('35');
+  await expect(page.getByText('Algo deu errado nesta tela')).not.toBeVisible();
+
+  expect(pageErrors).toEqual([]);
+});
