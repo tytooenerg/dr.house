@@ -518,6 +518,21 @@ A follow-up to a market-fit analysis (Lastro vs. Monkey/Kanastra, vs. what a16z 
 
 New tests: `server/test/api-partner-role.test.ts` (4), `registro_api` cases in `server/test/addon-revenue.test.ts` (2), white-label domain cases in the same file (3), `server/test/guarantee-fund-tranches.test.ts` (6) — 15 new tests. Verified: `npm run typecheck`/`build`/`test` all green (server 98 files/561 tests, client 24/24).
 
+### 6 more standalone API products — the same "internal capability, sold on its own" pattern applied further
+
+The previous pass turned 3 internal capabilities into standalone products (Score/PLD/Registro APIs). This does the same to 6 more: every one is billed per call (`lib/addOnBilling.ts`), scoped to its own `ApiKeyProduct`/route (bundled free on a `platform` key, blocked from every other v1 route on a dedicated key), and follows the same real-when-configured honesty as everything else in this codebase — a feature that genuinely needs an unconfigured external provider 503s and never charges, rather than faking a result.
+
+- **Judicial Records API** (`POST /v1/judicial/consulta`, R$4,00/chamada) — the exact same real-when-configured provider adapter `lib/complianceEngine.ts` already reads internally (`JUDICIAL_RECORDS_API_URL/KEY`), exposed standalone. Honestly 503s (no free public equivalent exists in Brazil) when unconfigured.
+- **Fraud Screening API** (`POST /v1/fraude/avaliar`, R$2,50/chamada, new `lib/fraudScreeningApi.ts`) — the same two real, explainable heuristics `lib/fraudAnomalyDetection.ts` runs as a scheduled scan over Lastro's own `duplicatas` table (self-dealing, single-counterparty concentration), reimplemented stateless so a caller can evaluate their own transaction and history without a Lastro account. Always available — pure computation, no external provider, never 503s.
+- **Document Intelligence API** (`POST /v1/documentos/analisar`, R$3,00/documento) — the same Claude-vision contract analysis and NF-e extraction (`lib/contractAnalysis.ts`, `lib/nfeExtraction.ts`) `routes/uploads.ts` already runs for Lastro's own uploads. The caller sends the file as Base64; it's written to a throwaway temp file for the call's duration and always deleted in `finally`, never persisted. 503s honestly without `ANTHROPIC_API_KEY`.
+- **Reconciliation API** (`POST /v1/conciliacao`, R$1,50/conciliação, new `lib/reconciliationApi.ts`) — generalizes `lib/bankStatementReconciliation.ts` (which matches an OFX statement against Lastro's *own* internal `ledger`) to any caller: send the OFX content plus your own list of expected transactions (referência/valor/data), get back what matched and what's pending on both sides. Same real OFX parser (`lib/ofxParser.ts`), no Lastro account required on either side.
+- **Suitability API** (`POST /v1/suitability/avaliar`, R$1,00/avaliação) — `lib/suitability.ts`'s CVM-style questionnaire scoring, split into a pure `scoreAnswers()` (used here, stateless) and the existing `submitSuitability()` (persists to a Lastro investor's own row) — the same deterministic, explainable classification, usable to assess a third party's own end customer without a Lastro account to attach it to.
+- **Lastro Index** (`GET /v1/index`, R$5,00/consulta, new `lib/marketIndex.ts`) — the one product with no external dependency: deságio médio and taxa de inadimplência aggregated live from Lastro's own real (non-sandbox) transaction volume, broken down by rating (AA/A/B/C). Same honesty discipline as the public transparency page (`lib/publicStatsCore.ts`) — real numbers that start small and grow with real usage, never a fabricated benchmark.
+
+`ApiKeyProduct`/`AddOnKind` both gained the 6 new values; migration `0053_new_api_products_addon_kind.sql` widens `addon_charges.kind`'s CHECK (mirrored in `migrations-postgres/`, registered in `generate-schema.mjs`'s `REBUILD_OVERRIDES`, re-verified against a real Postgres 16: 53 migrations, 68 tables). `DevPage`/`PrecosPage`/`DevelopersPage`/`AddonRevenuePanel` all extended with the 6 new products.
+
+New tests: `server/test/new-api-products.test.ts` (11), plus the `precos.length` assertion in `addon-revenue.test.ts` updated from 6 to 12. Verified: `npm run typecheck`/`test`/`test:e2e` all green (server 100 files/578 tests, client 24/24).
+
 ## Running locally
 
 ```bash

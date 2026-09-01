@@ -73,7 +73,7 @@ export const SUITABILITY_QUESTIONS: SuitabilityQuestion[] = [
   },
 ];
 
-const MAX_SCORE = SUITABILITY_QUESTIONS.reduce((sum, q) => sum + Math.max(...q.options.map((o) => o.points)), 0);
+export const MAX_SCORE = SUITABILITY_QUESTIONS.reduce((sum, q) => sum + Math.max(...q.options.map((o) => o.points)), 0);
 
 export type SuitabilityProfile = 'conservador' | 'moderado' | 'arrojado';
 
@@ -103,7 +103,15 @@ export type SubmitSuitabilityOutcome =
   | { status: 200; body: SuitabilityView }
   | { status: 400; body: { error: 'validation_error'; message: string } };
 
-export function submitSuitability(userId: number, answers: Record<string, string>): SubmitSuitabilityOutcome {
+export type ScoreAnswersOutcome =
+  | { status: 200; score: number; profile: SuitabilityProfile }
+  | { status: 400; body: { error: 'validation_error'; message: string } };
+
+// Pure scoring, no persistence — shared by submitSuitability below (a Lastro investor's
+// own on-platform assessment, persisted to the `suitability` table) and the stateless
+// Suitability API (routes/v1.ts POST /suitability/avaliar), which scores a third party's
+// own end customer and has no Lastro user row to attach a result to.
+export function scoreAnswers(answers: Record<string, string>): ScoreAnswersOutcome {
   let score = 0;
   for (const q of SUITABILITY_QUESTIONS) {
     const chosen = answers[q.id];
@@ -113,8 +121,13 @@ export function submitSuitability(userId: number, answers: Record<string, string
     }
     score += option.points;
   }
-  const profile = profileForScore(score);
-  const row = upsertSuitability(userId, score, profile, JSON.stringify(answers), computeExpiresAt());
+  return { status: 200, score, profile: profileForScore(score) };
+}
+
+export function submitSuitability(userId: number, answers: Record<string, string>): SubmitSuitabilityOutcome {
+  const scored = scoreAnswers(answers);
+  if (scored.status === 400) return scored;
+  const row = upsertSuitability(userId, scored.score, scored.profile, JSON.stringify(answers), computeExpiresAt());
   return { status: 200, body: toView(row) };
 }
 

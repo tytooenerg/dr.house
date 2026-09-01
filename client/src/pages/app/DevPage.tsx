@@ -6,13 +6,37 @@ import { Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useSession } from '../../state/SessionContext';
 
+type ApiKeyProduct =
+  | 'platform'
+  | 'score_api'
+  | 'pld_screening_api'
+  | 'registro_api'
+  | 'judicial_records_api'
+  | 'fraud_screening_api'
+  | 'document_intelligence_api'
+  | 'reconciliation_api'
+  | 'suitability_api'
+  | 'market_index_api';
+
+const NARROW_PRODUCT_LABELS: Record<Exclude<ApiKeyProduct, 'platform'>, string> = {
+  score_api: 'Score API',
+  pld_screening_api: 'PLD Screening API',
+  registro_api: 'Registro API',
+  judicial_records_api: 'Judicial Records API',
+  fraud_screening_api: 'Fraud Screening API',
+  document_intelligence_api: 'Document Intelligence API',
+  reconciliation_api: 'Reconciliation API',
+  suitability_api: 'Suitability API',
+  market_index_api: 'Lastro Index',
+};
+
 interface ApiKeyView {
   id: number;
   prefix: string;
   label: string;
   mode: 'live' | 'test';
   scope: 'read_only' | 'read_write';
-  product: 'platform' | 'score_api' | 'pld_screening_api' | 'registro_api';
+  product: ApiKeyProduct;
   callsThisMonth: number;
   createdAt: string;
   lastUsed: string;
@@ -47,6 +71,12 @@ interface DevData {
   scoreApiPriceFmt: string;
   pldScreeningApiPriceFmt: string;
   registroApiPriceFmt: string;
+  judicialRecordsApiPriceFmt: string;
+  fraudScreeningApiPriceFmt: string;
+  documentIntelligenceApiPriceFmt: string;
+  reconciliationApiPriceFmt: string;
+  suitabilityApiPriceFmt: string;
+  marketIndexApiPriceFmt: string;
   addonCharges: AddonChargeView[];
   webhooks: WebhookView[];
   apiLog: { status: string; method: string; path: string; time: string }[];
@@ -71,7 +101,7 @@ export function DevPage() {
   const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
   const [keyMode, setKeyMode] = useState<'live' | 'test'>('live');
   const [keyScope, setKeyScope] = useState<'read_write' | 'read_only'>('read_write');
-  const [keyProduct, setKeyProduct] = useState<'platform' | 'score_api' | 'pld_screening_api' | 'registro_api'>(isApiPartner ? 'score_api' : 'platform');
+  const [keyProduct, setKeyProduct] = useState<ApiKeyProduct>(isApiPartner ? 'score_api' : 'platform');
   const [openDeliveriesFor, setOpenDeliveriesFor] = useState<number | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryView[]>([]);
   const [keyError, setKeyError] = useState('');
@@ -183,7 +213,7 @@ export function DevPage() {
                     </span>
                     {k.product !== 'platform' && (
                       <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: '#EAF0FB', color: '#1B4DB1' }}>
-                        {k.product === 'score_api' ? 'Score API' : k.product === 'pld_screening_api' ? 'PLD Screening API' : 'Registro API'}
+                        {NARROW_PRODUCT_LABELS[k.product]}
                       </span>
                     )}
                   </div>
@@ -212,6 +242,12 @@ export function DevPage() {
               <option value="score_api">Score API — {data.scoreApiPriceFmt}/chamada</option>
               <option value="pld_screening_api">PLD Screening API — {data.pldScreeningApiPriceFmt}/chamada</option>
               <option value="registro_api">Registro API — {data.registroApiPriceFmt}/registro</option>
+              <option value="judicial_records_api">Judicial Records API — {data.judicialRecordsApiPriceFmt}/consulta</option>
+              <option value="fraud_screening_api">Fraud Screening API — {data.fraudScreeningApiPriceFmt}/avaliação</option>
+              <option value="document_intelligence_api">Document Intelligence API — {data.documentIntelligenceApiPriceFmt}/documento</option>
+              <option value="reconciliation_api">Reconciliation API — {data.reconciliationApiPriceFmt}/conciliação</option>
+              <option value="suitability_api">Suitability API — {data.suitabilityApiPriceFmt}/avaliação</option>
+              <option value="market_index_api">Lastro Index — {data.marketIndexApiPriceFmt}/consulta</option>
             </Select>
           </div>
           <Button size="sm" variant="secondary" onClick={generateKey}>

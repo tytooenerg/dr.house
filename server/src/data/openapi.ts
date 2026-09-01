@@ -226,5 +226,120 @@ export const openApiSpec = {
         },
       },
     },
+    '/judicial/consulta': {
+      post: {
+        summary: 'Consultar antecedentes judiciais de um CNPJ (execuções, falência/recuperação, protestos)',
+        description:
+          'Mesmo provedor real-when-configured que o motor de compliance interno já consulta (JUDICIAL_RECORDS_API_URL/KEY) — sem equivalente público gratuito no Brasil, então retorna 503 honesto (nunca cobra, nunca fabrica um resultado limpo) quando não configurado. Disponível em qualquer chave `platform` sem custo adicional, ou vendido avulso por chamada a uma chave dedicada `judicial_records_api`.',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['cnpj'], properties: { cnpj: { type: 'string', example: '12.345.678/0001-90' } } } } },
+        },
+        responses: {
+          '200': { description: '`processCount`, `hasExecutions`, `hasBankruptcyOrRecovery`, `hasProtests`, `fonte`.' },
+          '400': { description: 'Erro de validação.' },
+          '503': { description: 'Nenhum provedor configurado, ou provedor indisponível no momento.' },
+        },
+      },
+    },
+    '/fraude/avaliar': {
+      post: {
+        summary: 'Avaliar sinais de fraude (autorrelacionamento e concentração anômala) sobre uma transação',
+        description:
+          'Aplica as mesmas duas heurísticas reais e explicáveis que o scan interno de anomalias de fraude roda sobre a base da Lastro (lib/fraudAnomalyDetection.ts), mas de forma stateless: avalia a transação e o histórico recente que você mesmo enviar, sem depender de você ter conta na Lastro. Sempre disponível (cálculo puro, sem provedor externo).',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['cedenteNome', 'sacadoNome', 'valor'],
+                properties: {
+                  cedenteNome: { type: 'string' },
+                  sacadoNome: { type: 'string' },
+                  valor: { type: 'number' },
+                  historicoRecente: { type: 'array', items: { type: 'object', properties: { sacadoNome: { type: 'string' }, valor: { type: 'number' } } } },
+                },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: '`flagged` e `findings` (tipo, severidade, descrição, evidência).' }, '400': { description: 'Erro de validação.' } },
+      },
+    },
+    '/documentos/analisar': {
+      post: {
+        summary: 'Analisar um contrato de cessão ou extrair campos de uma NF-e via IA',
+        description:
+          'Mesma leitura real via Claude que routes/uploads.ts já faz para os próprios uploads da Lastro (lib/contractAnalysis.ts, lib/nfeExtraction.ts), exposta standalone — envie o arquivo em Base64 (nunca é persistido, só escrito num arquivo temporário durante a chamada). Retorna 503 honesto quando ANTHROPIC_API_KEY não está configurado. Requer escopo de leitura e escrita.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['tipo', 'arquivoBase64', 'mimeType'],
+                properties: {
+                  tipo: { type: 'string', enum: ['contrato', 'nfe'] },
+                  arquivoBase64: { type: 'string' },
+                  mimeType: { type: 'string', enum: ['application/pdf', 'application/xml', 'text/xml', 'image/png', 'image/jpeg'] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '`tipo` e `resultado` (flags do contrato, ou campos extraídos da NF-e).' },
+          '400': { description: 'Erro de validação.' },
+          '503': { description: 'ANTHROPIC_API_KEY não configurado, ou análise indisponível no momento.' },
+        },
+      },
+    },
+    '/conciliacao': {
+      post: {
+        summary: 'Conciliar um extrato bancário (OFX) contra sua própria lista de lançamentos esperados',
+        description:
+          'Generaliza lib/bankStatementReconciliation.ts (que concilia contra o `ledger` interno de uma conta Lastro) para qualquer chamador: envie o conteúdo do seu extrato OFX e a lista de lançamentos que você esperava encontrar (referência, valor, data) — recebe de volta o que bateu e o que ficou pendente dos dois lados. Requer escopo de leitura e escrita.',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['ofxContent', 'esperado'],
+                properties: {
+                  ofxContent: { type: 'string' },
+                  esperado: { type: 'array', items: { type: 'object', properties: { referencia: { type: 'string' }, valor: { type: 'number' }, data: { type: 'string' } } } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '`transacoesNoExtrato`, `conferidas`, `semCorrespondenciaNoExtrato`, `naoEsperadasNoExtrato`.' },
+          '400': { description: 'Erro de validação, ou extrato OFX malformado.' },
+        },
+      },
+    },
+    '/suitability/avaliar': {
+      post: {
+        summary: 'Avaliar o perfil de suitability (conservador/moderado/arrojado) de um investidor',
+        description:
+          'Mesmo questionário e cálculo determinístico estilo CVM que lib/suitability.ts já usa para os próprios investidores da Lastro, exposto de forma stateless — avalia o cliente final da sua própria plataforma sem persistir nada do lado da Lastro.',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['answers'], properties: { answers: { type: 'object', additionalProperties: { type: 'string' } } } } } },
+        },
+        responses: { '200': { description: '`score`, `maxScore`, `profile` e `profileLabel`.' }, '400': { description: 'Erro de validação — resposta inválida para alguma pergunta.' } },
+      },
+    },
+    '/index': {
+      get: {
+        summary: 'Consultar o Lastro Index — deságio médio e inadimplência por rating',
+        description:
+          'Agregado calculado ao vivo sobre o volume real (não-sandbox) transacionado na Lastro, mesma disciplina de honestidade do painel público de transparência (lib/publicStatsCore.ts) — números reais, que começam pequenos e crescem com o uso real, nunca um benchmark fabricado.',
+        responses: { '200': { description: '`avgDesagioGeralPct`, `taxaInadimplenciaGeralPct` e `porRating` (por AA/A/B/C).' } },
+      },
+    },
   },
 };

@@ -3,7 +3,19 @@ import { api } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 
-type AddOnKind = 'api_overage' | 'score_api' | 'pld_screening_api' | 'registro_api' | 'whitelabel_plus' | 'institutional_reporting';
+type AddOnKind =
+  | 'api_overage'
+  | 'score_api'
+  | 'pld_screening_api'
+  | 'registro_api'
+  | 'whitelabel_plus'
+  | 'institutional_reporting'
+  | 'judicial_records_api'
+  | 'fraud_screening_api'
+  | 'document_intelligence_api'
+  | 'reconciliation_api'
+  | 'suitability_api'
+  | 'market_index_api';
 
 interface AddonPrice {
   kind: AddOnKind;
@@ -35,6 +47,12 @@ const ADDON_KIND_LABELS: Record<AddOnKind, string> = {
   registro_api: 'Registro API avulsa (por chamada)',
   whitelabel_plus: 'White-label Plus (mensal)',
   institutional_reporting: 'Relatórios Institucionais (mensal)',
+  judicial_records_api: 'Judicial Records API avulsa (por chamada)',
+  fraud_screening_api: 'Fraud Screening API avulsa (por chamada)',
+  document_intelligence_api: 'Document Intelligence API avulsa (por chamada)',
+  reconciliation_api: 'Reconciliation API avulsa (por chamada)',
+  suitability_api: 'Suitability API avulsa (por chamada)',
+  market_index_api: 'Lastro Index avulso (por chamada)',
 };
 
 export function AddonRevenuePanel() {

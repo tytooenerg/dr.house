@@ -181,7 +181,23 @@ export type ApiKeyScope = 'read_only' | 'read_write';
 // 'registro_api' — feature "compliance-as-a-service": the multi-registradora smart
 // routing (lib/registradoras.ts) exposed for the first time to a third party that isn't
 // a Lastro cedente, standalone and pay-per-call, same shape as score_api/pld_screening_api.
-export type ApiKeyProduct = 'platform' | 'score_api' | 'pld_screening_api' | 'registro_api';
+// 6 more narrow, standalone data products (same shape again — no marketplace/duplicata
+// access, sold on their own, billed per call): 'judicial_records_api' wraps
+// lib/judicialRecords.ts, 'fraud_screening_api' wraps lib/fraudScreeningApi.ts,
+// 'document_intelligence_api' wraps lib/contractAnalysis.ts + lib/nfeExtraction.ts,
+// 'reconciliation_api' wraps lib/reconciliationApi.ts, 'suitability_api' wraps
+// lib/suitability.ts's stateless scorer, 'market_index_api' wraps lib/marketIndex.ts.
+export type ApiKeyProduct =
+  | 'platform'
+  | 'score_api'
+  | 'pld_screening_api'
+  | 'registro_api'
+  | 'judicial_records_api'
+  | 'fraud_screening_api'
+  | 'document_intelligence_api'
+  | 'reconciliation_api'
+  | 'suitability_api'
+  | 'market_index_api';
 
 export interface ApiKeyRow {
   id: number;

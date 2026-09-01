@@ -236,7 +236,7 @@ export function DevelopersPage() {
           <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Sem virar cliente do marketplace</div>
           <div className="text-[30px] font-extrabold tracking-tight">Só precisa do dado, não da esteira inteira.</div>
           <div className="text-textSecondary text-[15px] mt-3 leading-relaxed">
-            Score de risco, triagem PLD e roteamento de registro são vendidos avulsos, por chamada — uma conta "só-API" gera a chave em minutos, sem passar pelo cadastro de cedente/investidor nem por KYB.
+            9 capacidades internas da Lastro são vendidas avulsas, por chamada — uma conta "só-API" gera a chave em minutos, sem passar pelo cadastro de cedente/investidor nem por KYB.
           </div>
         </div>
         <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
@@ -257,6 +257,42 @@ export function DevelopersPage() {
             <div className="font-bold text-base mb-2">Registro API</div>
             <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">O mesmo roteamento inteligente entre CERC/B3/Núclea/Grafeno que a Lastro usa internamente, sem entrar no marketplace — R$ 3,50 por registro.</div>
             <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/registro</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
+            <div className="font-bold text-base mb-2">Judicial Records API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Execuções, falência/recuperação judicial e protestos por CNPJ — R$ 4,00 por consulta.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/judicial/consulta</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
+            <div className="font-bold text-base mb-2">Fraud Screening API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Autorrelacionamento e concentração anômala sobre a sua própria transação e histórico — R$ 2,50 por avaliação.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/fraude/avaliar</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
+            <div className="font-bold text-base mb-2">Document Intelligence API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Extração de NF-e ou análise de cláusulas de contrato via IA, direto do PDF/imagem/XML — R$ 3,00 por documento.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/documentos/analisar</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
+            <div className="font-bold text-base mb-2">Reconciliation API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Envie um extrato OFX e sua lista de lançamentos esperados, receba o que bateu e o que ficou pendente — R$ 1,50 por conciliação.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/conciliacao</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
+            <div className="font-bold text-base mb-2">Suitability API</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Classificação conservador/moderado/arrojado, estilo CVM, para o cliente final da sua própria plataforma — R$ 1,00 por avaliação.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/suitability/avaliar</div>
+          </div>
+          <div className="border border-border rounded-card p-6.5">
+            <div className="font-mono-num text-[11.5px] font-bold text-green mb-2">GET</div>
+            <div className="font-bold text-base mb-2">Lastro Index</div>
+            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Deságio médio e taxa de inadimplência por rating, calculado ao vivo sobre o volume real da Lastro — R$ 5,00 por consulta.</div>
+            <div className="font-mono-num text-[12px] text-textTertiary">GET /v1/index</div>
           </div>
         </div>
         <div className="mt-6">

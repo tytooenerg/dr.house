@@ -16,6 +16,12 @@ const DEFAULT_PRICES: Record<AddOnKind, number> = {
   registro_api: 3.5, // per registro via a standalone Registro API key — pricier than a read (score/PLD) since it's a real write to an external registry
   whitelabel_plus: 490, // flat monthly recurring fee
   institutional_reporting: 690, // flat monthly recurring fee
+  judicial_records_api: 4.0, // per consulta — needs a real commercial upstream (JUDICIAL_RECORDS_API_URL/KEY), pricier than a read against a free public list
+  fraud_screening_api: 2.5, // per avaliação via uma chave dedicada fraud_screening_api
+  document_intelligence_api: 3.0, // per documento analisado (contrato ou NF-e) via Claude
+  reconciliation_api: 1.5, // per extrato conciliado
+  suitability_api: 1.0, // per questionário avaliado — mais barato, é um cálculo determinístico, sem custo de IA/terceiro
+  market_index_api: 5.0, // per consulta ao índice — dado agregado, comprado com menos frequência que um lookup pontual
 };
 
 const SETTING_PREFIX = 'addon_price_';
