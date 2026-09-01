@@ -11,7 +11,6 @@ import {
 import { getDuplicata, isPurchased, setStatus } from '../db/duplicatas.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { platformFee, pctLabel } from './settlement.js';
-import { contributeToFund } from './guaranteeFund.js';
 import { fmtBRL } from './format.js';
 import type { UserRow } from '../db/types.js';
 
@@ -121,7 +120,6 @@ export function buyFractionalTokens(investor: UserRow, duplicataId: string, toke
       net
     );
   }
-  contributeToFund(duplicataId, fee);
   createHolding(offering.id, investor.id, tokens, valorInvestido, retorno);
   const updated = incrementTokensSold(offering.id, tokens);
   if (updated.tokens_vendidos >= updated.total_tokens) {

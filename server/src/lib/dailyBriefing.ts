@@ -2,7 +2,6 @@ import { listPendingKyb } from '../db/users.js';
 import { listAllOpenDisputes } from '../db/disputes.js';
 import { listPendingComplianceReview } from '../db/complianceEngine.js';
 import { listSuspiciousActivityReports } from '../db/suspiciousActivity.js';
-import { listFundClaims } from '../db/guaranteeFund.js';
 import { listFlags } from '../db/reconciliation.js';
 import { listPendingTedDeposits } from '../db/ted.js';
 import { notifyAdmins } from '../db/misc.js';
@@ -35,14 +34,12 @@ export function buildDailyBriefing(): DailyBriefing {
   const compliance = listPendingComplianceReview().length;
   const sarCritico = listSuspiciousActivityReports('aberto').filter((s) => s.severidade === 'critico').length;
   const sarAtencao = listSuspiciousActivityReports('aberto').length - sarCritico;
-  const fundClaims = listFundClaims('aberto').length;
   const reconciliacao = listFlags('aberta').length;
   const ted = listPendingTedDeposits().length;
 
   const items: DailyBriefingItem[] = (
     [
       { label: 'Alertas de PLD críticos', count: sarCritico, severity: 'critico' },
-      { label: 'Acionamentos do fundo de garantia', count: fundClaims, severity: 'critico' },
       { label: 'Duplicatas em revisão de compliance', count: compliance, severity: 'atencao' },
       { label: 'Disputas em aberto', count: disputas, severity: 'atencao' },
       { label: 'Alertas de PLD (atenção)', count: sarAtencao, severity: 'atencao' },

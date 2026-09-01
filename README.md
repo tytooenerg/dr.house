@@ -546,6 +546,14 @@ Até aqui `lib/cashflowForecast.ts` era o único recurso de peso liberado de gra
 
 Novos testes: 5 em `server/test/cashflow.test.ts` (gate de plano, recebíveis do ERP com deságio, concentração, campos Empresarial, DRE). Verificado: `npm run typecheck`/`test`/`test:e2e` todos verdes (server 100 arquivos/583 testes, client 24/24, e2e 13/13) — migração Postgres re-verificada contra um PostgreSQL 16 real (54 migrations, 69 tabelas).
 
+### Fundo de garantia removido — a Lastro não carrega risco de crédito com capital próprio
+
+O fundo de garantia (introduzido duas passagens atrás, expandido com tranches investíveis logo em seguida) capitalizava sua reserva-base com 10% da própria taxa de plataforma da Lastro (`FUND_CONTRIBUTION_PCT`) e usava esse capital como primeira camada de perda em duplicata sem seguro — exatamente o risco de crédito que o posicionamento da Lastro (já declarado no prompt do assistente: *"a Lastro não é um banco, não concede crédito e não assume risco de crédito — ela é infraestrutura tecnológica"*) diz que ela não carrega. A seguradora (`lib/seguradoraCore.ts`) já é o mecanismo real de transferência de risco pra quem quer proteção; uma duplicata sem seguro agora fica honestamente sem cobertura, decisão de quem a comprou — não um segundo produto de proteção subsidiado pelo caixa da própria plataforma.
+
+Removido por completo: `lib/guaranteeFund.ts`, `lib/guaranteeFundTranches.ts`, `lib/guaranteeFundStressTest.ts`, `routes/guaranteeFund.ts`, `db/guaranteeFund.ts`, `db/guaranteeFundTranches.ts`, as chamadas `contributeToFund()` em `lib/settlement.ts`/`lib/fractionalOfferings.ts`, as 6 rotas administrativas em `routes/admin.ts`, o card "Fundo de garantia"/"Investir no fundo de garantia" em Carteira & Histórico, os dois blocos correspondentes no painel de Compliance, a linha "Fundo de garantia" na página de Transparência, e o item "Acionamentos do fundo de garantia" do resumo diário do back-office. Migração `0055_remove_guarantee_fund.sql` derruba as 4 tabelas (`guarantee_fund_ledger`, `guarantee_fund_claims`, `guarantee_fund_tranche_ledger`, `guarantee_fund_tranche_quota_movements`), mirrorada em `migrations-postgres/`.
+
+Testes removidos: `server/test/guarantee-fund.test.ts` (6), `server/test/guarantee-fund-tranches.test.ts` (6), `server/test/guarantee-fund-stress-test.test.ts`, e o regression e2e sobre o card ficar invisível pra sacado. Verificado: `npm run typecheck`/`build`/`test`/`test:e2e` todos verdes — migração Postgres re-verificada contra um PostgreSQL 16 real (55 migrations, 65 tabelas).
+
 ## Running locally
 
 ```bash

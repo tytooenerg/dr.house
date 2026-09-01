@@ -27,31 +27,6 @@ interface SarReport {
   quando: string;
 }
 
-interface FundClaim {
-  id: number;
-  duplicataId: string;
-  sacado: string;
-  investidor: string;
-  valorSolicitadoFmt: string;
-  valorPagoFmt: string | null;
-  status: 'aberto' | 'aprovado' | 'negado';
-  note: string | null;
-  createdAt: string;
-}
-
-interface StressTestResult {
-  simulations: number;
-  correlation: number;
-  fundBalanceFmt: string;
-  exposureCount: number;
-  exposureTotalFmt: string;
-  usingMlModel: boolean;
-  pDepletion: number;
-  expectedLossFmt: string;
-  var95Fmt: string;
-  var99Fmt: string;
-  expectedShortfallFmt: string;
-}
 
 const SAR_TIPO_LABELS: Record<string, string> = {
   fracionamento: 'Fracionamento',
@@ -59,9 +34,8 @@ const SAR_TIPO_LABELS: Record<string, string> = {
 };
 
 // Tudo que trata de risco regulatório/financeiro do marketplace num só lugar: fila de
-// suspensão automática do Compliance AI Engine, monitor de PLD (SARs), informes CVM/DARF
-// (documentos de apoio, não protocolos formais — ver disclaimers inline) e o fundo de
-// garantia (acionamentos + teste de estresse Monte Carlo).
+// suspensão automática do Compliance AI Engine, monitor de PLD (SARs) e informes CVM/DARF
+// (documentos de apoio, não protocolos formais — ver disclaimers inline).
 export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) {
   const [complianceQueue, setComplianceQueue] = useState<ComplianceQueueItem[]>([]);
   const [complianceNoteById, setComplianceNoteById] = useState<Record<string, string>>({});
@@ -80,12 +54,6 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
   const [downloadingCvm, setDownloadingCvm] = useState(false);
   const [darfPeriod, setDarfPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [downloadingDarf, setDownloadingDarf] = useState(false);
-  const [fundClaims, setFundClaims] = useState<FundClaim[]>([]);
-  const [fundBalanceFmt, setFundBalanceFmt] = useState('');
-  const [decidingFundClaimId, setDecidingFundClaimId] = useState<number | null>(null);
-  const [fundNoteById, setFundNoteById] = useState<Record<number, string>>({});
-  const [stressResult, setStressResult] = useState<StressTestResult | null>(null);
-  const [runningStress, setRunningStress] = useState(false);
 
   const loadCompliance = () => api.get<{ pending: ComplianceQueueItem[] }>('/admin/compliance-queue').then((d) => setComplianceQueue(d.pending));
   const loadThreshold = () =>
@@ -99,16 +67,10 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
       setSarThreshold(d.threshold);
       setSarThresholdInput(String(d.threshold));
     });
-  const loadFundClaims = () =>
-    api.get<{ claims: FundClaim[] }>('/admin/guarantee-fund/claims?status=aberto').then((d) => setFundClaims(d.claims));
-  const loadFundBalance = () => api.get<{ balanceFmt: string }>('/admin/guarantee-fund').then((d) => setFundBalanceFmt(d.balanceFmt));
-
   useEffect(() => {
     loadCompliance();
     loadThreshold();
     loadSar();
-    loadFundClaims();
-    loadFundBalance();
   }, []);
 
   useEffect(() => {
@@ -203,29 +165,6 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
       await downloadFile(`/admin/juridico/darf.pdf?period=${darfPeriod}`, `darf-irrf-${darfPeriod}.pdf`);
     } finally {
       setDownloadingDarf(false);
-    }
-  };
-
-  const decideFundClaim = async (id: number, decision: 'aprovado' | 'negado') => {
-    const note = (fundNoteById[id] ?? '').trim();
-    if (!note) return;
-    setDecidingFundClaimId(id);
-    try {
-      await api.post(`/admin/guarantee-fund/claims/${id}/decidir`, { decision, note });
-      await loadFundClaims();
-      await loadFundBalance();
-    } finally {
-      setDecidingFundClaimId(null);
-    }
-  };
-
-  const runStressTest = async () => {
-    setRunningStress(true);
-    try {
-      const result = await api.get<StressTestResult>('/admin/guarantee-fund/stress-test?simulations=10000');
-      setStressResult(result);
-    } finally {
-      setRunningStress(false);
     }
   };
 
@@ -405,100 +344,6 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
             {downloadingDarf ? 'Gerando…' : 'Baixar DARF (PDF)'}
           </Button>
         </div>
-      </div>
-
-      <div className="bg-white border border-border rounded-card p-5 mt-4">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-bold text-[14px]">Fundo de garantia — acionamentos em aberto</div>
-          <span className="text-[12.5px] font-bold text-textSecondary">Saldo do fundo: {fundBalanceFmt || '—'}</span>
-        </div>
-        <div className="text-textSecondary text-[12.5px] mb-3">
-          Cobre defaults em duplicatas sem seguro contratado, alimentado por 10% da taxa de plataforma — nunca um custo extra ao cedente ou
-          investidor. Pagamento aprovado é limitado a 80% do valor solicitado e ao saldo real disponível.
-        </div>
-        {fundClaims.map((c) => (
-          <div key={c.id} className="rounded-[10px] p-4 mb-3 last:mb-0 border border-border">
-            <div className="flex items-start justify-between gap-2.5 mb-2">
-              <div>
-                <div className="font-bold text-[13.5px]">
-                  {c.investidor} <span className="font-normal text-textMuted">— {c.sacado} ({c.duplicataId})</span>
-                </div>
-                <div className="text-textSecondary text-[12.5px] mt-1">Solicitado: {c.valorSolicitadoFmt}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <input
-                className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[12.5px]"
-                placeholder="Justificativa da decisão"
-                value={fundNoteById[c.id] ?? ''}
-                onChange={(e) => setFundNoteById((prev) => ({ ...prev, [c.id]: e.target.value }))}
-              />
-              <Button
-                size="sm"
-                variant="success"
-                disabled={decidingFundClaimId === c.id || !(fundNoteById[c.id] ?? '').trim()}
-                onClick={() => decideFundClaim(c.id, 'aprovado')}
-              >
-                Aprovar
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={decidingFundClaimId === c.id || !(fundNoteById[c.id] ?? '').trim()}
-                onClick={() => decideFundClaim(c.id, 'negado')}
-              >
-                Negar
-              </Button>
-            </div>
-          </div>
-        ))}
-        {fundClaims.length === 0 && <EmptyState title="Nenhum acionamento em aberto" hint="Solicitações do fundo de garantia aparecem aqui" />}
-      </div>
-
-      <div className="bg-white border border-border rounded-card p-5 mt-4">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-bold text-[14px]">Fundo de garantia — teste de estresse (Monte Carlo)</div>
-          <Button size="sm" variant="secondary" disabled={runningStress} onClick={runStressTest}>
-            {runningStress ? 'Simulando…' : 'Executar simulação'}
-          </Button>
-        </div>
-        <div className="text-textSecondary text-[12.5px] mb-3">
-          Simula a exposição real atual (posições ativas sem seguro) milhares de vezes contra um choque macro comum correlacionado — um
-          fator único (mesma ideia estrutural do modelo de Vasicek), não flips independentes ingênuos. Sem modelo de ML treinado, a
-          probabilidade de default por posição usa uma premissa assumida por rating (documentada em lib/guaranteeFundStressTest.ts), nunca
-          apresentada como histórico real medido.
-        </div>
-        {stressResult ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="rounded-md border border-border p-3">
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">P(esgotamento)</div>
-              <div className="font-mono-num font-bold text-[15px]" style={{ color: stressResult.pDepletion > 0.05 ? '#B03A2E' : '#0A5C36' }}>
-                {(stressResult.pDepletion * 100).toFixed(2)}%
-              </div>
-            </div>
-            <div className="rounded-md border border-border p-3">
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Perda esperada</div>
-              <div className="font-mono-num font-bold text-[15px]">{stressResult.expectedLossFmt}</div>
-            </div>
-            <div className="rounded-md border border-border p-3">
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">VaR 95% / 99%</div>
-              <div className="font-mono-num font-bold text-[13px]">
-                {stressResult.var95Fmt} / {stressResult.var99Fmt}
-              </div>
-            </div>
-            <div className="rounded-md border border-border p-3">
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Shortfall esperado</div>
-              <div className="font-mono-num font-bold text-[15px]">{stressResult.expectedShortfallFmt}</div>
-            </div>
-            <div className="col-span-2 md:col-span-4 text-[11.5px] text-textSecondary">
-              {stressResult.simulations.toLocaleString('pt-BR')} simulações · correlação {(stressResult.correlation * 100).toFixed(0)}% ·
-              exposição real {stressResult.exposureTotalFmt} em {stressResult.exposureCount} posições · saldo do fundo{' '}
-              {stressResult.fundBalanceFmt} · {stressResult.usingMlModel ? 'usando modelo de ML treinado' : 'usando premissa assumida por rating (sem modelo de ML treinado ainda)'}
-            </div>
-          </div>
-        ) : (
-          <EmptyState title="Nenhuma simulação executada ainda" hint="Clique em “Executar simulação” para rodar o Monte Carlo" />
-        )}
       </div>
     </div>
   );

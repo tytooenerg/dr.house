@@ -22,7 +22,7 @@ describe('resetDbForTests', () => {
   it('empties every real table without violating a foreign key, and leaves schema_migrations alone', async () => {
     // Touch a broad slice of the schema beyond what seedIfEmpty() already populates, so the
     // FK ordering is actually exercised end to end (a purchase -> a resale listing -> a bid,
-    // an aceite -> a dispute, a duplicata -> a compliance/guarantee-fund/insurance row...).
+    // an aceite -> a dispute, a duplicata -> a compliance/insurance row...).
     const email = `reset-check-${Date.now()}@example.com`;
     const reg = await request(app).post('/api/auth/register').send({ nome: 'Reset Check', email, password: 'senha123', companyName: 'Reset Check Ltda', role: 'investidor' });
     approveKyb(reg.body.user.id);

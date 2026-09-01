@@ -24,7 +24,6 @@ const SEVERITY_COLOR: Record<DailyBriefingItem['severity'], string> = {
 // back-office's own tabs.
 function tabFor(label: string): string | null {
   if (label.includes('PLD')) return 'compliance';
-  if (label.includes('fundo de garantia')) return 'compliance';
   if (label.includes('compliance')) return 'compliance';
   if (label.includes('Disputas')) return 'disputas';
   if (label.includes('KYB')) return 'kyb';
