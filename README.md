@@ -533,6 +533,19 @@ The previous pass turned 3 internal capabilities into standalone products (Score
 
 New tests: `server/test/new-api-products.test.ts` (11), plus the `precos.length` assertion in `addon-revenue.test.ts` updated from 6 to 12. Verified: `npm run typecheck`/`test`/`test:e2e` all green (server 100 files/578 tests, client 24/24).
 
+### AI CFO gated behind Pro/Empresarial, and made to actually earn that gate
+
+Até aqui `lib/cashflowForecast.ts` era o único recurso de peso liberado de graça no plano Básico — só enxergava recebíveis já emitidos como duplicata na Lastro e contas a pagar digitadas manualmente. Esta mudança faz duas coisas ao mesmo tempo: cobra por ele (Pro/Empresarial) e dá a ele dados de verdade pra justificar a cobrança — conectar um ERP não serve só pra emitir duplicata em lote, agora também alimenta a própria projeção de caixa, o que aumenta o que a Lastro sabe sobre a saúde financeira real de quem conecta.
+
+- **Gate de plano** (`routes/cashflow.ts`) — `requirePlan('pro')` na rota inteira; o chat AI continua respondendo perguntas de caixa pra qualquer cedente (não é o mesmo gate da página paga).
+- **ERP alimentando o CFO** (Pro+) — `GET /erp/{omie,sap,totvs}/contas-receber` agora persiste cada busca em `erp_receivables` (migração `0054_erp_receivables.sql`, dedupe por cedente/fonte/id externo via UPSERT) em vez de só devolver a lista efêmera pro cliente montar duplicata em lote. `lib/cashflowForecast.ts` soma esses recebíveis à projeção com um deságio de risco fixo e documentado por cenário (0%/5%/20% — sem score real da Lastro pra eles, não finge uma PD calculada).
+- **Concentração de clientes** (Pro+) — novo insight combinando duplicatas na Lastro + recebíveis do ERP: alerta quando um único cliente responde por ≥50% do total a receber.
+- **CNPJ da empresa + saldo bancário real via Open Finance** (Empresarial) — novo campo `settings.companyCnpj` (rota `POST /erp/company-cnpj`); `lib/openFinance.ts` (já existente, real-when-configured) é consultado pela primeira vez com o CNPJ do próprio cedente em vez do CNPJ de um sacado.
+- **DRE simplificado** (Empresarial) — receita realizada (duplicatas efetivamente liquidadas via compra de investidor nos últimos 90 dias) menos despesa realizada (contas a pagar já pagas no período) — valor bruto, não líquido da taxa da Lastro, deliberadamente rotulado "simplificado".
+- **Benchmark de mercado** (Empresarial) — compara a inadimplência real da carteira do próprio cedente contra o Lastro Index (`lib/marketIndex.ts`, o mesmo agregado vendido como API standalone acima) pro rating médio equivalente.
+
+Novos testes: 5 em `server/test/cashflow.test.ts` (gate de plano, recebíveis do ERP com deságio, concentração, campos Empresarial, DRE). Verificado: `npm run typecheck`/`test`/`test:e2e` todos verdes (server 100 arquivos/583 testes, client 24/24, e2e 13/13) — migração Postgres re-verificada contra um PostgreSQL 16 real (54 migrations, 69 tabelas).
+
 ## Running locally
 
 ```bash

@@ -57,6 +57,7 @@ export function resetDbForTests() {
     DELETE FROM credit_line_fund_contributions;
     DELETE FROM credit_line_fund_quota_movements;
     DELETE FROM credit_lines;
+    DELETE FROM erp_receivables;
     DELETE FROM fractional_holdings;
     DELETE FROM fractional_offerings;
     DELETE FROM guarantee_fund_claims;

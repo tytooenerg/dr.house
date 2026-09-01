@@ -26,6 +26,14 @@ export function listPendingByCedenteUntil(cedenteId: number, untilIso: string): 
     .all(cedenteId, untilIso) as PayableRow[];
 }
 
+// Feature "AI CFO — DRE simplificado (Empresarial)": expenses actually paid in a period —
+// see lib/duplicatas.ts's listSettledByCedenteSince for the revenue side of the same DRE.
+export function listPaidByCedenteSince(cedenteId: number, sinceIso: string): PayableRow[] {
+  return db
+    .prepare("SELECT * FROM payables WHERE cedente_id = ? AND status = 'pago' AND paid_at >= ? ORDER BY paid_at ASC")
+    .all(cedenteId, sinceIso) as PayableRow[];
+}
+
 export function getPayable(id: number): PayableRow | undefined {
   return db.prepare('SELECT * FROM payables WHERE id = ?').get(id) as PayableRow | undefined;
 }

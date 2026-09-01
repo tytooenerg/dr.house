@@ -6,6 +6,8 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { askClaude, claudeEnabled } from '../lib/claude.js';
 import { buildCashflowForecast } from '../lib/cashflowForecast.js';
+import { getSettings } from '../db/users.js';
+import type { UserRow } from '../db/types.js';
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -18,10 +20,10 @@ Responda em português do Brasil, em 2-4 frases, direto e específico ao produto
 // answer from this real, computed-on-request forecast (lib/cashflowForecast.ts) — never a
 // plausible-sounding guess. Only cedentes have payables/receivables to project; other roles
 // get the base prompt unchanged.
-function systemPromptFor(role: string | undefined, userId: number): string {
-  if (role !== 'cedente') return SYSTEM_PROMPT;
+async function systemPromptFor(user: UserRow): Promise<string> {
+  if (user.role !== 'cedente') return SYSTEM_PROMPT;
   try {
-    const forecast = buildCashflowForecast(userId);
+    const forecast = await buildCashflowForecast(user.id, user.plan, getSettings(user).companyCnpj);
     const base = forecast.scenarios.find((s) => s.scenario === 'base')!;
     const linhas = base.points.map((p) => `  - em ${p.days} dias: saldo projetado ${p.saldoProjetadoFmt}${p.deficit ? ' (déficit)' : ''}`).join('\n');
     return `${SYSTEM_PROMPT}
@@ -38,6 +40,10 @@ ${forecast.insights.map((i) => `- ${i.mensagem}`).join('\n')}`;
     return SYSTEM_PROMPT;
   }
 }
+// Note: this grounding runs for any cedente, regardless of plan — the Básico plan not
+// having the paid AI CFO *page* (routes/cashflow.ts, gated at Pro) doesn't mean the chat
+// assistant should answer cashflow questions with worse (invented) numbers instead of the
+// same real computation.
 
 chatRouter.get('/', (_req, res) => res.json({ suggestions: CHAT_SUGGESTIONS, llmEnabled: claudeEnabled }));
 
@@ -54,7 +60,7 @@ chatRouter.post(
     }
     const question = parsed.data.question;
 
-    const systemPrompt = systemPromptFor(req.user!.role, req.user!.id);
+    const systemPrompt = await systemPromptFor(req.user!);
     const answer = await askClaude(systemPrompt, question, 300, { feature: 'chat', userId: req.user!.id });
     if (answer) {
       res.json({ question, answer, source: 'llm' });

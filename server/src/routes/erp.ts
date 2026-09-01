@@ -8,6 +8,7 @@ import { testSapConnection, listarContasReceberSap } from '../lib/erpConnectors/
 import { testTotvsConnection, listarContasReceberTotvs } from '../lib/erpConnectors/totvs.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { fmtAddOnPrice } from '../lib/addOnBilling.js';
+import { upsertErpReceivables } from '../db/erpReceivables.js';
 
 export const erpRouter = Router();
 erpRouter.use(requireAuth);
@@ -45,6 +46,7 @@ function payload(settings: ReturnType<typeof getSettings>, userId: number) {
     // White-label com domínio próprio — a marca aparece na tela de login/shell público de
     // quem visita esse domínio, antes de qualquer autenticação (routes/public.ts GET /brand).
     whitelabelCustomDomain: user?.whitelabel_custom_domain ?? null,
+    companyCnpj: settings.companyCnpj,
   };
 }
 
@@ -60,6 +62,22 @@ erpRouter.post('/:key/toggle', (req, res) => {
     return;
   }
   const updated = updateSettings(req.user!.id, { erpConnections: { ...settings.erpConnections, [key]: !settings.erpConnections[key] } });
+  res.json(payload(updated, req.user!.id));
+});
+
+const companyCnpjSchema = z.object({ cnpj: z.string().trim().max(20) });
+
+// Feature "AI CFO — saldo bancário real (Empresarial)" — the one input the cedente has to
+// provide by hand for lib/openFinance.ts to look up *their own* company instead of a
+// sacado's (every other caller of consultarFluxoDeCaixa passes a sacado's CNPJ during
+// risk analysis; this is the first time it's called with the cedente's own).
+erpRouter.post('/company-cnpj', (req, res) => {
+  const parsed = companyCnpjSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const updated = updateSettings(req.user!.id, { companyCnpj: parsed.data.cnpj });
   res.json(payload(updated, req.user!.id));
 });
 
@@ -113,6 +131,13 @@ erpRouter.get(
       res.status(502).json({ error: 'omie_fetch_failed', message: result.error });
       return;
     }
+    // Snapshot for lib/cashflowForecast.ts (feature "AI CFO enxerga o ERP") — see
+    // db/erpReceivables.ts for why this upserts instead of replacing wholesale.
+    upsertErpReceivables(
+      req.user!.id,
+      'omie',
+      result.contas.map((c) => ({ externalId: String(c.codigoLancamento), cliente: c.cliente, valor: c.valor, vencimento: c.vencimento }))
+    );
     res.json({ contas: result.contas });
   })
 );
@@ -166,6 +191,11 @@ erpRouter.get(
       res.status(502).json({ error: 'sap_fetch_failed', message: result.error });
       return;
     }
+    upsertErpReceivables(
+      req.user!.id,
+      'sap',
+      result.contas.map((c) => ({ externalId: c.id, cliente: c.cliente, valor: c.valor, vencimento: c.vencimento }))
+    );
     res.json({ contas: result.contas });
   })
 );
@@ -218,6 +248,11 @@ erpRouter.get(
       res.status(502).json({ error: 'totvs_fetch_failed', message: result.error });
       return;
     }
+    upsertErpReceivables(
+      req.user!.id,
+      'totvs',
+      result.contas.map((c) => ({ externalId: c.id, cliente: c.cliente, valor: c.valor, vencimento: c.vencimento }))
+    );
     res.json({ contas: result.contas });
   })
 );
