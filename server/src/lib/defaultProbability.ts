@@ -4,11 +4,9 @@ import type { DuplicataRow } from '../db/types.js';
 import type { Rating } from '../data/seed.js';
 
 // Single source of truth for "what's the probability this duplicata's sacado defaults" —
-// previously computed inline (and independently) inside lib/guaranteeFundStressTest.ts's
-// Monte Carlo exposure builder, with lib/agents/underwriting.ts's ML tool having no
-// fallback of its own (it just reported "unavailable" whenever the model wasn't trained
-// yet, even though a documented assumed prior was already sitting one file away doing
-// exactly this for the stress test). Both now call this.
+// used by lib/agents/underwriting.ts's ML tool (which, before this existed, just reported
+// "unavailable" whenever the model wasn't trained yet, instead of falling back to a
+// documented assumed prior).
 //
 // Honesty about what's assumed vs measured, unchanged from before: this platform is too
 // young to have enough real labeled defaults to fit a reliable per-position probability

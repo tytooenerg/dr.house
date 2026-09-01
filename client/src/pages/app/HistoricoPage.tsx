@@ -6,7 +6,6 @@ import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useLang } from '../../lib/i18n';
-import { useSession } from '../../state/SessionContext';
 
 interface Historico {
   data: string;
@@ -38,19 +37,6 @@ interface InstitutionalAnalytics {
   ratingDistribution: { rating: string; valorFmt: string; pct: number }[];
   maioresExposicoes: { sacado: string; valorFmt: string; pct: number }[];
 }
-interface FundEligiblePosition {
-  duplicataId: string;
-  sacado: string;
-  valorFmt: string;
-  vencimento: string;
-}
-interface TrancheOverview {
-  classe: 'senior' | 'junior';
-  navFmt: string;
-  cotaPriceFmt: string;
-  yieldAprFmt: string;
-  minhaPosicaoFmt: string | null;
-}
 interface RebalanceView {
   totalInvestidoFmt: string;
   posicoesAtivas: number;
@@ -76,8 +62,6 @@ const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
 
 export function HistoricoPage() {
   const { t } = useLang();
-  const { user } = useSession();
-  const isInvestidor = user?.role === 'investidor';
   const [data, setData] = useState<HistoricoData | null>(null);
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
@@ -88,14 +72,6 @@ export function HistoricoPage() {
   const [rebalance, setRebalance] = useState<RebalanceView | null>(null);
   const [irYear, setIrYear] = useState(new Date().getFullYear());
   const [exportingIr, setExportingIr] = useState(false);
-  const [fundEligible, setFundEligible] = useState<FundEligiblePosition[]>([]);
-  const [filingClaimId, setFilingClaimId] = useState<string | null>(null);
-  const [fundClaimError, setFundClaimError] = useState('');
-  const [fundClaimSuccessIds, setFundClaimSuccessIds] = useState<Set<string>>(new Set());
-  const [tranches, setTranches] = useState<{ senior: TrancheOverview; junior: TrancheOverview } | null>(null);
-  const [trancheValor, setTrancheValor] = useState<Record<'senior' | 'junior', string>>({ senior: '', junior: '' });
-  const [trancheBusy, setTrancheBusy] = useState<'senior' | 'junior' | null>(null);
-  const [trancheError, setTrancheError] = useState('');
   const [performance, setPerformance] = useState<PerformanceDashboard | null>(null);
   const [riskFreeInput, setRiskFreeInput] = useState(0);
 
@@ -114,67 +90,6 @@ export function HistoricoPage() {
   useEffect(() => {
     loadPerformance(0);
   }, []);
-
-  const loadFundEligible = () => api.get<{ eligible: FundEligiblePosition[] }>('/guarantee-fund/eligible').then((d) => setFundEligible(d.eligible));
-
-  useEffect(() => {
-    // O fundo de garantia (acionamento e tranches) é um produto de investidor — sacado/cedente
-    // também chegam nesta página (compartilhada via ROLE_TABS), e o servidor rejeita essas
-    // rotas com 403 para qualquer outro papel. Só carrega para quem pode de fato usar.
-    if (isInvestidor) loadFundEligible();
-  }, [isInvestidor]);
-
-  const fileFundClaim = async (duplicataId: string) => {
-    setFundClaimError('');
-    setFilingClaimId(duplicataId);
-    try {
-      await api.post('/guarantee-fund/claims', { duplicataId });
-      setFundClaimSuccessIds((prev) => new Set(prev).add(duplicataId));
-      await loadFundEligible();
-    } catch (err) {
-      setFundClaimError(err instanceof ApiError ? err.message : 'Não foi possível acionar o fundo de garantia.');
-    } finally {
-      setFilingClaimId(null);
-    }
-  };
-
-  const loadTranches = () => api.get<{ senior: TrancheOverview; junior: TrancheOverview }>('/guarantee-fund/tranches').then(setTranches);
-
-  useEffect(() => {
-    if (isInvestidor) loadTranches();
-  }, [isInvestidor]);
-
-  const aportarTranche = async (classe: 'senior' | 'junior') => {
-    const valor = Number(trancheValor[classe].replace(',', '.'));
-    if (!valor || valor <= 0) return;
-    setTrancheError('');
-    setTrancheBusy(classe);
-    try {
-      const d = await api.post<{ senior: TrancheOverview; junior: TrancheOverview }>('/guarantee-fund/tranches/aportar', { classe, valor });
-      setTranches(d);
-      setTrancheValor((prev) => ({ ...prev, [classe]: '' }));
-    } catch (err) {
-      setTrancheError(err instanceof ApiError ? err.message : 'Não foi possível aportar no fundo.');
-    } finally {
-      setTrancheBusy(null);
-    }
-  };
-
-  const resgatarTranche = async (classe: 'senior' | 'junior') => {
-    const valor = Number(trancheValor[classe].replace(',', '.'));
-    if (!valor || valor <= 0) return;
-    setTrancheError('');
-    setTrancheBusy(classe);
-    try {
-      const d = await api.post<{ senior: TrancheOverview; junior: TrancheOverview }>('/guarantee-fund/tranches/resgatar', { classe, valor });
-      setTranches(d);
-      setTrancheValor((prev) => ({ ...prev, [classe]: '' }));
-    } catch (err) {
-      setTrancheError(err instanceof ApiError ? err.message : 'Não foi possível resgatar — verifique o valor disponível.');
-    } finally {
-      setTrancheBusy(null);
-    }
-  };
 
   useEffect(() => {
     api.get<InstitutionalStatus>('/historico/institutional/status').then(setInstitutional);
@@ -290,77 +205,6 @@ export function HistoricoPage() {
               ))}
             </div>
           )}
-        </Card>
-      )}
-
-      {(fundEligible.length > 0 || fundClaimSuccessIds.size > 0) && (
-        <Card className="mb-4 px-6 py-5">
-          <div className="font-bold text-[14.5px] mb-1">Fundo de garantia</div>
-          <div className="text-textSecondary text-[12.5px] mb-3.5">
-            Posições sem seguro contratado que já venceram e ainda não foram pagas — você pode acionar o fundo de garantia da plataforma, que cobre
-            até 80% do valor, limitado ao saldo real disponível no fundo.
-          </div>
-          {fundClaimError && <div className="mb-2 text-red text-[12.5px] font-semibold">{fundClaimError}</div>}
-          <div className="flex flex-col gap-2">
-            {fundEligible.map((p) => (
-              <div key={p.duplicataId} className="flex items-center justify-between text-[12.5px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
-                <span className="font-semibold">{p.sacado}</span>
-                <span className="text-textSecondary">venceu em {p.vencimento}</span>
-                <span className="font-mono-num font-bold">{p.valorFmt}</span>
-                <Button size="sm" variant="secondary" disabled={filingClaimId === p.duplicataId} onClick={() => fileFundClaim(p.duplicataId)}>
-                  {filingClaimId === p.duplicataId ? 'Enviando…' : 'Acionar fundo'}
-                </Button>
-              </div>
-            ))}
-            {[...fundClaimSuccessIds]
-              .filter((id) => !fundEligible.some((p) => p.duplicataId === id))
-              .map((id) => (
-                <div key={id} className="text-[12.5px] text-green font-semibold">
-                  Acionamento registrado para {id} — um admin vai revisar.
-                </div>
-              ))}
-          </div>
-        </Card>
-      )}
-
-      {tranches && (
-        <Card className="mb-4 px-6 py-5">
-          <div className="font-bold text-[14.5px] mb-1">Investir no fundo de garantia</div>
-          <div className="text-textSecondary text-[12.5px] mb-3.5">
-            Duas classes de cota, mesmo fundo real: a sênior só é atingida por uma perda depois que o capital-base da Lastro e a júnior já
-            zeraram — mais protegida, yield menor. A júnior absorve perda primeiro — mais risco, yield maior.
-          </div>
-          {trancheError && <div className="mb-3 text-red text-[12.5px] font-semibold">{trancheError}</div>}
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            {(['senior', 'junior'] as const).map((classe) => {
-              const t = tranches[classe];
-              return (
-                <div key={classe} className="bg-[#F7F8FA] border border-border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-[13px]">{classe === 'senior' ? 'Sênior' : 'Júnior'}</span>
-                    <span className="font-mono-num text-[12px] font-bold text-blue">{t.yieldAprFmt}</span>
-                  </div>
-                  <div className="text-[11.5px] text-textTertiary mb-0.5">NAV da classe: {t.navFmt} · cota {t.cotaPriceFmt}</div>
-                  {t.minhaPosicaoFmt && <div className="text-[11.5px] text-textSecondary mb-2.5">Sua posição: {t.minhaPosicaoFmt}</div>}
-                  <div className="flex gap-1.5">
-                    <input
-                      value={trancheValor[classe]}
-                      onChange={(e) => setTrancheValor((prev) => ({ ...prev, [classe]: e.target.value }))}
-                      placeholder="Valor (R$)"
-                      inputMode="decimal"
-                      className="flex-1 border border-inputBorder rounded-md px-2.5 py-1.5 text-[12px]"
-                    />
-                    <Button size="sm" variant="secondary" disabled={trancheBusy === classe || !trancheValor[classe]} onClick={() => aportarTranche(classe)}>
-                      Aportar
-                    </Button>
-                    <Button size="sm" variant="ghost" disabled={trancheBusy === classe || !trancheValor[classe]} onClick={() => resgatarTranche(classe)}>
-                      Resgatar
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </Card>
       )}
 

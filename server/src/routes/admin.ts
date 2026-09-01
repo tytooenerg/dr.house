@@ -57,10 +57,6 @@ import { computeMetrics } from '../lib/metrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
 import { buildDarfSummary, streamDarfPdf } from '../lib/darfGenerator.js';
-import { buildFundOverview, listFundClaimsForAdmin, decideFundClaimOutcome, fundClaimDecisionSchema } from '../lib/guaranteeFund.js';
-import { buildTrancheOverview, runTrancheYieldDistribution, getYieldApr, setYieldApr } from '../lib/guaranteeFundTranches.js';
-import type { TrancheClasse } from '../db/guaranteeFundTranches.js';
-import { runStressTest } from '../lib/guaranteeFundStressTest.js';
 import { peekDailyBriefing } from '../lib/dailyBriefing.js';
 
 const ADDON_KINDS: AddOnKind[] = [
@@ -982,74 +978,6 @@ adminRouter.get('/juridico/darf.pdf', (req, res) => {
   const summary = buildDarfSummary(period);
   recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.darf_gerado', { period });
   streamDarfPdf(res, summary);
-});
-
-// Fundo de garantia (lib/guaranteeFund.ts) — an admin reviews each investor-filed claim
-// against an uninsured, overdue duplicata and decides whether the reserve pays out
-// (capped by both FUND_COVERAGE_PCT and the fund's real available balance).
-adminRouter.get('/guarantee-fund', (_req, res) => {
-  res.json(buildFundOverview());
-});
-
-adminRouter.get('/guarantee-fund/claims', (req, res) => {
-  const status = typeof req.query.status === 'string' ? (req.query.status as 'aberto' | 'aprovado' | 'negado') : undefined;
-  res.json({ claims: listFundClaimsForAdmin(status) });
-});
-
-// Real Monte Carlo stress test over the fund's *current* actual uninsured exposure
-// (lib/guaranteeFundStressTest.ts) — "how likely is today's real book to exhaust today's
-// real balance", not a static ratio. simulations/correlation are optional, bounded knobs
-// for exploring the assumption space; defaults are sane for a real run.
-adminRouter.get('/guarantee-fund/stress-test', (req, res) => {
-  const simulations = req.query.simulations ? Number(req.query.simulations) : undefined;
-  const correlation = req.query.correlation ? Number(req.query.correlation) : undefined;
-  res.json(runStressTest({ simulations, correlation }));
-});
-
-adminRouter.post(
-  '/guarantee-fund/claims/:id/decidir',
-  asyncHandler(async (req, res) => {
-    const parsed = fundClaimDecisionSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
-      return;
-    }
-    const outcome = decideFundClaimOutcome(req.user!.id, Number(req.params.id), parsed.data.decision, parsed.data.note);
-    if (outcome.status === 200) {
-      recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.guarantee_fund_claim_decidido', {
-        claimId: Number(req.params.id),
-        decision: parsed.data.decision,
-      });
-    }
-    res.status(outcome.status).json(outcome.body);
-  })
-);
-
-// Tranches investíveis do fundo de garantia (lib/guaranteeFundTranches.ts) — visão
-// administrativa das duas classes, e o job (admin-triggered, mesmo padrão de
-// runApiOverageBilling/runWhitelabelPlusBilling) que distribui rendimento periodicamente,
-// financiado pelo capital-base da própria Lastro.
-adminRouter.get('/guarantee-fund/tranches', (_req, res) => {
-  res.json({ senior: buildTrancheOverview('senior'), junior: buildTrancheOverview('junior') });
-});
-
-adminRouter.post('/guarantee-fund/tranches/distribuir-rendimento', (req, res) => {
-  const result = runTrancheYieldDistribution(req.user!.id);
-  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.guarantee_fund_yield_distribuido', { ...result });
-  res.json({ ...result, senior: buildTrancheOverview('senior'), junior: buildTrancheOverview('junior') });
-});
-
-const trancheYieldAprSchema = z.object({ classe: z.enum(['senior', 'junior']), apr: z.number().min(0).max(1) });
-
-adminRouter.put('/guarantee-fund/tranches/yield-apr', (req, res) => {
-  const parsed = trancheYieldAprSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
-    return;
-  }
-  setYieldApr(parsed.data.classe as TrancheClasse, parsed.data.apr, req.user!.id);
-  recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.guarantee_fund_yield_apr_updated', parsed.data);
-  res.json({ classe: parsed.data.classe, apr: getYieldApr(parsed.data.classe as TrancheClasse) });
 });
 
 // Shared config/visibility for the 5 add-on revenue products (lib/addOnBilling.ts) —

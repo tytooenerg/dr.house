@@ -1,7 +1,6 @@
 import { db } from '../db/index.js';
 import { fmtBRL } from './format.js';
 import { getRegistradora } from './registradoras.js';
-import { getFundBalance } from '../db/guaranteeFund.js';
 
 // Real aggregates computed live from the database — no fabricated numbers. On a fresh
 // deployment these will be small (or zero); they grow as real usage grows, exactly like
@@ -47,9 +46,6 @@ export function buildPublicStats() {
     totalSacadosDistintos,
     taxaInadimplenciaPct,
     tempoMedioLiquidacaoHoras,
-    // Real balance of the guarantee fund (lib/guaranteeFund.ts) — a transparency
-    // number, same spirit as everything else on this page: no fabricated marketing figure.
-    fundoGarantiaFmt: fmtBRL(getFundBalance()),
     geradoEm: new Date().toISOString(),
   };
 }

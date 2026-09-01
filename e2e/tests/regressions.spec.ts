@@ -28,37 +28,6 @@ test('cedente can open Integrações ERP without the page crashing (hooks-order 
   expect(pageErrors).toEqual([]);
 });
 
-test('sacado can open Carteira & Histórico without the guarantee-fund tranche card (investor-only) erroring', async ({ page }) => {
-  // HistoricoPage.tsx is shared by investidor/cedente/sacado (ROLE_TABS), but it fired
-  // useEffect calls to GET /guarantee-fund/eligible and /guarantee-fund/tranches
-  // unconditionally on mount. Both routes are requireRole('investidor') server-side, so any
-  // sacado (or cedente) landing on this page got two 403s and an uncaught ApiError on every
-  // visit — and the "Investir no fundo de garantia" card must not render for them either.
-  const pageErrors: string[] = [];
-  const forbidden: string[] = [];
-  page.on('pageerror', (err) => pageErrors.push(err.message));
-  page.on('response', (res) => {
-    if (res.status() === 403 && res.url().includes('/api/guarantee-fund/')) forbidden.push(res.url());
-  });
-
-  await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  await page.getByPlaceholder('voce@empresa.com.br').fill('sacado@lastro.demo');
-  await page.getByPlaceholder('••••••••').fill('demo1234');
-  await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
-  await expect(page).toHaveURL(/\/app\//, { timeout: 15_000 });
-  await dismissOnboardingIfPresent(page);
-
-  await page.goto('/app/historico', { waitUntil: 'domcontentloaded' });
-  await dismissOnboardingIfPresent(page);
-
-  // "Carteira & Histórico" also matches the sidebar nav button — assert on the page's own
-  // subtitle instead.
-  await expect(page.getByText('Suas operações concluídas e retornos obtidos')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('Investir no fundo de garantia')).not.toBeVisible();
-  expect(forbidden).toEqual([]);
-  expect(pageErrors).toEqual([]);
-});
-
 test('investidor can edit an auto-bid rule on Automação de Lances without the page crashing', async ({ page }) => {
   // Every POST /automacao/* route replied with only the field it had just changed (e.g.
   // { autoBidRules: ... }), but AutomacaoPage.tsx does `api.post(...).then(setData)` —

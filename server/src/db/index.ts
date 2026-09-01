@@ -60,10 +60,6 @@ export function resetDbForTests() {
     DELETE FROM erp_receivables;
     DELETE FROM fractional_holdings;
     DELETE FROM fractional_offerings;
-    DELETE FROM guarantee_fund_claims;
-    DELETE FROM guarantee_fund_ledger;
-    DELETE FROM guarantee_fund_tranche_ledger;
-    DELETE FROM guarantee_fund_tranche_quota_movements;
     DELETE FROM insurance_settlements;
     DELETE FROM legal_collection_fees;
     DELETE FROM legal_documents;

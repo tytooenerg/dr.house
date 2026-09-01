@@ -227,18 +227,3 @@ export function listPurchasesByInvestor(
     )
     .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string })[];
 }
-
-// Platform-wide, not scoped to one investor — every active position that is real exposure
-// for the guarantee fund (uninsured; an insured one has its own seguradora claims path and
-// never draws on the fund), used by lib/guaranteeFundStressTest.ts's Monte Carlo simulation.
-export function listActiveUninsuredPurchases(): (PurchaseRow & { duplicata: DuplicataRow })[] {
-  const rows = db
-    .prepare(
-      `SELECT p.* FROM purchases p
-       JOIN duplicatas d ON d.id = p.duplicata_id
-       WHERE p.active = 1 AND d.sandbox = 0 AND d.insurer_key IS NULL
-       ORDER BY p.created_at DESC`
-    )
-    .all() as PurchaseRow[];
-  return rows.map((p) => ({ ...p, duplicata: getDuplicata(p.duplicata_id)! })).filter((p) => p.duplicata);
-}
