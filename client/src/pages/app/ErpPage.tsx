@@ -75,6 +75,8 @@ export function ErpPage() {
   const [brandError, setBrandError] = useState('');
   const [savingBrand, setSavingBrand] = useState(false);
 
+  const [whitelabelPlusError, setWhitelabelPlusError] = useState('');
+
   const load = () =>
     api.get<ErpData>('/erp').then((d) => {
       setData(d);
@@ -191,7 +193,6 @@ export function ErpPage() {
 
   const removeBrand = () => api.post<ErpData>('/erp/whitelabel/brand/remove').then(setData);
 
-  const [whitelabelPlusError, setWhitelabelPlusError] = useState('');
   const toggleWhitelabelPlus = async (enabled: boolean) => {
     setWhitelabelPlusError('');
     try {

@@ -1,0 +1,60 @@
+import { test, expect, dismissOnboardingIfPresent } from './fixtures';
+
+// Two real bugs found by driving every role through every nav page with a Playwright crawl
+// and watching for console errors / uncaught page errors / failed requests:
+
+test('cedente can open Integrações ERP without the page crashing (hooks-order regression)', async ({ page }) => {
+  // ErpPage.tsx declared `whitelabelPlusError`'s useState *after* the `if (!data) return
+  // <PageSkeleton />` early return. On the first render (data still null) React only sees
+  // the hooks before the early return; once `/erp` resolves and the component re-renders
+  // past it, that extra useState call makes React throw "Rendered more hooks than during
+  // the previous render" and the page goes blank behind the ErrorBoundary.
+  const pageErrors: string[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err.message));
+
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.getByPlaceholder('voce@empresa.com.br').fill('cedente@lastro.demo');
+  await page.getByPlaceholder('••••••••').fill('demo1234');
+  await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//, { timeout: 15_000 });
+  await dismissOnboardingIfPresent(page);
+
+  await page.goto('/app/erp', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
+
+  // "Integrações ERP" also matches the sidebar nav button — assert on the page's own
+  // subtitle instead, which only exists in the (post-crash) rendered body.
+  await expect(page.getByText('Conecte seu sistema de gestão')).toBeVisible({ timeout: 10_000 });
+  expect(pageErrors).toEqual([]);
+});
+
+test('sacado can open Carteira & Histórico without the guarantee-fund tranche card (investor-only) erroring', async ({ page }) => {
+  // HistoricoPage.tsx is shared by investidor/cedente/sacado (ROLE_TABS), but it fired
+  // useEffect calls to GET /guarantee-fund/eligible and /guarantee-fund/tranches
+  // unconditionally on mount. Both routes are requireRole('investidor') server-side, so any
+  // sacado (or cedente) landing on this page got two 403s and an uncaught ApiError on every
+  // visit — and the "Investir no fundo de garantia" card must not render for them either.
+  const pageErrors: string[] = [];
+  const forbidden: string[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err.message));
+  page.on('response', (res) => {
+    if (res.status() === 403 && res.url().includes('/api/guarantee-fund/')) forbidden.push(res.url());
+  });
+
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.getByPlaceholder('voce@empresa.com.br').fill('sacado@lastro.demo');
+  await page.getByPlaceholder('••••••••').fill('demo1234');
+  await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL(/\/app\//, { timeout: 15_000 });
+  await dismissOnboardingIfPresent(page);
+
+  await page.goto('/app/historico', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
+
+  // "Carteira & Histórico" also matches the sidebar nav button — assert on the page's own
+  // subtitle instead.
+  await expect(page.getByText('Suas operações concluídas e retornos obtidos')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Investir no fundo de garantia')).not.toBeVisible();
+  expect(forbidden).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});

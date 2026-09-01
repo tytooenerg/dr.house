@@ -6,6 +6,7 @@ import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useLang } from '../../lib/i18n';
+import { useSession } from '../../state/SessionContext';
 
 interface Historico {
   data: string;
@@ -75,6 +76,8 @@ const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
 
 export function HistoricoPage() {
   const { t } = useLang();
+  const { user } = useSession();
+  const isInvestidor = user?.role === 'investidor';
   const [data, setData] = useState<HistoricoData | null>(null);
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
@@ -115,8 +118,11 @@ export function HistoricoPage() {
   const loadFundEligible = () => api.get<{ eligible: FundEligiblePosition[] }>('/guarantee-fund/eligible').then((d) => setFundEligible(d.eligible));
 
   useEffect(() => {
-    loadFundEligible();
-  }, []);
+    // O fundo de garantia (acionamento e tranches) é um produto de investidor — sacado/cedente
+    // também chegam nesta página (compartilhada via ROLE_TABS), e o servidor rejeita essas
+    // rotas com 403 para qualquer outro papel. Só carrega para quem pode de fato usar.
+    if (isInvestidor) loadFundEligible();
+  }, [isInvestidor]);
 
   const fileFundClaim = async (duplicataId: string) => {
     setFundClaimError('');
@@ -135,8 +141,8 @@ export function HistoricoPage() {
   const loadTranches = () => api.get<{ senior: TrancheOverview; junior: TrancheOverview }>('/guarantee-fund/tranches').then(setTranches);
 
   useEffect(() => {
-    loadTranches();
-  }, []);
+    if (isInvestidor) loadTranches();
+  }, [isInvestidor]);
 
   const aportarTranche = async (classe: 'senior' | 'junior') => {
     const valor = Number(trancheValor[classe].replace(',', '.'));
