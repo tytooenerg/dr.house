@@ -57,9 +57,9 @@ export function PrecosPage() {
           <div className="text-center mb-8">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Produtos de dados</div>
             <div className="text-[26px] font-extrabold tracking-tight mb-2">Só precisa dos dados, não do marketplace?</div>
-            <div className="text-textSecondary text-[15px] max-w-[560px] mx-auto">Score de risco, triagem PLD e roteamento de registro vendidos avulsos, por chamada — sem virar cliente da plataforma, sem plano, sem contrato mínimo.</div>
+            <div className="text-textSecondary text-[15px] max-w-[560px] mx-auto">9 capacidades internas da Lastro vendidas avulsas, por chamada — sem virar cliente da plataforma, sem plano, sem contrato mínimo.</div>
           </div>
-          <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="grid gap-5 mb-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="rounded-2xl p-8 border border-border">
               <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Score API</div>
               <div className="text-[30px] font-extrabold mb-1.5">R$ 1,50</div>
@@ -88,6 +88,70 @@ export function PrecosPage() {
                 <div>✓ Roteamento inteligente entre CERC/B3/Núclea/Grafeno</div>
                 <div>✓ Checagem de duplicidade na registradora escolhida</div>
                 <div>✓ Nunca entra no seu marketplace nem cria conta cedente</div>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Judicial Records API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 4,00</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por consulta — POST /v1/judicial/consulta</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Execuções, falência/recuperação judicial e protestos por CNPJ</div>
+                <div>✓ Mesmo provedor que alimenta o motor de compliance interno</div>
+                <div>✓ Sem mensalidade, cobrado só o que usar</div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Fraud Screening API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 2,50</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por avaliação — POST /v1/fraude/avaliar</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Detecta autorrelacionamento e concentração anômala</div>
+                <div>✓ Mesma heurística que roda internamente sobre cada duplicata</div>
+                <div>✓ Avalia sua própria transação e histórico, sem depender da Lastro</div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Document Intelligence API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 3,00</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por documento — POST /v1/documentos/analisar</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Extração de campos de NF-e ou análise de cláusulas de contrato</div>
+                <div>✓ Leitura real via IA (PDF, imagem ou XML)</div>
+                <div>✓ Envie o arquivo em Base64, receba o JSON estruturado</div>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-5 mt-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Reconciliation API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 1,50</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por conciliação — POST /v1/conciliacao</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Envie seu extrato OFX e sua própria lista de lançamentos esperados</div>
+                <div>✓ Recebe de volta o que bateu e o que ficou pendente dos dois lados</div>
+                <div>✓ Não depende de você ter conta na Lastro</div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Suitability API</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 1,00</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por avaliação — POST /v1/suitability/avaliar</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Classificação conservador/moderado/arrojado, estilo CVM</div>
+                <div>✓ Cálculo determinístico e explicável, sem caixa-preta</div>
+                <div>✓ Avalie o cliente final da sua própria plataforma de investimento</div>
+              </div>
+            </div>
+            <div className="rounded-2xl p-8 border border-border">
+              <div className="font-bold text-[13px] text-textSecondary uppercase tracking-wide mb-3.5">Lastro Index</div>
+              <div className="text-[30px] font-extrabold mb-1.5">R$ 5,00</div>
+              <div className="text-textSecondary text-[13.5px] mb-5">por consulta — GET /v1/index</div>
+              <div className="flex flex-col gap-2.5 text-[13.5px] text-[#3D4658]">
+                <div>✓ Deságio médio e taxa de inadimplência por rating (AA/A/B/C)</div>
+                <div>✓ Calculado ao vivo sobre o volume real transacionado na Lastro</div>
+                <div>✓ Benchmark de mercado, não uma amostra ou estimativa</div>
               </div>
             </div>
           </div>

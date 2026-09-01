@@ -129,6 +129,12 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('investidor','
   '0050_registro_api_addon_kind.sql': `ALTER TABLE addon_charges DROP CONSTRAINT addon_charges_kind_check;
 ALTER TABLE addon_charges ADD CONSTRAINT addon_charges_kind_check CHECK (kind IN ('api_overage', 'score_api', 'pld_screening_api', 'registro_api', 'whitelabel_plus', 'institutional_reporting'));
 `,
+  // Same rebuild idiom again (widens addon_charges.kind for 6 new standalone API
+  // products) — registered here from the start, same as every widening migration since
+  // 0049/0050.
+  '0053_new_api_products_addon_kind.sql': `ALTER TABLE addon_charges DROP CONSTRAINT addon_charges_kind_check;
+ALTER TABLE addon_charges ADD CONSTRAINT addon_charges_kind_check CHECK (kind IN ('api_overage', 'score_api', 'pld_screening_api', 'registro_api', 'whitelabel_plus', 'institutional_reporting', 'judicial_records_api', 'fraud_screening_api', 'document_intelligence_api', 'reconciliation_api', 'suitability_api', 'market_index_api'));
+`,
 };
 
 const files = readdirSync(srcDir).filter((f) => f.endsWith('.sql')).sort();

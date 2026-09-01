@@ -16,6 +16,19 @@ import { chargePerCall } from '../lib/addOnBilling.js';
 import { screenEntity } from '../db/sanctions.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { apiVersioningHeaders } from '../lib/apiVersioning.js';
+import { screenJudicialRecords, judicialRecordsEnabled } from '../lib/judicialRecords.js';
+import { screenFraudSignals } from '../lib/fraudScreeningApi.js';
+import { analyzeContract } from '../lib/contractAnalysis.js';
+import { extractNfeFields } from '../lib/nfeExtraction.js';
+import { claudeEnabled } from '../lib/claude.js';
+import { reconcileAgainstExpected } from '../lib/reconciliationApi.js';
+import { OfxParseError } from '../lib/ofxParser.js';
+import { scoreAnswers, PROFILE_LABEL, MAX_SCORE } from '../lib/suitability.js';
+import { buildMarketIndex } from '../lib/marketIndex.js';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
 
 // Public, versioned, API-key-authenticated endpoints for external partners (ERPs, FIDCs,
 // securitizadoras, sacados, seguradoras…) to integrate with directly — distinct from the
@@ -44,11 +57,20 @@ v1Router.use((req, res, next) => {
   const isScoreRoute = product === 'score_api' && req.method === 'GET' && /^\/sacados\/[^/]+\/score$/.test(req.path);
   const isPldRoute = product === 'pld_screening_api' && req.method === 'POST' && req.path === '/pld/triagem';
   const isRegistroRoute = product === 'registro_api' && req.method === 'POST' && req.path === '/registro';
-  if (isScoreRoute || isPldRoute || isRegistroRoute) {
+  const isJudicialRoute = product === 'judicial_records_api' && req.method === 'POST' && req.path === '/judicial/consulta';
+  const isFraudRoute = product === 'fraud_screening_api' && req.method === 'POST' && req.path === '/fraude/avaliar';
+  const isDocRoute = product === 'document_intelligence_api' && req.method === 'POST' && req.path === '/documentos/analisar';
+  const isReconciliationRoute = product === 'reconciliation_api' && req.method === 'POST' && req.path === '/conciliacao';
+  const isSuitabilityRoute = product === 'suitability_api' && req.method === 'POST' && req.path === '/suitability/avaliar';
+  const isIndexRoute = product === 'market_index_api' && req.method === 'GET' && req.path === '/index';
+  if (isScoreRoute || isPldRoute || isRegistroRoute || isJudicialRoute || isFraudRoute || isDocRoute || isReconciliationRoute || isSuitabilityRoute || isIndexRoute) {
     next();
     return;
   }
-  res.status(403).json({ error: 'forbidden', message: 'Esta chave é válida apenas para o produto contratado (Score API, PLD Screening API ou Registro API).' });
+  res.status(403).json({
+    error: 'forbidden',
+    message: 'Esta chave é válida apenas para o produto contratado (Score API, PLD Screening API, Registro API, Judicial Records API, Fraud Screening API, Document Intelligence API, Reconciliation API, Suitability API ou Lastro Index).',
+  });
 });
 
 function idempotencyHeader(req: import('express').Request): string | undefined {
@@ -317,5 +339,194 @@ v1Router.post(
       simulado,
       duplicidadeConfirmada,
     });
+  })
+);
+
+const judicialConsultaSchema = z.object({ cnpj: z.string().trim().min(11).max(20) });
+
+// Feature "Judicial Records API" — the exact same real-when-configured provider adapter
+// lib/complianceEngine.ts already reads internally (JUDICIAL_RECORDS_API_URL/KEY), exposed
+// standalone for the first time. Honestly 503s (never charges, never fabricates a clean
+// result) when no commercial provider is configured — no free public equivalent exists in
+// Brazil, same disclosed limitation as lib/judicialRecords.ts's internal use.
+v1Router.post(
+  '/judicial/consulta',
+  asyncHandler(async (req, res) => {
+    const parsed = judicialConsultaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    if (!judicialRecordsEnabled) {
+      res.status(503).json({
+        error: 'judicial_records_unavailable',
+        message: 'Nenhum provedor de histórico judicial configurado (JUDICIAL_RECORDS_API_URL/KEY) — sem equivalente público gratuito no Brasil.',
+      });
+      return;
+    }
+    let result;
+    try {
+      result = await screenJudicialRecords(parsed.data.cnpj);
+    } catch {
+      res.status(503).json({ error: 'judicial_records_unavailable', message: 'O provedor de histórico judicial está indisponível no momento — tente novamente.' });
+      return;
+    }
+    if (req.apiKey!.product === 'judicial_records_api') {
+      await chargePerCall(req.apiUser!.id, 'judicial_records_api', `Consulta de antecedentes judiciais via API — CNPJ ${parsed.data.cnpj}`);
+    }
+    res.json({ cnpj: parsed.data.cnpj, ...result });
+  })
+);
+
+const fraudeAvaliarSchema = z.object({
+  cedenteNome: z.string().trim().min(1).max(200),
+  sacadoNome: z.string().trim().min(1).max(200),
+  valor: z.number().positive().max(50_000_000),
+  historicoRecente: z.array(z.object({ sacadoNome: z.string().trim().min(1).max(200), valor: z.number().positive() })).max(200).optional(),
+});
+
+// Feature "Fraud Screening API" — see lib/fraudScreeningApi.ts for why this isn't a
+// straight reuse of the internal fraud-anomaly scan job. Always available (pure
+// computation over what the caller sends, no external provider), so this is the one new
+// product here that never 503s.
+v1Router.post(
+  '/fraude/avaliar',
+  asyncHandler(async (req, res) => {
+    const parsed = fraudeAvaliarSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const result = screenFraudSignals(parsed.data);
+    if (req.apiKey!.product === 'fraud_screening_api') {
+      await chargePerCall(req.apiUser!.id, 'fraud_screening_api', `Avaliação de fraude via API — cedente ${parsed.data.cedenteNome}`);
+    }
+    res.json(result);
+  })
+);
+
+const documentosAnalisarSchema = z.object({
+  tipo: z.enum(['contrato', 'nfe']),
+  arquivoBase64: z.string().min(1),
+  mimeType: z.enum(['application/pdf', 'application/xml', 'text/xml', 'image/png', 'image/jpeg']),
+});
+
+// Feature "Document Intelligence API" — the same real Claude-vision document reads
+// lib/contractAnalysis.ts and lib/nfeExtraction.ts already do for Lastro's own uploads
+// (routes/uploads.ts), exposed standalone. Both take a file *path* (they read it off disk
+// themselves), so the base64 body is written to a throwaway temp file for the duration of
+// the call and always cleaned up in `finally` — no upload is ever persisted here. Honestly
+// 503s (never charges) when ANTHROPIC_API_KEY isn't configured, same as every internal
+// caller of these two functions.
+v1Router.post(
+  '/documentos/analisar',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    const parsed = documentosAnalisarSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    if (!claudeEnabled) {
+      res.status(503).json({ error: 'document_intelligence_unavailable', message: 'ANTHROPIC_API_KEY não configurado — análise de documentos desativada.' });
+      return;
+    }
+    const { tipo, arquivoBase64, mimeType } = parsed.data;
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(arquivoBase64, 'base64');
+    } catch {
+      res.status(400).json({ error: 'validation_error', message: 'arquivoBase64 não é um Base64 válido.' });
+      return;
+    }
+    const tmpPath = path.join(os.tmpdir(), `v1-doc-${crypto.randomUUID()}`);
+    try {
+      await fs.writeFile(tmpPath, buffer);
+      const resultado = tipo === 'contrato' ? await analyzeContract(tmpPath, mimeType, req.apiUser!.id) : await extractNfeFields(tmpPath, mimeType, req.apiUser!.id);
+      if (!resultado) {
+        res.status(503).json({ error: 'document_intelligence_unavailable', message: 'Não foi possível analisar o documento no momento — tente novamente.' });
+        return;
+      }
+      if (req.apiKey!.product === 'document_intelligence_api') {
+        await chargePerCall(req.apiUser!.id, 'document_intelligence_api', `Análise de documento (${tipo}) via API`);
+      }
+      res.json({ tipo, resultado });
+    } finally {
+      await fs.unlink(tmpPath).catch(() => {});
+    }
+  })
+);
+
+const conciliacaoSchema = z.object({
+  ofxContent: z.string().min(1),
+  esperado: z.array(z.object({ referencia: z.string().trim().min(1).max(120), valor: z.number().positive(), data: z.string().trim().min(8).max(10) })).max(1000),
+});
+
+// Feature "Reconciliation API" — see lib/reconciliationApi.ts for why this generalizes
+// (rather than reuses) lib/bankStatementReconciliation.ts's internal ledger-matching.
+// Always available (no external provider — the caller supplies both sides), so this never
+// 503s; a malformed OFX file is a 400, not a 503, since it's the caller's own input.
+v1Router.post(
+  '/conciliacao',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    const parsed = conciliacaoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    let result;
+    try {
+      result = reconcileAgainstExpected(parsed.data.ofxContent, parsed.data.esperado);
+    } catch (err) {
+      if (err instanceof OfxParseError) {
+        res.status(400).json({ error: 'ofx_parse_error', message: err.message });
+        return;
+      }
+      throw err;
+    }
+    if (req.apiKey!.product === 'reconciliation_api') {
+      await chargePerCall(req.apiUser!.id, 'reconciliation_api', `Conciliação bancária via API — ${result.transacoesNoExtrato} transação(ões) no extrato`);
+    }
+    res.json(result);
+  })
+);
+
+const suitabilityAvaliarSchema = z.object({ answers: z.record(z.string(), z.string()) });
+
+// Feature "Suitability-as-a-Service" — the same CVM-style scoring lib/suitability.ts
+// already runs for Lastro's own investors, exposed stateless: scores the caller's own end
+// customer without touching Lastro's `suitability` table (there is no Lastro user to
+// attach a result to). Always available (deterministic, no external provider).
+v1Router.post(
+  '/suitability/avaliar',
+  asyncHandler(async (req, res) => {
+    const parsed = suitabilityAvaliarSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const scored = scoreAnswers(parsed.data.answers);
+    if (scored.status === 400) {
+      res.status(400).json(scored.body);
+      return;
+    }
+    if (req.apiKey!.product === 'suitability_api') {
+      await chargePerCall(req.apiUser!.id, 'suitability_api', 'Avaliação de suitability via API');
+    }
+    res.json({ score: scored.score, maxScore: MAX_SCORE, profile: scored.profile, profileLabel: PROFILE_LABEL[scored.profile] });
+  })
+);
+
+// Feature "Lastro Index" — see lib/marketIndex.ts. Always available (Lastro's own
+// aggregated data, no external provider), and the one new product here billed on a GET.
+v1Router.get(
+  '/index',
+  asyncHandler(async (req, res) => {
+    const index = buildMarketIndex();
+    if (req.apiKey!.product === 'market_index_api') {
+      await chargePerCall(req.apiUser!.id, 'market_index_api', 'Consulta ao Lastro Index via API');
+    }
+    res.json(index);
   })
 );

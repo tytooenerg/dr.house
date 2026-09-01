@@ -56,10 +56,16 @@ function payload(userId: number, settings: ReturnType<typeof getSettings>, playg
       pricePerCallFmt: fmtAddOnPrice('api_overage'),
       estimatedChargeFmt: fmtBRL(Math.max(0, platformCallsThisMonth - included) * getAddOnPrice('api_overage')),
     },
-    // Features 2/3/4 — standalone data-product keys and what they've cost so far.
+    // Standalone data-product keys and what they've cost so far.
     scoreApiPriceFmt: fmtAddOnPrice('score_api'),
     pldScreeningApiPriceFmt: fmtAddOnPrice('pld_screening_api'),
     registroApiPriceFmt: fmtAddOnPrice('registro_api'),
+    judicialRecordsApiPriceFmt: fmtAddOnPrice('judicial_records_api'),
+    fraudScreeningApiPriceFmt: fmtAddOnPrice('fraud_screening_api'),
+    documentIntelligenceApiPriceFmt: fmtAddOnPrice('document_intelligence_api'),
+    reconciliationApiPriceFmt: fmtAddOnPrice('reconciliation_api'),
+    suitabilityApiPriceFmt: fmtAddOnPrice('suitability_api'),
+    marketIndexApiPriceFmt: fmtAddOnPrice('market_index_api'),
     addonCharges: listAddOnChargesByUser(userId, 20).map((c) => ({
       id: c.id,
       kind: c.kind,
@@ -84,10 +90,24 @@ devRouter.get('/', (req, res) => res.json(payload(req.user!.id, getSettings(req.
 const generateKeySchema = z.object({
   mode: z.enum(['live', 'test']).optional().default('live'),
   scope: z.enum(['read_only', 'read_write']).optional().default('read_write'),
-  // 'score_api'/'pld_screening_api' are standalone, pay-per-call data products (features
-  // 2/3) — deliberately NOT gated behind Empresarial the way the full 'platform' product
-  // is, since they're sold on their own, billed per call, not part of the subscription.
-  product: z.enum(['platform', 'score_api', 'pld_screening_api', 'registro_api']).optional().default('platform'),
+  // Every non-'platform' value here is a standalone, pay-per-call data product —
+  // deliberately NOT gated behind Empresarial the way the full 'platform' product is,
+  // since they're sold on their own, billed per call, not part of the subscription.
+  product: z
+    .enum([
+      'platform',
+      'score_api',
+      'pld_screening_api',
+      'registro_api',
+      'judicial_records_api',
+      'fraud_screening_api',
+      'document_intelligence_api',
+      'reconciliation_api',
+      'suitability_api',
+      'market_index_api',
+    ])
+    .optional()
+    .default('platform'),
 });
 
 devRouter.post('/keys/generate', (req, res) => {
@@ -102,7 +122,7 @@ devRouter.post('/keys/generate', (req, res) => {
   // uma conta só-API nunca é. Bloqueado aqui, não só escondido no client, porque é uma
   // garantia real do produto ("só a API, nunca o marketplace"), não só UX.
   if (product === 'platform' && req.user!.role === 'api_partner') {
-    res.status(403).json({ error: 'role_not_allowed', message: 'Contas só-API têm acesso apenas ao Score API e ao PLD Screening API.' });
+    res.status(403).json({ error: 'role_not_allowed', message: 'Contas só-API têm acesso apenas aos produtos avulsos (Score, PLD, Registro, Judicial, Fraude, Documentos, Conciliação, Suitability e Índice), nunca à API completa da plataforma.' });
     return;
   }
   if (mode === 'live' && product === 'platform' && !planAtLeast(req.user!.plan, 'empresarial')) {
@@ -114,7 +134,18 @@ devRouter.post('/keys/generate', (req, res) => {
     return;
   }
   const { rawKey, keyHash, keyPrefix } = generateApiKey(mode);
-  const productLabel: Record<ApiKeyProduct, string> = { platform: '', score_api: 'Score API', pld_screening_api: 'PLD Screening API', registro_api: 'Registro API' };
+  const productLabel: Record<ApiKeyProduct, string> = {
+    platform: '',
+    score_api: 'Score API',
+    pld_screening_api: 'PLD Screening API',
+    registro_api: 'Registro API',
+    judicial_records_api: 'Judicial Records API',
+    fraud_screening_api: 'Fraud Screening API',
+    document_intelligence_api: 'Document Intelligence API',
+    reconciliation_api: 'Reconciliation API',
+    suitability_api: 'Suitability API',
+    market_index_api: 'Lastro Index',
+  };
   const label = product === 'platform' ? (mode === 'test' ? 'Chave de teste (sandbox)' : 'Chave de produção') : `${productLabel[product]} (${mode === 'test' ? 'teste' : 'produção'})`;
   createApiKey(req.user!.id, keyHash, keyPrefix, label, mode, scope, product);
   if (mode === 'test' && product === 'platform') ensureSandboxDataset(req.user!);
