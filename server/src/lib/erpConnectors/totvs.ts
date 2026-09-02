@@ -46,6 +46,14 @@ export interface ContaReceberTotvs {
   vencimento: string;
 }
 
+export interface ContaPagarTotvs {
+  id: string;
+  fornecedor: string;
+  numeroDocumento: string;
+  valor: number;
+  vencimento: string;
+}
+
 export async function listarContasReceberTotvs(baseUrl: string, clientId: string, clientSecret: string): Promise<{ ok: boolean; contas: ContaReceberTotvs[]; error?: string }> {
   try {
     const token = await totvsAuth(baseUrl, clientId, clientSecret);
@@ -66,6 +74,33 @@ export async function listarContasReceberTotvs(baseUrl: string, clientId: string
     };
   } catch (err) {
     logger.warn({ err }, '[erp:totvs] falha ao listar contas a receber');
+    return { ok: false, contas: [], error: err instanceof Error ? err.message : 'totvs_fetch_failed' };
+  }
+}
+
+// Mirror of listarContasReceberTotvs against the AP counterpart resource — same honesty as
+// the AR call above: this REST shape is meant to be adjusted to whichever TOTVS product
+// line's (Protheus/RM/Fluig) actual contas-a-pagar API docs you're integrating against.
+export async function listarContasPagarTotvs(baseUrl: string, clientId: string, clientSecret: string): Promise<{ ok: boolean; contas: ContaPagarTotvs[]; error?: string }> {
+  try {
+    const token = await totvsAuth(baseUrl, clientId, clientSecret);
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api/financas/v1/contas-a-pagar?status=aberto&top=50`, {
+      headers: { Authorization: `Bearer ${token.accessToken}` },
+    });
+    if (!res.ok) throw new Error(`totvs_contas_pagar_failed: ${res.status} ${await res.text()}`);
+    const data = (await res.json()) as { items?: { id: string; fornecedor: string; numeroDocumento?: string; valor: number; dataVencimento: string }[] };
+    return {
+      ok: true,
+      contas: (data.items ?? []).map((r) => ({
+        id: r.id,
+        fornecedor: r.fornecedor,
+        numeroDocumento: r.numeroDocumento || r.id,
+        valor: r.valor,
+        vencimento: r.dataVencimento,
+      })),
+    };
+  } catch (err) {
+    logger.warn({ err }, '[erp:totvs] falha ao listar contas a pagar');
     return { ok: false, contas: [], error: err instanceof Error ? err.message : 'totvs_fetch_failed' };
   }
 }

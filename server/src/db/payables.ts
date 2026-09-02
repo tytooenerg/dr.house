@@ -12,7 +12,13 @@ export interface PayableRow {
   recorrente: number;
   paid_at: string | null;
   created_at: string;
+  // Preenchidos só para uma conta a pagar sincronizada de um ERP conectado (feature "Contas
+  // a Pagar via ERP") — null para toda entrada manual ou importada via CSV.
+  fonte: PayableFonte | null;
+  external_id: string | null;
 }
+
+export type PayableFonte = 'omie' | 'sap' | 'totvs';
 
 export function listByCedente(cedenteId: number): PayableRow[] {
   return db.prepare('SELECT * FROM payables WHERE cedente_id = ? ORDER BY vencimento ASC').all(cedenteId) as PayableRow[];
@@ -53,6 +59,37 @@ export function createPayable(input: {
     )
     .run(input.cedenteId, input.descricao, input.fornecedor, input.categoria, input.valor, input.vencimento, input.recorrente ? 1 : 0);
   return getPayable(info.lastInsertRowid as number)!;
+}
+
+const findErpPayableStmt = db.prepare('SELECT id FROM payables WHERE cedente_id = ? AND fonte = ? AND external_id = ?');
+const updateErpPayableStmt = db.prepare('UPDATE payables SET descricao = ?, fornecedor = ?, valor = ?, vencimento = ? WHERE id = ?');
+const insertErpPayableStmt = db.prepare(
+  `INSERT INTO payables (cedente_id, descricao, fornecedor, categoria, valor, vencimento, fonte, external_id)
+   VALUES (?, ?, ?, 'fornecedores', ?, ?, ?, ?)`
+);
+
+// Snapshots open (not-yet-paid) contas a pagar pulled from a connected ERP — explicit
+// find-then-update-or-insert (not a SQL upsert) so this doesn't depend on ON CONFLICT
+// syntax against the partial unique index (idx_payables_erp_source only covers rows with a
+// real fonte). Unlike db/erpReceivables.ts's upsertErpReceivables, this lands straight in
+// the existing `payables` table: a payable is the same real cash-out obligation no matter
+// which system it was entered from, so Contas a Pagar/AI CFO already treat every row here
+// uniformly — no separate haircut or parallel table needed the way an unscored ERP
+// receivable gets.
+export function upsertErpPayables(
+  cedenteId: number,
+  fonte: PayableFonte,
+  contas: { externalId: string; fornecedor: string; numeroDocumento: string; valor: number; vencimento: string }[]
+): void {
+  const tx = db.transaction((rows: typeof contas) => {
+    for (const c of rows) {
+      const descricao = `Fatura ${c.numeroDocumento}`;
+      const existing = findErpPayableStmt.get(cedenteId, fonte, c.externalId) as { id: number } | undefined;
+      if (existing) updateErpPayableStmt.run(descricao, c.fornecedor, c.valor, c.vencimento, existing.id);
+      else insertErpPayableStmt.run(cedenteId, descricao, c.fornecedor, c.valor, c.vencimento, fonte, c.externalId);
+    }
+  });
+  tx(contas);
 }
 
 export function markPayablePaid(id: number): void {

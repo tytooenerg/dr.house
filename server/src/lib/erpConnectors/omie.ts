@@ -41,6 +41,14 @@ export interface ContaReceberOmie {
   vencimento: string;
 }
 
+export interface ContaPagarOmie {
+  codigoLancamento: number;
+  fornecedor: string;
+  numeroDocumento: string;
+  valor: number;
+  vencimento: string;
+}
+
 interface ListarContasReceberResponse {
   conta_receber_cadastro?: {
     codigo_lancamento_omie: number;
@@ -68,6 +76,41 @@ export async function listarContasReceberOmie(appKey: string, appSecret: string)
     contas: rows.map((r) => ({
       codigoLancamento: r.codigo_lancamento_omie,
       cliente: r.nome_cliente_fornecedor || `Cliente #${r.codigo_cliente_fornecedor}`,
+      numeroDocumento: r.numero_documento,
+      valor: r.valor_documento,
+      vencimento: r.data_vencimento,
+    })),
+  };
+}
+
+interface ListarContasPagarResponse {
+  conta_pagar_cadastro?: {
+    codigo_lancamento_omie: number;
+    codigo_cliente_fornecedor: number;
+    numero_documento: string;
+    valor_documento: number;
+    data_vencimento: string;
+    nome_cliente_fornecedor?: string;
+  }[];
+}
+
+// Mirror of listarContasReceberOmie against Omie's contapagar module (same real,
+// documented API, symmetric AR/AP shape — Omie's "Cliente/Fornecedor" is one shared cadastro
+// entity, so the field names on the wire are identical to the AR call above). Feeds
+// db/payables.ts's upsertErpPayables instead of a duplicata candidate.
+export async function listarContasPagarOmie(appKey: string, appSecret: string): Promise<{ ok: boolean; contas: ContaPagarOmie[]; error?: string }> {
+  const result = await omieCall<ListarContasPagarResponse>('financas/contapagar', 'contapagar', 'ListarContasPagar', appKey, appSecret, {
+    pagina: 1,
+    registros_por_pagina: 50,
+    apenas_importado_api: 'N',
+  });
+  if (!result.ok || !result.data) return { ok: false, contas: [], error: result.error };
+  const rows = result.data.conta_pagar_cadastro ?? [];
+  return {
+    ok: true,
+    contas: rows.map((r) => ({
+      codigoLancamento: r.codigo_lancamento_omie,
+      fornecedor: r.nome_cliente_fornecedor || `Fornecedor #${r.codigo_cliente_fornecedor}`,
       numeroDocumento: r.numero_documento,
       valor: r.valor_documento,
       vencimento: r.data_vencimento,
