@@ -9,6 +9,7 @@ import { createServer } from 'node:http';
 import { startTracing } from './lib/tracing.js';
 import { app } from './app.js';
 import { seedIfEmpty } from './db/seed.js';
+import { backfillDuplicataSetor } from './db/duplicatas.js';
 import { attachWebSocketServer } from './ws.js';
 import { startHealthMonitor } from './lib/healthMonitor.js';
 import { startAceiteReminderJob } from './lib/aceiteReminder.js';
@@ -33,6 +34,8 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 async function main() {
   await startTracing();
   await seedIfEmpty();
+  const backfilled = backfillDuplicataSetor();
+  if (backfilled > 0) logger.info(`[duplicatas] classificou setor de ${backfilled} duplicata(s) existente(s) sem essa coluna preenchida`);
   const server = createServer(app);
   attachWebSocketServer(server);
   startHealthMonitor();
