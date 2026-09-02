@@ -83,7 +83,7 @@ describe('GET /api/market filters', () => {
   });
 });
 
-const SETOR_KEYS = ['varejo', 'industria', 'construcao', 'servicos'];
+const SETOR_KEYS = ['varejo', 'atacado', 'comercio', 'industria', 'construcao', 'servicos'];
 
 describe('POST /api/market/:id/buy', () => {
   it('is forbidden for non-investidor roles', async () => {

@@ -85,7 +85,7 @@ export const SACADOS: Record<string, Sacado> = {
     factors: [
       { label: 'Histórico de pagamento', value: 'Bom, 1 atraso leve', barPct: '78%', barColor: COLORS.GREEN },
       { label: 'Protestos (24m)', value: '0 ocorrências', barPct: '90%', barColor: COLORS.GREEN },
-      { label: 'Concentração setorial', value: 'Alimentício — baixo', barPct: '70%', barColor: COLORS.GREEN },
+      { label: 'Concentração setorial', value: 'Atacado alimentício — baixo', barPct: '70%', barColor: COLORS.GREEN },
       { label: 'Endividamento', value: 'Baixo', barPct: '75%', barColor: COLORS.GREEN },
     ],
   },

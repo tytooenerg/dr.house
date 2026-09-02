@@ -70,8 +70,12 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   const classAlloc = (settings.diversification as Record<string, number>)[rating] || 0;
   const passesDiversificacao = classAlloc > 0;
 
+  // sectorDiversification only tracks the 4 original classes (varejo/industria/construcao/
+  // servicos) — a sacado classified into a newer sector this control doesn't manage yet
+  // (e.g. atacado/comercio) is treated the same honest way as an unknown sector: don't
+  // silently block the auto-bid on a cap that was never configured for it.
   const sector = sectorFor(offer.sacado_nome);
-  const sectorAlloc = sector ? (settings.sectorDiversification as Record<string, number>)[sector] ?? 0 : null;
+  const sectorAlloc = sector && sector in settings.sectorDiversification ? (settings.sectorDiversification as Record<string, number>)[sector] : null;
   const passesSetor = sectorAlloc === null || sectorAlloc > 0;
 
   const purchases = listPurchasesByInvestor(user.id).filter((p) => p.active);
