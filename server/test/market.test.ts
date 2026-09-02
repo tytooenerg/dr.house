@@ -3,6 +3,8 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
+import { db } from '../src/db/index.js';
+import { createDuplicata, backfillDuplicataSetor, getDuplicata } from '../src/db/duplicatas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -84,6 +86,36 @@ describe('GET /api/market filters', () => {
 });
 
 const SETOR_KEYS = ['varejo', 'atacado', 'comercio', 'industria', 'construcao', 'servicos'];
+
+describe('backfillDuplicataSetor', () => {
+  it('classifies a pre-existing duplicata whose setor was never computed (legacy row)', () => {
+    const d = createDuplicata({
+      cedenteId: null,
+      cedenteNome: 'Fornecedor Teste Ltda',
+      sacadoNome: 'Grupo Atlas Varejo',
+      sacadoCnpj: '',
+      valor: 10000,
+      vencimento: '2026-12-01',
+      emissao: '2026-01-01',
+      status: 'aprovada',
+      lastroPct: 100,
+      seguro: false,
+    });
+    // Simulate a row created before the `setor` column was backfilled — a plain
+    // ALTER TABLE ADD COLUMN never sets a value for pre-existing rows.
+    db.prepare('UPDATE duplicatas SET setor = NULL WHERE id = ?').run(d.id);
+    expect(getDuplicata(d.id)!.setor).toBeNull();
+
+    const updated = backfillDuplicataSetor();
+    expect(updated).toBeGreaterThan(0);
+    expect(getDuplicata(d.id)!.setor).toBe('varejo');
+  });
+
+  it('is idempotent — a second run touches nothing already classified', () => {
+    backfillDuplicataSetor();
+    expect(backfillDuplicataSetor()).toBe(0);
+  });
+});
 
 describe('POST /api/market/:id/buy', () => {
   it('is forbidden for non-investidor roles', async () => {

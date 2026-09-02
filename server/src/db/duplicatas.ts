@@ -8,6 +8,28 @@ export function getDuplicata(id: string): DuplicataRow | undefined {
   return db.prepare('SELECT * FROM duplicatas WHERE id = ?').get(id) as DuplicataRow | undefined;
 }
 
+// One-time backfill for duplicatas created before the `setor` column existed (migration
+// 0060) — a plain `ALTER TABLE ADD COLUMN` doesn't retroactively compute a value, so every
+// duplicata emitted before this feature shipped (including anything already seeded on a
+// dev/demo database from before the merge) would otherwise show no class badge on the
+// Marketplace forever, even though the same sectorFor lookup that new duplicatas use at
+// emission time can classify it just fine. Idempotent and cheap — only touches rows still
+// NULL, safe to run on every boot (server/src/index.ts calls it once after seedIfEmpty()).
+export function backfillDuplicataSetor(): number {
+  const rows = db.prepare('SELECT id, sacado_nome FROM duplicatas WHERE setor IS NULL').all() as { id: string; sacado_nome: string }[];
+  if (rows.length === 0) return 0;
+  const update = db.prepare('UPDATE duplicatas SET setor = ? WHERE id = ?');
+  let updated = 0;
+  for (const row of rows) {
+    const setor = sectorFor(row.sacado_nome);
+    if (setor) {
+      update.run(setor, row.id);
+      updated++;
+    }
+  }
+  return updated;
+}
+
 // Live/internal reads (SPA, background jobs, revenue, compliance) only ever see real
 // data — sandbox=1 rows created via a test-mode partner API key (lib/sandboxData.ts) are
 // filtered out here, at the query layer, so no caller can accidentally leak them into a
