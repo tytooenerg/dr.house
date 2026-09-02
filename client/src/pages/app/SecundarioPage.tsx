@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
+import { Input, Select } from '../../components/ui/Input';
 
 interface ListingView {
   id: number;
@@ -12,6 +12,7 @@ interface ListingView {
   score: number | null;
   vencimento: string;
   diasRestantes: number;
+  valor: number;
   valorOriginalFmt: string;
   precoFmt: string;
   variacaoPct: number;
@@ -79,6 +80,8 @@ export function SecundarioPage() {
   const [prices, setPrices] = useState<Record<number, string>>({});
   const [bidValues, setBidValues] = useState<Record<number, string>>({});
   const [error, setError] = useState('');
+  const [marketQuery, setMarketQuery] = useState('');
+  const [marketSort, setMarketSort] = useState<'variacao' | 'valor' | 'prazo' | 'score'>('variacao');
   // One key at a time, e.g. "buy:42" or "acceptBid:7" — disables just the button that
   // triggered the request (not every button on the page) and blocks a double-click from
   // firing the same money-moving action twice while the first request is still in flight.
@@ -95,6 +98,17 @@ export function SecundarioPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const sortedMarket = useMemo(() => {
+    const q = marketQuery.trim().toLowerCase();
+    let list = data ? data.market.filter((l) => !q || l.sacado.toLowerCase().includes(q) || l.cedente.toLowerCase().includes(q)) : [];
+    list = list.slice();
+    if (marketSort === 'variacao') list.sort((a, b) => a.variacaoPct - b.variacaoPct);
+    else if (marketSort === 'valor') list.sort((a, b) => b.valor - a.valor);
+    else if (marketSort === 'prazo') list.sort((a, b) => a.diasRestantes - b.diasRestantes);
+    else if (marketSort === 'score') list.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    return list;
+  }, [data, marketQuery, marketSort]);
 
   if (!data) return null;
 
@@ -280,8 +294,17 @@ export function SecundarioPage() {
 
         <Card>
           <div className="font-bold text-[15px] mb-3.5">Anúncios de outros investidores</div>
+          <div className="flex gap-2 mb-3">
+            <Input placeholder="Buscar por sacado ou cedente" value={marketQuery} onChange={(e) => setMarketQuery(e.target.value)} className="flex-1" />
+            <Select value={marketSort} onChange={(e) => setMarketSort(e.target.value as typeof marketSort)}>
+              <option value="variacao">Ordenar: melhor deságio</option>
+              <option value="valor">Ordenar: maior valor</option>
+              <option value="prazo">Ordenar: vencendo antes</option>
+              <option value="score">Ordenar: maior score</option>
+            </Select>
+          </div>
           <div className="flex flex-col gap-2.5">
-            {data.market.map((l) => (
+            {sortedMarket.map((l) => (
               <div key={l.id} className="bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-3">
                 <div className="flex items-center justify-between mb-1">
                   <div className="font-semibold text-[13.5px]">{l.sacado}</div>
@@ -308,7 +331,11 @@ export function SecundarioPage() {
                 </div>
               </div>
             ))}
-            {data.market.length === 0 && <div className="text-textSecondary text-[12.5px]">Nenhum anúncio ativo no mercado secundário agora.</div>}
+            {sortedMarket.length === 0 && (
+              <div className="text-textSecondary text-[12.5px]">
+                {data.market.length === 0 ? 'Nenhum anúncio ativo no mercado secundário agora.' : 'Nenhum anúncio corresponde à busca.'}
+              </div>
+            )}
           </div>
         </Card>
       </div>

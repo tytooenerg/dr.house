@@ -61,6 +61,7 @@ export function viewResaleMarket() {
       score: l.score,
       vencimento: l.vencimento,
       diasRestantes: daysUntil(l.vencimento),
+      valor: l.asking_valor,
       valorOriginalFmt: fmtBRL(l.original_valor),
       precoFmt: fmtBRL(l.asking_valor),
       variacaoPct: l.original_valor > 0 ? +(((l.asking_valor - l.original_valor) / l.original_valor) * 100).toFixed(2) : 0,

@@ -625,6 +625,16 @@ O rótulo de setor introduzido no filtro acima aparecia como texto cinza pequeno
 
 Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 100 arquivos/597 testes, client 24/24).
 
+### Mercado Secundário: proteção contra clique duplo + ordenação e filtro
+
+Auditoria do Mercado Secundário encontrou que nenhuma ação real da página (Anunciar, Cancelar, Comprar, Dar lance, Cancelar/Aceitar/Recusar lance) desabilitava o botão durante a chamada — diferente do resto do app — e que a listagem só ordenava por mais recente, sem filtro.
+
+- Cada ação agora usa uma chave própria (`busyKey`, ex: `comprar:42`) — um clique com a mesma ação já em andamento é ignorado, e o botão troca pra um gerúndio ("Comprando…", "Aceitando…") só durante a própria chamada.
+- **`viewResaleMarket()`** (`lib/resaleCore.ts`) passou a expor `valor` (numérico), não só `precoFmt` — necessário pra ordenar por valor no client sem re-parsear a string formatada.
+- **Client**: busca por sacado/cedente e ordenação (melhor deságio / maior valor / vencendo antes / maior score) na lista "Anúncios de outros investidores" — mesmo padrão já usado no Marketplace, calculado só no client (a página não usa WebSocket, então não há payload de servidor a filtrar).
+
+Novos testes: `server/test/secondary-market-bids.test.ts` ganhou 1 caso confirmando que `valor` bate com o preço pedido. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 100 arquivos/600 testes, client 24/24).
+
 ## Running locally
 
 ```bash
