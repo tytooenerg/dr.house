@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { useSession } from '../../state/SessionContext';
 
 interface Aceite {
@@ -20,6 +20,7 @@ interface Aceite {
 export function SacadoPage() {
   const { user } = useSession();
   const [aceites, setAceites] = useState<Aceite[]>([]);
+  const [errorById, setErrorById] = useState<Record<number, string>>({});
 
   const load = () => api.get<{ aceites: Aceite[] }>('/aceites').then((d) => setAceites(d.aceites));
 
@@ -28,9 +29,17 @@ export function SacadoPage() {
   }, []);
 
   const setStatus = async (id: number, status: 'aceita' | 'contestada') => {
+    setErrorById((prev) => ({ ...prev, [id]: '' }));
     setAceites((prev) => prev.map((a) => (a.id === id ? { ...a, isProcessing: true } : a)));
-    const data = await api.post<{ aceites: Aceite[] }>(`/aceites/${id}/status`, { status });
-    setAceites(data.aceites);
+    try {
+      const data = await api.post<{ aceites: Aceite[] }>(`/aceites/${id}/status`, { status });
+      setAceites(data.aceites);
+    } catch (err) {
+      // Revert the optimistic "Processando…" state so the Confirmar/Contestar buttons come
+      // back — a failed request must never leave this row stuck forever with no way to retry.
+      setAceites((prev) => prev.map((a) => (a.id === id ? { ...a, isProcessing: false } : a)));
+      setErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível registrar sua resposta agora — tente de novo.' }));
+    }
   };
 
   return (
@@ -67,6 +76,7 @@ export function SacadoPage() {
                 </span>
               )}
               {a.isProcessing && <div className="text-[12.5px] font-bold text-textSecondary">Processando…</div>}
+              {!a.isProcessing && errorById[a.id] && <div className="text-[12.5px] font-bold text-red">{errorById[a.id]}</div>}
               {!a.isProcessing && a.isPending && (
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setStatus(a.id, 'aceita')} className="px-3.5 py-2 rounded-lg border-none bg-green text-white text-[12.5px] font-bold cursor-pointer hover:opacity-90">
