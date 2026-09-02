@@ -40,6 +40,14 @@ interface ContaReceber {
   valor: number;
   vencimento: string;
 }
+interface ContaPagar {
+  id?: string;
+  codigoLancamento?: number;
+  fornecedor: string;
+  numeroDocumento: string;
+  valor: number;
+  vencimento: string;
+}
 
 export function ErpPage() {
   const [data, setData] = useState<ErpData | null>(null);
@@ -64,6 +72,8 @@ export function ErpPage() {
   const [busy, setBusy] = useState(false);
   const [contas, setContas] = useState<ContaReceber[] | null>(null);
   const [contasFonte, setContasFonte] = useState('');
+  const [contasPagar, setContasPagar] = useState<ContaPagar[] | null>(null);
+  const [contasPagarFonte, setContasPagarFonte] = useState('');
 
   const [autoEmitMaxInput, setAutoEmitMaxInput] = useState('');
   const [savingAutoEmit, setSavingAutoEmit] = useState(false);
@@ -117,7 +127,7 @@ export function ErpPage() {
     }
   };
 
-  const disconnectOmie = () => api.post<ErpData>('/erp/omie/disconnect').then((d) => { setData(d); setContas(null); });
+  const disconnectOmie = () => api.post<ErpData>('/erp/omie/disconnect').then((d) => { setData(d); setContas(null); setContasPagar(null); });
 
   const connectSap = async () => {
     setBusy(true);
@@ -137,7 +147,7 @@ export function ErpPage() {
     }
   };
 
-  const disconnectSap = () => api.post<ErpData>('/erp/sap/disconnect').then((d) => { setData(d); setContas(null); });
+  const disconnectSap = () => api.post<ErpData>('/erp/sap/disconnect').then((d) => { setData(d); setContas(null); setContasPagar(null); });
 
   const connectTotvs = async () => {
     setBusy(true);
@@ -156,7 +166,7 @@ export function ErpPage() {
     }
   };
 
-  const disconnectTotvs = () => api.post<ErpData>('/erp/totvs/disconnect').then((d) => { setData(d); setContas(null); });
+  const disconnectTotvs = () => api.post<ErpData>('/erp/totvs/disconnect').then((d) => { setData(d); setContas(null); setContasPagar(null); });
 
   const buscarContas = async (key: 'omie' | 'sap' | 'totvs', label: string) => {
     setBusy(true);
@@ -164,6 +174,20 @@ export function ErpPage() {
       const res = await api.get<{ contas: ContaReceber[] }>(`/erp/${key}/contas-receber`);
       setContas(res.contas);
       setContasFonte(label);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Feature "Contas a Pagar via ERP" — mesma ideia de buscarContas, mas o backend persiste
+  // direto na tabela payables (upsertErpPayables), então o resultado também aparece em
+  // Contas a Pagar e entra na projeção do AI CFO sem precisar de nenhuma ação a mais aqui.
+  const buscarContasPagar = async (key: 'omie' | 'sap' | 'totvs', label: string) => {
+    setBusy(true);
+    try {
+      const res = await api.get<{ contas: ContaPagar[] }>(`/erp/${key}/contas-pagar`);
+      setContasPagar(res.contas);
+      setContasPagarFonte(label);
     } finally {
       setBusy(false);
     }
@@ -237,6 +261,9 @@ export function ErpPage() {
                 <button type="button" onClick={() => buscarContas('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
                   Buscar contas a receber
                 </button>
+                <button type="button" onClick={() => buscarContasPagar('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                  Buscar contas a pagar
+                </button>
                 <button type="button" onClick={disconnectOmie} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
                   Desconectar
                 </button>
@@ -257,6 +284,9 @@ export function ErpPage() {
                 </button>
                 <button type="button" onClick={() => buscarContas('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
                   Buscar faturas em aberto
+                </button>
+                <button type="button" onClick={() => buscarContasPagar('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                  Buscar contas a pagar
                 </button>
                 <button type="button" onClick={disconnectSap} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
                   Desconectar
@@ -280,6 +310,9 @@ export function ErpPage() {
                 </button>
                 <button type="button" onClick={() => buscarContas('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
                   Buscar contas a receber
+                </button>
+                <button type="button" onClick={() => buscarContasPagar('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                  Buscar contas a pagar
                 </button>
                 <button type="button" onClick={disconnectTotvs} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
                   Desconectar
@@ -321,6 +354,29 @@ export function ErpPage() {
               {contas.map((c, i) => (
                 <div key={c.id ?? c.codigoLancamento ?? i} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-[#F7F8FA] text-[12.5px]">
                   <div>{c.cliente} — doc. {c.numeroDocumento}</div>
+                  <div className="font-mono-num font-semibold">
+                    R$ {c.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · vence {c.vencimento}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {contasPagar && (
+        <Card className="mb-4">
+          <div className="font-bold text-[15px] mb-1">
+            Contas a pagar importadas — {contasPagarFonte} ({contasPagar.length})
+          </div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">Já entram em Contas a Pagar e na projeção do AI CFO — nenhuma ação extra necessária.</div>
+          {contasPagar.length === 0 ? (
+            <div className="text-[13px] text-textSecondary">Nenhuma conta a pagar em aberto encontrada.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {contasPagar.map((c, i) => (
+                <div key={c.id ?? c.codigoLancamento ?? i} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-[#F7F8FA] text-[12.5px]">
+                  <div>{c.fornecedor} — doc. {c.numeroDocumento}</div>
                   <div className="font-mono-num font-semibold">
                     R$ {c.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · vence {c.vencimento}
                   </div>

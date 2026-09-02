@@ -3,12 +3,13 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { getSettings, updateSettings, getUserById, setWhitelabelPlusEnabled, getUserByWhitelabelDomain, setWhitelabelCustomDomain } from '../db/users.js';
 import { ERP_CONNECTORS_META } from '../data/seed.js';
-import { testOmieConnection, listarContasReceberOmie } from '../lib/erpConnectors/omie.js';
-import { testSapConnection, listarContasReceberSap } from '../lib/erpConnectors/sap.js';
-import { testTotvsConnection, listarContasReceberTotvs } from '../lib/erpConnectors/totvs.js';
+import { testOmieConnection, listarContasReceberOmie, listarContasPagarOmie } from '../lib/erpConnectors/omie.js';
+import { testSapConnection, listarContasReceberSap, listarContasPagarSap } from '../lib/erpConnectors/sap.js';
+import { testTotvsConnection, listarContasReceberTotvs, listarContasPagarTotvs } from '../lib/erpConnectors/totvs.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { fmtAddOnPrice } from '../lib/addOnBilling.js';
 import { upsertErpReceivables } from '../db/erpReceivables.js';
+import { upsertErpPayables } from '../db/payables.js';
 
 export const erpRouter = Router();
 erpRouter.use(requireAuth);
@@ -142,6 +143,33 @@ erpRouter.get(
   })
 );
 
+// Real contas-a-pagar pull (feature "Contas a Pagar via ERP") — mirrors the contas-receber
+// route above, but persists straight into the shared `payables` table (db/payables.ts's
+// upsertErpPayables) instead of a separate one: same table Contas a Pagar already reads
+// from, so a synced conta a pagar shows up there and in the AI CFO projection with no
+// separate code path needed.
+erpRouter.get(
+  '/omie/contas-pagar',
+  asyncHandler(async (req, res) => {
+    const settings = getSettings(req.user!);
+    if (!settings.omieCredentials) {
+      res.status(409).json({ error: 'omie_not_connected' });
+      return;
+    }
+    const result = await listarContasPagarOmie(settings.omieCredentials.appKey, settings.omieCredentials.appSecret);
+    if (!result.ok) {
+      res.status(502).json({ error: 'omie_fetch_failed', message: result.error });
+      return;
+    }
+    upsertErpPayables(
+      req.user!.id,
+      'omie',
+      result.contas.map((c) => ({ externalId: String(c.codigoLancamento), fornecedor: c.fornecedor, numeroDocumento: c.numeroDocumento, valor: c.valor, vencimento: c.vencimento }))
+    );
+    res.json({ contas: result.contas });
+  })
+);
+
 const sapConnectSchema = z.object({
   baseUrl: z.string().trim().url(),
   companyDb: z.string().trim().min(1),
@@ -200,6 +228,29 @@ erpRouter.get(
   })
 );
 
+erpRouter.get(
+  '/sap/contas-pagar',
+  asyncHandler(async (req, res) => {
+    const settings = getSettings(req.user!);
+    if (!settings.sapCredentials) {
+      res.status(409).json({ error: 'sap_not_connected' });
+      return;
+    }
+    const { baseUrl, companyDb, username, password } = settings.sapCredentials;
+    const result = await listarContasPagarSap(baseUrl, companyDb, username, password);
+    if (!result.ok) {
+      res.status(502).json({ error: 'sap_fetch_failed', message: result.error });
+      return;
+    }
+    upsertErpPayables(
+      req.user!.id,
+      'sap',
+      result.contas.map((c) => ({ externalId: c.id, fornecedor: c.fornecedor, numeroDocumento: c.numeroDocumento, valor: c.valor, vencimento: c.vencimento }))
+    );
+    res.json({ contas: result.contas });
+  })
+);
+
 const totvsConnectSchema = z.object({
   baseUrl: z.string().trim().url(),
   clientId: z.string().trim().min(1),
@@ -252,6 +303,29 @@ erpRouter.get(
       req.user!.id,
       'totvs',
       result.contas.map((c) => ({ externalId: c.id, cliente: c.cliente, valor: c.valor, vencimento: c.vencimento }))
+    );
+    res.json({ contas: result.contas });
+  })
+);
+
+erpRouter.get(
+  '/totvs/contas-pagar',
+  asyncHandler(async (req, res) => {
+    const settings = getSettings(req.user!);
+    if (!settings.totvsCredentials) {
+      res.status(409).json({ error: 'totvs_not_connected' });
+      return;
+    }
+    const { baseUrl, clientId, clientSecret } = settings.totvsCredentials;
+    const result = await listarContasPagarTotvs(baseUrl, clientId, clientSecret);
+    if (!result.ok) {
+      res.status(502).json({ error: 'totvs_fetch_failed', message: result.error });
+      return;
+    }
+    upsertErpPayables(
+      req.user!.id,
+      'totvs',
+      result.contas.map((c) => ({ externalId: c.id, fornecedor: c.fornecedor, numeroDocumento: c.numeroDocumento, valor: c.valor, vencimento: c.vencimento }))
     );
     res.json({ contas: result.contas });
   })

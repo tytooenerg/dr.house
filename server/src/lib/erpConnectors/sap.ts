@@ -46,6 +46,14 @@ export interface ContaReceberSap {
   vencimento: string;
 }
 
+export interface ContaPagarSap {
+  id: string;
+  fornecedor: string;
+  numeroDocumento: string;
+  valor: number;
+  vencimento: string;
+}
+
 // Pulls open (bost_Open) sales invoices from the cedente's own SAP Business One tenant —
 // same "turn ERP data into duplicata candidates" role listarContasReceberOmie plays.
 export async function listarContasReceberSap(baseUrl: string, companyDb: string, username: string, password: string): Promise<{ ok: boolean; contas: ContaReceberSap[]; error?: string }> {
@@ -69,6 +77,35 @@ export async function listarContasReceberSap(baseUrl: string, companyDb: string,
     };
   } catch (err) {
     logger.warn({ err }, '[erp:sap] falha ao listar faturas em aberto');
+    return { ok: false, contas: [], error: err instanceof Error ? err.message : 'sap_fetch_failed' };
+  }
+}
+
+// Mirror of listarContasReceberSap against PurchaseInvoices — the standard SAP Business One
+// Service Layer entity for supplier invoices, same document family as Invoices (sales) just
+// on the AP side: same DocumentStatus/DocTotal/DocDueDate fields, CardName here holds the
+// vendor's name instead of the customer's.
+export async function listarContasPagarSap(baseUrl: string, companyDb: string, username: string, password: string): Promise<{ ok: boolean; contas: ContaPagarSap[]; error?: string }> {
+  try {
+    const session = await sapLogin(baseUrl, companyDb, username, password);
+    const res = await fetch(
+      `${baseUrl.replace(/\/$/, '')}/b1s/v1/PurchaseInvoices?$filter=DocumentStatus eq 'bost_Open'&$select=DocEntry,CardName,NumAtCard,DocTotal,DocDueDate&$top=50`,
+      { headers: { Cookie: `B1SESSION=${session.sessionId}` } }
+    );
+    if (!res.ok) throw new Error(`sap_purchase_invoices_failed: ${res.status} ${await res.text()}`);
+    const data = (await res.json()) as { value?: { DocEntry: number; CardName: string; NumAtCard?: string; DocTotal: number; DocDueDate: string }[] };
+    return {
+      ok: true,
+      contas: (data.value ?? []).map((r) => ({
+        id: String(r.DocEntry),
+        fornecedor: r.CardName,
+        numeroDocumento: r.NumAtCard || String(r.DocEntry),
+        valor: r.DocTotal,
+        vencimento: r.DocDueDate,
+      })),
+    };
+  } catch (err) {
+    logger.warn({ err }, '[erp:sap] falha ao listar contas a pagar em aberto');
     return { ok: false, contas: [], error: err instanceof Error ? err.message : 'sap_fetch_failed' };
   }
 }
