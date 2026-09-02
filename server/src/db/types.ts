@@ -4,7 +4,11 @@
 // seguradora) — see "Score/PLD API como produto standalone" in README. It never touches
 // duplicatas, never needs KYB (needsKyb below is investidor-only by design), and its only
 // tabs are Desenvolvedores/Conta/Assinatura/Perfil.
-export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor' | 'api_partner';
+// 'anunciante' is the same no-KYB, self-service shape for a company that just wants a slot
+// in the landing page's ad carousel (db/advertisements.ts, lib/advertisementBilling.ts) —
+// its only tab is Publicidade (plus Conta, to deposit real money via Pix/boleto/TED into
+// the ledger balance the monthly ad fee is charged against, and Perfil).
+export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor' | 'api_partner' | 'anunciante';
 export type KybStatus = 'none' | 'pending' | 'approved' | 'rejected';
 export type Plan = 'basico' | 'pro' | 'empresarial';
 export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';

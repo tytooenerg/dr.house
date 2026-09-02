@@ -10,6 +10,66 @@ interface PublicStats {
   taxaInadimplenciaPct: number;
 }
 
+interface Advertisement {
+  id: number;
+  logoUrl: string;
+  titulo: string;
+  texto: string;
+  linkUrl: string;
+}
+
+const AD_ROTATE_MS = 6000;
+
+// Carrossel de publicidade (feature "Carrossel de publicidade") — conteúdo pago de
+// empresas anunciantes, rotativo, rotulado como publicidade de propósito (nunca
+// apresentado como parceria/endosso da Lastro). Renderiza null quando não há nenhum
+// anúncio aprovado+ativo — nunca mostra uma seção vazia pra quem visita.
+function AdCarousel({ ads }: { ads: Advertisement[] }) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (ads.length < 2) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % ads.length), AD_ROTATE_MS);
+    return () => clearInterval(id);
+  }, [ads.length]);
+
+  if (ads.length === 0) return null;
+  const ad = ads[index % ads.length];
+
+  return (
+    <div className="px-14 py-10 max-w-[1360px] mx-auto">
+      <div className="text-[11px] font-bold text-textTertiary uppercase tracking-wide mb-3 text-center">Publicidade</div>
+      <a
+        href={ad.linkUrl}
+        target="_blank"
+        rel="noopener noreferrer sponsored"
+        className="flex items-center gap-5 border border-border rounded-card p-6 hover:bg-[#F7F8FA] transition-colors"
+      >
+        <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-[#F7F8FA] flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-[16px]">{ad.titulo}</div>
+          <div className="text-textSecondary text-[13.5px] mt-1">{ad.texto}</div>
+        </div>
+        <div className="text-blue font-bold text-[13px] whitespace-nowrap">Saiba mais →</div>
+      </a>
+      {ads.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-4">
+          {ads.map((a, i) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setIndex(i)}
+              aria-label={`Ver anúncio ${i + 1}`}
+              className="rounded-full border-none cursor-pointer p-0"
+              style={{ width: 7, height: 7, background: i === index ? '#1E5EFF' : '#D6DCE5' }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const PROBLEMAS = [
   { t: 'Capital de giro travado', d: 'Empresas vendem a prazo e esperam 30, 60, 90 dias para receber — mesmo precisando do caixa agora.' },
   { t: 'Processo em papel e planilha', d: 'Emissão, aceite e registro de duplicatas ainda dependem de e-mail, PDF e conferência manual.' },
@@ -41,11 +101,19 @@ const PILARES = [
 
 export function LandingPage() {
   const [stats, setStats] = useState<PublicStats | null>(null);
+  const [ads, setAds] = useState<Advertisement[]>([]);
 
   useEffect(() => {
     fetch('/api/public/stats')
       .then((r) => r.json())
       .then(setStats)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/public/advertisements')
+      .then((r) => r.json())
+      .then((d) => setAds(d.ads ?? []))
       .catch(() => {});
   }, []);
 
@@ -226,6 +294,8 @@ export function LandingPage() {
           </div>
         </div>
       </div>
+
+      <AdCarousel ads={ads} />
 
       {/* CTA FINAL */}
       <div className="px-14 py-20 text-center bg-[#F7F8FA]">

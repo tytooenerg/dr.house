@@ -42,6 +42,7 @@ const AdminPage = lazy(() => import('./pages/app/AdminPage').then((m) => ({ defa
 const AssinaturaPage = lazy(() => import('./pages/app/AssinaturaPage').then((m) => ({ default: m.AssinaturaPage })));
 const SeguradoraPage = lazy(() => import('./pages/app/SeguradoraPage').then((m) => ({ default: m.SeguradoraPage })));
 const AuditorPage = lazy(() => import('./pages/app/AuditorPage').then((m) => ({ default: m.AuditorPage })));
+const PublicidadePage = lazy(() => import('./pages/app/PublicidadePage').then((m) => ({ default: m.PublicidadePage })));
 const LandingPage = lazy(() => import('./pages/public/LandingPage').then((m) => ({ default: m.LandingPage })));
 const DevelopersPage = lazy(() => import('./pages/public/DevelopersPage').then((m) => ({ default: m.DevelopersPage })));
 const DocsPage = lazy(() => import('./pages/public/DocsPage').then((m) => ({ default: m.DocsPage })));
@@ -116,6 +117,7 @@ export default function App() {
             <Route path="assinatura" element={<Gate tab="assinatura"><AssinaturaPage /></Gate>} />
             <Route path="seguradora" element={<Gate tab="seguradora"><SeguradoraPage /></Gate>} />
             <Route path="auditor" element={<Gate tab="auditor"><AuditorPage /></Gate>} />
+            <Route path="publicidade" element={<Gate tab="publicidade"><PublicidadePage /></Gate>} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

@@ -580,6 +580,20 @@ Até aqui só Contas a Receber sincronizava com o ERP conectado (Omie/SAP/TOTVS)
 
 Novos testes: `server/test/erp-payables.test.ts` (6 — cria via ERP, dedupe por `external_id` na mesma fonte, não-colisão entre fontes diferentes, entra na projeção do AI CFO, pode ser marcada como paga pelo fluxo normal). Verificado: `npm run typecheck`/`build`/`test` todos verdes.
 
+### Carrossel de publicidade na landing page — empresas pagantes anunciam self-service
+
+Nova linha de receita: um carrossel de publicidade na página inicial pública, vendido self-service pra empresas de fora da Lastro (fintechs, factorings, provedores de software mirando a mesma audiência) que querem alcance sem virar cedente/investidor/sacado/seguradora.
+
+- **Novo papel `anunciante`** (self-service, sem KYB) — mesmo formato de `api_partner` (migração `0057_anunciante_role.sql`, alarga o `CHECK` de `users.role`). Única aba real é Publicidade; Conta &amp; Liquidação fica disponível pra depositar via Pix/TED/boleto (já real-when-configured) o saldo que cobre a mensalidade — sem gate de plano Básico/Pro/Empresarial, mesma lógica de preço avulso que `api_partner` já usa.
+- **Nova tabela `advertisements`** (migração `0058_advertisements.sql`) — um anúncio por conta anunciante (`UNIQUE(advertiser_id)`), com `logo_url`/`titulo`/`texto`/`link_url`, `status` (pendente/aprovado/rejeitado) e `ativo` (o próprio anunciante liga/desliga sem perder o conteúdo aprovado). Toda edição de conteúdo — mesmo depois de aprovado — volta pro status `pendente`: o admin revisa o que vai rodar de verdade, não o que rodava antes.
+- **`routes/advertisements.ts`** (novo) — `GET/POST /advertisements/me` (configura o próprio anúncio) e `POST /advertisements/me/toggle` (liga/desliga), tudo escopado à própria conta.
+- **Moderação no back-office** (`routes/admin.ts`) — `GET /admin/advertisements` lista a fila de pendentes, `POST /admin/advertisements/:id/decidir` aprova (sem motivo) ou rejeita (motivo obrigatório, devolvido pro anunciante em `GET /advertisements/me`). Novo painel `AdvertisementsPanel.tsx`, décima aba do back-office.
+- **`GET /public/advertisements`** (`routes/public.ts`) — feed totalmente público, cacheado 30s (mesmo `lib/cache.ts` de `/public/stats`), só devolve anúncios `aprovado` + `ativo`. Um admin pode desligar o carrossel inteiro na hora via feature flag `ad_carousel` (`lib/featureFlags.ts`) sem mexer em cada anúncio — mesma válvula de segurança que o widget embutível já tem.
+- **Cobrança mensal recorrente** (`lib/advertisementBilling.ts`, novo `AddOnKind` `publicidade_carrossel`, migração `0059_advertisement_addon_kind.sql` — R$350/mês) — mesmo motor de `lib/whitelabelBilling.ts`: cobra do saldo real da conta uma vez por período, só enquanto `aprovado` e `ativo`; `POST /admin/advertisements/cobrar` pra rodar/re-rodar manualmente, mesmo padrão de `/whitelabel-plus/cobrar`.
+- **Client**: novo card do carrossel em `LandingPage.tsx` (rotação automática a cada 6s, rotulado "Publicidade", nunca renderiza vazio) e nova página `PublicidadePage.tsx` pra a conta anunciante configurar/ver status/pausar o próprio anúncio.
+
+Novos testes: `server/test/advertisements.test.ts` (14 — cadastro sem KYB, validação de URL, ciclo pendente→aprovado→edição volta pra pendente, toggle, fila de moderação exige motivo pra rejeitar, feed público filtra por aprovado+ativo, feature flag desliga o carrossel inteiro, cobrança mensal só de quem está aprovado+ativo e é idempotente no período); `agents.test.ts`/`addon-revenue.test.ts` ajustados pras novas contagens. Verificado: `npm run typecheck`/`build`/`test`/`test:e2e` todos verdes (server 100 arquivos/593 testes, client 24/24, SDK 9/9, e2e 12/12) — migração Postgres re-verificada contra um PostgreSQL 16 real (59 migrations, 66 tabelas).
+
 ## Running locally
 
 ```bash

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { approveKyb, listPendingKyb, rejectKyb, getUserById, listUsersByRole } from '../db/users.js';
 import { createAuditorAccount, CreateAuditorError } from '../lib/createAuditorAccount.js';
+import { listPendingAdvertisements, getAdvertisement, decideAdvertisement } from '../db/advertisements.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
@@ -50,6 +51,7 @@ import { sumAddOnChargesByKind, listRecentAddOnCharges, type AddOnKind } from '.
 import { getIncludedCallsPerMonth, setIncludedCallsPerMonth, runApiOverageBilling } from '../lib/apiOverageBilling.js';
 import { runWhitelabelPlusBilling } from '../lib/whitelabelBilling.js';
 import { runInstitutionalReportingBilling } from '../lib/institutionalReporting.js';
+import { runAdvertisementBilling } from '../lib/advertisementBilling.js';
 import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/agents.js';
 import { trainModel, getModel, MIN_TRAINING_SAMPLES, MIN_NEURAL_NET_SAMPLES } from '../lib/mlScoring.js';
 import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
@@ -72,6 +74,7 @@ const ADDON_KINDS: AddOnKind[] = [
   'reconciliation_api',
   'suitability_api',
   'market_index_api',
+  'publicidade_carrossel',
 ];
 
 export const adminRouter = Router();
@@ -1068,6 +1071,17 @@ adminRouter.post(
   })
 );
 
+// Carrossel de publicidade monthly billing — same manual-trigger pattern.
+adminRouter.post(
+  '/advertisements/cobrar',
+  asyncHandler(async (req, res) => {
+    const period = typeof req.body?.period === 'string' ? req.body.period : undefined;
+    const result = await runAdvertisementBilling(period);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.advertisement_cobranca_manual', { ...result });
+    res.json(result);
+  })
+);
+
 adminRouter.get('/backups', (_req, res) => {
   const backups = listBackups().map((b) => ({ ...b, quando: fmtRelative(b.createdAt) }));
   res.json({ enabled: backupEnabled, backups });
@@ -1127,3 +1141,50 @@ adminRouter.post(
 adminRouter.get('/daily-briefing', (_req, res) => {
   res.json(peekDailyBriefing());
 });
+
+// Fila de moderação do carrossel de publicidade (feature "Carrossel de publicidade") — um
+// admin revisa cada anúncio submetido por uma conta 'anunciante' antes dele rodar
+// publicamente na landing page (routes/public.ts GET /public/advertisements). Rejeitar
+// exige um motivo (mostrado de volta pro anunciante em GET /advertisements/me); aprovar não.
+adminRouter.get('/advertisements', (_req, res) => {
+  res.json({
+    pending: listPendingAdvertisements().map((a) => ({
+      id: a.id,
+      empresa: a.company_name,
+      logoUrl: a.logo_url,
+      titulo: a.titulo,
+      texto: a.texto,
+      linkUrl: a.link_url,
+      createdAt: a.created_at,
+    })),
+  });
+});
+
+const advertisementDecisionSchema = z.object({
+  decision: z.enum(['aprovado', 'rejeitado']),
+  rejectReason: z.string().trim().max(500).optional(),
+});
+
+adminRouter.post(
+  '/advertisements/:id/decidir',
+  asyncHandler(async (req, res) => {
+    const parsed = advertisementDecisionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    if (parsed.data.decision === 'rejeitado' && !parsed.data.rejectReason?.trim()) {
+      res.status(400).json({ error: 'validation_error', message: 'Informe o motivo da rejeição.' });
+      return;
+    }
+    const id = Number(req.params.id);
+    const ad = getAdvertisement(id);
+    if (!ad || ad.status !== 'pendente') {
+      res.status(404).json({ error: 'not_found', message: 'Anúncio não encontrado ou já revisado.' });
+      return;
+    }
+    decideAdvertisement(id, parsed.data.decision, parsed.data.decision === 'rejeitado' ? parsed.data.rejectReason!.trim() : null);
+    recordAuditEvent(req.user!.id, req.user!.company_name, 'admin.advertisement_decidido', { adId: id, decision: parsed.data.decision });
+    res.json({ pending: listPendingAdvertisements().map((a) => ({ id: a.id, empresa: a.company_name, logoUrl: a.logo_url, titulo: a.titulo, texto: a.texto, linkUrl: a.link_url, createdAt: a.created_at })) });
+  })
+);

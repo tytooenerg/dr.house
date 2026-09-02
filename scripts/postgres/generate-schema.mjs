@@ -135,6 +135,17 @@ ALTER TABLE addon_charges ADD CONSTRAINT addon_charges_kind_check CHECK (kind IN
   '0053_new_api_products_addon_kind.sql': `ALTER TABLE addon_charges DROP CONSTRAINT addon_charges_kind_check;
 ALTER TABLE addon_charges ADD CONSTRAINT addon_charges_kind_check CHECK (kind IN ('api_overage', 'score_api', 'pld_screening_api', 'registro_api', 'whitelabel_plus', 'institutional_reporting', 'judicial_records_api', 'fraud_screening_api', 'document_intelligence_api', 'reconciliation_api', 'suitability_api', 'market_index_api'));
 `,
+  // Same rebuild idiom again (widens users.role for the new 'anunciante' role — carrossel
+  // de publicidade) — registered here from the start, same as every widening migration
+  // since 0049/0050.
+  '0057_anunciante_role.sql': `ALTER TABLE users DROP CONSTRAINT users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('investidor','cedente','sacado','admin','seguradora','auditor','api_partner','anunciante'));
+`,
+  // Same rebuild idiom again (widens addon_charges.kind for the new 'publicidade_carrossel'
+  // recurring add-on) — registered here from the start.
+  '0059_advertisement_addon_kind.sql': `ALTER TABLE addon_charges DROP CONSTRAINT addon_charges_kind_check;
+ALTER TABLE addon_charges ADD CONSTRAINT addon_charges_kind_check CHECK (kind IN ('api_overage', 'score_api', 'pld_screening_api', 'registro_api', 'whitelabel_plus', 'institutional_reporting', 'judicial_records_api', 'fraud_screening_api', 'document_intelligence_api', 'reconciliation_api', 'suitability_api', 'market_index_api', 'publicidade_carrossel'));
+`,
 };
 
 const files = readdirSync(srcDir).filter((f) => f.endsWith('.sql')).sort();

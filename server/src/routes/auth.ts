@@ -79,7 +79,7 @@ const registerSchema = z.object({
   email: z.string().trim().email('E-mail inválido.'),
   password: z.string().min(6, 'A senha precisa ter ao menos 6 caracteres.'),
   companyName: z.string().trim().min(2, 'Informe o nome da empresa.'),
-  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora', 'api_partner']),
+  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora', 'api_partner', 'anunciante']),
   insurerKey: z
     .enum(INSURERS.map((i) => i.key) as [string, ...string[]])
     .optional(),
@@ -131,7 +131,9 @@ function publicUser(user: UserRow) {
                 ? 'Acesso via API'
                 : user.role === 'auditor'
                   ? 'Auditoria'
-                  : 'Conta Investidor',
+                  : user.role === 'anunciante'
+                    ? 'Conta Anunciante'
+                    : 'Conta Investidor',
     navTabs: user.team_owner_id ? roleTabs.filter((t) => TEAM_MEMBER_ALLOWED_TABS.includes(t)) : roleTabs,
     isTeamMember: !!user.team_owner_id,
     totpEnabled: !!user.totp_enabled,
@@ -349,7 +351,7 @@ authRouter.get(
 const completeGoogleSignupSchema = z.object({
   signupToken: z.string().trim().min(10),
   companyName: z.string().trim().min(2, 'Informe o nome da empresa.'),
-  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora', 'api_partner']),
+  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora', 'api_partner', 'anunciante']),
   insurerKey: z.enum(INSURERS.map((i) => i.key) as [string, ...string[]]).optional(),
 });
 
@@ -492,7 +494,7 @@ authRouter.post(
 const completeSamlSignupSchema = z.object({
   signupToken: z.string().trim().min(10),
   companyName: z.string().trim().min(2, 'Informe o nome da empresa.'),
-  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora', 'api_partner']),
+  role: z.enum(['investidor', 'cedente', 'sacado', 'seguradora', 'api_partner', 'anunciante']),
   insurerKey: z.enum(INSURERS.map((i) => i.key) as [string, ...string[]]).optional(),
 });
 

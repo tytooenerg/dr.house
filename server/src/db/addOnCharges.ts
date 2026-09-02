@@ -12,7 +12,8 @@ export type AddOnKind =
   | 'document_intelligence_api'
   | 'reconciliation_api'
   | 'suitability_api'
-  | 'market_index_api';
+  | 'market_index_api'
+  | 'publicidade_carrossel';
 
 export interface AddOnChargeRow {
   id: number;

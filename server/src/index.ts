@@ -18,6 +18,7 @@ import { startSuspiciousActivityJob } from './lib/suspiciousActivityMonitor.js';
 import { startApiOverageBillingJob } from './lib/apiOverageBilling.js';
 import { startWhitelabelPlusBillingJob } from './lib/whitelabelBilling.js';
 import { startInstitutionalReportingBillingJob } from './lib/institutionalReporting.js';
+import { startAdvertisementBillingJob } from './lib/advertisementBilling.js';
 import { startCobrancaAgentJob } from './lib/cobrancaAgentJob.js';
 import { startPldAgentJob } from './lib/pldAgentJob.js';
 import { startMarketMakerAgentJob } from './lib/marketMakerAgentJob.js';
@@ -42,6 +43,7 @@ async function main() {
   startApiOverageBillingJob();
   startWhitelabelPlusBillingJob();
   startInstitutionalReportingBillingJob();
+  startAdvertisementBillingJob();
   startCobrancaAgentJob();
   startPldAgentJob();
   startMarketMakerAgentJob();
