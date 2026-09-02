@@ -126,3 +126,17 @@ describe('secondary market — bids (order depth)', () => {
     expect(reject.status).toBe(404);
   });
 });
+
+// Client-side sort/filter on the market list (SecundarioPage.tsx) relies on a raw numeric
+// `valor` field on each listing view, not just the formatted `precoFmt` string — this
+// covers the server side of that: the field exists and matches what was actually asked.
+describe('secondary market — listing view carries a raw numeric valor', () => {
+  it('exposes valor as the numeric asking price, not just precoFmt', async () => {
+    const { listingId } = await sellerWithListing('12.345');
+    const viewer = await registerInvestidor();
+    const res = await request(app).get('/api/secundario').set('Authorization', `Bearer ${viewer.token}`);
+    const listing = res.body.market.find((l: { id: number }) => l.id === listingId);
+    expect(listing.valor).toBe(12345);
+    expect(listing.precoFmt).toBe(fmtBRL(12345));
+  });
+});
