@@ -47,6 +47,12 @@ interface LoteOutcome {
   falhas: number;
   resultados: LoteRowResult[];
 }
+interface MinhaMatricula {
+  sacadoNome: string;
+  taxaAmFmt: string;
+  sublimiteFmt: string | null;
+  programaAtivo: boolean;
+}
 
 const CSV_TEMPLATE = 'sacado,cnpj,valor,vencimento,seguro\nGrupo Atlas Varejo,58.442.111/0001-27,50000,2026-12-31,0\n';
 
@@ -199,7 +205,15 @@ export function EmitirPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ registro: string; seguro: boolean; registradora: string } | null>(null);
+  const [matriculas, setMatriculas] = useState<MinhaMatricula[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    api
+      .get<{ matriculas: MinhaMatricula[] }>('/confirming/minhas-matriculas')
+      .then((d) => setMatriculas(d.matriculas))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -410,6 +424,24 @@ export function EmitirPage() {
               <span className="rounded-full bg-green flex-shrink-0" style={{ width: 9, height: 9 }} />
               <span className="text-[12.5px] text-green font-semibold">{preview.sacadoRecognizedText}</span>
             </div>
+          )}
+
+          {matriculas.length > 0 && (
+            <Card>
+              <div className="font-bold text-sm mb-1">Meus Programas Confirming</div>
+              <div className="text-textSecondary text-xs mb-3">Sacados que já pré-aprovaram você — financiamento futuro sem passar pelo leilão</div>
+              <div className="flex flex-col gap-2">
+                {matriculas.map((m) => (
+                  <div key={m.sacadoNome} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F8FA]">
+                    <div>
+                      <div className="font-semibold text-[12.5px]">{m.sacadoNome}</div>
+                      {!m.programaAtivo && <div className="text-textSecondary text-[11px]">Programa pausado no momento</div>}
+                    </div>
+                    <div className="font-bold font-mono-num text-[12.5px]">{m.taxaAmFmt}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           )}
 
           <Card className="px-6 py-5">

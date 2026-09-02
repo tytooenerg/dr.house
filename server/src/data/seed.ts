@@ -360,7 +360,7 @@ export const ROLE_TABS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | '
   seguradora: ['seguradora', 'perfil'],
   investidor: ['dashboard', 'marketplace', 'secundario', 'cestas', 'suitability', 'automacao', 'linha-credito', 'risco', 'historico', 'comparador', 'compliance', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
   cedente: ['dashboard', 'erp', 'emitir', 'minhas', 'linha-credito', 'contas-pagar', 'ai-cfo', 'aceite', 'risco', 'historico', 'compliance', 'dev', 'conta', 'receita', 'assinatura', 'disputa', 'perfil'],
-  sacado: ['dashboard', 'sacado', 'historico', 'conta', 'disputa', 'perfil'],
+  sacado: ['dashboard', 'sacado', 'confirming', 'historico', 'conta', 'disputa', 'perfil'],
 };
 
 export const PLAYGROUND_ENDPOINTS: Record<string, { method: string; path: string; fields: string[]; label: string }> = {

@@ -646,6 +646,18 @@ Pesquisa de mercado (setembro/2026): o Banco Central está em plena transição 
 
 Novos testes: `server/test/compliance-calendar.test.ts` (10 casos — classificação pura, persistência, validação, gating de papel, auditoria, agregação do admin). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 101 arquivos/610 testes, client 24/24).
 
+### Programa Confirming / Risco Sacado (fundação)
+
+Pesquisa de mercado (set/2026): o maior concorrente do Lastro (Monkey Exchange, ~R$100bi transacionados) não compete no mesmo modelo de leilão aberto — o motor dele é "confirming"/risco sacado: um grande comprador (sacado-âncora) pré-aprova um programa de financiamento pra toda a cadeia de fornecedores, na própria taxa de crédito, sem leilão por duplicata. Este é o primeiro PR de uma série de 4: cria o programa e a matrícula de cedentes elegíveis, sem ainda pular o leilão de fato (isso vem nos próximos PRs, depois que o fundo de fomento dedicado existir).
+
+- **`confirming_programas`/`confirming_membros`** (migração `0061`) — um programa por sacado (`sacado_user_id UNIQUE`), com `rating`/`taxa_am` calculados uma vez na criação a partir da classificação de risco real do próprio sacado (`buildBlendedRiscoViewSync` + `estimateRateBand` — as mesmas funções que já precificam qualquer oferta no mercado aberto, nunca um número escolhido pelo sacado) e um `limite` que o sacado define, dentro de uma faixa (R$10 mil a R$5 milhões).
+- **CNPJ autodeclarado uma vez** — reaproveita `UserSettings.companyCnpj` (até aqui só usado pelo AI CFO do cedente), agora também pelo sacado ao criar o programa.
+- **Matrícula com base em histórico real**: `listarCedentesElegiveis` sugere cedentes que já têm aceites reais contra este sacado (`listAceitesBySacadoNome`, a mesma consulta que já resolve o Portal do Sacado) — não uma lista arbitrária.
+- **`GET/POST /api/confirming/*`** — sacado cria/pausa/reativa o programa e matricula/remove cedentes; cedente só lê em quais programas está matriculado (`GET /minhas-matriculas`). Toda mutação grava evento de auditoria.
+- **Client**: nova nav tab "Programa Confirming" pro sacado (nav dele tinha só 6 tabs — cabia folgado); do lado cedente, sem nova tab — um card "Meus Programas Confirming" dentro de Emitir Duplicata, o lugar mais natural pra ver a que sacados já tem acesso pré-aprovado.
+
+Ainda não muda nada no fluxo de emissão/leilão em si — é só visão e configuração. Novos testes: `server/test/confirming.test.ts` (11 casos — criação com taxa real, limites de faixa, matrícula por histórico real, gating de papel, auditoria). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 102 arquivos/621 testes, client 24/24, sdks/node 9/9); `migrations-postgres/0061` conferido byte a byte contra `scripts/postgres/generate-schema.mjs`.
+
 ## Running locally
 
 ```bash
