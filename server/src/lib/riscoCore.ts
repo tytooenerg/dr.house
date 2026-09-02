@@ -33,6 +33,43 @@ export function ratingFromScore(score: number): Rating {
   return 'C';
 }
 
+export type Setor = 'varejo' | 'industria' | 'construcao' | 'servicos';
+
+export const SETOR_LABELS: Record<Setor, string> = {
+  varejo: 'Varejo',
+  industria: 'Indústria',
+  construcao: 'Construção',
+  servicos: 'Serviços',
+};
+
+const SECTOR_KEYWORDS: Record<string, Setor> = {
+  varejo: 'varejo',
+  indústria: 'industria',
+  industria: 'industria',
+  construção: 'construcao',
+  construcao: 'construcao',
+  serviços: 'servicos',
+  servicos: 'servicos',
+};
+
+// Best-effort sector lookup from the same seed profile used for score — there's no
+// dedicated sector column on SACADOS itself, so this reads the "Concentração setorial"
+// factor text seeded per sacado. Returns null (meaning: unknown, don't filter it out
+// implicitly) rather than silently guessing when a sacado has no seeded profile at all —
+// shared by db/duplicatas.ts (persisted once at emission, mirroring scoreFor) and
+// routes/automation.ts's auto-bid sector-diversification check.
+export function sectorFor(sacadoNome: string): Setor | null {
+  const perfil = SACADOS[sacadoNome];
+  if (!perfil) return null;
+  const factor = perfil.factors.find((f) => f.label === 'Concentração setorial');
+  if (!factor) return null;
+  const text = factor.value.toLowerCase();
+  for (const [needle, key] of Object.entries(SECTOR_KEYWORDS)) {
+    if (text.includes(needle)) return key;
+  }
+  return null;
+}
+
 export interface SinaisDeRedeView {
   total: number;
   pontual: number;

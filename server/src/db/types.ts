@@ -170,6 +170,9 @@ export interface DuplicataRow {
   // 1 for duplicatas created via a test-mode partner API key (lib/sandboxData.ts) —
   // filtered out of every live/internal read at the query layer (db/duplicatas.ts).
   sandbox: number;
+  // Derived once at emission time from the sacado's seeded risk profile (lib/riscoCore.ts's
+  // sectorFor), same pattern as `score` — null when the sacado has no seeded profile at all.
+  setor: string | null;
 }
 
 export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';

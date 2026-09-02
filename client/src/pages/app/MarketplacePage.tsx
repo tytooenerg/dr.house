@@ -54,6 +54,16 @@ interface FractionalOffering {
 // above this face value are eligible for tokenização.
 const FRACTIONAL_MIN_VALOR = 150000;
 
+// Mirrors server lib/riscoCore.ts's Setor union + SETOR_LABELS — a fixed, small enum, not
+// worth a round-trip to fetch a catalog for.
+const SETOR_OPTIONS: { value: string; label: string }[] = [
+  { value: 'varejo', label: 'Varejo' },
+  { value: 'industria', label: 'Indústria' },
+  { value: 'construcao', label: 'Construção' },
+  { value: 'servicos', label: 'Serviços' },
+];
+const RATING_OPTIONS = ['AA', 'A', 'B', 'C'];
+
 interface Offer {
   id: string;
   sacado: string;
@@ -62,7 +72,11 @@ interface Offer {
   valorFmt: string;
   desagio: string;
   vencimento: string;
+  prazoDias: number;
+  setor: string | null;
+  setorLabel: string | null;
   score: number;
+  rating: string;
   scoreBg: string;
   scoreColor: string;
   isBought: boolean;
@@ -87,6 +101,12 @@ export function MarketplacePage() {
   const { offers: liveOffers, connected } = useMarketSocket<Offer>();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('taxa');
+  const [setorFilter, setSetorFilter] = useState('');
+  const [ratingFilter, setRatingFilter] = useState('');
+  const [valorMin, setValorMin] = useState('');
+  const [valorMax, setValorMax] = useState('');
+  const [prazoMin, setPrazoMin] = useState('');
+  const [prazoMax, setPrazoMax] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [insurerPickerFor, setInsurerPickerFor] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -110,13 +130,36 @@ export function MarketplacePage() {
 
   const offers = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = q ? liveOffers.filter((o) => o.sacado.toLowerCase().includes(q) || o.cedente.toLowerCase().includes(q)) : liveOffers.slice();
+    const vMin = valorMin.trim() ? Number(valorMin) : null;
+    const vMax = valorMax.trim() ? Number(valorMax) : null;
+    const pMin = prazoMin.trim() ? Number(prazoMin) : null;
+    const pMax = prazoMax.trim() ? Number(prazoMax) : null;
+    let list = liveOffers.filter((o) => {
+      if (q && !o.sacado.toLowerCase().includes(q) && !o.cedente.toLowerCase().includes(q)) return false;
+      if (setorFilter && o.setor !== setorFilter) return false;
+      if (ratingFilter && o.rating !== ratingFilter) return false;
+      if (vMin !== null && Number.isFinite(vMin) && o.valor < vMin) return false;
+      if (vMax !== null && Number.isFinite(vMax) && o.valor > vMax) return false;
+      if (pMin !== null && Number.isFinite(pMin) && o.prazoDias < pMin) return false;
+      if (pMax !== null && Number.isFinite(pMax) && o.prazoDias > pMax) return false;
+      return true;
+    });
     if (sort === 'taxa') list.sort((a, b) => parseFloat(a.desagio) - parseFloat(b.desagio));
     else if (sort === 'score') list.sort((a, b) => b.score - a.score);
     else if (sort === 'valor') list.sort((a, b) => b.valor - a.valor);
     else if (sort === 'prazo') list.sort((a, b) => a.countdownSec - b.countdownSec);
     return list;
-  }, [liveOffers, query, sort]);
+  }, [liveOffers, query, sort, setorFilter, ratingFilter, valorMin, valorMax, prazoMin, prazoMax]);
+
+  const hasActiveFilters = !!(setorFilter || ratingFilter || valorMin || valorMax || prazoMin || prazoMax);
+  const clearFilters = () => {
+    setSetorFilter('');
+    setRatingFilter('');
+    setValorMin('');
+    setValorMax('');
+    setPrazoMin('');
+    setPrazoMax('');
+  };
 
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
@@ -199,7 +242,7 @@ export function MarketplacePage() {
         }
       />
 
-      <div className="flex gap-2.5 mb-4">
+      <div className="flex gap-2.5 mb-2.5 flex-wrap">
         <Input placeholder={t('marketplace.searchPlaceholder', 'Buscar por sacado ou cedente')} value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[340px]" />
         <Select value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="taxa">{t('marketplace.sortRate', 'Ordenar: melhor deságio')}</option>
@@ -207,6 +250,40 @@ export function MarketplacePage() {
           <option value="valor">{t('marketplace.sortValue', 'Ordenar: maior valor')}</option>
           <option value="prazo">{t('marketplace.sortDeadline', 'Ordenar: leilão fechando')}</option>
         </Select>
+      </div>
+
+      <div className="flex gap-2.5 mb-4 flex-wrap items-center">
+        <Select value={setorFilter} onChange={(e) => setSetorFilter(e.target.value)}>
+          <option value="">{t('marketplace.filterSector', 'Setor: todos')}</option>
+          {SETOR_OPTIONS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </Select>
+        <Select value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
+          <option value="">{t('marketplace.filterRating', 'Rating: todos')}</option>
+          {RATING_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </Select>
+        <div className="flex items-center gap-1.5">
+          <Input type="number" placeholder={t('marketplace.valueMin', 'Valor mín.')} value={valorMin} onChange={(e) => setValorMin(e.target.value)} className="w-[120px]" />
+          <span className="text-textTertiary text-xs">–</span>
+          <Input type="number" placeholder={t('marketplace.valueMax', 'Valor máx.')} value={valorMax} onChange={(e) => setValorMax(e.target.value)} className="w-[120px]" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Input type="number" placeholder={t('marketplace.prazoMin', 'Prazo mín. (dias)')} value={prazoMin} onChange={(e) => setPrazoMin(e.target.value)} className="w-[140px]" />
+          <span className="text-textTertiary text-xs">–</span>
+          <Input type="number" placeholder={t('marketplace.prazoMax', 'Prazo máx. (dias)')} value={prazoMax} onChange={(e) => setPrazoMax(e.target.value)} className="w-[140px]" />
+        </div>
+        {hasActiveFilters && (
+          <Button size="sm" variant="secondary" onClick={clearFilters}>
+            {t('marketplace.clearFilters', 'Limpar filtros')}
+          </Button>
+        )}
       </div>
 
       <div className="bg-white border border-border rounded-card overflow-hidden">
@@ -229,6 +306,7 @@ export function MarketplacePage() {
               <div className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}>
                 <div>
                   <div className="font-semibold">{offer.sacado}</div>
+                  {offer.setorLabel && <div className="text-[10.5px] text-textTertiary mt-0.5">{offer.setorLabel}</div>}
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
                 </div>
                 <div className="text-textSecondary">{offer.cedente}</div>

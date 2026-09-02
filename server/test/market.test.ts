@@ -34,6 +34,57 @@ describe('GET /api/market', () => {
   });
 });
 
+describe('GET /api/market filters', () => {
+  it('filters by setor, returning only offers with that sector', async () => {
+    const token = await registerInvestidor();
+    const all = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
+    const withSetor = all.body.offers.find((o: { setor: string | null }) => o.setor);
+    expect(withSetor).toBeTruthy();
+
+    const res = await request(app).get(`/api/market?setor=${withSetor.setor}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.offers.length).toBeGreaterThan(0);
+    for (const o of res.body.offers) expect(o.setor).toBe(withSetor.setor);
+
+    const other = SETOR_KEYS.find((k) => k !== withSetor.setor)!;
+    const excluded = await request(app).get(`/api/market?setor=${other}`).set('Authorization', `Bearer ${token}`);
+    expect(excluded.body.offers.every((o: { setor: string | null }) => o.setor !== withSetor.setor)).toBe(true);
+  });
+
+  it('filters by rating', async () => {
+    const token = await registerInvestidor();
+    const all = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
+    const rating = all.body.offers[0].rating as string;
+
+    const res = await request(app).get(`/api/market?rating=${rating}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    for (const o of res.body.offers) expect(o.rating).toBe(rating);
+  });
+
+  it('filters by valor range (min,max)', async () => {
+    const token = await registerInvestidor();
+    const all = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
+    const valores = all.body.offers.map((o: { valor: number }) => o.valor);
+    const maxValor = Math.max(...valores);
+    const half = Math.floor(maxValor / 2);
+
+    const res = await request(app).get(`/api/market?valor=0,${half}`).set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    for (const o of res.body.offers) expect(o.valor).toBeLessThanOrEqual(half);
+  });
+
+  it('filters by prazo range in days, excluding everything for an absurd range', async () => {
+    const token = await registerInvestidor();
+    const wide = await request(app).get('/api/market?prazo=0,100000').set('Authorization', `Bearer ${token}`);
+    expect(wide.body.offers.length).toBeGreaterThan(0);
+
+    const none = await request(app).get('/api/market?prazo=999999,9999999').set('Authorization', `Bearer ${token}`);
+    expect(none.body.offers.length).toBe(0);
+  });
+});
+
+const SETOR_KEYS = ['varejo', 'industria', 'construcao', 'servicos'];
+
 describe('POST /api/market/:id/buy', () => {
   it('is forbidden for non-investidor roles', async () => {
     const cedenteEmail = `ced-${Date.now()}@example.com`;
