@@ -594,6 +594,17 @@ Nova linha de receita: um carrossel de publicidade na página inicial pública, 
 
 Novos testes: `server/test/advertisements.test.ts` (14 — cadastro sem KYB, validação de URL, ciclo pendente→aprovado→edição volta pra pendente, toggle, fila de moderação exige motivo pra rejeitar, feed público filtra por aprovado+ativo, feature flag desliga o carrossel inteiro, cobrança mensal só de quem está aprovado+ativo e é idempotente no período); `agents.test.ts`/`addon-revenue.test.ts` ajustados pras novas contagens. Verificado: `npm run typecheck`/`build`/`test`/`test:e2e` todos verdes (server 100 arquivos/593 testes, client 24/24, SDK 9/9, e2e 12/12) — migração Postgres re-verificada contra um PostgreSQL 16 real (59 migrations, 66 tabelas).
 
+### Marketplace: filtros por setor, faixa de valor/prazo e rating
+
+Análise de usabilidade identificou que o Marketplace só tinha busca por texto e ordenação — sem nenhum filtro de fato, e sem o campo "setor do sacado" persistido em lugar nenhum (existia só como texto livre dentro do perfil de risco simulado, usado apenas pelo auto-bid). Investidor institucional monta portfólio por diversificação setorial — não dava pra filtrar por isso.
+
+- **Campo `setor` na duplicata** (migração `0060_duplicata_setor.sql`) — calculado uma vez na emissão a partir do mesmo perfil de risco que já gera o `score` (`lib/riscoCore.ts`'s `sectorFor`, movido de `routes/automation.ts` pra ser reaproveitado aqui e lá). `null` quando o sacado não tem perfil setorial mapeado — nunca inventa um setor.
+- **`buildOfferView`** (`lib/marketCompute.ts`) agora expõe `setor`, `setorLabel` (rótulo em português), `rating` (AA/A/B/C, antes só calculado internamente pro badge de cor) e `prazoDias` (dias até o vencimento — distinto do `countdownSec`, que é o tempo até o leilão fechar).
+- **`GET /market`** aceita `setor`, `rating`, `valor=min,max` e `prazo=min,max` (dias) como filtros server-side, aplicados antes da ordenação — qualquer combinação ausente/malformada degrada pra "sem filtro", nunca exclui tudo silenciosamente.
+- **Client**: nova linha de filtros no Marketplace (setor, rating, faixa de valor, faixa de prazo, botão "Limpar filtros"), aplicados também sobre o feed ao vivo via WebSocket — mesmo padrão que já existia pra busca/ordenação. Rótulo do setor aparece direto no card da oferta.
+
+Novos testes: `server/test/market.test.ts` ganhou 4 casos (filtro por setor exclui os demais, filtro por rating, faixa de valor, faixa de prazo com um intervalo absurdo excluindo tudo). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 100 arquivos/601 testes) — migração Postgres re-verificada (60 migrations, 66 tabelas; `ALTER TABLE ADD COLUMN` simples, sem rebuild).
+
 ## Running locally
 
 ```bash

@@ -1,9 +1,9 @@
 import type { DuplicataRow } from '../db/types.js';
 import { BID_TEMPLATES, COLORS, EXTRA_BIDDERS, INSURERS } from '../data/seed.js';
-import { fmtBRL, scoreColorFor } from './format.js';
+import { fmtBRL, scoreColorFor, parseFlexibleDate } from './format.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { isPurchased } from '../db/duplicatas.js';
-import { ratingFromScore } from './riscoCore.js';
+import { ratingFromScore, SETOR_LABELS } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { listInsuranceQuotes } from './insuranceQuotes.js';
 import { getLatestInsuranceSettlement } from '../db/insuranceSettlements.js';
@@ -76,6 +76,8 @@ export function buildOfferView(d: DuplicataRow) {
     insurer = catalogEntry ? { key: catalogEntry.key, name: catalogEntry.name, premioFmt, selo: catalogEntry.selo } : null;
   }
   const insurerOptions = listInsuranceQuotes(d);
+  const rating = ratingFromScore(score);
+  const prazoDias = Math.max(0, Math.round((parseFlexibleDate(d.vencimento).getTime() - Date.now()) / 86_400_000));
 
   return {
     id: d.id,
@@ -85,7 +87,11 @@ export function buildOfferView(d: DuplicataRow) {
     valorFmt: fmtBRL(d.valor),
     desagio,
     vencimento: d.vencimento,
+    prazoDias,
+    setor: d.setor,
+    setorLabel: d.setor ? SETOR_LABELS[d.setor as keyof typeof SETOR_LABELS] ?? d.setor : null,
     score,
+    rating,
     scoreBg: sc === COLORS.GREEN ? '#EAF3EE' : sc === COLORS.AMBER ? '#FBF1E0' : '#F7E9E7',
     scoreColor: sc,
     isBought: bought,

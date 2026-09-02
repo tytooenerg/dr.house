@@ -16,14 +16,35 @@ import { explainFundingOffer } from '../lib/fundingExplainability.js';
 export const marketRouter = Router();
 marketRouter.use(requireAuth);
 
+// A numeric range filter query param comes in as "min,max" (either half optional, e.g.
+// "50000," or ",90"); undefined/malformed input means "no bound" rather than excluding
+// everything, matching how every other optional filter here degrades gracefully.
+function parseRange(raw: unknown): { min: number | null; max: number | null } {
+  if (typeof raw !== 'string' || !raw.includes(',')) return { min: null, max: null };
+  const [minRaw, maxRaw] = raw.split(',', 2);
+  const min = minRaw.trim() ? Number(minRaw) : null;
+  const max = maxRaw.trim() ? Number(maxRaw) : null;
+  return { min: min !== null && Number.isFinite(min) ? min : null, max: max !== null && Number.isFinite(max) ? max : null };
+}
+
 marketRouter.get('/', (req, res) => {
   const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
   const sort = typeof req.query.sort === 'string' ? req.query.sort : 'taxa';
+  const setor = typeof req.query.setor === 'string' && req.query.setor ? req.query.setor : null;
+  const rating = typeof req.query.rating === 'string' && req.query.rating ? req.query.rating : null;
+  const valorRange = parseRange(req.query.valor);
+  const prazoRange = parseRange(req.query.prazo);
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
 
   let offers = listMarketplace().map(buildOfferView);
   if (q) offers = offers.filter((o) => o.sacado.toLowerCase().includes(q) || o.cedente.toLowerCase().includes(q));
+  if (setor) offers = offers.filter((o) => o.setor === setor);
+  if (rating) offers = offers.filter((o) => o.rating === rating);
+  if (valorRange.min !== null) offers = offers.filter((o) => o.valor >= valorRange.min!);
+  if (valorRange.max !== null) offers = offers.filter((o) => o.valor <= valorRange.max!);
+  if (prazoRange.min !== null) offers = offers.filter((o) => o.prazoDias >= prazoRange.min!);
+  if (prazoRange.max !== null) offers = offers.filter((o) => o.prazoDias <= prazoRange.max!);
 
   if (sort === 'taxa') offers.sort((a, b) => parseFloat(a.desagio) - parseFloat(b.desagio));
   else if (sort === 'score') offers.sort((a, b) => b.score - a.score);

@@ -2,6 +2,7 @@ import { db } from './index.js';
 import type { DuplicataRow } from './types.js';
 import { SACADOS } from '../data/seed.js';
 import { parseFlexibleDate } from '../lib/format.js';
+import { sectorFor } from '../lib/riscoCore.js';
 
 export function getDuplicata(id: string): DuplicataRow | undefined {
   return db.prepare('SELECT * FROM duplicatas WHERE id = ?').get(id) as DuplicataRow | undefined;
@@ -88,8 +89,8 @@ export function createDuplicata(input: {
 }): DuplicataRow {
   const id = input.id ?? nextId('DUP-2026');
   db.prepare(
-    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, registradora, nfe_chave, sandbox)
-     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @registradora, @nfeChave, @sandbox)`
+    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, setor, registradora, nfe_chave, sandbox)
+     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @setor, @registradora, @nfeChave, @sandbox)`
   ).run({
     id,
     cedenteId: input.cedenteId,
@@ -105,6 +106,7 @@ export function createDuplicata(input: {
     registro: input.registro ?? null,
     desagio: input.desagio ?? null,
     score: scoreFor(input.sacadoNome),
+    setor: sectorFor(input.sacadoNome),
     registradora: input.registradora ?? null,
     nfeChave: input.nfeChave || null,
     sandbox: input.sandbox ? 1 : 0,

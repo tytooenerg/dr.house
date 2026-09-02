@@ -8,39 +8,13 @@ import { listMarketplace, isPurchased, createPurchase, listPurchasesByInvestor }
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { settlePurchase } from '../lib/settlement.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
-import { ratingFromScore } from '../lib/riscoCore.js';
-import { SACADOS } from '../data/seed.js';
+import { ratingFromScore, sectorFor } from '../lib/riscoCore.js';
 import type { UserRow, UserSettings } from '../db/types.js';
 
 export const automationRouter = Router();
 automationRouter.use(requireAuth, requirePlan('pro'));
 
 const SCORE_ORDER: Record<string, number> = { AA: 4, A: 3, B: 2, C: 1 };
-const SECTOR_KEYWORDS: Record<string, keyof { varejo: 0; industria: 0; construcao: 0; servicos: 0 }> = {
-  varejo: 'varejo',
-  indústria: 'industria',
-  industria: 'industria',
-  construção: 'construcao',
-  construcao: 'construcao',
-  serviços: 'servicos',
-  servicos: 'servicos',
-};
-
-// Best-effort sector lookup from the same seed profile riscoCore already uses for score —
-// there's no dedicated sector column on a duplicata, so this reads the "Concentração
-// setorial" factor text seeded per sacado. Returns null (meaning: don't filter) when it
-// can't be determined, rather than silently pretending a match either way.
-function sectorFor(sacadoNome: string): string | null {
-  const perfil = SACADOS[sacadoNome];
-  if (!perfil) return null;
-  const factor = perfil.factors.find((f) => f.label === 'Concentração setorial');
-  if (!factor) return null;
-  const text = factor.value.toLowerCase();
-  for (const [needle, key] of Object.entries(SECTOR_KEYWORDS)) {
-    if (text.includes(needle)) return key;
-  }
-  return null;
-}
 
 // Per-user, in-memory "already decided" set so a rejected offer isn't re-logged on every
 // poll — cleared implicitly once the offer is bought/removed from listMarketplace, or the
