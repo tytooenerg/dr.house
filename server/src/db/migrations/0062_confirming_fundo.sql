@@ -1,0 +1,43 @@
+-- Fundo de Fomento do Programa Confirming — o dinheiro que vai financiar cada duplicata
+-- comprada instantaneamente dentro de um Programa Confirming (feature seguinte) precisa
+-- vir de algum lugar real: um pool de investidores, nunca do caixa da própria Lastro
+-- (mesma disciplina da linha de crédito rotativa — ver 0038/0039_credit_line*.sql — e
+-- coerente com a remoção deliberada do fundo de garantia: Lastro não carrega risco de
+-- crédito com capital próprio). Deliberadamente um pool SEPARADO do fundo de fomento da
+-- linha de crédito (0039/0042): são perfis de risco e rendimento diferentes, não devem se
+-- misturar pro investidor que está decidindo aportar.
+--
+-- Já nasce com o mecanismo de cota/NAV completo (0039 e 0042 do fundo da linha de crédito
+-- precisaram de duas migrações pra chegar aqui — aqui já sabemos que precisamos disso
+-- desde o início, então não faz sentido repetir o mesmo "sem atribuição de rendimento por
+-- enquanto" que aquele par documentou). Mesmo mecanismo: cada aporte compra cotas no preço
+-- atual (NAV / cotas em circulação); cada resgate vende cotas de volta no preço atual.
+CREATE TABLE IF NOT EXISTS confirming_fundo_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL CHECK(tipo IN ('aporte', 'resgate', 'compra_financiada', 'retorno')),
+  valor REAL NOT NULL, -- positivo = dinheiro entrando no pool, negativo = saindo
+  descricao TEXT NOT NULL,
+  investor_id INTEGER REFERENCES users(id),
+  duplicata_id TEXT REFERENCES duplicatas(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS confirming_fundo_contributions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  investor_id INTEGER NOT NULL REFERENCES users(id),
+  valor_aportado REAL NOT NULL,
+  valor_resgatado REAL NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_confirming_fundo_contributions_investor ON confirming_fundo_contributions(investor_id);
+
+CREATE TABLE IF NOT EXISTS confirming_fundo_quota_movements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  investor_id INTEGER NOT NULL REFERENCES users(id),
+  quotas REAL NOT NULL, -- positivo = cotas compradas (aporte), negativo = cotas vendidas (resgate)
+  cota_price REAL NOT NULL, -- preço por cota no momento deste movimento, mantido pra auditoria/exibição
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_confirming_fundo_quota_movements_investor ON confirming_fundo_quota_movements(investor_id);

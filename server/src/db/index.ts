@@ -52,6 +52,9 @@ export function resetDbForTests() {
     DELETE FROM claude_usage;
     DELETE FROM compliance_alerts;
     DELETE FROM compliance_engine_results;
+    DELETE FROM confirming_fundo_ledger;
+    DELETE FROM confirming_fundo_contributions;
+    DELETE FROM confirming_fundo_quota_movements;
     DELETE FROM confirming_membros;
     DELETE FROM confirming_programas;
     DELETE FROM contract_analyses;
