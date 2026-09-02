@@ -4,6 +4,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { ComplianceCalendarCard } from '../../components/ComplianceCalendarCard';
 
 interface DupGroup {
   valorFmt: string;
@@ -195,6 +196,8 @@ export function CompliancePage() {
           ))}
         </div>
       </Card>
+
+      <ComplianceCalendarCard />
 
       <Card className="mb-4">
         <div className="font-bold text-[15px] mb-1">Verificação de duplicidade</div>

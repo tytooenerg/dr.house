@@ -13,6 +13,7 @@ import { COLORS } from '../data/seed.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { summarizeDispute } from '../lib/disputeCopilot.js';
+import { listComplianceCalendarSummary } from '../lib/complianceCalendarCore.js';
 import { listPendingComplianceReview, resolveComplianceReview, type ComplianceBreakdownItem } from '../db/complianceEngine.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { getClaudeUsageSummary } from '../db/claudeUsage.js';
@@ -276,6 +277,13 @@ adminRouter.get('/compliance-queue', (_req, res) => {
     quando: fmtRelative(r.created_at),
   }));
   res.json({ pending });
+});
+
+// Visão de oversight do cronograma de obrigatoriedade da duplicata escritural (BCB) —
+// quantos cedentes/sacados já informaram faturamento, e em qual status cada um está.
+// Somente leitura: quem informa o faturamento é o próprio cedente/sacado (routes/complianceCalendar.ts).
+adminRouter.get('/conformidade-escritural', (_req, res) => {
+  res.json(listComplianceCalendarSummary());
 });
 
 const complianceReviewSchema = z.object({ decision: z.enum(['liberado', 'rejeitado']), note: z.string().trim().min(1) });

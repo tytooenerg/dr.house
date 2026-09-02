@@ -635,6 +635,17 @@ Auditoria do Mercado Secundário encontrou que nenhuma ação real da página (A
 
 Novos testes: `server/test/secondary-market-bids.test.ts` ganhou 1 caso confirmando que `valor` bate com o preço pedido. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 100 arquivos/600 testes, client 24/24).
 
+### Cronograma de Conformidade — Duplicata Escritural
+
+Pesquisa de mercado (setembro/2026): o Banco Central está em plena transição pra duplicata escritural — adesão voluntária desde jul/2026, obrigatoriedade escalonada por faturamento anual até ~2028 — e nada no produto respondia à pergunta mais óbvia de todo cedente/sacado: "quando isso vira obrigatório pra mim". O único cronograma existente (`CRONOGRAMA` em `data/seed.ts`, na Central de Compliance) é genérico e estático, sem dizer em qual faixa cada empresa está.
+
+- **`lib/complianceCalendarCore.ts`** (novo) — classifica a faixa de faturamento anual autodeclarada contra um calendário de datas do BC (`OBRIGATORIEDADE_POR_BRACKET`, documentado como conhecimento regulatório estático e aproximado, mantido manualmente — não é uma integração externa, não existe API do BCB pra isso). Devolve status `nao_informado` / `assistida_disponivel` (com dias restantes) / `obrigatorio_pleno`.
+- Autodeclarado, não inferido do Open Finance/DRE do AI CFO: aquele fluxo cobre só 90 dias de duplicatas do próprio Lastro (não o faturamento anual real da empresa) e só existe pra cedente Empresarial — nunca pra sacado. Um campo novo em `UserSettings.faturamentoAnualBracket` (zero migração, mesmo padrão de `companyCnpj`/`fidcPL`) cobre os dois papéis, em qualquer plano.
+- **`GET/POST /api/conformidade`** (cedente e sacado) — consulta e informa a própria faixa; grava evento de auditoria (`compliance_calendario.faturamento_informado`). **`GET /api/admin/conformidade-escritural`** — visão agregada de oversight (contagem por status).
+- **Client**: card compartilhado `ComplianceCalendarCard` embutido na Central de Compliance (cedente, logo após o cronograma genérico) e no Portal do Sacado — sem nova nav tab. Nova sub-aba "Conformidade Escritural" no Back-office.
+
+Novos testes: `server/test/compliance-calendar.test.ts` (10 casos — classificação pura, persistência, validação, gating de papel, auditoria, agregação do admin). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 101 arquivos/610 testes, client 24/24).
+
 ## Running locally
 
 ```bash

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useSession } from '../../state/SessionContext';
+import { ComplianceCalendarCard } from '../../components/ComplianceCalendarCard';
 
 interface Aceite {
   id: number;
@@ -54,6 +55,8 @@ export function SacadoPage() {
         </span>
         Logado como: {user?.companyName} (sacado)
       </div>
+
+      <ComplianceCalendarCard />
 
       <div className="flex flex-col gap-3.5">
         {aceites.map((a) => (

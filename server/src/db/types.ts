@@ -12,6 +12,11 @@ export type Role = 'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' 
 export type KybStatus = 'none' | 'pending' | 'approved' | 'rejected';
 export type Plan = 'basico' | 'pro' | 'empresarial';
 export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
+// Faixa de faturamento anual autodeclarada — usada só por lib/complianceCalendarCore.ts
+// pra calcular o prazo de obrigatoriedade da duplicata escritural desta empresa. Definido
+// aqui (não em complianceCalendarCore.ts) pra esse arquivo poder importar de db/types.ts
+// sem criar um ciclo de import.
+export type FaturamentoBracket = 'acima_300m' | 'entre_90m_300m' | 'entre_4_8m_90m' | 'ate_4_8m';
 
 export interface UserSettings {
   onboardingSeen: boolean;
@@ -65,6 +70,12 @@ export interface UserSettings {
   // consultado por CNPJ, mas até aqui só era chamado com o CNPJ de um sacado (na análise
   // de risco), nunca com o CNPJ do próprio cedente.
   companyCnpj: string;
+  // Autodeclarado, editável depois — usado só por lib/complianceCalendarCore.ts pra
+  // calcular o prazo de obrigatoriedade da duplicata escritural desta empresa (cedente ou
+  // sacado). Nunca inferido do Open Finance/DRE do AI CFO: aquele fluxo cobre só 90 dias
+  // de duplicatas do próprio Lastro, não o faturamento anual real da empresa — e só existe
+  // pra cedente Empresarial, nunca pra sacado. null até a empresa informar pela primeira vez.
+  faturamentoAnualBracket: FaturamentoBracket | null;
 }
 
 export function defaultSettings(): UserSettings {
@@ -103,6 +114,7 @@ export function defaultSettings(): UserSettings {
     marketMakerMaxExposicao: '200.000',
     marketMakerMinScore: '60',
     companyCnpj: '',
+    faturamentoAnualBracket: null,
   };
 }
 
