@@ -15,6 +15,7 @@ import { TedPendentesPanel } from './admin/TedPendentesPanel';
 import { BackupsPanel } from './admin/BackupsPanel';
 import { AddonRevenuePanel } from './admin/AddonRevenuePanel';
 import { DailyBriefingCard } from './admin/DailyBriefingCard';
+import { AdvertisementsPanel } from './admin/AdvertisementsPanel';
 
 // This page used to be ~1900 lines with every tab's state, data-loading and JSX inlined —
 // each tab is now its own panel component under admin/, following the pattern already set
@@ -27,7 +28,7 @@ import { DailyBriefingCard } from './admin/DailyBriefingCard';
 // The KYB/disputas/compliance tab-count badges are the one place a fully independent panel
 // still needs to hand something back up — each accepts an optional onCount callback it
 // fires once its own list loads, so the badge stays live without the parent owning the list.
-type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | 'reconciliacao' | 'flags' | 'auditoria';
+type Tab = 'kyb' | 'disputas' | 'compliance' | 'juridico' | 'ia' | 'agentes' | 'reconciliacao' | 'flags' | 'auditoria' | 'publicidade';
 
 export function AdminPage() {
   const { t } = useLang();
@@ -35,6 +36,7 @@ export function AdminPage() {
   const [kybCount, setKybCount] = useState(0);
   const [disputasCount, setDisputasCount] = useState(0);
   const [complianceCount, setComplianceCount] = useState(0);
+  const [advertisementsCount, setAdvertisementsCount] = useState(0);
 
   return (
     <div>
@@ -53,6 +55,7 @@ export function AdminPage() {
           ['reconciliacao', t('admin.tab.reconciliacao', 'Reconciliação')],
           ['flags', t('admin.tab.flags', 'Feature flags')],
           ['auditoria', t('admin.tab.auditoria', 'Auditoria')],
+          ['publicidade', `${t('admin.tab.publicidade', 'Publicidade')} (${advertisementsCount})`],
         ] as [Tab, string][]).map(([key, label]) => (
           <button
             key={key}
@@ -74,6 +77,7 @@ export function AdminPage() {
       {tab === 'agentes' && <AgentesIaPanel />}
       {tab === 'reconciliacao' && <ReconciliacaoPanel />}
       {tab === 'flags' && <FeatureFlagsPanel />}
+      {tab === 'publicidade' && <AdvertisementsPanel onCount={setAdvertisementsCount} />}
       {tab === 'auditoria' && (
         <>
           <AuditTrailPanel />

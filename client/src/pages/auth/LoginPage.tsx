@@ -28,6 +28,7 @@ export const ROLES: { key: Role; title: string; desc: string; shape: 'circle' | 
   { key: 'sacado', title: 'Empresa (sacado)', desc: 'Confirmar ou contestar duplicatas recebidas', shape: 'diamond' },
   { key: 'seguradora', title: 'Seguradora parceira', desc: 'Acompanhar apólices e decidir sinistros', shape: 'triangle' },
   { key: 'api_partner', title: 'Só quero a API', desc: 'Score API e PLD Screening API, sem passar pelo marketplace', shape: 'hex' },
+  { key: 'anunciante', title: 'Anunciar na Lastro', desc: 'Um slot no carrossel de publicidade da página inicial', shape: 'square' },
 ];
 
 // Mirrors server/src/data/seed.ts INSURERS — needed here because registration happens

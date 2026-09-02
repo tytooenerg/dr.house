@@ -15,7 +15,8 @@ type AddOnKind =
   | 'document_intelligence_api'
   | 'reconciliation_api'
   | 'suitability_api'
-  | 'market_index_api';
+  | 'market_index_api'
+  | 'publicidade_carrossel';
 
 interface AddonPrice {
   kind: AddOnKind;
@@ -53,6 +54,7 @@ const ADDON_KIND_LABELS: Record<AddOnKind, string> = {
   reconciliation_api: 'Reconciliation API avulsa (por chamada)',
   suitability_api: 'Suitability API avulsa (por chamada)',
   market_index_api: 'Lastro Index avulso (por chamada)',
+  publicidade_carrossel: 'Carrossel de publicidade (mensal)',
 };
 
 export function AddonRevenuePanel() {

@@ -44,6 +44,12 @@ export const FEATURE_FLAG_DEFS: FeatureFlagDef[] = [
     description: 'Liga/desliga a varredura periódica do Agente de Reconciliação (lib/reconciliationAgentJob.ts). O botão manual "Rodar reconciliação agora" no back-office continua funcionando mesmo desligada — este flag só pausa o cron de 6h.',
     defaultEnabled: true,
   },
+  {
+    key: 'ad_carousel',
+    label: 'Carrossel de publicidade',
+    description: 'Liga/desliga o carrossel de publicidade da landing page (GET /public/advertisements) sem afetar a fila de moderação nem a cobrança dos anunciantes — útil pra tirar um anúncio problemático do ar imediatamente, sem depender de reprovar/desativar cada um.',
+    defaultEnabled: true,
+  },
 ];
 
 const DEF_BY_KEY = new Map(FEATURE_FLAG_DEFS.map((d) => [d.key, d]));

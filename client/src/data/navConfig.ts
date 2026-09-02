@@ -33,6 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'admin', label: 'Back-office', path: '/app/admin', group: 'plataforma' },
   { key: 'seguradora', label: 'Painel da Seguradora', path: '/app/seguradora', group: 'operacoes' },
   { key: 'auditor', label: 'Painel de Auditoria', path: '/app/auditor', group: 'plataforma' },
+  { key: 'publicidade', label: 'Publicidade', path: '/app/publicidade', group: 'plataforma' },
 ];
 
 export const GROUP_LABELS: Record<string, string> = {
@@ -49,4 +50,5 @@ export const DEFAULT_TAB_BY_ROLE: Record<string, string> = {
   seguradora: 'seguradora',
   auditor: 'auditor',
   api_partner: 'dev',
+  anunciante: 'publicidade',
 };

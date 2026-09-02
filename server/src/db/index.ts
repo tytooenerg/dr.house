@@ -34,6 +34,7 @@ export function resetDbForTests() {
     DELETE FROM disputes;
     DELETE FROM aceites;
     DELETE FROM addon_charges;
+    DELETE FROM advertisements;
     DELETE FROM agent_pending_approvals;
     DELETE FROM agent_pending_actions;
     DELETE FROM agent_steps;

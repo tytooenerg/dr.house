@@ -371,7 +371,7 @@ describe('Admin add-on pricing config', () => {
     const admin = await adminToken();
     const list = await request(app).get('/api/admin/addons/precos').set('Authorization', `Bearer ${admin}`);
     expect(list.status).toBe(200);
-    expect(list.body.precos.length).toBe(12);
+    expect(list.body.precos.length).toBe(13);
 
     const update = await request(app).put('/api/admin/addons/precos').set('Authorization', `Bearer ${admin}`).send({ kind: 'score_api', preco: 2.5 });
     expect(update.status).toBe(200);

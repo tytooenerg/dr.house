@@ -22,6 +22,7 @@ const DEFAULT_PRICES: Record<AddOnKind, number> = {
   reconciliation_api: 1.5, // per extrato conciliado
   suitability_api: 1.0, // per questionário avaliado — mais barato, é um cálculo determinístico, sem custo de IA/terceiro
   market_index_api: 5.0, // per consulta ao índice — dado agregado, comprado com menos frequência que um lookup pontual
+  publicidade_carrossel: 350, // flat monthly recurring fee — um slot no carrossel de publicidade da landing page
 };
 
 const SETTING_PREFIX = 'addon_price_';

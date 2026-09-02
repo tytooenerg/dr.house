@@ -18,6 +18,7 @@ import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
 import { isFeatureEnabled } from '../lib/featureFlags.js';
+import { listActiveApprovedAdvertisements } from '../db/advertisements.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
 // the embeddable rate simulator widget — all meant to be called from outside the app
@@ -132,6 +133,20 @@ publicRouter.post('/stablecoin-webhook', paymentWebhookLimiter, (req, res) => {
 // numbers is a real trade-off worth stating, not one worth hiding.
 publicRouter.get('/stats', async (_req, res) => {
   res.json(await cached('public:stats', 30, () => buildPublicStats()));
+});
+
+// Fully public feed for the landing page's ad carousel (feature "Carrossel de
+// publicidade") — só anúncios aprovados por um admin (routes/admin.ts) e que a própria
+// conta anunciante ainda mantém ativos (routes/advertisements.ts). Um admin também pode
+// desligar o carrossel inteiro sem redeploy via lib/featureFlags.ts, mesma válvula de
+// segurança que o widget embutido já usa — útil se um anúncio aprovado se revelar
+// problemático depois do fato.
+publicRouter.get('/advertisements', async (_req, res) => {
+  if (!isFeatureEnabled('ad_carousel')) {
+    res.json({ ads: [] });
+    return;
+  }
+  res.json({ ads: await cached('public:advertisements', 30, () => listActiveApprovedAdvertisements()) });
 });
 
 publicRouter.get('/status', (_req, res) => {
