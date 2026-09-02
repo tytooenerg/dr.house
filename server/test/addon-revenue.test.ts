@@ -15,6 +15,21 @@ function currentMonthKey(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
+// lib/registradoras.ts honestly simulates ~12% real-world instability per registro
+// attempt (see submitEmitir/registrarNaRegistradora) — routes/v1.ts's own 503 for this
+// says exactly "tente novamente" (try again), and billing only happens strictly *after*
+// a successful registro (never before), so a retry here has no double-billing risk and
+// mirrors the documented client behavior instead of masking a real bug. Without this,
+// these tests fail at their real ~12% rate on every CI run, unrelated to whatever else
+// the run is actually testing.
+async function postRegistroWithRetry(key: string, body: Record<string, unknown>) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await request(app).post('/api/v1/registro').set('Authorization', `Bearer ${key}`).send(body);
+    if (res.status !== 503 || attempt === 4) return res;
+  }
+  throw new Error('unreachable');
+}
+
 async function adminToken() {
   const res = await request(app).post('/api/auth/login').send({ email: 'admin@lastro.demo', password: 'demo1234' });
   return res.body.token as string;
@@ -170,10 +185,7 @@ describe('Feature — Registro API (compliance-as-a-service)', () => {
     const admin = await adminToken();
     const before = await addonSummary(admin, 'registro_api');
 
-    const res = await request(app)
-      .post('/api/v1/registro')
-      .set('Authorization', `Bearer ${key}`)
-      .send({ referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
+    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
     expect(res.status).toBe(200);
     expect(res.body.registro).toBeTypeOf('string');
     expect(res.body.registradora).toBeTypeOf('string');
@@ -193,10 +205,7 @@ describe('Feature — Registro API (compliance-as-a-service)', () => {
 
     const admin = await adminToken();
     const before = await addonSummary(admin, 'registro_api');
-    const res = await request(app)
-      .post('/api/v1/registro')
-      .set('Authorization', `Bearer ${key}`)
-      .send({ referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
+    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
     expect(res.status).toBe(200);
     const after = await addonSummary(admin, 'registro_api');
     expect(after.count).toBe(before.count);
