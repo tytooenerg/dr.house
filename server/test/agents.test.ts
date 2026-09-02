@@ -19,9 +19,9 @@ async function adminToken() {
 }
 
 describe('agentic AI layer — registry', () => {
-  it('registers exactly the 12 agents, each with at least one tool and a description', () => {
+  it('registers exactly the 15 agents, each with at least one tool and a description', () => {
     const ids = Object.keys(AGENTS);
-    expect(ids).toHaveLength(12);
+    expect(ids).toHaveLength(15);
     for (const id of ids) {
       const def = AGENTS[id];
       expect(def.label.length).toBeGreaterThan(0);
@@ -46,6 +46,7 @@ describe('agentic AI layer — registry', () => {
       'reenviar_lembrete_aceite',
       'registrar_nota_comercial',
       'dar_lance_liquidez',
+      'registrar_alerta_concentracao',
     ]);
     for (const def of Object.values(AGENTS)) {
       for (const tool of def.tools) {
@@ -61,11 +62,11 @@ describe('agentic AI layer — API authorization', () => {
     expect(res.status).toBe(401);
   });
 
-  it('lists all 12 agents for an admin', async () => {
+  it('lists all 15 agents for an admin', async () => {
     const tok = await adminToken();
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${tok}`);
     expect(res.status).toBe(200);
-    expect(res.body.agents).toHaveLength(12);
+    expect(res.body.agents).toHaveLength(15);
     expect(typeof res.body.llmEnabled).toBe('boolean');
   });
 });
@@ -79,11 +80,14 @@ describe('agentic AI layer — self-service scoping (cedente/investidor)', () =>
     return { token: reg.body.token as string, userId: reg.body.user.id as number, email };
   }
 
-  it('only exposes the agent(s) allowed for that role, never the full 12', async () => {
+  it('only exposes the agent(s) allowed for that role, never the full registry', async () => {
     const { token } = await registerAndLogin('cedente');
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.agents.map((a: { id: string }) => a.id).sort()).toEqual(['emissao', 'suporte']);
+    // 'cfo' is listed here regardless of plan — listAgentSummaries filters by role only, the
+    // same layered-gate design cashflow's own page uses (visible, 402s on run if underpaid);
+    // a fresh self-registered cedente starts on Básico, so it can't actually run yet.
+    expect(res.body.agents.map((a: { id: string }) => a.id).sort()).toEqual(['cfo', 'emissao', 'suporte']);
 
     const inv = await registerAndLogin('investidor');
     const res2 = await request(app).get('/api/agents').set('Authorization', `Bearer ${inv.token}`);

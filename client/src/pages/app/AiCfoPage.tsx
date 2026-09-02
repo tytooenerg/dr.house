@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Segmented } from '../../components/ui/Segmented';
 import { AiTag } from '../../components/ui/Badge';
+import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 import { useSession } from '../../state/SessionContext';
 
@@ -191,6 +192,14 @@ export function AiCfoPage() {
           ))}
         </div>
       </Card>
+
+      <div className="mb-6">
+        <SelfServiceAgentCard
+          agentId="cfo"
+          title="Converse com o CFO Digital"
+          placeholder="Ex: devo antecipar duplicatas agora? minha carteira está concentrada em poucos clientes?"
+        />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
         <Card>

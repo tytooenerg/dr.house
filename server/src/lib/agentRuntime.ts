@@ -4,7 +4,7 @@ import { logger } from './logger.js';
 import { addAgentStep, createAgentRun, createPendingAction, finishAgentRun, listAgentRunsForSubject } from '../db/agents.js';
 import { isAgentEnabled, isAgentOverBudget, getAgentDailyBudgetUsd, getDualApprovalThresholdBrl } from './agentGovernance.js';
 import { withSpan } from './tracing.js';
-import type { Role } from '../db/types.js';
+import type { Role, Plan } from '../db/types.js';
 
 // The agentic layer: every other AI feature in this codebase (chat, NF-e extraction, risk
 // narrative, dispute copilot, etc — see lib/claude.ts) is one prompt in, one answer out.
@@ -69,6 +69,11 @@ export interface AgentDefinition {
   // themselves — always forced to act on their own account, never another user's. Absent
   // means admin-only, same as before this field existed.
   selfServiceRoles?: Role[];
+  // Minimum plan required for a self-service run (checked in routes/agents.ts, same
+  // planAtLeast() comparison requirePlan() uses for a regular route). Absent means no plan
+  // gate — every self-service agent before this field existed was free on any plan. Never
+  // applies to an admin-run agent (an admin can always run any agent, on anyone's behalf).
+  requiredPlan?: Plan;
 }
 
 export interface AgentRunStepView {

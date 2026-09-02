@@ -12,12 +12,14 @@ import { parseFlexibleDate, fmtBRL } from './format.js';
 
 // Statuses where the cedente still expects to receive money — either from Lastro (once the
 // duplicata sells/finances) or, if never sold, from the sacado directly at vencimento.
-// 'vendida' and 'paga' both mean the cedente already has the cash in hand.
-const PENDING_STATUSES = new Set(['pendente_analise', 'aprovada', 'no_mercado']);
+// 'vendida' and 'paga' both mean the cedente already has the cash in hand. Exported — the AI
+// CFO agent's sub-agents (lib/agents/cfoConcentracao.ts, lib/agents/cfoAntecipacao.ts) reuse
+// the exact same definition instead of re-deciding which statuses "still pending" means.
+export const PENDING_STATUSES = new Set(['pendente_analise', 'aprovada', 'no_mercado']);
 // Already validated and sitting in the marketplace — antecipação is a click away, not
 // blocked on further analysis. This is what "quanto tenho disponível para antecipar hoje"
 // actually means.
-const ELIGIBLE_NOW_STATUSES = new Set(['aprovada', 'no_mercado']);
+export const ELIGIBLE_NOW_STATUSES = new Set(['aprovada', 'no_mercado']);
 
 export const FORECAST_HORIZONS_DAYS = [7, 30, 60, 90, 180, 365] as const;
 export type ForecastHorizon = (typeof FORECAST_HORIZONS_DAYS)[number];

@@ -554,6 +554,21 @@ Removido por completo: `lib/guaranteeFund.ts`, `lib/guaranteeFundTranches.ts`, `
 
 Testes removidos: `server/test/guarantee-fund.test.ts` (6), `server/test/guarantee-fund-tranches.test.ts` (6), `server/test/guarantee-fund-stress-test.test.ts`, e o regression e2e sobre o card ficar invisível pra sacado. Verificado: `npm run typecheck`/`build`/`test`/`test:e2e` todos verdes — migração Postgres re-verificada contra um PostgreSQL 16 real (55 migrations, 65 tabelas).
 
+### CFO Digital vira IA agêntica — orquestrador + sub-agentes especialistas
+
+Até aqui o AI CFO (`lib/cashflowForecast.ts`) era cálculo determinístico mais uma pergunta-resposta única no chat — nenhuma ferramenta, nenhum raciocínio em múltiplos passos, nenhuma delegação. Esta mudança reconstrói a experiência em cima do framework agêntico já existente (`lib/agentRuntime.ts`, o mesmo que sustenta os outros 12 agentes do back-office): agora é um **orquestrador que aciona especialistas**, o mesmo mecanismo de handoff que o Agente de Emissão já usa para consultar o de Underwriting.
+
+- **`AgentDefinition` ganha `requiredPlan`** (`lib/agentRuntime.ts`) — primeiro agente self-service com gate de plano; checado em `routes/agents.ts` na rota de execução (`POST /:agentId/run`), mesma comparação `planAtLeast()` que `requirePlan()` já usa numa rota comum, 402 com `requiredPlan` no corpo.
+- **Orquestrador `cfo`** (novo, `lib/agents/cfo.ts`) — self-service pro cedente, travado em Pro+. Ferramentas: `ver_projecao_caixa` (reaproveita `buildCashflowForecast`), `listar_recebiveis_pendentes`, `listar_contas_a_pagar`. Pode `acionar_agente` para delegar a `cfo_concentracao`, `cfo_antecipacao` ou ao `underwriting` já existente.
+- **Sub-agente `cfo_concentracao`** (novo, `lib/agents/cfoConcentracao.ts`) — investiga concentração de cliente a fundo (duplicatas na Lastro + recebíveis do ERP) e pode `registrar_alerta_concentracao`, ação sensível e auto-aprovável que grava um alerta permanente na conta do cedente.
+- **Sub-agente `cfo_antecipacao`** (novo, `lib/agents/cfoAntecipacao.ts`) — recomenda quais recebíveis já elegíveis antecipar primeiro pra cobrir um déficit projetado, ordenados por risco.
+- Os dois sub-agentes não têm `selfServiceRoles` próprio — só são acionáveis via handoff do `cfo` ou diretamente por um admin, mesmo formato que `underwritingAgent` já tinha.
+- **Client**: novo card "Converse com o CFO Digital" em `/app/ai-cfo`, reaproveitando o `SelfServiceAgentCard` já usado em Emitir/Automação/Minhas Duplicatas — nenhuma UI nova construída do zero.
+
+`PENDING_STATUSES`/`ELIGIBLE_NOW_STATUSES` (antes internos a `cashflowForecast.ts`) agora exportados para os sub-agentes reaproveitarem a mesma definição em vez de redecidir o que "pendente"/"elegível agora" significa. Nenhuma migração nova — os agentes só leem/escrevem tabelas já existentes (`duplicatas`, `payables`, `erp_receivables`, `audit_log`).
+
+Novos testes: `server/test/cfo-agent-self-service.test.ts` (11 — gate de plano, ferramentas do orquestrador escopadas à própria conta, os dois sub-agentes só acionáveis via handoff/admin, agregação de concentração, alerta gravado em auditoria, ranking de antecipação por risco); `agents.test.ts` atualizado para os 15 agentes registrados. Verificado: `npm run typecheck`/`build`/`test`/`test:e2e` todos verdes (server 99 arquivos/584 testes, client 24/24, SDK 9/9, e2e 12/12).
+
 ## Running locally
 
 ```bash

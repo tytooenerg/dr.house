@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { claudeEnabled } from '../lib/claude.js';
+import { planAtLeast, PLANS } from '../lib/billing.js';
 import { runAgent, executeApprovedTool } from '../lib/agentRuntime.js';
 import { AGENTS, listAgentSummaries, getAgent, canRunSelfService } from '../lib/agents/index.js';
 import {
@@ -151,6 +152,17 @@ agentsRouter.post(
     const admin = isAdmin(req.user!.role);
     if (!admin && !canRunSelfService(def, req.user!.role)) {
       res.status(403).json({ error: 'forbidden', message: `Seu papel não tem acesso ao agente "${def.label}".` });
+      return;
+    }
+    // Same planAtLeast() gate a regular route gets from requirePlan() — an admin can always
+    // run any agent regardless of whose account it's scoped to, so this only ever applies to
+    // a self-service run.
+    if (!admin && def.requiredPlan && !planAtLeast(req.user!.plan, def.requiredPlan)) {
+      res.status(402).json({
+        error: 'plan_required',
+        requiredPlan: def.requiredPlan,
+        message: `O agente "${def.label}" requer o plano ${PLANS[def.requiredPlan].label} ou superior.`,
+      });
       return;
     }
     const parsed = runSchema.safeParse(req.body);
