@@ -3,6 +3,132 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { useSession } from '../../state/SessionContext';
+
+interface FundoOverview {
+  balanceFmt: string;
+  navFmt: string;
+  cotaPriceFmt: string;
+  yourPositionFmt: string | null;
+  yourPrincipalAportadoFmt: string | null;
+  yourAvailableToRedeemFmt: string | null;
+}
+
+// Capital real de investidores financia cada compra automática dentro de um Programa
+// Confirming (feature seguinte) — sem aporte no pool, não há como financiar nada. Mesmo
+// mecanismo de cota/NAV do pool de fomento da linha de crédito (CreditLinePage.tsx), num
+// pool deliberadamente separado.
+function FundoCard() {
+  const { user } = useSession();
+  const isInvestor = user?.role === 'investidor';
+  const [fundo, setFundo] = useState<FundoOverview | null>(null);
+  const [valor, setValor] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const load = () => api.get<FundoOverview>('/confirming-fundo').then(setFundo);
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const parsed = Number(valor.replace(',', '.'));
+
+  const contribuir = async () => {
+    setError('');
+    setNotice('');
+    if (!parsed || parsed <= 0) {
+      setError('Informe um valor válido para aportar.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/confirming-fundo/contribuir', { valor: parsed });
+      setValor('');
+      setNotice('Aporte registrado — valor debitado do seu extrato.');
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível registrar o aporte.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resgatar = async () => {
+    setError('');
+    setNotice('');
+    if (!parsed || parsed <= 0) {
+      setError('Informe um valor válido para resgatar.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post('/confirming-fundo/resgatar', { valor: parsed });
+      setValor('');
+      setNotice('Resgate registrado — valor creditado no seu extrato.');
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível registrar o resgate.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!fundo) return null;
+
+  return (
+    <Card className="mb-4">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div className="font-bold text-[15px]">Fundo de Fomento do Confirming</div>
+        <span className="text-[12.5px] font-bold text-textSecondary">
+          Saldo do pool: {fundo.balanceFmt} · NAV: {fundo.navFmt} · Cota: {fundo.cotaPriceFmt}
+        </span>
+      </div>
+      <p className="text-[12.5px] text-textSecondary mb-3">
+        Financia cada compra automática dentro de um Programa Confirming, num pool separado do fomento à linha de crédito. Cada aporte compra
+        cotas ao preço atual; retornos de pagamento voltam ao pool sem emitir novas cotas, então o preço da cota sobe para quem já está
+        posicionado.
+      </p>
+      {isInvestor && (
+        <>
+          <div className="grid grid-cols-3 gap-4 mb-3">
+            <div>
+              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Sua posição (com rendimento)</div>
+              <div className="font-mono-num font-bold text-[15px]">{fundo.yourPositionFmt}</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Principal aportado</div>
+              <div className="font-mono-num font-bold text-[15px] text-textSecondary">{fundo.yourPrincipalAportadoFmt}</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Disponível para resgate</div>
+              <div className="font-mono-num font-bold text-[15px] text-blue">{fundo.yourAvailableToRedeemFmt}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Valor em R$"
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              className="border border-border rounded-md px-3 py-2 text-sm w-48"
+            />
+            <Button disabled={busy} onClick={contribuir}>
+              Aportar
+            </Button>
+            <Button disabled={busy} onClick={resgatar}>
+              Resgatar
+            </Button>
+          </div>
+          {error && <div className="mt-2.5 text-red text-[12.5px] font-semibold">{error}</div>}
+          {notice && <div className="mt-2.5 text-green text-[12.5px] font-semibold">{notice}</div>}
+        </>
+      )}
+    </Card>
+  );
+}
 
 interface MembroView {
   id: number;
@@ -37,6 +163,8 @@ interface CedenteElegivel {
 // contra este sacado (listarCedentesElegiveis, server-side). O financiamento automático
 // em si — pular o leilão na emissão — vem numa feature seguinte.
 export function ConfirmingPage() {
+  const { user } = useSession();
+  const isSacado = user?.role === 'sacado';
   const [programa, setPrograma] = useState<ProgramaView | null>(null);
   const [cnpj, setCnpj] = useState('');
   const [limite, setLimite] = useState('');
@@ -55,9 +183,11 @@ export function ConfirmingPage() {
   const loadElegiveis = () => api.get<{ elegiveis: CedenteElegivel[] }>('/confirming/elegiveis').then((d) => setElegiveis(d.elegiveis));
 
   useEffect(() => {
-    load();
-    loadElegiveis();
-  }, []);
+    if (isSacado) {
+      load();
+      loadElegiveis();
+    }
+  }, [isSacado]);
 
   const run = async (key: string, fn: () => Promise<void>, fallbackMessage: string) => {
     if (busyKey) return;
@@ -127,12 +257,23 @@ export function ConfirmingPage() {
 
   return (
     <div>
-      <PageHeader title="Programa Confirming" subtitle="Pré-aprove financiamento para a sua cadeia de fornecedores, na sua própria taxa de risco" />
+      <PageHeader
+        title="Programa Confirming"
+        subtitle={
+          isSacado
+            ? 'Pré-aprove financiamento para a sua cadeia de fornecedores, na sua própria taxa de risco'
+            : 'Aporte capital no fundo que financia cada compra automática dentro de um Programa Confirming'
+        }
+      />
 
-      {error && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold">{error}</div>}
-      {notice && <div className="mb-4 px-3.5 py-3 rounded-lg bg-greenBg text-green text-sm font-semibold">{notice}</div>}
+      <FundoCard />
 
-      {!programa ? (
+      {isSacado && (
+        <>
+          {error && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold">{error}</div>}
+          {notice && <div className="mb-4 px-3.5 py-3 rounded-lg bg-greenBg text-green text-sm font-semibold">{notice}</div>}
+
+          {!programa ? (
         <Card className="mb-4 max-w-[560px]">
           <div className="font-bold text-[15px] mb-1">Criar meu Programa Confirming</div>
           <div className="text-textSecondary text-[12.5px] mb-4">
@@ -253,6 +394,8 @@ export function ConfirmingPage() {
               )}
             </Card>
           </div>
+        </>
+      )}
         </>
       )}
     </div>

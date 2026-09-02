@@ -658,6 +658,17 @@ Pesquisa de mercado (set/2026): o maior concorrente do Lastro (Monkey Exchange, 
 
 Ainda não muda nada no fluxo de emissão/leilão em si — é só visão e configuração. Novos testes: `server/test/confirming.test.ts` (11 casos — criação com taxa real, limites de faixa, matrícula por histórico real, gating de papel, auditoria). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 102 arquivos/621 testes, client 24/24, sdks/node 9/9); `migrations-postgres/0061` conferido byte a byte contra `scripts/postgres/generate-schema.mjs`.
 
+### Fundo de Fomento do Programa Confirming (2/4)
+
+Segunda PR da série: o financiamento automático do Programa Confirming (próxima PR) precisa de uma fonte real de capital pra cada compra instantânea — nunca o caixa da própria Lastro, mesma disciplina da linha de crédito rotativa e coerente com a remoção do fundo de garantia.
+
+- **`confirming_fundo_*`** (migração `0062`) — espelha `lib/creditLineFund.ts`/`db/creditLineFund.ts` quase 1:1 (ledger, contribuições, cota/NAV), mas num pool **deliberadamente separado** do fomento à linha de crédito — perfis de risco/rendimento diferentes não devem se misturar pro investidor que está decidindo aportar. Já nasce com o mecanismo de cota/NAV completo (o fundo da linha de crédito precisou de duas migrações pra chegar lá; aqui já sabíamos que precisávamos disso desde o início).
+- **`GET/POST /api/confirming-fundo/*`** — investidor aporta/resgata; `GET` é aberto a qualquer papel (mostra saldo/NAV/cota do pool), mas só o investidor vê sua própria posição.
+- **`fundoFinanciarCompra`/`fundoRetornoDePagamento`** (`lib/confirmingFundo.ts`) já existem e têm cobertura de teste direta (ciclo cota/NAV completo, com uma duplicata real criada só pra isso), mas ainda não têm nenhum chamador real — isso vem na próxima PR, quando o financiamento automático existir.
+- **Client**: card "Fundo de Fomento do Confirming" na página do Programa Confirming, visível pro sacado (contexto) e pro investidor (aportar/resgatar) — mesmo padrão visual do card de fomento da linha de crédito. Investidor ganhou acesso à tab "Programa Confirming" (antes só do sacado).
+
+Novos testes: `server/test/confirming-fundo.test.ts` (8 casos — aporte, resgate, limites, gating de papel, e o ciclo cota/NAV de ponta a ponta chamando `fundoFinanciarCompra`/`fundoRetornoDePagamento` diretamente, já que ainda não têm rota própria). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 103 arquivos/629 testes, client 24/24, sdks/node 9/9); `migrations-postgres/0062` conferido byte a byte contra `scripts/postgres/generate-schema.mjs`.
+
 ## Running locally
 
 ```bash
