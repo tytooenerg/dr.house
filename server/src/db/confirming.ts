@@ -19,6 +19,7 @@ export interface ConfirmingMembroRow {
   programa_id: number;
   cedente_user_id: number;
   sublimite: number | null;
+  utilizado: number;
   status: 'ativo' | 'removido';
   created_at: string;
 }
@@ -46,10 +47,16 @@ export function setProgramaStatus(id: number, status: 'ativo' | 'pausado') {
   db.prepare('UPDATE confirming_programas SET status = ?, updated_at = datetime(\'now\') WHERE id = ?').run(status, id);
 }
 
-// Chamado só depois que o financiamento automático (feature futura) começar a mover
-// dinheiro de fato — nenhuma rota desta fundação incrementa utilizado ainda.
+// Incrementado por lib/confirmingCore.ts's tentarFinanciarViaPrograma sempre que uma
+// duplicata é financiada automaticamente dentro do programa.
 export function setProgramaUtilizado(id: number, utilizado: number) {
   db.prepare('UPDATE confirming_programas SET utilizado = ?, updated_at = datetime(\'now\') WHERE id = ?').run(Math.max(0, utilizado), id);
+}
+
+// Mesmo papel de setProgramaUtilizado, mas por cedente matriculado — necessário pra
+// checar o sublimite individual, não só o limite agregado do programa.
+export function setMembroUtilizado(id: number, utilizado: number) {
+  db.prepare('UPDATE confirming_membros SET utilizado = ? WHERE id = ?').run(Math.max(0, utilizado), id);
 }
 
 export interface ConfirmingMembroComCedente extends ConfirmingMembroRow {

@@ -15,6 +15,7 @@ import { fmtBRL, parseBRLNumber } from './format.js';
 import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import { estimateRateBand } from './dynamicPricing.js';
+import { tentarFinanciarViaPrograma } from './confirmingCore.js';
 import { withSpan } from './tracing.js';
 import type { UserRow } from '../db/types.js';
 
@@ -78,7 +79,10 @@ export function computeEmitirPreview(form: EmitirForm) {
 }
 
 export type EmitirOutcome =
-  | { status: 200; body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string; complianceSuspensa: boolean } }
+  | {
+      status: 200;
+      body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string; complianceSuspensa: boolean; financiadoViaPrograma: boolean };
+    }
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 402; body: { error: 'plan_required'; requiredPlan: 'pro'; message: string } }
   | { status: 409; body: { error: 'nfe_duplicidade'; message: string } }
@@ -256,6 +260,24 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
     logger.warn({ err, duplicataId: duplicata.id }, '[compliance-engine] falha ao pontuar a duplicata — seguindo sem suspensão automática');
   }
 
+  // Programa Confirming — só tenta financiar automaticamente depois que a duplicata está
+  // de fato aprovada (checklist 100%, não suspensa pelo Compliance AI Engine acima) e
+  // nunca em modo sandbox (chave de teste, dados falsos — nunca move dinheiro real). Se o
+  // sacado não tiver programa ativo ou o cedente não estiver matriculado, segue
+  // exatamente como hoje: precisa do disparo manual do leilão.
+  let financiadoViaPrograma = false;
+  if (!suspended && preview.lastroChecklist.pct === 100 && !opts.sandbox) {
+    try {
+      const resultado = await tentarFinanciarViaPrograma(duplicata, user);
+      if (resultado.financiado) {
+        financiadoViaPrograma = true;
+        recordAuditEvent(user.id, user.company_name, 'confirming.duplicata_financiada_automaticamente', { duplicataId: duplicata.id });
+      }
+    } catch (err) {
+      logger.warn({ err, duplicataId: duplicata.id }, '[confirming] falha ao tentar financiar automaticamente — segue pro fluxo normal de leilão');
+    }
+  }
+
   return {
     status: 200,
     body: {
@@ -265,6 +287,7 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
       seguro: form.seguro,
       registradora: registradora.name,
       complianceSuspensa: suspended,
+      financiadoViaPrograma,
     },
   };
 }

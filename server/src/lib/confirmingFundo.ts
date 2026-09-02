@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import {
   addFundoLedgerEntry,
   addFundoContribution,
@@ -11,7 +12,33 @@ import {
   markFundoRedeemed,
 } from '../db/confirmingFundo.js';
 import { addLedgerEntry } from '../db/misc.js';
+import { createUser, getUserByEmail, approveKyb } from '../db/users.js';
+import { hashPassword } from '../auth/password.js';
 import { fmtBRL } from './format.js';
+
+// Conta de sistema, nunca logável, que detém as posições que o fundo comprou de fato
+// (purchases.investor_id é uma FK real pra users, então o fundo precisa de UM titular
+// pra que o resto do app — carteira, liquidação, maturidade — trate essas posições como
+// qualquer outra compra). Criada uma vez, de forma preguiçosa (na primeira compra
+// financiada), no mesmo padrão de conta-nunca-logável já usado pra contas só-Google
+// (routes/auth.ts: senha aleatória, bcrypt-hasheada do jeito normal, nunca revelada —
+// verifyPassword nunca vai bater com ela).
+const FUNDO_SISTEMA_EMAIL = 'fundo-confirming@lastro.internal';
+
+export async function getOrCreateFundoSistemaUserId(): Promise<number> {
+  const existing = getUserByEmail(FUNDO_SISTEMA_EMAIL);
+  if (existing) return existing.id;
+  const randomPasswordHash = await hashPassword(crypto.randomBytes(24).toString('hex'));
+  const user = createUser({
+    email: FUNDO_SISTEMA_EMAIL,
+    passwordHash: randomPasswordHash,
+    nome: 'Fundo de Fomento do Confirming',
+    companyName: 'Fundo de Fomento do Confirming (conta de sistema)',
+    role: 'investidor',
+  });
+  approveKyb(user.id);
+  return user.id;
+}
 
 // Fundo de Fomento do Programa Confirming — abre o financiamento instantâneo do Programa
 // Confirming (feature seguinte) pra funding real de investidor, na mesma disciplina da
