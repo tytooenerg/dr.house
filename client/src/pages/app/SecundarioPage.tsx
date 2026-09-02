@@ -79,6 +79,10 @@ export function SecundarioPage() {
   const [prices, setPrices] = useState<Record<number, string>>({});
   const [bidValues, setBidValues] = useState<Record<number, string>>({});
   const [error, setError] = useState('');
+  // One key at a time, e.g. "buy:42" or "acceptBid:7" — disables just the button that
+  // triggered the request (not every button on the page) and blocks a double-click from
+  // firing the same money-moving action twice while the first request is still in flight.
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const [blockValorMaximo, setBlockValorMaximo] = useState('');
   const [blockScoreMin, setBlockScoreMin] = useState('');
@@ -94,31 +98,46 @@ export function SecundarioPage() {
 
   if (!data) return null;
 
-  const runAction = async (fn: () => Promise<SecundarioData>, fallbackMessage: string) => {
+  const runAction = async (key: string, fn: () => Promise<SecundarioData>, fallbackMessage: string) => {
+    if (busyKey) return; // one money-moving action in flight at a time
     setError('');
+    setBusyKey(key);
     try {
       const res = await fn();
       setData(res);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : fallbackMessage);
+    } finally {
+      setBusyKey(null);
     }
   };
 
   const listPosition = (purchaseId: number) =>
-    runAction(() => api.post<SecundarioData>('/secundario/listar', { purchaseId, askingValor: prices[purchaseId] ?? '' }), 'Não foi possível criar o anúncio.');
+    runAction(
+      `listar:${purchaseId}`,
+      () => api.post<SecundarioData>('/secundario/listar', { purchaseId, askingValor: prices[purchaseId] ?? '' }),
+      'Não foi possível criar o anúncio.'
+    );
 
-  const cancel = (id: number) => runAction(() => api.post<SecundarioData>(`/secundario/${id}/cancelar`), 'Não foi possível cancelar o anúncio.');
+  const cancel = (id: number) => runAction(`cancelar:${id}`, () => api.post<SecundarioData>(`/secundario/${id}/cancelar`), 'Não foi possível cancelar o anúncio.');
 
-  const buy = (id: number) => runAction(() => api.post<SecundarioData>(`/secundario/${id}/comprar`), 'Não foi possível comprar esta posição.');
+  const buy = (id: number) => runAction(`comprar:${id}`, () => api.post<SecundarioData>(`/secundario/${id}/comprar`), 'Não foi possível comprar esta posição.');
 
   const placeBid = (listingId: number) =>
-    runAction(() => api.post<SecundarioData>(`/secundario/${listingId}/lances`, { valor: bidValues[listingId] ?? '' }), 'Não foi possível registrar seu lance.');
+    runAction(
+      `lance:${listingId}`,
+      () => api.post<SecundarioData>(`/secundario/${listingId}/lances`, { valor: bidValues[listingId] ?? '' }),
+      'Não foi possível registrar seu lance.'
+    );
 
-  const cancelBid = (bidId: number) => runAction(() => api.post<SecundarioData>(`/secundario/lances/${bidId}/cancelar`), 'Não foi possível cancelar o lance.');
+  const cancelBid = (bidId: number) =>
+    runAction(`cancelarLance:${bidId}`, () => api.post<SecundarioData>(`/secundario/lances/${bidId}/cancelar`), 'Não foi possível cancelar o lance.');
 
-  const acceptBid = (bidId: number) => runAction(() => api.post<SecundarioData>(`/secundario/lances/${bidId}/aceitar`), 'Não foi possível aceitar o lance.');
+  const acceptBid = (bidId: number) =>
+    runAction(`aceitarLance:${bidId}`, () => api.post<SecundarioData>(`/secundario/lances/${bidId}/aceitar`), 'Não foi possível aceitar o lance.');
 
-  const rejectBid = (bidId: number) => runAction(() => api.post<SecundarioData>(`/secundario/lances/${bidId}/recusar`), 'Não foi possível recusar o lance.');
+  const rejectBid = (bidId: number) =>
+    runAction(`recusarLance:${bidId}`, () => api.post<SecundarioData>(`/secundario/lances/${bidId}/recusar`), 'Não foi possível recusar o lance.');
 
   const runBlockTrade = async () => {
     setError('');
@@ -166,8 +185,8 @@ export function SecundarioPage() {
                     onChange={(e) => setPrices((v) => ({ ...v, [p.purchaseId]: e.target.value }))}
                     className="flex-1"
                   />
-                  <Button size="sm" variant="secondary" onClick={() => listPosition(p.purchaseId)}>
-                    Anunciar
+                  <Button size="sm" variant="secondary" disabled={busyKey === `listar:${p.purchaseId}`} onClick={() => listPosition(p.purchaseId)}>
+                    {busyKey === `listar:${p.purchaseId}` ? 'Anunciando…' : 'Anunciar'}
                   </Button>
                 </div>
               </div>
@@ -187,8 +206,13 @@ export function SecundarioPage() {
                       <span className="font-semibold">{a.precoFmt}</span>
                       <span className="text-textTertiary">{a.status}</span>
                       {a.status === 'ativo' && (
-                        <button type="button" onClick={() => cancel(a.id)} className="text-red font-bold bg-transparent border-none cursor-pointer">
-                          Cancelar
+                        <button
+                          type="button"
+                          onClick={() => cancel(a.id)}
+                          disabled={busyKey === `cancelar:${a.id}`}
+                          className="text-red font-bold bg-transparent border-none cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                        >
+                          {busyKey === `cancelar:${a.id}` ? 'Cancelando…' : 'Cancelar'}
                         </button>
                       )}
                     </div>
@@ -200,11 +224,21 @@ export function SecundarioPage() {
                               Lance de <b>{b.bidderCompanyName}</b>: {b.valorFmt}
                             </span>
                             <div className="flex gap-1.5">
-                              <button type="button" onClick={() => acceptBid(b.id)} className="text-green font-bold bg-transparent border-none cursor-pointer">
-                                Aceitar
+                              <button
+                                type="button"
+                                onClick={() => acceptBid(b.id)}
+                                disabled={busyKey === `aceitarLance:${b.id}` || busyKey === `recusarLance:${b.id}`}
+                                className="text-green font-bold bg-transparent border-none cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                              >
+                                {busyKey === `aceitarLance:${b.id}` ? 'Aceitando…' : 'Aceitar'}
                               </button>
-                              <button type="button" onClick={() => rejectBid(b.id)} className="text-red font-bold bg-transparent border-none cursor-pointer">
-                                Recusar
+                              <button
+                                type="button"
+                                onClick={() => rejectBid(b.id)}
+                                disabled={busyKey === `aceitarLance:${b.id}` || busyKey === `recusarLance:${b.id}`}
+                                className="text-red font-bold bg-transparent border-none cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                              >
+                                {busyKey === `recusarLance:${b.id}` ? 'Recusando…' : 'Recusar'}
                               </button>
                             </div>
                           </div>
@@ -228,8 +262,13 @@ export function SecundarioPage() {
                     <span className="font-semibold">{b.valorFmt}</span>
                     <span className="text-textTertiary">{BID_STATUS_LABEL[b.status]}</span>
                     {b.status === 'ativo' && (
-                      <button type="button" onClick={() => cancelBid(b.id)} className="text-red font-bold bg-transparent border-none cursor-pointer">
-                        Cancelar
+                      <button
+                        type="button"
+                        onClick={() => cancelBid(b.id)}
+                        disabled={busyKey === `cancelarLance:${b.id}`}
+                        className="text-red font-bold bg-transparent border-none cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                      >
+                        {busyKey === `cancelarLance:${b.id}` ? 'Cancelando…' : 'Cancelar'}
                       </button>
                     )}
                   </div>
@@ -254,8 +293,8 @@ export function SecundarioPage() {
                 </div>
                 {l.melhorLanceFmt && <div className="text-textSecondary text-[11.5px] mb-2">Melhor lance no mercado: {l.melhorLanceFmt}</div>}
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={() => buy(l.id)}>
-                    Comprar por {l.precoFmt}
+                  <Button size="sm" disabled={busyKey === `comprar:${l.id}`} onClick={() => buy(l.id)}>
+                    {busyKey === `comprar:${l.id}` ? 'Comprando…' : `Comprar por ${l.precoFmt}`}
                   </Button>
                   <Input
                     placeholder="Seu lance"
@@ -263,8 +302,8 @@ export function SecundarioPage() {
                     onChange={(e) => setBidValues((v) => ({ ...v, [l.id]: e.target.value }))}
                     className="flex-1"
                   />
-                  <Button size="sm" variant="secondary" onClick={() => placeBid(l.id)}>
-                    Dar lance
+                  <Button size="sm" variant="secondary" disabled={busyKey === `lance:${l.id}`} onClick={() => placeBid(l.id)}>
+                    {busyKey === `lance:${l.id}` ? 'Enviando…' : 'Dar lance'}
                   </Button>
                 </div>
               </div>
