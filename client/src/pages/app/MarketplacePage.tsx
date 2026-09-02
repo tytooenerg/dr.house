@@ -5,7 +5,7 @@ import { PageHeader } from '../../components/ui/Card';
 import { Input, Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { AiTag } from '../../components/ui/Badge';
+import { AiTag, Badge } from '../../components/ui/Badge';
 import { useLang } from '../../lib/i18n';
 
 interface Insurer {
@@ -58,10 +58,22 @@ const FRACTIONAL_MIN_VALOR = 150000;
 // worth a round-trip to fetch a catalog for.
 const SETOR_OPTIONS: { value: string; label: string }[] = [
   { value: 'varejo', label: 'Varejo' },
+  { value: 'atacado', label: 'Atacado' },
+  { value: 'comercio', label: 'Comércio' },
   { value: 'industria', label: 'Indústria' },
   { value: 'construcao', label: 'Construção' },
   { value: 'servicos', label: 'Serviços' },
 ];
+// One color per class so the badge is scannable at a glance across a long list of offers —
+// distinct from the score/rating colors (green/amber/red), which mean risk, not business type.
+const SETOR_STYLE: Record<string, { bg: string; color: string }> = {
+  varejo: { bg: '#E8EEFB', color: '#2952A3' },
+  atacado: { bg: '#F0EAFB', color: '#6B3FA0' },
+  comercio: { bg: '#FCEAF5', color: '#A33578' },
+  industria: { bg: '#FBF1E0', color: '#8A5A00' },
+  construcao: { bg: '#F7E9E7', color: '#B3261E' },
+  servicos: { bg: '#EAF3EE', color: '#0A5C36' },
+};
 const RATING_OPTIONS = ['AA', 'A', 'B', 'C'];
 
 interface Offer {
@@ -305,8 +317,12 @@ export function MarketplacePage() {
             <div key={offer.id} className="border-b border-border last:border-b-0">
               <div className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}>
                 <div>
-                  <div className="font-semibold">{offer.sacado}</div>
-                  {offer.setorLabel && <div className="text-[10.5px] text-textTertiary mt-0.5">{offer.setorLabel}</div>}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold">{offer.sacado}</span>
+                    {offer.setor && offer.setorLabel && (
+                      <Badge label={offer.setorLabel} bg={SETOR_STYLE[offer.setor]?.bg ?? '#F0F2F5'} color={SETOR_STYLE[offer.setor]?.color ?? '#5B6472'} className="text-[10px] px-2 py-0.5" />
+                    )}
+                  </div>
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
                 </div>
                 <div className="text-textSecondary">{offer.cedente}</div>

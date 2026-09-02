@@ -33,23 +33,33 @@ export function ratingFromScore(score: number): Rating {
   return 'C';
 }
 
-export type Setor = 'varejo' | 'industria' | 'construcao' | 'servicos';
+export type Setor = 'varejo' | 'atacado' | 'comercio' | 'industria' | 'construcao' | 'servicos';
 
 export const SETOR_LABELS: Record<Setor, string> = {
   varejo: 'Varejo',
+  atacado: 'Atacado',
+  comercio: 'Comércio',
   industria: 'Indústria',
   construcao: 'Construção',
   servicos: 'Serviços',
 };
 
+// Order matters: more specific terms are checked first so e.g. "comércio atacadista" is
+// classified as atacado, not the more generic comercio.
 const SECTOR_KEYWORDS: Record<string, Setor> = {
+  atacadista: 'atacado',
+  atacado: 'atacado',
   varejo: 'varejo',
+  varejista: 'varejo',
+  comércio: 'comercio',
+  comercio: 'comercio',
   indústria: 'industria',
   industria: 'industria',
   construção: 'construcao',
   construcao: 'construcao',
   serviços: 'servicos',
   servicos: 'servicos',
+  prestador: 'servicos',
 };
 
 // Best-effort sector lookup from the same seed profile used for score — there's no

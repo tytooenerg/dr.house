@@ -605,6 +605,26 @@ Análise de usabilidade identificou que o Marketplace só tinha busca por texto 
 
 Novos testes: `server/test/market.test.ts` ganhou 4 casos (filtro por setor exclui os demais, filtro por rating, faixa de valor, faixa de prazo com um intervalo absurdo excluindo tudo). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 100 arquivos/601 testes) — migração Postgres re-verificada (60 migrations, 66 tabelas; `ALTER TABLE ADD COLUMN` simples, sem rebuild).
 
+### Botão travado em ação otimista sem tratamento de erro — Disputa e Portal do Sacado
+
+Auditoria de usabilidade das abas investidor/sacado/cedente/admin/seguradora encontrou o mesmo bug em duas telas: `DisputaPage.tsx`'s `sendEvidence`/`resolve` e `SacadoPage.tsx`'s `setStatus` marcavam o estado otimista (`isSending`/`isProcessing`) antes do `await`, sem `try/catch` — uma falha de rede deixava a linha travada pra sempre ("Enviando evidência…"/"Processando…"), sem os botões de volta e sem mensagem de erro, num fluxo com prazo legal real.
+
+- Ambas agora revertem o estado otimista e mostram a mensagem real de erro da API (`err instanceof ApiError ? err.message : ...`) se a chamada falhar.
+- `DisputaPage.tsx`'s `resolve` ganhou também um estado de "Resolvendo…" que não existia antes (nenhum feedback visual durante a chamada).
+
+Verificado: `npm run typecheck`/`build`/`test` do client todos verdes (24/24), sem teste de página novo — mesma justificativa das duas vezes: o client não tem convenção de testar páginas conectadas à API com RTL.
+
+### Marketplace: classe da empresa (setor) como badge, com Atacado e Comércio
+
+O rótulo de setor introduzido no filtro acima aparecia como texto cinza pequeno embaixo do nome do sacado — pouco visível — e só cobria 4 classes (Varejo, Indústria, Construção, Serviços), deixando de fora tipos comuns de sacado como distribuidoras/atacadistas.
+
+- **`Setor` ampliado pra 6 classes** (`lib/riscoCore.ts`) — Varejo, **Atacado**, **Comércio**, Indústria, Construção, Serviços. `SECTOR_KEYWORDS` prioriza termos mais específicos primeiro (ex: "atacadista" antes de "comércio", pra "comércio atacadista" cair em Atacado, não no genérico Comércio).
+- **`sectorDiversification`** (auto-bid, `routes/automation.ts`) continua rastreando só as 4 classes originais — um sacado classificado numa classe nova (Atacado/Comércio) que essa configuração ainda não gerencia é tratado como setor desconhecido (não bloqueia o lance automático num teto que nunca foi configurado pra ele), em vez de silenciosamente barrar toda oferta desse tipo.
+- **Client**: o rótulo de setor virou um badge colorido (uma cor por classe, distinta das cores de risco AA/A/B/C) ao lado do nome do sacado, igual ao badge de rating que já existia. Filtro de setor no Marketplace ganhou as duas opções novas.
+- Fechado de quebra: "Distribuidora Bom Preço" (um dos 4 sacados de demonstração) tinha o fator "Concentração setorial" como "Alimentício" — termo que não batia em nenhuma palavra-chave e ficava sem classe nenhuma; corrigido pra "Atacado alimentício", que reflete melhor o que uma distribuidora é.
+
+Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 100 arquivos/597 testes, client 24/24).
+
 ## Running locally
 
 ```bash
