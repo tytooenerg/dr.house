@@ -20,6 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'suitability', label: 'Perfil de Investidor', path: '/app/suitability', group: 'operacoes' },
   { key: 'aceite', label: 'Aceite do Sacado', path: '/app/aceite', group: 'operacoes' },
   { key: 'sacado', label: 'Portal do Sacado', path: '/app/sacado', group: 'operacoes' },
+  { key: 'confirming', label: 'Programa Confirming', path: '/app/confirming', group: 'operacoes' },
   { key: 'disputa', label: 'Resolução de Disputas', path: '/app/disputa', group: 'operacoes' },
   { key: 'risco', label: 'Análise de Risco', path: '/app/risco', group: 'analise' },
   { key: 'historico', label: 'Carteira & Histórico', path: '/app/historico', group: 'analise' },

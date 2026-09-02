@@ -65,10 +65,12 @@ export interface UserSettings {
   marketMakerEnabled: boolean;
   marketMakerMaxExposicao: string;
   marketMakerMinScore: string;
-  // CNPJ da própria empresa (não do sacado) — usado só pelo AI CFO (plano Empresarial)
-  // pra consultar o saldo bancário real via lib/openFinance.ts, que já existe e é
-  // consultado por CNPJ, mas até aqui só era chamado com o CNPJ de um sacado (na análise
-  // de risco), nunca com o CNPJ do próprio cedente.
+  // CNPJ da própria empresa de quem está logado — originalmente só pro AI CFO (plano
+  // Empresarial) consultar o saldo bancário real via lib/openFinance.ts (que já existia e
+  // era consultado por CNPJ, mas só com o CNPJ de um sacado, na análise de risco, nunca
+  // com o do próprio cedente). Reaproveitado por lib/confirmingCore.ts pro sacado
+  // autodeclarar seu próprio CNPJ ao criar um Programa Confirming — mesmo campo genérico
+  // ("CNPJ da própria empresa"), sem sentido restringir a um papel só.
   companyCnpj: string;
   // Autodeclarado, editável depois — usado só por lib/complianceCalendarCore.ts pra
   // calcular o prazo de obrigatoriedade da duplicata escritural desta empresa (cedente ou

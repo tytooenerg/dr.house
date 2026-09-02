@@ -318,7 +318,10 @@ async function applyAiNarrative(view: RiscoView, userId?: number): Promise<Risco
 // path (buildRiscoView without any network/bureau blend), not just the blended view.
 export { applyAiNarrative };
 
-function buildBlendedRiscoViewSync(cnpj: string): RiscoView | null {
+// Exportada (só a versão síncrona, sem bureau/Open Finance) pra lib/confirmingCore.ts
+// calcular a classificação de risco do próprio sacado ao criar um Programa Confirming —
+// mesma fonte de score que qualquer duplicata dele já usaria no mercado aberto.
+export function buildBlendedRiscoViewSync(cnpj: string): RiscoView | null {
   const internal = findSacadoByCnpj(cnpj);
   const rede = networkView(summarizeSignals(cnpj));
 

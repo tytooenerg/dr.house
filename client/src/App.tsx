@@ -34,6 +34,7 @@ const CompliancePage = lazy(() => import('./pages/app/CompliancePage').then((m) 
 const DevPage = lazy(() => import('./pages/app/DevPage').then((m) => ({ default: m.DevPage })));
 const AceitePage = lazy(() => import('./pages/app/AceitePage').then((m) => ({ default: m.AceitePage })));
 const SacadoPage = lazy(() => import('./pages/app/SacadoPage').then((m) => ({ default: m.SacadoPage })));
+const ConfirmingPage = lazy(() => import('./pages/app/ConfirmingPage').then((m) => ({ default: m.ConfirmingPage })));
 const DisputaPage = lazy(() => import('./pages/app/DisputaPage').then((m) => ({ default: m.DisputaPage })));
 const PerfilPage = lazy(() => import('./pages/app/PerfilPage').then((m) => ({ default: m.PerfilPage })));
 const ContaPage = lazy(() => import('./pages/app/ContaPage').then((m) => ({ default: m.ContaPage })));
@@ -109,6 +110,7 @@ export default function App() {
             <Route path="dev" element={<Gate tab="dev"><DevPage /></Gate>} />
             <Route path="aceite" element={<Gate tab="aceite"><AceitePage /></Gate>} />
             <Route path="sacado" element={<Gate tab="sacado"><SacadoPage /></Gate>} />
+            <Route path="confirming" element={<Gate tab="confirming"><ConfirmingPage /></Gate>} />
             <Route path="disputa" element={<Gate tab="disputa"><DisputaPage /></Gate>} />
             <Route path="perfil" element={<Gate tab="perfil"><PerfilPage /></Gate>} />
             <Route path="conta" element={<Gate tab="conta"><ContaPage /></Gate>} />
