@@ -12,12 +12,17 @@ import { suporteAgent } from './suporte.js';
 import { comercialAgent } from './comercial.js';
 import { marketMakerAgent } from './marketMaker.js';
 import { reconciliationAgent } from './reconciliation.js';
+import { cfoAgent } from './cfo.js';
+import { cfoConcentracaoAgent } from './cfoConcentracao.js';
+import { cfoAntecipacaoAgent } from './cfoAntecipacao.js';
 
-// The 12 agentic AI deployments — every one wraps real Lastro data/pipelines (never
+// The 15 agentic AI deployments — every one wraps real Lastro data/pipelines (never
 // fabricated tool results) behind the shared tool-use loop in lib/agentRuntime.ts. Any
 // write with real consequence (money, a compliance/KYB decision, an official legal or
 // regulatory record) is marked `sensitive` on its tool and gated behind human approval —
-// see routes/agents.ts.
+// see routes/agents.ts. cfoConcentracao/cfoAntecipacao have no selfServiceRoles of their
+// own — they're specialists reachable only via cfoAgent's acionar_agente handoff (or
+// directly by an admin), same shape as underwritingAgent.
 export const AGENTS: Record<string, AgentDefinition> = {
   [emissaoAgent.id]: emissaoAgent,
   [underwritingAgent.id]: underwritingAgent,
@@ -31,6 +36,9 @@ export const AGENTS: Record<string, AgentDefinition> = {
   [comercialAgent.id]: comercialAgent,
   [reconciliationAgent.id]: reconciliationAgent,
   [marketMakerAgent.id]: marketMakerAgent,
+  [cfoAgent.id]: cfoAgent,
+  [cfoConcentracaoAgent.id]: cfoConcentracaoAgent,
+  [cfoAntecipacaoAgent.id]: cfoAntecipacaoAgent,
 };
 
 // Lets agentRuntime.ts's handoff tool (createHandoffTool) call another agent by id without
