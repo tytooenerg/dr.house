@@ -280,7 +280,7 @@ export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedent
   if (getFundoBalance() < precoCompra) return { financiado: false, motivo: 'fundo_insuficiente' };
 
   const fundoUserId = await getOrCreateFundoSistemaUserId();
-  createPurchase(duplicata.id, fundoUserId, duplicata.valor, fmtTaxaAm(programa.taxa_am));
+  createPurchase(duplicata.id, fundoUserId, duplicata.valor, fmtTaxaAm(programa.taxa_am), Math.round(duplicata.valor - precoCompra));
   settlePurchase({ duplicataId: duplicata.id, sacadoNome: duplicata.sacado_nome, investorId: fundoUserId, cedenteId: cedenteUser.id, valor: duplicata.valor, precoCompra });
   fundoFinanciarCompra(duplicata.id, precoCompra);
   setProgramaUtilizado(programa.id, programa.utilizado + duplicata.valor);

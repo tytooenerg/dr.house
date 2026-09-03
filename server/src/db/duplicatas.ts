@@ -217,14 +217,16 @@ export function isPurchased(duplicataId: string): boolean {
   return offering.n > 0;
 }
 
-export function createPurchase(duplicataId: string, investorId: number, valor: number, taxa: string) {
-  db.prepare('INSERT INTO purchases (duplicata_id, investor_id, valor, taxa, retorno) VALUES (?, ?, ?, ?, ?)').run(
-    duplicataId,
-    investorId,
-    valor,
-    taxa,
-    Math.round(valor * (0.02 + Math.random() * 0.02))
-  );
+// `retorno` is the real, deterministic gain this specific purchase captured — face value
+// minus what was actually paid for it (lib/marketCompute.ts's computePurchasePrice on a
+// primary buy, or the agreed price vs. face value on a mercado secundário resale — see
+// lib/resaleCore.ts's executeResaleTrade). Every caller must compute its own real number;
+// this used to default to Math.round(valor * (0.02 + Math.random() * 0.02)) — a fabricated
+// number with no connection to any real deságio, feeding Carteira & Histórico's "Retorno"
+// column, its "Retorno acumulado" headline, the whole Performance institucional dashboard
+// (lib/investorPerformance.ts) and the institutional PDF report as if it were real.
+export function createPurchase(duplicataId: string, investorId: number, valor: number, taxa: string, retorno: number) {
+  db.prepare('INSERT INTO purchases (duplicata_id, investor_id, valor, taxa, retorno) VALUES (?, ?, ?, ?, ?)').run(duplicataId, investorId, valor, taxa, retorno);
   setStatus(duplicataId, 'vendida');
 }
 

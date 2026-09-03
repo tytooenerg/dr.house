@@ -79,7 +79,7 @@ export const autoBidAgent: AgentDefinition = {
         if (!offer) throw new Error('Oferta não encontrada.');
         if (isPurchased(offer.id)) throw new Error('Oferta já foi comprada.');
         const { precoCompra } = computePurchasePrice(offer);
-        createPurchase(offer.id, input.userId, offer.valor, offer.desagio ?? '');
+        createPurchase(offer.id, input.userId, offer.valor, offer.desagio ?? '', Math.round(offer.valor - precoCompra));
         settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: input.userId, cedenteId: offer.cedente_id, valor: offer.valor, precoCompra });
         if (offer.cedente_id) {
           void deliverWebhookEvent(offer.cedente_id, 'pagamento.confirmado', { duplicataId: offer.id, valor: offer.valor, investorId: input.userId });

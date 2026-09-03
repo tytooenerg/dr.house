@@ -40,7 +40,7 @@ function buyPosition(investorId: number, sacadoNome: string, valor: number, reto
     lastroPct: 100,
     seguro: false,
   });
-  createPurchase(d.id, investorId, valor, '2,0%');
+  createPurchase(d.id, investorId, valor, '2,0%', 0);
   db.prepare('UPDATE purchases SET retorno = ?, created_at = ? WHERE duplicata_id = ?').run(retorno, appliedAt, d.id);
   return d.id;
 }

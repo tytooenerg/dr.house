@@ -54,7 +54,7 @@ describe('Informe de rendimentos — real per-operation IR estimate', () => {
       lastroPct: 100,
       seguro: false,
     });
-    createPurchase(d.id, userId, 10000, '2,0%');
+    createPurchase(d.id, userId, 10000, '2,0%', 0);
     // Force a known, deterministic retorno for a clean assertion — createPurchase's own
     // retorno is randomized within a real range, which is fine for settlement but not for
     // asserting an exact IR figure here.
@@ -85,7 +85,7 @@ describe('Informe de rendimentos — real per-operation IR estimate', () => {
       lastroPct: 100,
       seguro: false,
     });
-    createPurchase(d.id, userId, 5000, '2,0%');
+    createPurchase(d.id, userId, 5000, '2,0%', 0);
     const statement = buildIncomeTaxStatement(userId, 'Fundo Teste IR 2', 2019);
     expect(statement.operacoesCount).toBe(0);
     expect(statement.totalRendimentoBrutoFmt).toContain('0');

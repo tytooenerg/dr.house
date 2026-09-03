@@ -45,7 +45,7 @@ describe('DARF — real aggregate IRRF over a competência period', () => {
       lastroPct: 100,
       seguro: false,
     });
-    createPurchase(d.id, userId, 20000, '2,0%');
+    createPurchase(d.id, userId, 20000, '2,0%', 0);
     db.prepare('UPDATE purchases SET retorno = 2000 WHERE duplicata_id = ?').run(d.id);
 
     const summary = buildDarfSummary('2031-06');

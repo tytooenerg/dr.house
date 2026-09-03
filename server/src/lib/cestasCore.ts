@@ -91,7 +91,7 @@ export function investInBasket(user: UserRow, cestaKey: CestaKey, valorRaw: stri
     // the duplicata's face value, which is only what comes back at maturity.
     const { precoCompra } = computePurchasePrice(d);
     if (precoCompra > remaining) continue;
-    createPurchase(d.id, user.id, d.valor, d.desagio ?? '');
+    createPurchase(d.id, user.id, d.valor, d.desagio ?? '', Math.round(d.valor - precoCompra));
     settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: user.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
     if (d.cedente_id) {
       void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: user.id });

@@ -51,7 +51,7 @@ describe('CVM period report — real aggregates from real data', () => {
       lastroPct: 100,
       seguro: false,
     });
-    createPurchase(d.id, userId, 50000, '2,0%');
+    createPurchase(d.id, userId, 50000, '2,0%', 0);
 
     const after = buildCvmPeriodStats(currentPeriod());
     expect(after.totalEmitidoCount).toBe(before.totalEmitidoCount + 1);
