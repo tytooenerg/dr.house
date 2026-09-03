@@ -8,6 +8,7 @@ import {
   insertPrograma,
   listMatriculasByCedente,
   listMembrosByPrograma,
+  listProgramas,
   setMembroStatus,
   setMembroUtilizado,
   setProgramaStatus,
@@ -255,4 +256,35 @@ export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedent
   setMembroUtilizado(membro.id, membro.utilizado + duplicata.valor);
 
   return { financiado: true };
+}
+
+export interface ProgramaAdminView {
+  id: number;
+  sacadoNome: string;
+  sacadoEmail: string;
+  rating: string;
+  taxaAmFmt: string;
+  limiteFmt: string;
+  utilizadoFmt: string;
+  disponivelFmt: string;
+  status: 'ativo' | 'pausado';
+  membrosAtivos: number;
+}
+
+// Visão de oversight do admin — todo programa que já existe, quantos cedentes matriculados
+// cada um tem, e quanto já financiou. Somente leitura: quem cria/gerencia um programa é o
+// próprio sacado (routes/confirming.ts), nunca o admin.
+export function listProgramasParaAdmin(): ProgramaAdminView[] {
+  return listProgramas().map((p) => ({
+    id: p.id,
+    sacadoNome: p.sacado_nome,
+    sacadoEmail: p.sacado_email,
+    rating: p.rating,
+    taxaAmFmt: fmtTaxaAm(p.taxa_am),
+    limiteFmt: fmtBRL(p.limite),
+    utilizadoFmt: fmtBRL(p.utilizado),
+    disponivelFmt: fmtBRL(Math.max(0, p.limite - p.utilizado)),
+    status: p.status,
+    membrosAtivos: listMembrosByPrograma(p.id).filter((m) => m.status === 'ativo').length,
+  }));
 }

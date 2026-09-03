@@ -681,6 +681,17 @@ Terceira PR da série, a que de fato move dinheiro: emitir uma duplicata contra 
 
 Novos testes: `server/test/confirming-auto-fund.test.ts` (6 casos — financiamento de ponta a ponta com o pool realmente debitado e o leilão genuinamente pulado, cedente não matriculado segue o fluxo normal, programa pausado nunca financia, limite do programa e sublimite do cedente respeitados, modo sandbox nunca financia). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 104 arquivos/635 testes, client 24/24, sdks/node 9/9); `migrations-postgres/0063` conferido byte a byte contra `scripts/postgres/generate-schema.mjs`.
 
+### Oversight do admin do Programa Confirming (4/4) — série completa
+
+Última PR da série. Com a fundação (1), o fundo de fomento (2) e o financiamento automático (3) mesclados, faltava o back-office conseguir enxergar o que está rodando — os três PRs anteriores eram só visíveis pro sacado, pro investidor e pro cedente, cada um vendo só a própria parte.
+
+- **`GET /api/admin/confirming`** — todo programa que já existe (`listProgramasParaAdmin`, `lib/confirmingCore.ts`), com quantos cedentes matriculados cada um tem e quanto já financiou, mais o NAV/saldo/cota real do fundo (`buildFundoOverview(null)`, já existente desde a PR 2). Somente leitura: quem cria/gerencia um programa continua sendo o sacado, quem aporta/resgata no fundo continua sendo o investidor.
+- **Client**: nova sub-aba "Programa Confirming" no Back-office (`ConfirmingAdminPanel.tsx`, mesmo formato de `ConformidadeEscrituralPanel.tsx`).
+
+Com isso o Programa Confirming / Risco Sacado — a frente 2 das 3 identificadas na pesquisa de mercado desta sessão — está completo: sacado cria e gerencia seu programa na própria taxa de risco real, cedentes com histórico real de aceite são matriculados, um pool de investidores dedicado financia cada compra instantaneamente na emissão (pulando o leilão), e o admin tem visibilidade de tudo isso.
+
+Novos testes: `server/test/confirming-admin.test.ts` (2 casos — a rota reflete um programa recém-criado com sua contagem de matrícula, gating de papel). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 105 arquivos/637 testes, client 24/24, sdks/node 9/9).
+
 ## Running locally
 
 ```bash

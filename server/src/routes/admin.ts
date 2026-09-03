@@ -14,6 +14,8 @@ import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { summarizeDispute } from '../lib/disputeCopilot.js';
 import { listComplianceCalendarSummary } from '../lib/complianceCalendarCore.js';
+import { listProgramasParaAdmin } from '../lib/confirmingCore.js';
+import { buildFundoOverview } from '../lib/confirmingFundo.js';
 import { listPendingComplianceReview, resolveComplianceReview, type ComplianceBreakdownItem } from '../db/complianceEngine.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { getClaudeUsageSummary } from '../db/claudeUsage.js';
@@ -284,6 +286,15 @@ adminRouter.get('/compliance-queue', (_req, res) => {
 // Somente leitura: quem informa o faturamento é o próprio cedente/sacado (routes/complianceCalendar.ts).
 adminRouter.get('/conformidade-escritural', (_req, res) => {
   res.json(listComplianceCalendarSummary());
+});
+
+// Visão de oversight do Programa Confirming — todo programa que já existe (limite,
+// utilizado, quantos cedentes matriculados) e o NAV/saldo real do fundo que os financia.
+// Somente leitura: quem cria/gerencia um programa é o próprio sacado
+// (routes/confirming.ts), quem aporta/resgata no fundo é o investidor
+// (routes/confirmingFundo.ts).
+adminRouter.get('/confirming', (_req, res) => {
+  res.json({ programas: listProgramasParaAdmin(), fundo: buildFundoOverview(null) });
 });
 
 const complianceReviewSchema = z.object({ decision: z.enum(['liberado', 'rejeitado']), note: z.string().trim().min(1) });
