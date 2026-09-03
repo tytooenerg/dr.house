@@ -9,6 +9,8 @@ import { getUserById, getSettings } from '../db/users.js';
 import { currentCreditorFor } from './legalCollectionFee.js';
 import { settleAtMaturity } from './settlement.js';
 import { getFundoSistemaUserIdIfExists, fundoRetornoDePagamento } from './confirmingFundo.js';
+import { getOfferingByDuplicata, listHoldingsForOffering } from '../db/fractionalOfferings.js';
+import { settleFractionalAtMaturity } from './fractionalOfferings.js';
 import { fmtBRL } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow, DuplicataRow } from '../db/types.js';
@@ -196,6 +198,31 @@ export function reportPayment(user: UserRow, aceiteId: number): ReportPaymentOut
   if (!eligibility.eligible) {
     return { status: 409, body: { error: 'not_eligible', message: eligibility.reason! } };
   }
+
+  // currentCreditorFor só conhece a tabela `purchases` de compra integral — uma duplicata
+  // com um fracionamento (lib/fractionalOfferings.ts) nunca aparece lá, então sem esta
+  // checagem o fallback creditaria o cedente de novo (já recebeu na venda dos tokens) e
+  // nenhum investidor fracionado receberia nada de volta. Verificada antes de
+  // currentCreditorFor, não depois — a oferta pode existir mesmo sem estar 'concluida'
+  // (parte dos tokens nunca vendida), caso em que settleFractionalAtMaturity credita o
+  // cedente só pela fração que ele nunca vendeu.
+  const offering = getOfferingByDuplicata(duplicata.id);
+  if (offering) {
+    settleFractionalAtMaturity(duplicata, offering);
+    setDuplicataStatus(duplicata.id, 'paga');
+    if (aceite.status === 'aguardando') setAceiteStatus(aceite.id, 'aceita');
+    for (const h of listHoldingsForOffering(offering.id)) {
+      addNotification(
+        h.investor_id,
+        `${duplicata.sacado_nome} reportou o pagamento da duplicata ${duplicata.id} — ${h.tokens} token(s) fracionados creditados.`,
+        COLORS.GREEN,
+        'aceite'
+      );
+    }
+    recordAuditEvent(user.id, user.company_name, 'duplicata.pagamento_reportado', { duplicataId: duplicata.id, fracionado: true });
+    return { status: 200, body: { aceites: listAceitesForUser(user) } };
+  }
+
   const creditor = currentCreditorFor(duplicata);
   if (!creditor) {
     return { status: 409, body: { error: 'no_creditor', message: 'Não foi possível identificar quem detém o direito ao recebível desta duplicata.' } };
