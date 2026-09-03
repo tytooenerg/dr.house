@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { listInsuredByInsurerKey, listClaimableByInsurerKey, setSinistroStatus } from '../db/duplicatas.js';
+import { listInsuredByInsurerKey, listClaimableByInsurerKey, setSinistroStatus, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
 import { recordAuditEvent } from '../db/audit.js';
-import { addNotification } from '../db/misc.js';
+import { addNotification, addLedgerEntry } from '../db/misc.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { INSURERS, COLORS } from '../data/seed.js';
 import { fmtBRL } from './format.js';
@@ -72,6 +72,19 @@ export function decideSinistro(user: UserRow, duplicataId: string, input: Sinist
     return { status: 404, body: { error: 'not_found', message: 'Sinistro não encontrado ou já decidido.' } };
   }
   setSinistroStatus(target.id, input.decision === 'aprovado' ? 'aprovado' : 'negado', input.note);
+  // Aprovar um sinistro dizia "indenizará" na notificação mas nunca movia dinheiro nenhum —
+  // mesma classe de bug já corrigida em settlePurchase/settleFractionalAtMaturity/
+  // recordRecovery: uma promessa de pagamento real precisa de um addLedgerEntry real. A
+  // seguradora paga o valor de face integral (o prêmio, cobrado à parte em
+  // settleInsurance, já remunerou o risco assumido — não se desconta de novo aqui), e a
+  // duplicata vira 'paga' pra não também aparecer como candidata a cobrança jurídica
+  // (lib/legalCollection.ts) e ser "recuperada" uma segunda vez pelo mesmo valor.
+  if (input.decision === 'aprovado' && target.cedente_id) {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    addLedgerEntry(user.id, hoje, `Indenização de sinistro — duplicata ${target.id}`, -target.valor);
+    addLedgerEntry(target.cedente_id, hoje, `Indenização de sinistro recebida — duplicata ${target.id} (${insurer.name})`, target.valor);
+    setDuplicataStatus(target.id, 'paga');
+  }
   if (target.cedente_id) {
     const verb = input.decision === 'aprovado' ? 'aprovou o sinistro e indenizará' : 'negou o sinistro de';
     addNotification(
