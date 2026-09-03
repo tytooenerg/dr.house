@@ -768,6 +768,17 @@ O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib
 
 Novos testes em `server/test/advertisements.test.ts`: impressão contada por request real servido (com invalidação explícita do cache em memória entre chamadas do teste), clique contado + redirect correto, clique bloqueado (404, sem incrementar) contra anúncio inexistente ou pausado. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 109 arquivos/662 testes, client 24/24, sdks/node 9/9); `scripts/postgres/generate-schema.mjs` confirma que a migração espelhada em `migrations-postgres/` é idêntica à gerada automaticamente.
 
+### Testes reais para Comparador de Taxas, Dashboard e Cestas de investimento
+
+`routes/comparador.ts` só era exercitado pelo gating de plano em `billing.test.ts` (nunca verificava o cálculo em si), `routes/dashboard.ts` só era tocado incidentalmente pela checagem de auth em `team-invites.test.ts`, e `routes/cestas.ts`'s `GET /` (listagem das 3 cestas) nunca era chamado por nenhum teste — só `POST /investir` tinha cobertura.
+
+Novo `server/test/comparador-dashboard-cestas.test.ts`:
+- **Comparador**: `GET /rates` retorna os canais com o campo `isLastro`; `POST /estimate` confere o cálculo real de deságio/líquido pela faixa do score e o fator de prazo (30 dias = 1x, 60 dias = 2x), e que um valor não numérico retorna `—` em vez de fabricar um número.
+- **Dashboard**: `GET /` confere os 4 KPIs, que a barra do mês de maior volume bate 100% de altura, os 4 cortes do donut de risco (`from`/`to` de 0 a 100), e que `activeDuplicatas` reflete uma contagem real — sobe exatamente 1 depois de emitir uma nova duplicata aprovada.
+- **Cestas**: `GET /` lista as 3 cestas com os ratings corretos (`conservadora` = AA/A, `agressiva` = B/C) e é restrita a contas investidor.
+
+Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 110 arquivos/670 testes, client 24/24, sdks/node 9/9).
+
 ## Running locally
 
 ```bash
