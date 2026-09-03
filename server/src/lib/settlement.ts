@@ -23,14 +23,21 @@ function today(): string {
   return new Date().toLocaleDateString('pt-BR');
 }
 
-// Real settlement for a primary marketplace purchase (direct buy, or via a cesta de
-// investimento) — the investor's ledger shows the full amount leaving, the cedente's
-// shows the amount received net of the platform fee. This is what "taxa de plataforma...
-// descontada na liquidação" (shown in the Emitir preview) actually means happening.
-export function settlePurchase(opts: { duplicataId: string; sacadoNome: string; investorId: number; cedenteId: number | null; valor: number }) {
+// Real settlement for a primary marketplace purchase (direct buy, via a cesta de
+// investimento, an auto-bid, or the Programa Confirming's auto-financiamento) — the
+// investor's ledger shows the real deságio-adjusted price actually leaving (precoCompra,
+// from lib/marketCompute.ts's computePurchasePrice — always <= valor), the cedente's shows
+// that same price received net of the platform fee (still computed on the face value,
+// valor — the size of the receivable being anticipated, not what the investor happened to
+// pay for it). The face value itself only comes back later, to whoever ends up holding the
+// position, via settleAtMaturity below — that gap (precoCompra now vs. valor at maturity)
+// is the investor's actual return for financing early; before this, precoCompra didn't
+// exist and every caller passed the full face value here, so the deságio shown everywhere
+// in the UI was never applied to any real money movement.
+export function settlePurchase(opts: { duplicataId: string; sacadoNome: string; investorId: number; cedenteId: number | null; valor: number; precoCompra: number }) {
   const fee = platformFee(opts.valor);
-  const net = opts.valor - fee;
-  addLedgerEntry(opts.investorId, today(), `Compra da duplicata ${opts.duplicataId} — ${opts.sacadoNome}`, -opts.valor);
+  const net = opts.precoCompra - fee;
+  addLedgerEntry(opts.investorId, today(), `Compra da duplicata ${opts.duplicataId} — ${opts.sacadoNome}`, -opts.precoCompra);
   if (opts.cedenteId) {
     addLedgerEntry(
       opts.cedenteId,
@@ -39,7 +46,7 @@ export function settlePurchase(opts: { duplicataId: string; sacadoNome: string; 
       net
     );
   }
-  return { fee, net };
+  return { fee, net, precoCompra: opts.precoCompra };
 }
 
 // Lastro's cut of the insurance premium — a real distribution commission, not a fee

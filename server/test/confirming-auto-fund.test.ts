@@ -3,6 +3,9 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
+import { getProgramaBySacado } from '../src/db/confirming.js';
+import { getDuplicata } from '../src/db/duplicatas.js';
+import { computePurchasePrice } from '../src/lib/marketCompute.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -57,7 +60,7 @@ async function aportarNoFundo(valor: number) {
 describe('Financiamento automático — cedente matriculado pula o leilão', () => {
   it('funds the duplicata instantly at emission, skipping dispararLeilao entirely', async () => {
     const sacadoCompany = unique('Sacado Programa');
-    const { token: sacadoToken } = await register('sacado', sacadoCompany);
+    const { token: sacadoToken, userId: sacadoUserId } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Confirmado'));
     await criarProgramaEMatricular(sacadoToken, cedenteUserId);
     await aportarNoFundo(50000);
@@ -67,8 +70,14 @@ describe('Financiamento automático — cedente matriculado pula o leilão', () 
     expect(emit.status).toBe(200);
     expect(emit.body.financiadoViaPrograma).toBe(true);
 
-    // O fundo pagou pela compra de verdade — saldo do pool caiu no valor financiado.
-    expect(getFundoBalance()).toBeCloseTo(balanceBefore - 10000, 6);
+    // O fundo pagou pela compra de verdade — saldo do pool caiu no preço com deságio
+    // (lib/marketCompute.ts's computePurchasePrice, na taxa negociada do programa), não no
+    // valor de face — mesmo cálculo que lib/confirmingCore.ts's tentarFinanciarViaPrograma
+    // faz de verdade antes de financiar.
+    const duplicata = getDuplicata(emit.body.duplicataId)!;
+    const programa = getProgramaBySacado(sacadoUserId)!;
+    const { precoCompra } = computePurchasePrice(duplicata, programa.taxa_am);
+    expect(getFundoBalance()).toBeCloseTo(balanceBefore - precoCompra, 6);
 
     // A duplicata foi direto pra 'vendida' — nunca passou por 'no_mercado', e não há mais
     // leilão pra disparar (canDisparar reflete isso).
@@ -117,10 +126,14 @@ describe('Financiamento automático — cedente matriculado pula o leilão', () 
     await criarProgramaEMatricular(sacadoToken, cedenteUserId);
     // Nenhum aporte feito — o programa tem limite de sobra, mas o fundo não tem caixa real
     // pra financiar. tentarFinanciarViaPrograma deve recusar (motivo fundo_insuficiente) em
-    // vez de deixar o saldo do fundo ir negativo.
+    // vez de deixar o saldo do fundo ir negativo. O que precisa faltar é o preço COM
+    // deságio (computePurchasePrice), não o valor de face — pedir só balanceBefore + 1000
+    // de face não bastaria mais, já que o preço real pago é sempre menor que a face (o
+    // desconto máximo é limitado a 60% — ver MAX_DESCONTO_PCT em lib/marketCompute.ts), por
+    // isso o valor de face pedido aqui é generosamente maior que o caixa disponível.
     const balanceBefore = getFundoBalance();
 
-    const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, String(Math.round(balanceBefore) + 1000)));
+    const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, String(Math.round(balanceBefore * 3) + 1000)));
     expect(emit.status).toBe(200);
     expect(emit.body.financiadoViaPrograma).toBe(false);
     expect(getFundoBalance()).toBe(balanceBefore);

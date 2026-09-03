@@ -5,6 +5,9 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
 import { computeFundoNav } from '../src/lib/confirmingFundo.js';
 import { approveKyb } from '../src/db/users.js';
+import { getProgramaBySacado } from '../src/db/confirming.js';
+import { getDuplicata } from '../src/db/duplicatas.js';
+import { computePurchasePrice } from '../src/lib/marketCompute.js';
 
 // Nenhuma parte da plataforma modelava "sacado pagou no vencimento, caminho feliz" antes
 // desta feature — nem o marketplace normal, nem a linha de crédito, nem o Confirming. Self-
@@ -111,7 +114,7 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
 
   it('duplicata financiada via Programa Confirming: o fundo é o credor — retorna ao pool (fundoRetornoDePagamento)', async () => {
     const sacadoCompany = unique('Sacado Pagamento Confirming');
-    const { token: sacadoToken } = await register('sacado', sacadoCompany);
+    const { token: sacadoToken, userId: sacadoUserId } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Cedente Confirming Pagamento'));
     const { token: fundoInvestorToken } = await register('investidor', unique('Investidor Fundo Pagamento'));
 
@@ -130,10 +133,16 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
     expect(emit.body.financiadoViaPrograma).toBe(true);
     const duplicataId = emit.body.duplicataId as string;
 
-    // Financiado: caixa cai, mas NAV (caixa + posições em aberto) fica igual — o fundo só
-    // trocou dinheiro por um direito a receber, não perdeu valor.
-    expect(getFundoBalance()).toBe(balanceAfterAporte - 10000);
-    expect(computeFundoNav()).toBeCloseTo(navAfterAporte, 5);
+    // O fundo paga o preço com deságio (lib/marketCompute.ts's computePurchasePrice, na
+    // taxa negociada do programa), não o valor de face — mesmo cálculo real que
+    // lib/confirmingCore.ts's tentarFinanciarViaPrograma usa. Caixa cai só esse tanto; NAV
+    // (caixa + posições em aberto, valorizadas ao valor de face) SOBE pelo valor do deságio
+    // — um ganho ainda não realizado: o fundo trocou dinheiro por um direito a receber que
+    // vale mais do que pagou por ele.
+    const programa = getProgramaBySacado(sacadoUserId)!;
+    const { precoCompra, descontoValor } = computePurchasePrice(getDuplicata(duplicataId)!, programa.taxa_am);
+    expect(getFundoBalance()).toBeCloseTo(balanceAfterAporte - precoCompra, 6);
+    expect(computeFundoNav()).toBeCloseTo(navAfterAporte + descontoValor, 5);
 
     const aceite = await findAceite(sacadoToken, duplicataId);
     expect(aceite.canReportPayment).toBe(true);
@@ -141,9 +150,11 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
     const report = await request(app).post(`/api/aceites/${aceite.id}/pagamento`).set('Authorization', `Bearer ${sacadoToken}`);
     expect(report.status).toBe(200);
 
-    // Retornou ao pool: caixa volta ao nível de antes do financiamento, NAV se mantém.
-    expect(getFundoBalance()).toBe(balanceAfterAporte);
-    expect(computeFundoNav()).toBeCloseTo(navAfterAporte, 5);
+    // Retornou ao pool o valor de face cheio: caixa termina ACIMA do nível de antes do
+    // financiamento (o ganho do deságio, agora realizado em caixa de verdade); NAV se
+    // mantém no mesmo patamar de quando o ganho ainda era só uma posição em aberto.
+    expect(getFundoBalance()).toBeCloseTo(balanceAfterAporte + descontoValor, 6);
+    expect(computeFundoNav()).toBeCloseTo(navAfterAporte + descontoValor, 5);
   });
 });
 
