@@ -828,6 +828,18 @@ Depois das correções L–P, simulei manualmente a plataforma inteira (cedente,
 
 Verificado: `npm run typecheck`/`test`/`build` todos verdes (server 111 arquivos/684 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
 
+### Revender uma posição antes do vencimento nunca atualizava o retorno realizado
+
+Achado simulando o mercado secundário de ponta a ponta: quando um investidor revendia uma posição antes do vencimento, `purchases.retorno` da linha original continuava com o retorno "se tivesse segurado até o vencimento" (calculado na hora da compra) — nunca era atualizado pro ganho real que o investidor efetivamente recebeu ao sair da posição mais cedo. Esse número alimenta **5 lugares diferentes**: Carteira & Histórico, o dashboard de Performance institucional, o relatório PDF institucional, o Informe de Rendimentos e o gerador de DARF (documento fiscal) — todos mostrando (ou calculando imposto sobre) um valor que o investidor nunca recebeu de verdade.
+
+- **`db/resaleListings.ts`**: `deactivatePurchase` agora recebe e grava o retorno real realizado, não só marca `active = 0`.
+- **`lib/resaleCore.ts`**: `executeResaleTrade` calcula o retorno real como `líquido recebido na revenda − o que o vendedor pagou originalmente`, e o que foi pago é recuperado como `valor de face da duplicata − o retorno que a linha já carregava` — funciona tanto pra uma posição comprada de primeira mão quanto pra uma que já veio de uma revenda anterior (`purchases.valor` guarda coisas diferentes dependendo da origem da compra — valor de face numa compra primária, preço pago numa compra via revenda — então não dava pra usar esse campo diretamente como custo de aquisição em todos os casos).
+- **`lib/format.ts`**: novo `fmtBRLSigned`, corrigindo um bug de sinal duplicado (`'+' + fmtBRL(-500)` produzia `"+-R$ 500"`) em 5 lugares que formatavam retorno — inofensivo enquanto um retorno negativo nunca acontecia na prática, mas a correção acima torna revenda com prejuízo um caminho real e comum.
+
+Novos testes em `server/test/resale-retorno.test.ts`: retorno real após revenda com lucro, com prejuízo (sinal correto, nunca `"+-"`), via lance aceito, e numa revenda encadeada (posição já revendida, revendida de novo — valida que a fórmula de recuperação de custo funciona nos dois formatos de `purchases.valor`). Verificado: `npm run typecheck`/`test`/`build` todos verdes (server 112 arquivos/688 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
+
+**Achado em aberto, não corrigido ainda**: `purchases.valor` guarda o valor de face pra uma compra primária mas o preço efetivamente pago pra uma compra via revenda — o mesmo campo significa duas coisas diferentes dependendo da origem da linha. Isso já existia antes desta correção (não foi introduzido por ela) e faz com que a coluna "Investido" em Carteira & Histórico mostre números com significados inconsistentes dependendo de como a posição foi adquirida. Não corrigido nesta rodada por ser uma mudança maior — padronizar o campo pra sempre guardar o preço pago tocaria a mesma coluna que `investorPerformance.ts` usa como denominador de `retornoPct` e como peso em várias médias, um raio de impacto bem maior que o bug pontual desta correção.
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).

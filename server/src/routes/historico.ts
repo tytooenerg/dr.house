@@ -10,7 +10,7 @@ import { buildInstitutionalAnalytics, streamInstitutionalReportPdf } from '../li
 import { buildRebalanceView } from '../lib/portfolioRebalance.js';
 import { buildIncomeTaxStatement, streamIncomeTaxStatementPdf } from '../lib/incomeTaxStatement.js';
 import { buildPerformanceDashboard } from '../lib/investorPerformance.js';
-import { fmtBRL, toIsoUtc } from '../lib/format.js';
+import { fmtBRL, fmtBRLSigned, toIsoUtc } from '../lib/format.js';
 
 export const historicoRouter = Router();
 historicoRouter.use(requireAuth);
@@ -22,7 +22,7 @@ function rows(req: import('express').Request) {
     data: new Date(toIsoUtc(p.created_at)).toLocaleDateString('pt-BR'),
     empresa: p.sacado_nome,
     investidoFmt: fmtBRL(p.valor),
-    retornoFmt: '+' + fmtBRL(p.retorno),
+    retornoFmt: fmtBRLSigned(p.retorno),
     status: 'Concluída',
     comRegresso: !!p.com_regresso,
   }));
@@ -40,7 +40,7 @@ historicoRouter.get('/', (req, res) => {
 
   res.json({
     totalInvestidoFmt: fmtBRL(totalInvestido),
-    retornoAcumuladoFmt: '+' + fmtBRL(totalRetorno),
+    retornoAcumuladoFmt: fmtBRLSigned(totalRetorno),
     rentabilidadeMediaFmt: rentMedia.toFixed(1).replace('.', ',') + '% a.m.',
     historico: all.slice((page - 1) * pageSize, page * pageSize),
     page,

@@ -4,6 +4,15 @@ export function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 
+// Prefixa "+" só quando o valor é realmente positivo — `fmtBRL` de um número negativo já
+// vem com "-" embutido (ex.: "-R$ 500"), então grudar um "+" incondicional na frente (como
+// vários lugares faziam) produzia "+-R$ 500" pra qualquer retorno negativo. Um retorno
+// negativo é honesto e esperado desde que a revenda no mercado secundário pode acontecer
+// com prejuízo (ver lib/resaleCore.ts) — só não pode aparecer com o sinal duplicado.
+export function fmtBRLSigned(n: number): string {
+  return (n >= 0 ? '+' : '') + fmtBRL(n);
+}
+
 export function scoreColorFor(score: number): string {
   if (score >= 75) return COLORS.GREEN;
   if (score >= 55) return COLORS.AMBER;
