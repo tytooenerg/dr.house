@@ -28,15 +28,47 @@ function getLiveExtraBids(startedAt: string | null, baseRate: number) {
   return bids;
 }
 
+// Real monthly deságio rate for a specific duplicata — either the rate actually agreed
+// when it entered the book (d.desagio, e.g. the Programa Confirming's own contracted
+// programa.taxa_am — lib/confirmingCore.ts's tentarFinanciarViaPrograma writes it there) or,
+// for an offer still open on the marketplace, the dynamic rating-based estimate
+// (lib/dynamicPricing.ts's estimateRateBand) reflecting real 30-day supply/demand instead of
+// one fixed number for the whole marketplace.
+export function effectiveMonthlyRatePct(d: DuplicataRow): number {
+  const score = d.score ?? 60;
+  return d.desagio ? parseFloat(d.desagio.replace(',', '.')) : estimateRateBand(ratingFromScore(score)).mid;
+}
+
+// Never let a very long-dated or very high-rate duplicata price down to almost nothing —
+// anticipating a receivable trades term for cash today, it isn't a fire sale.
+const MAX_DESCONTO_PCT = 0.6;
+
+// The real price an investor actually pays to finance a duplicata now and collect its full
+// face value back at maturity (lib/settlement.ts's settleAtMaturity) — until this, every
+// buy path (lib/settlement.ts's settlePurchase) charged the investor the full face value
+// and paid the same face value back at maturity, so the deságio shown everywhere in the UI
+// was never actually applied to any real money movement: the investor earned nothing for
+// financing early, only Lastro's own platform fee moved. Same simple (non-compounding)
+// proration by term that routes/comparador.ts's public preview calculator already uses for
+// its own deságio estimate. rateOverridePct lets a caller with its own already-negotiated
+// rate (Confirming's programa.taxa_am) use that instead of the generic marketplace rate.
+export function computePurchasePrice(
+  d: DuplicataRow,
+  rateOverridePct?: number
+): { precoCompra: number; descontoValor: number; descontoPct: number; taxaAmPct: number } {
+  const taxaAmPct = rateOverridePct ?? effectiveMonthlyRatePct(d);
+  const prazoDias = Math.max(0, Math.round((parseFlexibleDate(d.vencimento).getTime() - Date.now()) / 86_400_000));
+  const descontoPct = Math.min((taxaAmPct * (prazoDias / 30)) / 100, MAX_DESCONTO_PCT);
+  const descontoValor = d.valor * descontoPct;
+  return { precoCompra: d.valor - descontoValor, descontoValor, descontoPct, taxaAmPct };
+}
+
 export function buildOfferView(d: DuplicataRow) {
   const score = d.score ?? 60;
   const sc = scoreColorFor(score);
-  // desagio is never actually populated at emission time — this was a flat '2,5%' for
-  // every real duplicata regardless of rating or market conditions until now. Falls back
-  // to a rating-based estimate adjusted by real 30-day supply/demand (lib/dynamicPricing.ts)
-  // instead of one fixed number for the whole marketplace.
-  const baseRate = d.desagio ? parseFloat(d.desagio.replace(',', '.')) : estimateRateBand(ratingFromScore(score)).mid;
+  const baseRate = effectiveMonthlyRatePct(d);
   const desagio = baseRate.toFixed(2).replace('.', ',') + '%';
+  const { precoCompra, descontoValor } = computePurchasePrice(d, baseRate);
   const aceite = getAceiteByDuplicata(d.id);
   const aceiteStatus = aceite?.status ?? 'aguardando';
   const aceiteBadge = ACEITE_BADGE[aceiteStatus];
@@ -86,6 +118,12 @@ export function buildOfferView(d: DuplicataRow) {
     valor: d.valor,
     valorFmt: fmtBRL(d.valor),
     desagio,
+    // O que o investidor de fato paga agora (e recebe o valor de face — valorFmt acima — de
+    // volta no vencimento) — ver computePurchasePrice acima pra por que isso não era assim
+    // antes.
+    precoCompra,
+    precoCompraFmt: fmtBRL(precoCompra),
+    descontoValorFmt: fmtBRL(descontoValor),
     vencimento: d.vencimento,
     prazoDias,
     setor: d.setor,

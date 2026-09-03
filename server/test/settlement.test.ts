@@ -4,6 +4,8 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { platformFee, platformFeePct } from '../src/lib/settlement.js';
+import { computePurchasePrice } from '../src/lib/marketCompute.js';
+import { getDuplicata } from '../src/db/duplicatas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -68,11 +70,18 @@ describe('real settlement on a marketplace purchase', () => {
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
 
     const investor = await registerInvestidor();
+    // The real deságio-adjusted price this specific duplicata will actually be bought at
+    // (lib/marketCompute.ts's computePurchasePrice — the same function the buy route
+    // itself calls), always <= the R$10.000 face value — not a number this test should
+    // hardcode or recompute independently.
+    const { precoCompra } = computePurchasePrice(getDuplicata(duplicataId)!);
+    expect(precoCompra).toBeLessThanOrEqual(10_000);
+
     const buyRes = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
     expect(buyRes.status).toBe(200);
 
     const fee = platformFee(10_000);
-    const expectedNet = 10_000 - fee;
+    const expectedNet = precoCompra - fee;
 
     const cedenteExtrato = await request(app).get('/api/account').set('Authorization', `Bearer ${cedenteToken}`);
     const credit = cedenteExtrato.body.extrato.find((e: { descricao: string }) => e.descricao.includes(duplicataId));
@@ -85,7 +94,7 @@ describe('real settlement on a marketplace purchase', () => {
     const debit = investorExtrato.body.extrato.find((e: { descricao: string }) => e.descricao.includes(duplicataId));
     expect(debit).toBeTruthy();
     expect(debit.isPositive).toBe(false);
-    expect(debit.valorFmt.replace(/\D/g, '')).toBe('10000');
+    expect(debit.valorFmt.replace(/\D/g, '')).toBe(String(Math.round(precoCompra)));
   });
 });
 

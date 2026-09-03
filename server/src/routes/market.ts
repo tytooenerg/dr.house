@@ -4,7 +4,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { listMarketplace, getDuplicata, setInsurer, createPurchase, isPurchased } from '../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { getSeguradoraByInsurerKey } from '../db/users.js';
-import { buildOfferView } from '../lib/marketCompute.js';
+import { buildOfferView, computePurchasePrice } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { settlePurchase, settleInsurance } from '../lib/settlement.js';
 import { computeInsurerQuotePct } from '../lib/insuranceQuotes.js';
@@ -80,8 +80,9 @@ marketRouter.post('/:id/buy', (req, res) => {
     res.status(409).json({ error: 'already_purchased', message: 'Esta duplicata já foi comprada.' });
     return;
   }
+  const { precoCompra } = computePurchasePrice(d);
   createPurchase(d.id, req.user!.id, d.valor, d.desagio ?? '');
-  settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: req.user!.id, cedenteId: d.cedente_id, valor: d.valor });
+  settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: req.user!.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
   if (d.cedente_id) {
     void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: req.user!.id });
   }

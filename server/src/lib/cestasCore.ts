@@ -4,6 +4,7 @@ import { getAceiteByDuplicata } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { settlePurchase } from './settlement.js';
+import { computePurchasePrice } from './marketCompute.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { SACADOS, type Rating } from '../data/seed.js';
 import { checkCestaSuitability } from './suitability.js';
@@ -85,14 +86,18 @@ export function investInBasket(user: UserRow, cestaKey: CestaKey, valorRaw: stri
   let remaining = budget;
   const comprados: { duplicataId: string; sacado: string; rating: Rating; valorFmt: string; desagio: string }[] = [];
   for (const d of candidates) {
-    if (d.valor > remaining) continue;
+    // Affordability and the running budget are checked against precoCompra — what the
+    // investor's ledger actually gets debited (lib/settlement.ts's settlePurchase) — not
+    // the duplicata's face value, which is only what comes back at maturity.
+    const { precoCompra } = computePurchasePrice(d);
+    if (precoCompra > remaining) continue;
     createPurchase(d.id, user.id, d.valor, d.desagio ?? '');
-    settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: user.id, cedenteId: d.cedente_id, valor: d.valor });
+    settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: user.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
     if (d.cedente_id) {
       void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: user.id });
     }
     comprados.push({ duplicataId: d.id, sacado: d.sacado_nome, rating: ratingForOffer(d), valorFmt: fmtBRL(d.valor), desagio: d.desagio ?? '—' });
-    remaining -= d.valor;
+    remaining -= precoCompra;
   }
 
   recordAuditEvent(user.id, user.company_name, 'cesta.investido', { cesta: cestaKey, budget, comprados: comprados.length });

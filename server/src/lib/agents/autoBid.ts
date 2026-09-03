@@ -2,6 +2,7 @@ import { getDuplicata, isPurchased, createPurchase, listPurchasesByInvestor } fr
 import { getAceiteByDuplicata } from '../../db/aceites.js';
 import { getUserById, getSettings } from '../../db/users.js';
 import { settlePurchase } from '../settlement.js';
+import { computePurchasePrice } from '../marketCompute.js';
 import { deliverWebhookEvent } from '../webhookDelivery.js';
 import { addAutomationActivity } from '../../db/misc.js';
 import { ratingFromScore } from '../riscoCore.js';
@@ -77,8 +78,9 @@ export const autoBidAgent: AgentDefinition = {
         const offer = getDuplicata(input.duplicataId);
         if (!offer) throw new Error('Oferta não encontrada.');
         if (isPurchased(offer.id)) throw new Error('Oferta já foi comprada.');
+        const { precoCompra } = computePurchasePrice(offer);
         createPurchase(offer.id, input.userId, offer.valor, offer.desagio ?? '');
-        settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: input.userId, cedenteId: offer.cedente_id, valor: offer.valor });
+        settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: input.userId, cedenteId: offer.cedente_id, valor: offer.valor, precoCompra });
         if (offer.cedente_id) {
           void deliverWebhookEvent(offer.cedente_id, 'pagamento.confirmado', { duplicataId: offer.id, valor: offer.valor, investorId: input.userId });
         }

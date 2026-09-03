@@ -83,6 +83,7 @@ interface Offer {
   valor: number;
   valorFmt: string;
   desagio: string;
+  precoCompraFmt: string;
   vencimento: string;
   prazoDias: number;
   setor: string | null;
@@ -326,7 +327,12 @@ export function MarketplacePage() {
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
                 </div>
                 <div className="text-textSecondary">{offer.cedente}</div>
-                <div className="font-bold font-mono-num">{offer.valorFmt}</div>
+                <div>
+                  <div className="font-bold font-mono-num">{offer.valorFmt}</div>
+                  <div className="text-[11px] text-textTertiary font-mono-num" title="Preço com deságio — o que você paga agora; recebe o valor de face de volta no vencimento">
+                    Você paga {offer.precoCompraFmt}
+                  </div>
+                </div>
                 <div className="text-green font-bold">{offer.desagio}</div>
                 <div className="text-textSecondary">{offer.vencimento}</div>
                 <div className="flex items-center gap-2 flex-wrap">

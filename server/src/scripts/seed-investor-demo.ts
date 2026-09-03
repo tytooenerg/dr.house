@@ -18,6 +18,7 @@ import { addApiLog } from '../db/misc.js';
 import { generateApiKey } from '../auth/apiKey.js';
 import { hashPassword } from '../auth/password.js';
 import { settlePurchase, settleInsurance, settleResale } from '../lib/settlement.js';
+import { computePurchasePrice } from '../lib/marketCompute.js';
 import { chooseRegistradora } from '../lib/registradoras.js';
 import { INSURERS, SACADOS } from '../data/seed.js';
 import crypto from 'node:crypto';
@@ -153,14 +154,16 @@ async function main() {
 
     if (aceiteStatus !== 'contestada' && Math.random() < 0.75) {
       const investor = rand(investidores);
-      createPurchase(d.id, investor.id, valor, `${(1.5 + Math.random() * 3).toFixed(1)}%`);
+      const demoRate = 1.5 + Math.random() * 3;
+      createPurchase(d.id, investor.id, valor, `${demoRate.toFixed(1)}%`);
       const purchaseRow = db.prepare('SELECT id, created_at FROM purchases WHERE duplicata_id = ? ORDER BY id DESC LIMIT 1').get(d.id) as {
         id: number;
         created_at: string;
       };
       const purchaseDaysAgo = Math.max(0, daysAgo - randInt(0, 3));
       db.prepare('UPDATE purchases SET created_at = ? WHERE id = ?').run(daysAgoIso(purchaseDaysAgo), purchaseRow.id);
-      const { fee } = settlePurchase({ duplicataId: d.id, sacadoNome, investorId: investor.id, cedenteId: cedente.id, valor });
+      const { precoCompra } = computePurchasePrice(d, demoRate);
+      const { fee } = settlePurchase({ duplicataId: d.id, sacadoNome, investorId: investor.id, cedenteId: cedente.id, valor, precoCompra });
       totalFinanciado += valor;
       totalTaxas += fee;
       countPurchased++;

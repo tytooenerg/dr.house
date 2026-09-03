@@ -22,6 +22,7 @@ import { listOpenDisputesByCedente } from '../db/disputes.js';
 import { buildBlendedRiscoViewSync } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { settlePurchase } from './settlement.js';
+import { computePurchasePrice } from './marketCompute.js';
 import { fundoFinanciarCompra, getOrCreateFundoSistemaUserId } from './confirmingFundo.js';
 import { getFundoBalance } from '../db/confirmingFundo.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
@@ -267,18 +268,21 @@ export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedent
   if (membro.sublimite !== null && membro.utilizado + duplicata.valor > membro.sublimite) {
     return { financiado: false, motivo: 'sublimite_excedido' };
   }
-  // O limite do programa é uma promessa do sacado, não dinheiro de verdade — quem
-  // realmente precisa ter o valor disponível é o fundo (capital real de investidores).
-  // Sem esta checagem, um programa com limite alto e zero aporte real financiaria do
-  // mesmo jeito, deixando o ledger do fundo negativo — exatamente o risco de capital
-  // próprio que este desenho inteiro existe pra evitar (mesmo princípio de
-  // drawCreditLine checar getFundBalance() antes de liberar um saque).
-  if (getFundoBalance() < duplicata.valor) return { financiado: false, motivo: 'fundo_insuficiente' };
+  // O que o fundo de fato precisa ter em caixa é o preço com deságio (precoCompra), não o
+  // valor de face — igual a qualquer outro comprador (lib/marketCompute.ts's
+  // computePurchasePrice), usando a taxa negociada do próprio programa (programa.taxa_am)
+  // em vez da estimativa genérica de mercado, já que esse é o contrato real. Sem esta
+  // checagem, um programa com limite alto e zero aporte real financiaria do mesmo jeito,
+  // deixando o ledger do fundo negativo — exatamente o risco de capital próprio que este
+  // desenho inteiro existe pra evitar (mesmo princípio de drawCreditLine checar
+  // getFundBalance() antes de liberar um saque).
+  const { precoCompra } = computePurchasePrice(duplicata, programa.taxa_am);
+  if (getFundoBalance() < precoCompra) return { financiado: false, motivo: 'fundo_insuficiente' };
 
   const fundoUserId = await getOrCreateFundoSistemaUserId();
   createPurchase(duplicata.id, fundoUserId, duplicata.valor, fmtTaxaAm(programa.taxa_am));
-  settlePurchase({ duplicataId: duplicata.id, sacadoNome: duplicata.sacado_nome, investorId: fundoUserId, cedenteId: cedenteUser.id, valor: duplicata.valor });
-  fundoFinanciarCompra(duplicata.id, duplicata.valor);
+  settlePurchase({ duplicataId: duplicata.id, sacadoNome: duplicata.sacado_nome, investorId: fundoUserId, cedenteId: cedenteUser.id, valor: duplicata.valor, precoCompra });
+  fundoFinanciarCompra(duplicata.id, precoCompra);
   setProgramaUtilizado(programa.id, programa.utilizado + duplicata.valor);
   setMembroUtilizado(membro.id, membro.utilizado + duplicata.valor);
 

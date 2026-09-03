@@ -7,6 +7,7 @@ import { fmtRelative, fmtBRL, parseBRLNumber } from '../lib/format.js';
 import { listMarketplace, isPurchased, createPurchase, listPurchasesByInvestor } from '../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { settlePurchase } from '../lib/settlement.js';
+import { computePurchasePrice } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { ratingFromScore, sectorFor } from '../lib/riscoCore.js';
 import type { UserRow, UserSettings } from '../db/types.js';
@@ -95,8 +96,9 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   const passes = passesScore && passesTaxa && passesDiversificacao && passesSetor && passesExposicaoSacado && passesExposicaoMensal;
 
   if (passes) {
+    const { precoCompra } = computePurchasePrice(offer);
     createPurchase(offer.id, user.id, offer.valor, offer.desagio ?? '');
-    settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: user.id, cedenteId: offer.cedente_id, valor: offer.valor });
+    settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: user.id, cedenteId: offer.cedente_id, valor: offer.valor, precoCompra });
     if (offer.cedente_id) {
       void deliverWebhookEvent(offer.cedente_id, 'pagamento.confirmado', { duplicataId: offer.id, valor: offer.valor, investorId: user.id });
     }
