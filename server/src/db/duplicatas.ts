@@ -251,3 +251,20 @@ export function listPurchasesByInvestor(
     )
     .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string })[];
 }
+
+// Face value of every position this investor still actually holds — an active purchase
+// (never resold) whose duplicata hasn't been paid off yet (see lib/settlement.ts's
+// settleAtMaturity). Generic utility, not Confirming-specific: reused by
+// lib/confirmingFundo.ts's computeFundoNav the same way lib/creditLineFund.ts's
+// computeFundNav sums outstanding draws — cash on hand alone understates a fund's real NAV
+// while it still holds unpaid positions.
+export function sumOutstandingPurchasesByInvestor(investorId: number): number {
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(p.valor), 0) as total FROM purchases p
+       JOIN duplicatas d ON d.id = p.duplicata_id
+       WHERE p.investor_id = ? AND p.active = 1 AND d.status != 'paga'`
+    )
+    .get(investorId) as { total: number };
+  return row.total;
+}

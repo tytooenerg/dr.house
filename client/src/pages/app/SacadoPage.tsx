@@ -17,6 +17,7 @@ interface Aceite {
   cedente?: string;
   slaDiasRestantes: number | null;
   slaVencido: boolean;
+  canReportPayment: boolean;
 }
 
 export function SacadoPage() {
@@ -48,6 +49,21 @@ export function SacadoPage() {
       // back — a failed request must never leave this row stuck forever with no way to retry.
       setAceites((prev) => prev.map((a) => (a.id === id ? { ...a, isProcessing: false } : a)));
       setErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível registrar sua resposta agora — tente de novo.' }));
+    }
+  };
+
+  // Self-report de pagamento — nenhum sinal automático de banco/PSP existe hoje pra saber
+  // que o sacado pagou no vencimento (mesmo padrão de auto-serviço já usado pela linha de
+  // crédito rotativa, onde é o cedente quem reporta o próprio repagamento).
+  const reportPayment = async (id: number) => {
+    setErrorById((prev) => ({ ...prev, [id]: '' }));
+    setAceites((prev) => prev.map((a) => (a.id === id ? { ...a, isProcessing: true } : a)));
+    try {
+      const data = await api.post<{ aceites: Aceite[] }>(`/aceites/${id}/pagamento`);
+      setAceites(data.aceites);
+    } catch (err) {
+      setAceites((prev) => prev.map((a) => (a.id === id ? { ...a, isProcessing: false } : a)));
+      setErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível reportar o pagamento agora — tente de novo.' }));
     }
   };
 
@@ -104,6 +120,16 @@ export function SacadoPage() {
                     Contestar esta duplicata
                   </button>
                 </div>
+              )}
+              {!a.isProcessing && a.canReportPayment && (
+                <button
+                  type="button"
+                  onClick={() => reportPayment(a.id)}
+                  className="px-3.5 py-2 rounded-lg border-none bg-blue text-white text-[12.5px] font-bold cursor-pointer hover:opacity-90"
+                  title="Sem sinal automático de banco/PSP — confirme aqui que você já pagou esta duplicata"
+                >
+                  Reportar pagamento
+                </button>
               )}
             </div>
           </div>

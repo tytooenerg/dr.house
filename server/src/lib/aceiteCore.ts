@@ -1,14 +1,17 @@
 import { z } from 'zod';
-import { listAceitesByCedente, listAceitesBySacadoNome, getAceite, setAceiteStatus, aceiteSlaStatus } from '../db/aceites.js';
-import { getDuplicata } from '../db/duplicatas.js';
+import { listAceitesByCedente, listAceitesBySacadoNome, getAceite, getAceiteByDuplicata, setAceiteStatus, aceiteSlaStatus } from '../db/aceites.js';
+import { getDuplicata, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
 import { addNotification } from '../db/misc.js';
 import { createDispute, getDisputeByAceite } from '../db/disputes.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { addSignal } from '../db/networkSignals.js';
 import { getUserById, getSettings } from '../db/users.js';
+import { currentCreditorFor } from './legalCollectionFee.js';
+import { settleAtMaturity } from './settlement.js';
+import { getFundoSistemaUserIdIfExists, fundoRetornoDePagamento } from './confirmingFundo.js';
 import { fmtBRL } from './format.js';
 import { COLORS } from '../data/seed.js';
-import type { UserRow } from '../db/types.js';
+import type { UserRow, DuplicataRow } from '../db/types.js';
 
 export const STATUS_META = {
   aguardando: { label: 'Aguardando manifestação', bg: '#FBF1E0', color: COLORS.AMBER },
@@ -30,6 +33,7 @@ function view(
     sacado_nome?: string;
     cedente_nome?: string;
     cedente_id?: number | null;
+    duplicata_status?: string;
   },
   editable: boolean
 ) {
@@ -57,6 +61,10 @@ function view(
     statusBg: meta.bg,
     statusColor: meta.color,
     isPending: a.status === 'aguardando',
+    // Só o próprio sacado (editable) pode reportar, e só enquanto a duplicata ainda for uma
+    // posição viva (aprovada/vendida) — mesmos estados que checkPaymentReportEligibility
+    // exige; ver reportPayment abaixo pra checagem completa (inclui disputa em aberto).
+    canReportPayment: editable && (a.duplicata_status === 'aprovada' || a.duplicata_status === 'vendida'),
     editable,
     sacado: a.sacado_nome,
     cedente: a.cedente_nome,
@@ -133,4 +141,80 @@ export async function decideAceite(user: UserRow, aceiteId: number, decision: Ac
   }
   recordAuditEvent(user.id, user.company_name, `aceite.${decision}`, { duplicataId: duplicata.id });
   return { status: 200, body: { aceites: listAceitesForUser(user, sandbox) } };
+}
+
+export interface PaymentReportEligibility {
+  eligible: boolean;
+  reason?: string;
+}
+
+// Gate is deterministic — no LLM judgment call. A duplicata only makes sense to report as
+// paid while it's still a live position (aprovada/vendida, never already 'paga') and there's
+// no unresolved dispute open against it — same dispute check checkCollectionEligibility
+// already uses for the opposite case (escalating to cobrança jurídica), but without
+// requiring the vencimento to have passed: paying on time is the normal, expected case here.
+export function checkPaymentReportEligibility(duplicata: DuplicataRow): PaymentReportEligibility {
+  if (!['aprovada', 'vendida'].includes(duplicata.status)) {
+    return { eligible: false, reason: 'Esta duplicata não está num estado que permita reportar pagamento.' };
+  }
+  const aceite = getAceiteByDuplicata(duplicata.id);
+  if (aceite) {
+    const dispute = getDisputeByAceite(aceite.id);
+    if (dispute && !dispute.resolved) {
+      return { eligible: false, reason: 'Existe disputa em aberto — resolva a disputa antes de reportar o pagamento.' };
+    }
+  }
+  return { eligible: true };
+}
+
+export type ReportPaymentOutcome =
+  | { status: 200; body: { aceites: ReturnType<typeof listAceitesForUser> } }
+  | { status: 403; body: { error: 'forbidden'; message: string } }
+  | { status: 404; body: { error: 'not_found' } }
+  | { status: 409; body: { error: 'not_eligible' | 'no_creditor'; message: string } };
+
+// Sacado self-reports having paid a duplicata at maturity — same self-service pattern
+// lib/creditLine.ts's repayCreditLine already uses for a cedente reporting a credit-line
+// repayment, since no real bank webhook exists to see either event automatically. Whoever
+// currently holds the receivable (currentCreditorFor — the investor if it was sold, the
+// cedente otherwise) is credited the full face value via settleAtMaturity; if it was
+// financed by the Programa Confirming (the credor happens to be the fund's own system
+// account), the fund's own ledger (fundoRetornoDePagamento) is credited too so NAV/cota
+// reflects the real return — mirroring how fundoFinanciarCompra already records the outflow.
+export function reportPayment(user: UserRow, aceiteId: number): ReportPaymentOutcome {
+  if (user.role !== 'sacado') {
+    return { status: 403, body: { error: 'forbidden', message: 'Somente o sacado pode reportar o pagamento de uma duplicata.' } };
+  }
+  const aceite = getAceite(aceiteId);
+  if (!aceite) return { status: 404, body: { error: 'not_found' } };
+  const duplicata = getDuplicata(aceite.duplicata_id);
+  if (!duplicata) return { status: 404, body: { error: 'not_found' } };
+  if (duplicata.sacado_nome.toLowerCase() !== user.company_name.toLowerCase()) {
+    return { status: 403, body: { error: 'forbidden', message: 'Esta duplicata não pertence à sua empresa.' } };
+  }
+  const eligibility = checkPaymentReportEligibility(duplicata);
+  if (!eligibility.eligible) {
+    return { status: 409, body: { error: 'not_eligible', message: eligibility.reason! } };
+  }
+  const creditor = currentCreditorFor(duplicata);
+  if (!creditor) {
+    return { status: 409, body: { error: 'no_creditor', message: 'Não foi possível identificar quem detém o direito ao recebível desta duplicata.' } };
+  }
+
+  settleAtMaturity({ duplicataId: duplicata.id, creditorId: creditor.userId, valor: duplicata.valor });
+  const fundoSistemaUserId = getFundoSistemaUserIdIfExists();
+  if (fundoSistemaUserId !== null && creditor.userId === fundoSistemaUserId) {
+    fundoRetornoDePagamento(duplicata.id, duplicata.valor);
+  }
+  setDuplicataStatus(duplicata.id, 'paga');
+  if (aceite.status === 'aguardando') setAceiteStatus(aceite.id, 'aceita');
+
+  addNotification(
+    creditor.userId,
+    `${duplicata.sacado_nome} reportou o pagamento da duplicata ${duplicata.id} (${fmtBRL(duplicata.valor)}) — valor creditado.`,
+    COLORS.GREEN,
+    'aceite'
+  );
+  recordAuditEvent(user.id, user.company_name, 'duplicata.pagamento_reportado', { duplicataId: duplicata.id, creditorId: creditor.userId });
+  return { status: 200, body: { aceites: listAceitesForUser(user) } };
 }

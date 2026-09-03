@@ -746,6 +746,17 @@ Uma segunda rodada de auditoria (a mesma investigação que corrigiu os 17 pain�
 
 Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 108 arquivos/653 testes, client 24/24, sdks/node 9/9).
 
+### Pagamento no vencimento — a plataforma inteira nunca modelava esse evento
+
+Investigação disparada pelo achado original ("o fundo do Confirming nunca recebe capital de volta", `lib/confirmingFundo.ts`'s `fundoRetornoDePagamento` sem chamador em produção) revelou um escopo maior: **nenhuma parte da plataforma modelava "o sacado pagou a duplicata no vencimento, caminho feliz"** — nem o marketplace normal, nem a linha de crédito, nem o Confirming. O único jeito de uma duplicata virar `'paga'` era via `recordRecovery()` (cobrança jurídica por atraso, disparada pelo admin), e mesmo esse fluxo nunca creditava o principal de volta ao credor — só debitava a fee da Lastro.
+
+- **`lib/settlement.ts`**: nova `settleAtMaturity` — credita o credor atual (`currentCreditorFor`, já existente em `lib/legalCollectionFee.ts`) pelo valor de face cheio; a taxa de plataforma já foi cobrada na compra, nada é descontado de novo aqui.
+- **`lib/aceiteCore.ts`**: novo self-report do sacado (`reportPayment`, `POST /aceites/:id/pagamento`) — mesmo padrão de auto-serviço que `lib/creditLine.ts`'s `repayCreditLine` já usa (o pagador reporta, sem webhook de banco real disponível hoje). Elegível enquanto a duplicata for uma posição viva (`aprovada`/`vendida`) sem disputa em aberto; marca a duplicata `'paga'`, confirma o aceite se ainda estava `'aguardando'` (pagar implica aceitar), e — se o credor for a conta de sistema do Programa Confirming — também chama `fundoRetornoDePagamento`, fechando a lacuna original.
+- **`lib/confirmingFundo.ts`**: `computeFundoNav()` agora soma as posições em aberto do fundo (`sumOutstandingPurchasesByInvestor`, nova em `db/duplicatas.ts`) além do caixa — mesmo espírito de `creditLineFund.ts`'s `computeFundNav`; só caixa subestimava o NAV real enquanto o fundo tinha financiamentos ainda não pagos.
+- **`SacadoPage.tsx`**: botão "Reportar pagamento" por duplicata elegível, ao lado dos botões de confirmar/contestar já existentes.
+
+Novos testes: `server/test/duplicata-payment.test.ts` — os 3 caminhos de credor (investidor via compra no marketplace, cedente quando a duplicata nunca foi vendida, fundo do Confirming com `getFundoBalance()`/`computeFundoNav()` conferidos antes/depois) e os bloqueios (papel diferente de sacado, duplicata de outra empresa, disputa em aberto, idempotência). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 109 arquivos/659 testes, client 24/24, sdks/node 9/9).
+
 ## Running locally
 
 ```bash
