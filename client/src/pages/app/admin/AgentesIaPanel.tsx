@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 import {
   type AgentSummary,
   type AgentRunOutcome,
@@ -30,6 +31,7 @@ export function AgentesIaPanel() {
   const [thresholdInput, setThresholdInput] = useState('');
   const [budgetInputs, setBudgetInputs] = useState<Record<string, string>>({});
   const [savingGov, setSavingGov] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadAgents = () => api.get<{ llmEnabled: boolean; agents: AgentSummary[] }>('/agents').then((d) => {
     setAgents(d.agents);
@@ -44,11 +46,18 @@ export function AgentesIaPanel() {
       setBudgetInputs(Object.fromEntries(d.agents.map((a) => [a.id, a.dailyBudgetUsd === null ? '' : String(a.dailyBudgetUsd)])));
     });
 
+  const loadAll = () => {
+    setLoadError(null);
+    Promise.all([loadAgents(), loadPending(), loadGovernance()]).catch((err) =>
+      setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar os agentes de IA.')
+    );
+  };
+
   useEffect(() => {
-    loadAgents();
-    loadPending();
-    loadGovernance();
+    loadAll();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadAll} />;
 
   const toggleAgentEnabled = async (agentId: string, enabled: boolean) => {
     setSavingGov(agentId);

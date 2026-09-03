@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface PendingAd {
   id: number;
@@ -13,6 +14,11 @@ interface PendingAd {
   createdAt: string;
 }
 
+interface AdAssessment {
+  assessment: 'ok' | 'atencao';
+  reasoning: string;
+}
+
 // Fila de moderação do carrossel de publicidade (feature "Carrossel de publicidade") — um
 // anúncio submetido por uma conta 'anunciante' (routes/advertisements.ts) só roda
 // publicamente depois de aprovado aqui. Mesmo padrão de fila que CompliancePanel/SAR já
@@ -21,8 +27,27 @@ export function AdvertisementsPanel({ onCount }: { onCount?: (n: number) => void
   const [pending, setPending] = useState<PendingAd[]>([]);
   const [rejectReasonById, setRejectReasonById] = useState<Record<number, string>>({});
   const [decidingId, setDecidingId] = useState<number | null>(null);
+  const [screeningById, setScreeningById] = useState<Record<number, AdAssessment | null>>({});
+  const [screeningLoadingId, setScreeningLoadingId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<{ pending: PendingAd[] }>('/admin/advertisements').then((d) => setPending(d.pending));
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ pending: PendingAd[] }>('/admin/advertisements')
+      .then((d) => setPending(d.pending))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar anúncios pendentes.'));
+  };
+
+  const screen = async (id: number) => {
+    setScreeningLoadingId(id);
+    try {
+      const res = await api.get<{ assessment: AdAssessment | null }>(`/admin/advertisements/${id}/ai-screening`);
+      setScreeningById((prev) => ({ ...prev, [id]: res.assessment }));
+    } finally {
+      setScreeningLoadingId(null);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -43,6 +68,8 @@ export function AdvertisementsPanel({ onCount }: { onCount?: (n: number) => void
     }
   };
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="text-textSecondary text-[12.5px]">
@@ -61,6 +88,21 @@ export function AdvertisementsPanel({ onCount }: { onCount?: (n: number) => void
               </div>
             </div>
           </div>
+          {screeningById[ad.id] === undefined ? (
+            <Button size="sm" variant="secondary" className="mb-3" disabled={screeningLoadingId === ad.id} onClick={() => screen(ad.id)}>
+              {screeningLoadingId === ad.id ? 'Analisando…' : 'Gerar triagem da IA (sugestão, não decide sozinha)'}
+            </Button>
+          ) : screeningById[ad.id] ? (
+            <div
+              className={`rounded-[10px] px-4 py-3 mb-3 text-[12.5px] ${screeningById[ad.id]!.assessment === 'ok' ? 'bg-chip' : ''}`}
+              style={screeningById[ad.id]!.assessment === 'atencao' ? { background: '#F7E9E7', color: '#B3261E' } : undefined}
+            >
+              <div className="font-bold mb-1">{screeningById[ad.id]!.assessment === 'atencao' ? 'IA sinaliza atenção' : 'IA não encontrou problemas'}</div>
+              <div>{screeningById[ad.id]!.reasoning}</div>
+            </div>
+          ) : (
+            <div className="text-[12px] text-textSecondary mb-3">Triagem indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>
+          )}
           <div className="flex items-center gap-2 flex-wrap">
             <input
               className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[12.5px]"

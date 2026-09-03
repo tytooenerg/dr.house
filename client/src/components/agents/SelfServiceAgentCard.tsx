@@ -19,19 +19,40 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
   const [lastRun, setLastRun] = useState<AgentRunOutcome | null>(null);
   const [pending, setPending] = useState<PendingActionRow[]>([]);
   const [decidingId, setDecidingId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadPending = () =>
     api.get<{ pending: PendingActionRow[] }>('/agents/pending').then((d) => setPending(d.pending.filter((p) => p.agent_id === agentId)));
 
+  const load = () => {
+    setLoadError(null);
+    Promise.all([
+      api.get<{ llmEnabled: boolean; agents: AgentSummary[] }>('/agents').then((d) => {
+        setLlmEnabled(d.llmEnabled);
+        setAgent(d.agents.find((a) => a.id === agentId) ?? null);
+      }),
+      loadPending(),
+    ]).catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o agente.'));
+  };
+
   useEffect(() => {
-    api.get<{ llmEnabled: boolean; agents: AgentSummary[] }>('/agents').then((d) => {
-      setLlmEnabled(d.llmEnabled);
-      setAgent(d.agents.find((a) => a.id === agentId) ?? null);
-    });
-    loadPending();
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
 
+  if (loadError) {
+    return (
+      <Card className="p-6 flex flex-col gap-2">
+        <div className="text-red text-[12.5px] font-semibold">Não foi possível carregar o agente: {loadError}</div>
+        <button type="button" onClick={load} className="text-[12.5px] font-bold text-blue bg-transparent border-none cursor-pointer p-0 w-fit">
+          Tentar de novo
+        </button>
+      </Card>
+    );
+  }
+
+  // agent === null aqui só acontece durante a carga inicial, ou se este agentId não existe
+  // pro papel do usuário — nenhum dos dois casos tem o que mostrar.
   if (!agent) return null;
 
   const run = async () => {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface ReconciliationFlag {
   id: number;
@@ -97,12 +98,16 @@ export function ReconciliacaoPanel() {
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [runResult, setRunResult] = useState<{ checked: number; matched: number; newlyFlagged: number } | null>(null);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () =>
-    api.get<{ flags: ReconciliationFlag[] }>('/reconciliation/flags').then((d) => {
-      setFlags(d.flags);
-      setLoading(false);
-    });
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ flags: ReconciliationFlag[] }>('/reconciliation/flags')
+      .then((d) => setFlags(d.flags))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar a reconciliação.'))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     load();
@@ -139,6 +144,7 @@ export function ReconciliacaoPanel() {
   const resolved = flags.filter((f) => f.status === 'resolvida');
 
   if (loading) return <p className="text-[13px] text-navy/60">Carregando…</p>;
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
   return (
     <div className="flex flex-col gap-4">

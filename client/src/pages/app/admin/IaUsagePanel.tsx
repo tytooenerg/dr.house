@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface MlScoringStatus {
   minTrainingSamples: number;
@@ -47,14 +48,21 @@ export function IaUsagePanel() {
   const [mlScoring, setMlScoring] = useState<MlScoringStatus | null>(null);
   const [retrainingMl, setRetrainingMl] = useState(false);
   const [mlRetrainMessage, setMlRetrainMessage] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadAiUsage = () => api.get<AiUsageSummary>('/admin/ai-usage').then(setAiUsage);
   const loadMlScoring = () => api.get<MlScoringStatus>('/admin/ml-scoring').then(setMlScoring);
 
+  const loadAll = () => {
+    setLoadError(null);
+    Promise.all([loadAiUsage(), loadMlScoring()]).catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar uso de IA.'));
+  };
+
   useEffect(() => {
-    loadAiUsage();
-    loadMlScoring();
+    loadAll();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadAll} />;
 
   const retrainMl = async () => {
     setRetrainingMl(true);

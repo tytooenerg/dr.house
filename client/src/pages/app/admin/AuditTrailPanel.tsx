@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface AuditEntry {
   id: number;
@@ -13,10 +14,21 @@ interface AuditEntry {
 
 export function AuditTrailPanel() {
   const [audit, setAudit] = useState<{ entries: AuditEntry[]; chain: { valid: boolean; brokenAt: number | null } } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    api
+      .get<{ entries: AuditEntry[]; chain: { valid: boolean; brokenAt: number | null } }>('/admin/audit')
+      .then(setAudit)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar a trilha de auditoria.'));
+  };
 
   useEffect(() => {
-    api.get<{ entries: AuditEntry[]; chain: { valid: boolean; brokenAt: number | null } }>('/admin/audit').then(setAudit);
+    load();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
   return (
     <div className="bg-white border border-border rounded-card overflow-hidden">

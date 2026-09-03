@@ -48,6 +48,10 @@ interface ContaPagar {
   valor: number;
   vencimento: string;
 }
+interface ErpDiagnosis {
+  causaProvavel: string;
+  proximoPasso: string;
+}
 
 export function ErpPage() {
   const [data, setData] = useState<ErpData | null>(null);
@@ -55,6 +59,7 @@ export function ErpPage() {
   const [appKey, setAppKey] = useState('');
   const [appSecret, setAppSecret] = useState('');
   const [omieError, setOmieError] = useState<string | null>(null);
+  const [omieRawError, setOmieRawError] = useState<string | null>(null);
 
   const [sapForm, setSapForm] = useState(false);
   const [sapBaseUrl, setSapBaseUrl] = useState('');
@@ -91,6 +96,58 @@ export function ErpPage() {
   const [companyCnpjInput, setCompanyCnpjInput] = useState('');
   const [savingCompanyCnpj, setSavingCompanyCnpj] = useState(false);
 
+  // Copiloto de diagnóstico (lib/erpConnectionCopilot.ts) — sob demanda, um diagnóstico por
+  // conector por vez. undefined = ainda não pedido, null = IA indisponível, objeto = causa
+  // provável + próximo passo, nunca uma decisão automática.
+  const [diagnosisByConnector, setDiagnosisByConnector] = useState<Record<string, ErpDiagnosis | null>>({});
+  const [diagnosingConnector, setDiagnosingConnector] = useState<string | null>(null);
+
+  const resetDiagnosis = (connector: 'sap' | 'totvs' | 'omie') =>
+    setDiagnosisByConnector((prev) => {
+      if (!(connector in prev)) return prev;
+      const { [connector]: _omit, ...rest } = prev;
+      return rest;
+    });
+
+  const diagnose = async (connector: 'sap' | 'totvs' | 'omie', rawError: string) => {
+    setDiagnosingConnector(connector);
+    try {
+      const res = await api.post<{ diagnosis: ErpDiagnosis | null }>('/erp/diagnostico', { connector, error: rawError });
+      setDiagnosisByConnector((prev) => ({ ...prev, [connector]: res.diagnosis }));
+    } finally {
+      setDiagnosingConnector(null);
+    }
+  };
+
+  function renderDiagnosisBlock(connector: 'sap' | 'totvs' | 'omie', rawError: string) {
+    const diagnosis = diagnosisByConnector[connector];
+    if (diagnosis === undefined) {
+      return (
+        <button
+          type="button"
+          disabled={diagnosingConnector === connector}
+          onClick={() => diagnose(connector, rawError)}
+          className="w-full py-1.5 rounded-md border border-inputBorder bg-white text-[11.5px] font-bold cursor-pointer"
+        >
+          {diagnosingConnector === connector ? 'Diagnosticando…' : 'Diagnosticar com IA (sugestão, não corrige sozinha)'}
+        </button>
+      );
+    }
+    if (!diagnosis) {
+      return <div className="text-[11px] text-textSecondary">Diagnóstico indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>;
+    }
+    return (
+      <div className="rounded-md px-3 py-2.5 bg-chip text-[11.5px] flex flex-col gap-1">
+        <div>
+          <b>Causa provável:</b> {diagnosis.causaProvavel}
+        </div>
+        <div>
+          <b>Próximo passo:</b> {diagnosis.proximoPasso}
+        </div>
+      </div>
+    );
+  }
+
   const load = () =>
     api.get<ErpData>('/erp').then((d) => {
       setData(d);
@@ -114,14 +171,16 @@ export function ErpPage() {
   const connectOmie = async () => {
     setBusy(true);
     setOmieError(null);
+    resetDiagnosis('omie');
     try {
       const d = await api.post<ErpData>('/erp/omie/connect', { appKey, appSecret });
       setData(d);
       setOmieForm(false);
       setAppKey('');
       setAppSecret('');
-    } catch {
+    } catch (err) {
       setOmieError('Não foi possível validar as credenciais Omie. Confira o app_key/app_secret em Omie > Configurações > API.');
+      setOmieRawError(err instanceof ApiError ? err.message : 'omie_auth_failed');
     } finally {
       setBusy(false);
     }
@@ -132,6 +191,7 @@ export function ErpPage() {
   const connectSap = async () => {
     setBusy(true);
     setSapError(null);
+    resetDiagnosis('sap');
     try {
       const d = await api.post<ErpData>('/erp/sap/connect', { baseUrl: sapBaseUrl, companyDb: sapCompanyDb, username: sapUsername, password: sapPassword });
       setData(d);
@@ -152,6 +212,7 @@ export function ErpPage() {
   const connectTotvs = async () => {
     setBusy(true);
     setTotvsError(null);
+    resetDiagnosis('totvs');
     try {
       const d = await api.post<ErpData>('/erp/totvs/connect', { baseUrl: totvsBaseUrl, clientId: totvsClientId, clientSecret: totvsClientSecret });
       setData(d);
@@ -272,7 +333,12 @@ export function ErpPage() {
               <div className="flex flex-col gap-2">
                 <input value={appKey} onChange={(e) => setAppKey(e.target.value)} placeholder="app_key" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder="app_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                {omieError && <div className="text-[11px] text-red-600">{omieError}</div>}
+                {omieError && (
+                  <>
+                    <div className="text-[11px] text-red-600">{omieError}</div>
+                    {renderDiagnosisBlock('omie', omieRawError ?? omieError)}
+                  </>
+                )}
                 <Button variant="primary" disabled={busy || !appKey || !appSecret} onClick={connectOmie}>
                   Validar e conectar
                 </Button>
@@ -298,7 +364,12 @@ export function ErpPage() {
                 <input value={sapCompanyDb} onChange={(e) => setSapCompanyDb(e.target.value)} placeholder="CompanyDB" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 <input value={sapUsername} onChange={(e) => setSapUsername(e.target.value)} placeholder="Usuário" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 <input value={sapPassword} onChange={(e) => setSapPassword(e.target.value)} placeholder="Senha" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                {sapError && <div className="text-[11px] text-red-600">{sapError}</div>}
+                {sapError && (
+                  <>
+                    <div className="text-[11px] text-red-600">{sapError}</div>
+                    {renderDiagnosisBlock('sap', sapError)}
+                  </>
+                )}
                 <Button variant="primary" disabled={busy || !sapBaseUrl || !sapCompanyDb || !sapUsername || !sapPassword} onClick={connectSap}>
                   Validar e conectar
                 </Button>
@@ -323,7 +394,12 @@ export function ErpPage() {
                 <input value={totvsBaseUrl} onChange={(e) => setTotvsBaseUrl(e.target.value)} placeholder="https://api.totvs.seudominio.com.br" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 <input value={totvsClientId} onChange={(e) => setTotvsClientId(e.target.value)} placeholder="client_id" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 <input value={totvsClientSecret} onChange={(e) => setTotvsClientSecret(e.target.value)} placeholder="client_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                {totvsError && <div className="text-[11px] text-red-600">{totvsError}</div>}
+                {totvsError && (
+                  <>
+                    <div className="text-[11px] text-red-600">{totvsError}</div>
+                    {renderDiagnosisBlock('totvs', totvsError)}
+                  </>
+                )}
                 <Button variant="primary" disabled={busy || !totvsBaseUrl || !totvsClientId || !totvsClientSecret} onClick={connectTotvs}>
                   Validar e conectar
                 </Button>

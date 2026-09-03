@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api, downloadFile } from '../../../lib/api';
+import { api, downloadFile, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface ComplianceQueueItem {
   duplicataId: string;
@@ -54,6 +55,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
   const [downloadingCvm, setDownloadingCvm] = useState(false);
   const [darfPeriod, setDarfPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [downloadingDarf, setDownloadingDarf] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadCompliance = () => api.get<{ pending: ComplianceQueueItem[] }>('/admin/compliance-queue').then((d) => setComplianceQueue(d.pending));
   const loadThreshold = () =>
@@ -67,16 +69,24 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
       setSarThreshold(d.threshold);
       setSarThresholdInput(String(d.threshold));
     });
+
+  const loadAll = () => {
+    setLoadError(null);
+    Promise.all([loadCompliance(), loadThreshold(), loadSar()]).catch((err) =>
+      setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar a fila de compliance/PLD.')
+    );
+  };
+
   useEffect(() => {
-    loadCompliance();
-    loadThreshold();
-    loadSar();
+    loadAll();
   }, []);
 
   useEffect(() => {
     onCount?.(complianceQueue.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complianceQueue.length]);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadAll} />;
 
   const saveThreshold = async () => {
     const n = Number(thresholdInput);

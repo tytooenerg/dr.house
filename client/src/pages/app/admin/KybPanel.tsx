@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface PendingKyb {
   id: number;
@@ -39,8 +40,15 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
   const [decidingTriageId, setDecidingTriageId] = useState<number | null>(null);
   const [foreignScreeningsById, setForeignScreeningsById] = useState<Record<number, ForeignInvestorScreening[]>>({});
   const [generatingMemoId, setGeneratingMemoId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadKyb = () => api.get<{ pending: PendingKyb[] }>('/admin/kyb').then((d) => setPending(d.pending));
+  const loadKyb = () => {
+    setLoadError(null);
+    return api
+      .get<{ pending: PendingKyb[] }>('/admin/kyb')
+      .then((d) => setPending(d.pending))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar a fila de KYB.'));
+  };
 
   useEffect(() => {
     loadKyb();
@@ -57,6 +65,8 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending]);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadKyb} />;
 
   const loadForeignScreenings = (userId: number) =>
     api.get<{ screenings: ForeignInvestorScreening[] }>(`/admin/kyb/${userId}/elegibilidade-estrangeiro`).then((d) => {

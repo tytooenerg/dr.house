@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 
 interface DailyBriefingItem {
   label: string;
@@ -38,10 +38,20 @@ function tabFor(label: string): string | null {
 // this back-office has with lib/dailyBriefing.ts's own email/notification version of this.
 export function DailyBriefingCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get<DailyBriefing>('/admin/daily-briefing').then(setBriefing);
+    api
+      .get<DailyBriefing>('/admin/daily-briefing')
+      .then(setBriefing)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o resumo do dia.'));
   }, []);
+
+  // Card puramente informativo — uma falha aqui não deve travar o resto do back-office, mas
+  // também não pode desaparecer em silêncio como se não houvesse nada pendente hoje.
+  if (loadError) {
+    return <div className="bg-white border border-border rounded-card px-4 py-3 mb-4 text-[12px] text-red">Não foi possível carregar o resumo do dia: {loadError}</div>;
+  }
 
   if (!briefing || briefing.items.length === 0) return null;
 

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../../components/agents/SelfServiceAgentCard';
 
 interface AdminDispute {
@@ -17,8 +18,15 @@ interface AdminDispute {
 export function DisputasPanel({ onCount }: { onCount?: (n: number) => void }) {
   const [disputes, setDisputes] = useState<AdminDispute[]>([]);
   const [noteById, setNoteById] = useState<Record<number, string>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadDisputes = () => api.get<{ disputes: AdminDispute[] }>('/admin/disputes').then((d) => setDisputes(d.disputes));
+  const loadDisputes = () => {
+    setLoadError(null);
+    return api
+      .get<{ disputes: AdminDispute[] }>('/admin/disputes')
+      .then((d) => setDisputes(d.disputes))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar as disputas em aberto.'));
+  };
 
   useEffect(() => {
     loadDisputes();
@@ -43,7 +51,9 @@ export function DisputasPanel({ onCount }: { onCount?: (n: number) => void }) {
         title="Agente de Disputas & Sinistros"
         placeholder="Ex.: liste as disputas abertas e avalie a mais recente"
       />
-      {disputes.map((d) => (
+      {loadError && <ErrorState message={loadError} onRetry={loadDisputes} />}
+      {!loadError &&
+        disputes.map((d) => (
         <div key={d.id} className="bg-white border border-border rounded-card p-6">
           <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
             <div>
@@ -77,7 +87,7 @@ export function DisputasPanel({ onCount }: { onCount?: (n: number) => void }) {
           </div>
         </div>
       ))}
-      {disputes.length === 0 && (
+      {!loadError && disputes.length === 0 && (
         <div className="bg-white border border-border rounded-card">
           <EmptyState title="Nenhuma disputa em aberto" hint="Disputas escaladas pelo cedente aparecem aqui para arbitragem" />
         </div>
