@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 
 interface Apolice {
@@ -38,8 +39,15 @@ export function SeguradoraPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [aiById, setAiById] = useState<Record<string, { assessment: string; reasoning: string } | null>>({});
   const [loadingAiId, setLoadingAiId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<SeguradoraData>('/seguradora').then(setData);
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<SeguradoraData>('/seguradora')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o painel da seguradora.'));
+  };
 
   useEffect(() => {
     load();
@@ -67,6 +75,7 @@ export function SeguradoraPage() {
     }
   };
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   return (

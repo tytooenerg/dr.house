@@ -52,7 +52,10 @@ export function RiscoPage() {
         setSuggestions([]);
         return;
       }
-      api.get<{ suggestions: string[] }>(`/risco/search?q=${encodeURIComponent(query)}`).then((d) => setSuggestions(d.suggestions));
+      api
+        .get<{ suggestions: string[] }>(`/risco/search?q=${encodeURIComponent(query)}`)
+        .then((d) => setSuggestions(d.suggestions))
+        .catch(() => setSuggestions([]));
     }, 150);
     return () => clearTimeout(t);
   }, [query, selected]);

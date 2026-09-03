@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api, uploadFile } from '../../lib/api';
+import { api, uploadFile, ApiError } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface KycItem {
   label: string;
@@ -97,13 +98,21 @@ export function ContaPage() {
   const [stablecoinWalletInput, setStablecoinWalletInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<AccountData>('/account').then(setData);
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<AccountData>('/account')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar sua conta.'));
+  };
 
   useEffect(() => {
     load();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   const runAction = async (key: string) => {

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Segmented } from '../../components/ui/Segmented';
 import { RangeBar } from '../../components/ui/ProgressBar';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface RateChannel {
   label: string;
@@ -22,10 +23,18 @@ export function ComparadorPage() {
   const [input, setInput] = useState({ valor: '50.000', prazo: '30', score: 'A' });
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [channels, setChannels] = useState<RateChannel[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    Promise.all([
+      api.get<{ rateChannels: RateChannel[] }>('/comparador/rates').then((d) => setChannels(d.rateChannels)),
+      api.post<Estimate>('/comparador/estimate', input).then(setEstimate),
+    ]).catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o comparador de taxas.'));
+  };
 
   useEffect(() => {
-    api.get<{ rateChannels: RateChannel[] }>('/comparador/rates').then((d) => setChannels(d.rateChannels));
-    api.post<Estimate>('/comparador/estimate', input).then(setEstimate);
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -36,6 +45,8 @@ export function ComparadorPage() {
     setEstimate(data);
     setChannels(data.rateChannels);
   };
+
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
   return (
     <div>

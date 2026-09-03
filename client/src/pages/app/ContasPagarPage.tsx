@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 
 interface PayableView {
@@ -203,8 +204,15 @@ export function ContasPagarPage() {
   const [form, setForm] = useState({ descricao: '', fornecedor: '', categoria: 'outros', valor: '', vencimento: '', recorrente: false });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<PayablesOverview>('/payables').then(setOverview);
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<PayablesOverview>('/payables')
+      .then(setOverview)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar contas a pagar.'));
+  };
 
   useEffect(() => {
     load();
@@ -272,7 +280,9 @@ export function ContasPagarPage() {
         }
       />
 
-      {overview && (
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
+
+      {!loadError && overview && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card>
             <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Total pendente</div>
@@ -344,6 +354,7 @@ export function ContasPagarPage() {
 
       {error && <div className="mb-3 text-red text-[12.5px] font-semibold">{error}</div>}
 
+      {!loadError && (
       <Card>
         {!overview || overview.items.length === 0 ? (
           <EmptyState title="Nenhuma conta a pagar" hint="Cadastre suas obrigações para ver a projeção de caixa considerá-las em AI CFO" />
@@ -385,6 +396,7 @@ export function ContasPagarPage() {
           </div>
         )}
       </Card>
+      )}
     </div>
   );
 }

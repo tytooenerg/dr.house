@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
 import { Input } from '../../components/ui/Input';
 import { Segmented } from '../../components/ui/Segmented';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 
 interface AutomationData {
@@ -20,9 +21,24 @@ interface AutomationData {
 
 export function AutomacaoPage() {
   const [data, setData] = useState<AutomationData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasLoadedOnce = useRef(false);
 
-  const load = () => api.get<AutomationData>('/automacao').then(setData);
+  // Erro de carga só bloqueia a tela na primeira carga — depois disso a página faz polling
+  // (autoBidEnabled) a cada 4s, e uma falha isolada nesse polling não deve derrubar uma
+  // tela que já estava funcionando; ela só tenta de novo no próximo ciclo.
+  const load = () =>
+    api
+      .get<AutomationData>('/automacao')
+      .then((d) => {
+        setData(d);
+        setLoadError(null);
+        hasLoadedOnce.current = true;
+      })
+      .catch((err) => {
+        if (!hasLoadedOnce.current) setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar Automação de Lances.');
+      });
 
   useEffect(() => {
     load();
@@ -38,6 +54,7 @@ export function AutomacaoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.autoBidEnabled]);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   const toggle = () => api.post<AutomationData>('/automacao/toggle').then(setData);

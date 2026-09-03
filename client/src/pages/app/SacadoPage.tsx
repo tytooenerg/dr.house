@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { useSession } from '../../state/SessionContext';
 import { ComplianceCalendarCard } from '../../components/ComplianceCalendarCard';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface Aceite {
   id: number;
@@ -22,8 +23,15 @@ export function SacadoPage() {
   const { user } = useSession();
   const [aceites, setAceites] = useState<Aceite[]>([]);
   const [errorById, setErrorById] = useState<Record<number, string>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<{ aceites: Aceite[] }>('/aceites').then((d) => setAceites(d.aceites));
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ aceites: Aceite[] }>('/aceites')
+      .then((d) => setAceites(d.aceites))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar suas duplicatas a confirmar.'));
+  };
 
   useEffect(() => {
     load();
@@ -58,8 +66,10 @@ export function SacadoPage() {
 
       <ComplianceCalendarCard />
 
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
       <div className="flex flex-col gap-3.5">
-        {aceites.map((a) => (
+        {!loadError &&
+          aceites.map((a) => (
           <div key={a.id} className="bg-white border border-border rounded-card px-6 py-5 flex flex-col gap-3.5">
             <div className="min-w-0">
               <div className="font-mono-num text-xs text-textSecondary">{a.duplicataId}</div>

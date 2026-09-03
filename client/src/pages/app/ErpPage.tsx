@@ -4,6 +4,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface Connector {
   key: string;
@@ -55,6 +56,7 @@ interface ErpDiagnosis {
 
 export function ErpPage() {
   const [data, setData] = useState<ErpData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [omieForm, setOmieForm] = useState(false);
   const [appKey, setAppKey] = useState('');
   const [appSecret, setAppSecret] = useState('');
@@ -148,22 +150,28 @@ export function ErpPage() {
     );
   }
 
-  const load = () =>
-    api.get<ErpData>('/erp').then((d) => {
-      setData(d);
-      setAutoEmitMaxInput(d.autoEmitMaxValor);
-      setCompanyCnpjInput(d.companyCnpj);
-      if (d.whitelabelBrand) {
-        setBrandNome(d.whitelabelBrand.nome);
-        setBrandCor(d.whitelabelBrand.corPrimaria);
-        setBrandLogo(d.whitelabelBrand.logoUrl);
-      }
-    });
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<ErpData>('/erp')
+      .then((d) => {
+        setData(d);
+        setAutoEmitMaxInput(d.autoEmitMaxValor);
+        setCompanyCnpjInput(d.companyCnpj);
+        if (d.whitelabelBrand) {
+          setBrandNome(d.whitelabelBrand.nome);
+          setBrandCor(d.whitelabelBrand.corPrimaria);
+          setBrandLogo(d.whitelabelBrand.logoUrl);
+        }
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar Integrações ERP.'));
+  };
 
   useEffect(() => {
     load();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   const toggleConnector = (key: string) => api.post<ErpData>(`/erp/${key}/toggle`).then(setData);

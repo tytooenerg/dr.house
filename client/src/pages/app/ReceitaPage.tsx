@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Donut } from '../../components/ui/Gauge';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface RevenueStream {
   label: string;
@@ -41,11 +42,21 @@ interface RevenueData {
 
 export function ReceitaPage() {
   const [data, setData] = useState<RevenueData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    api
+      .get<RevenueData>('/revenue')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o modelo de receita.'));
+  };
 
   useEffect(() => {
-    api.get<RevenueData>('/revenue').then(setData);
+    load();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   return (

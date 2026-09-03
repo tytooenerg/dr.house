@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, downloadFile, uploadFile } from '../../lib/api';
+import { api, downloadFile, uploadFile, ApiError } from '../../lib/api';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { ComplianceCalendarCard } from '../../components/ComplianceCalendarCard';
 
 interface DupGroup {
@@ -55,15 +56,24 @@ export function CompliancePage() {
   const [analyzingContract, setAnalyzingContract] = useState(false);
   const [contractError, setContractError] = useState<string | null>(null);
   const contractFileInput = useRef<HTMLInputElement>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadAll = () => {
+    setLoadError(null);
+    Promise.all([
+      api.get<ComplianceData>('/compliance').then((d) => {
+        setData(d);
+        setFidcPL(d.fidcPL);
+      }),
+      api.get<{ rows: ProvisioningRow[]; summary: Record<string, number> }>('/compliance/provisionamento').then(setProvisioning),
+    ]).catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar Compliance.'));
+  };
 
   useEffect(() => {
-    api.get<ComplianceData>('/compliance').then((d) => {
-      setData(d);
-      setFidcPL(d.fidcPL);
-    });
-    api.get<{ rows: ProvisioningRow[]; summary: Record<string, number> }>('/compliance/provisionamento').then(setProvisioning);
+    loadAll();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={loadAll} />;
   if (!data) return <PageSkeleton />;
 
   const runDupCheck = async () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
 
 interface DrawRow {
@@ -54,8 +55,15 @@ function FundCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<FundOverview>('/credit-line-fund').then(setFund);
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<FundOverview>('/credit-line-fund')
+      .then(setFund)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o pool de fomento.'));
+  };
 
   useEffect(() => {
     load();
@@ -103,6 +111,7 @@ function FundCard() {
     }
   };
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!fund) return null;
 
   return (
@@ -166,8 +175,15 @@ export function CreditLinePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<CreditLineOverview>('/credit-line').then(setOverview);
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<CreditLineOverview>('/credit-line')
+      .then(setOverview)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar sua linha de crédito.'));
+  };
 
   useEffect(() => {
     if (isCedente) load();
@@ -224,7 +240,9 @@ export function CreditLinePage() {
 
       <FundCard />
 
-      {!isCedente ? null : !overview ? null : !overview.eligible ? (
+      {isCedente && loadError && <ErrorState message={loadError} onRetry={load} />}
+
+      {!isCedente ? null : loadError ? null : !overview ? null : !overview.eligible ? (
         <Card>
           <div className="font-bold text-[15px] mb-2">Ainda não elegível</div>
           <p className="text-[12.5px] text-textSecondary">{overview.motivo}</p>

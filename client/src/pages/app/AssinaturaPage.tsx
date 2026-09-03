@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { useSession } from '../../state/SessionContext';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 import type { Plan } from '../../state/SessionContext';
 
 interface PlanDef {
@@ -27,8 +28,15 @@ export function AssinaturaPage() {
   const [data, setData] = useState<BillingData | null>(null);
   const [busyPlan, setBusyPlan] = useState<Plan | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<BillingData>('/billing').then(setData);
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<BillingData>('/billing')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar sua assinatura.'));
+  };
 
   useEffect(() => {
     load();
@@ -56,6 +64,7 @@ export function AssinaturaPage() {
     else setNotice(res.message ?? 'Sem faturamento real para gerenciar.');
   };
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   return (

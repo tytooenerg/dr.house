@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 
@@ -23,8 +24,15 @@ const COLS = '1.2fr 0.8fr 0.7fr 0.7fr 0.7fr 1.2fr';
 export function MinhasPage() {
   const { t } = useLang();
   const [duplicatas, setDuplicatas] = useState<Duplicata[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<{ duplicatas: Duplicata[] }>('/minhas').then((d) => setDuplicatas(d.duplicatas));
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ duplicatas: Duplicata[] }>('/minhas')
+      .then((d) => setDuplicatas(d.duplicatas))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar suas duplicatas.'));
+  };
 
   useEffect(() => {
     load();
@@ -56,6 +64,9 @@ export function MinhasPage() {
         <div className="text-textSecondary text-[13px] mt-1.5">{t('minhas.dropzoneHint', 'ou clique para selecionar um arquivo do seu computador')}</div>
       </div>
 
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
+
+      {!loadError && (
       <div className="bg-white border border-border rounded-card overflow-hidden">
         <div className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
           <div>{t('minhas.colSacado', 'Sacado')}</div>
@@ -87,6 +98,7 @@ export function MinhasPage() {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
