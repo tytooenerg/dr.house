@@ -13,6 +13,7 @@ import {
 } from '../db/confirmingFundo.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { createUser, getUserByEmail, approveKyb } from '../db/users.js';
+import { sumOutstandingPurchasesByInvestor } from '../db/duplicatas.js';
 import { hashPassword } from '../auth/password.js';
 import { fmtBRL } from './format.js';
 
@@ -40,6 +41,14 @@ export async function getOrCreateFundoSistemaUserId(): Promise<number> {
   return user.id;
 }
 
+// Versão síncrona pra chamadores que só precisam checar "esse credor É o fundo?" (ex.:
+// lib/aceiteCore.ts's reportPayment) sem pagar o custo de criar a conta de sistema se ela
+// nunca tiver financiado nada ainda — ao contrário de getOrCreateFundoSistemaUserId, nunca
+// cria a conta, só a acha se ela já existir.
+export function getFundoSistemaUserIdIfExists(): number | null {
+  return getUserByEmail(FUNDO_SISTEMA_EMAIL)?.id ?? null;
+}
+
 // Fundo de Fomento do Programa Confirming — abre o financiamento instantâneo do Programa
 // Confirming (feature seguinte) pra funding real de investidor, na mesma disciplina da
 // linha de crédito rotativa (lib/creditLineFund.ts): sem aporte real no pool, não há
@@ -53,13 +62,15 @@ export async function getOrCreateFundoSistemaUserId(): Promise<number> {
 // proporcional a quanto/quanto tempo cada investidor teve dinheiro no fundo de verdade.
 const INITIAL_COTA_PRICE = 1;
 
-// NAV = caixa realmente na ledger (getFundoBalance). Ainda não soma o valor das duplicatas
-// que o fundo já tenha comprado, porque essa feature (o Programa Confirming financiando de
-// fato, pulando o leilão) ainda não existe — vem numa PR seguinte, que vai estender esta
-// função pra somar o valor das posições em aberto, no mesmo espírito de
-// creditLineFund.ts's computeFundNav somando os saques em aberto da linha de crédito.
+// NAV = caixa real na ledger (getFundoBalance) + valor de face das posições que o fundo
+// ainda detém e não foram pagas (sumOutstandingPurchasesByInvestor) — mesmo espírito de
+// creditLineFund.ts's computeFundNav somando os saques em aberto da linha de crédito. Só
+// caixa subestimaria o NAV real sempre que o fundo tiver financiado algo que ainda não
+// voltou via lib/settlement.ts's settleAtMaturity (ver fundoRetornoDePagamento abaixo).
 export function computeFundoNav(): number {
-  return getFundoBalance();
+  const sistemaUserId = getFundoSistemaUserIdIfExists();
+  const outstanding = sistemaUserId !== null ? sumOutstandingPurchasesByInvestor(sistemaUserId) : 0;
+  return getFundoBalance() + outstanding;
 }
 
 export function getFundoCotaPrice(): number {
@@ -118,9 +129,9 @@ export function fundoFinanciarCompra(duplicataId: string, valor: number) {
   addFundoLedgerEntry('compra_financiada', -valor, `Compra financiada — duplicata ${duplicataId}`, { duplicataId });
 }
 
-// Chamado quando o sacado paga a duplicata na data de vencimento (mesma rotina de
-// liquidação que já existe pra qualquer duplicata comprada) — devolve o valor recebido ao
-// pool, mesmo papel de creditLineFund.ts's returnFromRepayment.
+// Chamado por lib/aceiteCore.ts's reportPayment quando o sacado reporta o pagamento de uma
+// duplicata financiada pelo fundo (só se o credor atual for a conta de sistema do fundo) —
+// devolve o valor recebido ao pool, mesmo papel de creditLineFund.ts's returnFromRepayment.
 export function fundoRetornoDePagamento(duplicataId: string, valor: number) {
   if (valor <= 0) return;
   addFundoLedgerEntry('retorno', valor, `Retorno de pagamento — duplicata ${duplicataId}`, { duplicataId });

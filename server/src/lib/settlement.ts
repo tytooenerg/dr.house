@@ -75,6 +75,17 @@ export function settleInsurance(opts: { duplicataId: string; investorId: number;
   return { comissao, repasse };
 }
 
+// Real settlement for a duplicata paid by the sacado at maturity — the "caminho feliz" that
+// closes a purchase's lifecycle when nothing goes wrong. Self-reported by the sacado
+// (lib/aceiteCore.ts's reportPayment), mirroring lib/creditLine.ts's repayCreditLine: no
+// real bank webhook exists to see this happen automatically. Whoever currently holds the
+// receivable (legalCollectionFee.ts's currentCreditorFor) gets the full face value — the
+// platform fee was already collected at purchase time (settlePurchase/settleResale), so
+// nothing is deducted again here.
+export function settleAtMaturity(opts: { duplicataId: string; creditorId: number; valor: number }) {
+  addLedgerEntry(opts.creditorId, today(), `Pagamento recebido no vencimento — duplicata ${opts.duplicataId}`, opts.valor);
+}
+
 // Same fee schedule applies to trades on the mercado secundário — the platform still
 // facilitates the transfer, so the reselling investor pays the fee out of their proceeds.
 // feeDiscountPct (0-1) discounts the *platform's own fee* for institutional block trades

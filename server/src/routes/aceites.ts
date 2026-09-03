@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth/middleware.js';
-import { aceiteStatusSchema, decideAceite, listAceitesForUser } from '../lib/aceiteCore.js';
+import { aceiteStatusSchema, decideAceite, listAceitesForUser, reportPayment } from '../lib/aceiteCore.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const aceiteRouter = Router();
@@ -22,3 +22,10 @@ aceiteRouter.post(
     res.status(outcome.status).json(outcome.body);
   })
 );
+
+// Sacado self-reporta o pagamento no vencimento — ver lib/aceiteCore.ts's reportPayment
+// pra por que isso é necessário (nenhum sinal automático de banco/PSP existe hoje).
+aceiteRouter.post('/:id/pagamento', (req, res) => {
+  const outcome = reportPayment(req.user!, Number(req.params.id));
+  res.status(outcome.status).json(outcome.body);
+});

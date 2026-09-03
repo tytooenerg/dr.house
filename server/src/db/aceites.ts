@@ -47,14 +47,17 @@ export function listAceitesByCedente(cedenteId: number, sandbox = false): (Aceit
     .all(cedenteId, sandbox ? 1 : 0) as (AceiteRow & { sacado_nome: string; valor: number })[];
 }
 
-export function listAceitesBySacadoNome(sacadoNome: string, sandbox = false): (AceiteRow & { valor: number; cedente_nome: string; cedente_id: number | null })[] {
+export function listAceitesBySacadoNome(
+  sacadoNome: string,
+  sandbox = false
+): (AceiteRow & { valor: number; cedente_nome: string; cedente_id: number | null; duplicata_status: string })[] {
   return db
     .prepare(
-      `SELECT a.*, d.valor as valor, d.cedente_nome as cedente_nome, d.cedente_id as cedente_id FROM aceites a
+      `SELECT a.*, d.valor as valor, d.cedente_nome as cedente_nome, d.cedente_id as cedente_id, d.status as duplicata_status FROM aceites a
        JOIN duplicatas d ON d.id = a.duplicata_id
        WHERE lower(d.sacado_nome) = lower(?) AND d.sandbox = ? ORDER BY a.created_at DESC`
     )
-    .all(sacadoNome, sandbox ? 1 : 0) as (AceiteRow & { valor: number; cedente_nome: string; cedente_id: number | null })[];
+    .all(sacadoNome, sandbox ? 1 : 0) as (AceiteRow & { valor: number; cedente_nome: string; cedente_id: number | null; duplicata_status: string })[];
 }
 
 export function setAceiteStatus(id: number, status: 'aceita' | 'aguardando' | 'contestada') {
