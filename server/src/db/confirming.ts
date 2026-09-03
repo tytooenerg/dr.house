@@ -32,6 +32,23 @@ export function getProgramaById(id: number): ConfirmingProgramaRow | undefined {
   return db.prepare('SELECT * FROM confirming_programas WHERE id = ?').get(id) as ConfirmingProgramaRow | undefined;
 }
 
+export interface ConfirmingProgramaComSacado extends ConfirmingProgramaRow {
+  sacado_nome: string;
+  sacado_email: string;
+}
+
+// Visão de oversight do admin — todo programa que já existe, não só o de um sacado
+// específico.
+export function listProgramas(): ConfirmingProgramaComSacado[] {
+  return db
+    .prepare(
+      `SELECT p.*, u.company_name as sacado_nome, u.email as sacado_email FROM confirming_programas p
+       JOIN users u ON u.id = p.sacado_user_id
+       ORDER BY p.created_at DESC`
+    )
+    .all() as ConfirmingProgramaComSacado[];
+}
+
 export function insertPrograma(input: { sacadoUserId: number; sacadoCnpj: string; rating: Rating; taxaAm: number; limite: number }): ConfirmingProgramaRow {
   db.prepare('INSERT INTO confirming_programas (sacado_user_id, sacado_cnpj, rating, taxa_am, limite) VALUES (?, ?, ?, ?, ?)').run(
     input.sacadoUserId,

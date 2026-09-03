@@ -1,0 +1,102 @@
+import { useEffect, useState } from 'react';
+import { api } from '../../../lib/api';
+import { EmptyState } from '../../../components/ui/EmptyState';
+
+interface ProgramaAdminView {
+  id: number;
+  sacadoNome: string;
+  sacadoEmail: string;
+  rating: string;
+  taxaAmFmt: string;
+  limiteFmt: string;
+  utilizadoFmt: string;
+  disponivelFmt: string;
+  status: 'ativo' | 'pausado';
+  membrosAtivos: number;
+}
+
+interface FundoOverview {
+  balanceFmt: string;
+  navFmt: string;
+  cotaPriceFmt: string;
+}
+
+interface ConfirmingAdminData {
+  programas: ProgramaAdminView[];
+  fundo: FundoOverview;
+}
+
+const STATUS_STYLE: Record<'ativo' | 'pausado', { bg: string; color: string; label: string }> = {
+  ativo: { bg: '#EAF3EE', color: '#0A5C36', label: 'Ativo' },
+  pausado: { bg: '#F0F2F5', color: '#5B6472', label: 'Pausado' },
+};
+
+// Oversight do Programa Confirming — todo programa que já existe e o fundo real que os
+// financia. Somente leitura: quem cria/gerencia um programa é o sacado, quem
+// aporta/resgata no fundo é o investidor.
+export function ConfirmingAdminPanel() {
+  const [data, setData] = useState<ConfirmingAdminData | null>(null);
+
+  useEffect(() => {
+    api.get<ConfirmingAdminData>('/admin/confirming').then(setData);
+  }, []);
+
+  if (!data) return <p className="text-[13px] text-navy/60">Carregando…</p>;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-[16px] font-bold text-navy">Programa Confirming</h2>
+        <p className="text-[13px] text-navy/60 mt-1 max-w-2xl">
+          Todo programa criado por um sacado, quantos cedentes tem matriculados, e o saldo real do fundo de fomento que financia cada compra
+          automática.
+        </p>
+      </div>
+
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="bg-white border border-border rounded-card p-4">
+          <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Saldo do fundo</div>
+          <div className="text-xl font-extrabold font-mono-num">{data.fundo.balanceFmt}</div>
+        </div>
+        <div className="bg-white border border-border rounded-card p-4">
+          <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">NAV</div>
+          <div className="text-xl font-extrabold font-mono-num">{data.fundo.navFmt}</div>
+        </div>
+        <div className="bg-white border border-border rounded-card p-4">
+          <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Cota</div>
+          <div className="text-xl font-extrabold font-mono-num">{data.fundo.cotaPriceFmt}</div>
+        </div>
+      </div>
+
+      {data.programas.length === 0 ? (
+        <EmptyState title="Nenhum Programa Confirming criado ainda" hint="A lista aparece assim que um sacado criar seu primeiro programa" />
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {data.programas.map((p) => (
+            <div key={p.id} className="bg-white border border-border rounded-card px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="font-bold text-[14px]">
+                  {p.sacadoNome} <span className="text-textSecondary font-normal text-[12.5px]">· rating {p.rating}</span>
+                </div>
+                <div className="text-textSecondary text-[12.5px]">
+                  {p.sacadoEmail} · {p.membrosAtivos} fornecedor(es) matriculado(s) · taxa {p.taxaAmFmt}
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <div className="text-[11px] font-bold text-textSecondary uppercase">Utilizado / Limite</div>
+                  <div className="font-mono-num text-[12.5px]">
+                    {p.utilizadoFmt} / {p.limiteFmt}
+                  </div>
+                </div>
+                <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: STATUS_STYLE[p.status].bg, color: STATUS_STYLE[p.status].color }}>
+                  {STATUS_STYLE[p.status].label}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
