@@ -52,7 +52,7 @@ profileRouter.post(
   })
 );
 
-const notifPrefSchema = z.object({ key: z.enum(['leilao', 'aceite', 'disputa', 'marketing', 'digest']) });
+const notifPrefSchema = z.object({ key: z.enum(['leilao', 'aceite', 'disputa', 'marketing', 'digest', 'compliance']) });
 
 profileRouter.post('/notif-pref', (req, res) => {
   const parsed = notifPrefSchema.safeParse(req.body);

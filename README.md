@@ -692,6 +692,16 @@ Com isso o Programa Confirming / Risco Sacado — a frente 2 das 3 identificadas
 
 Novos testes: `server/test/confirming-admin.test.ts` (2 casos — a rota reflete um programa recém-criado com sua contagem de matrícula, gating de papel). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 105 arquivos/637 testes, client 24/24, sdks/node 9/9).
 
+### Lembrete do Cronograma de Conformidade
+
+Auditoria de "onde falta IA agêntica/automação" (nesta sessão) achou que o Cronograma de Conformidade (faturamento autodeclarado) era a única funcionalidade recente sem nenhum lembrete de prazo — ao contrário do aceite (`lib/aceiteReminder.ts`) e do SISCOAF (`lib/coafSubmissionReminder.ts`), que já avisam automaticamente antes de um prazo vencer.
+
+- **`lib/complianceCalendarReminder.ts`** (novo job, 24h, mesmo padrão de `aceiteReminder.ts`) — dois lembretes distintos, cada um enviado só uma vez por conta (dois carimbos separados em `UserSettings`, porque são estados não excludentes ao longo do tempo): um nudge simples pra quem nunca informou o faturamento, e um aviso de urgência pra quem já informou mas está a 90 dias ou menos do prazo obrigatório da sua faixa.
+- Nova categoria de notificação `compliance` em `notifPrefs` (com opt-out em Perfil, mesmo padrão de leilão/aceite/disputa) — email + WhatsApp (se habilitado) + push, reaproveitando o `addNotification` já existente.
+- `buildComplianceCalendarView`/`classifyCompliance` ganharam um parâmetro `today` opcional (default `new Date()`) pra tornar o job testável deterministicamente, sem depender da data real do relógio.
+
+Novos testes: `server/test/compliance-calendar-reminder.test.ts` (4 casos — nudge de faturamento não informado uma única vez, sem aviso pra prazo distante, aviso de urgência dentro do limiar e só uma vez, sem aviso depois que o prazo já virou regime pleno). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 106 arquivos/641 testes, client 24/24, sdks/node 9/9).
+
 ## Running locally
 
 ```bash

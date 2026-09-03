@@ -84,8 +84,8 @@ export function classifyCompliance(bracket: FaturamentoBracket | null, today: Da
   };
 }
 
-export function buildComplianceCalendarView(user: UserRow): ComplianceCalendarView {
-  return classifyCompliance(getSettings(user).faturamentoAnualBracket);
+export function buildComplianceCalendarView(user: UserRow, today: Date = new Date()): ComplianceCalendarView {
+  return classifyCompliance(getSettings(user).faturamentoAnualBracket, today);
 }
 
 export interface ComplianceCalendarAdminRow extends ComplianceCalendarView {
