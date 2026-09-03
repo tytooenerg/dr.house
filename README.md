@@ -799,6 +799,14 @@ Decisão de produto: tratar como a mesma lacuna do "pagamento no vencimento" (ac
 
 Novos testes em `legal-collection-fee.test.ts`: o credor recebe o crédito líquido real (não só o débito da fee), uma duplicata fracionada é rejeitada com a mensagem certa antes mesmo de chegar em `recordRecovery`, e o ledger interno do fundo do Confirming é atualizado quando ele é o credor. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 110 arquivos/677 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
 
+### Aprovar um sinistro dizia "indenizará" mas nunca movia dinheiro nenhum
+
+Mesma classe de bug das correções anteriores (deságio real, `recordRecovery`), agora achada no fluxo de seguros: `lib/seguradoraCore.ts`'s `decideSinistro`, ao aprovar um sinistro, mandava pro cedente uma notificação dizendo que a seguradora "aprovou o sinistro e indenizará" a duplicata — mas `setSinistroStatus` (a única chamada real do fluxo) é só um `UPDATE` de status; nenhum outro caminho do código credita indenização nenhuma. Uma promessa de pagamento real em texto de notificação, sem nenhum `addLedgerEntry` por trás.
+
+- **`lib/seguradoraCore.ts`**: `decideSinistro`, ao aprovar (`decision === 'aprovado'`), agora debita a seguradora e credita o cedente pelo valor de face integral da duplicata (o prêmio, cobrado à parte em `settleInsurance`, já remunerou o risco assumido — não se desconta de novo aqui), e marca a duplicata `'paga'` — pra não também virar candidata a cobrança jurídica (`lib/legalCollection.ts`) e ser "recuperada" uma segunda vez pelo mesmo valor. Negar um sinistro continua sem mover dinheiro nenhum, como já era.
+
+Novos testes em `seguradora.test.ts`: aprovar um sinistro credita o cedente e debita a seguradora exatamente pelo valor de face (e marca a duplicata `'Paga'` em `/minhas`), negar um sinistro não altera o extrato do cedente. Verificado: `npm run typecheck`/`test`/`build` todos verdes (server 110 arquivos/679 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).

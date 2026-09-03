@@ -12,6 +12,24 @@ async function loginSeguradora() {
   return res.body.token as string;
 }
 
+function unique(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function register(role: 'cedente' | 'sacado' | 'investidor', companyName: string) {
+  const email = `${unique(role)}@example.com`;
+  const res = await request(app).post('/api/auth/register').send({ nome: 'Teste', email, password: 'senha123', companyName, role });
+  return { token: res.body.token as string, userId: res.body.user.id as number };
+}
+
+async function emitirComRetry(token: string, body: Record<string, unknown>) {
+  let res = await request(app).post('/api/emitir/submit').set('Authorization', `Bearer ${token}`).send(body);
+  for (let attempt = 0; attempt < 5 && res.status !== 200; attempt++) {
+    res = await request(app).post('/api/emitir/submit').set('Authorization', `Bearer ${token}`).send(body);
+  }
+  return res;
+}
+
 describe('seguradora role', () => {
   it('is forbidden for non-seguradora roles', async () => {
     const login = await request(app).post('/api/auth/login').send({ email: 'investidor@lastro.demo', password: 'demo1234' });
@@ -58,5 +76,90 @@ describe('seguradora role', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ decision: 'negado', note: 'tentativa duplicada' });
     expect(again.status).toBe(404);
+  });
+
+  it('aprovar um sinistro credita o cedente pelo valor de face e debita a seguradora — antes só dizia "indenizará" e nunca movia dinheiro', async () => {
+    const sacadoCompany = unique('Sacado Sinistro');
+    const { token: sacadoToken } = await register('sacado', sacadoCompany);
+    const { token: cedenteToken } = await register('cedente', unique('Cedente Sinistro'));
+    const { token: investidorToken } = await register('investidor', unique('Investidor Segura'));
+
+    const emit = await emitirComRetry(cedenteToken, {
+      sacado: sacadoCompany,
+      cnpj: '33.222.111/0001-77',
+      valor: '20.000',
+      vencimento: '2020-01-10', // já vencida — elegível a sinistro assim que segurada
+      seguro: false,
+      nfAnexada: true,
+      batchValores: [],
+    });
+    expect(emit.status).toBe(200);
+    const duplicataId = emit.body.duplicataId as string;
+    // Nunca disparada pro leilão — segue 'aprovada', igual ao caminho real que
+    // listClaimableByInsurerKey cobre ("o cedente nunca foi pago pelo mercado").
+
+    const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorToken}`).send({ key: 'too' });
+    expect(insure.status).toBe(200);
+
+    const seguradoraToken = await loginSeguradora();
+    const before = await request(app).get('/api/seguradora').set('Authorization', `Bearer ${seguradoraToken}`);
+    const sinistro = before.body.sinistros.find((s: { id: string }) => s.id === duplicataId);
+    expect(sinistro).toBeTruthy();
+
+    const recover = await request(app)
+      .post(`/api/seguradora/sinistro/${duplicataId}/decidir`)
+      .set('Authorization', `Bearer ${seguradoraToken}`)
+      .send({ decision: 'aprovado', note: 'Documentação conferida, indenização aprovada.' });
+    expect(recover.status).toBe(200);
+
+    const cedenteExtrato = await request(app).get('/api/account').set('Authorization', `Bearer ${cedenteToken}`);
+    const credit = cedenteExtrato.body.extrato.find((e: { descricao: string }) => e.descricao.includes(duplicataId) && e.descricao.includes('Indenização'));
+    expect(credit).toBeTruthy();
+    expect(credit.isPositive).toBe(true);
+    expect(credit.valorFmt.replace(/\D/g, '')).toBe('20000');
+
+    const seguradoraExtrato = await request(app).get('/api/account').set('Authorization', `Bearer ${seguradoraToken}`);
+    const debit = seguradoraExtrato.body.extrato.find((e: { descricao: string }) => e.descricao.includes(duplicataId) && e.descricao.includes('Indenização'));
+    expect(debit).toBeTruthy();
+    expect(debit.isPositive).toBe(false);
+    expect(debit.valorFmt.replace(/\D/g, '')).toBe('20000');
+
+    // Marcada 'paga' — não pode também virar candidata a cobrança jurídica e ser
+    // "recuperada" uma segunda vez pelo mesmo valor.
+    const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
+    const dup = minhas.body.duplicatas.find((d: { id: string }) => d.id === duplicataId);
+    expect(dup.status).toBe('Paga');
+  });
+
+  it('negar um sinistro não move dinheiro nenhum', async () => {
+    const sacadoCompany = unique('Sacado Sinistro Negado');
+    const { token: sacadoToken } = await register('sacado', sacadoCompany);
+    const { token: cedenteToken } = await register('cedente', unique('Cedente Sinistro Negado'));
+    const { token: investidorToken } = await register('investidor', unique('Investidor Segura Negado'));
+
+    const emit = await emitirComRetry(cedenteToken, {
+      sacado: sacadoCompany,
+      cnpj: '33.222.111/0001-77',
+      valor: '15.000',
+      vencimento: '2020-01-10',
+      seguro: false,
+      nfAnexada: true,
+      batchValores: [],
+    });
+    const duplicataId = emit.body.duplicataId as string;
+    await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorToken}`).send({ key: 'too' });
+
+    const seguradoraToken = await loginSeguradora();
+    const before = await request(app).get('/api/account').set('Authorization', `Bearer ${cedenteToken}`);
+    const countBefore = before.body.extrato.length;
+
+    const decide = await request(app)
+      .post(`/api/seguradora/sinistro/${duplicataId}/decidir`)
+      .set('Authorization', `Bearer ${seguradoraToken}`)
+      .send({ decision: 'negado', note: 'Sinistro não caracterizado.' });
+    expect(decide.status).toBe(200);
+
+    const after = await request(app).get('/api/account').set('Authorization', `Bearer ${cedenteToken}`);
+    expect(after.body.extrato.length).toBe(countBefore);
   });
 });
