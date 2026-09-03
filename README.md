@@ -669,6 +669,18 @@ Segunda PR da série: o financiamento automático do Programa Confirming (próxi
 
 Novos testes: `server/test/confirming-fundo.test.ts` (8 casos — aporte, resgate, limites, gating de papel, e o ciclo cota/NAV de ponta a ponta chamando `fundoFinanciarCompra`/`fundoRetornoDePagamento` diretamente, já que ainda não têm rota própria). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 103 arquivos/629 testes, client 24/24, sdks/node 9/9); `migrations-postgres/0062` conferido byte a byte contra `scripts/postgres/generate-schema.mjs`.
 
+### Financiamento automático do Programa Confirming (3/4)
+
+Terceira PR da série, a que de fato move dinheiro: emitir uma duplicata contra um sacado com programa ativo, sendo o cedente matriculado, agora pula o leilão inteiro — financiamento na hora, direto do fundo de fomento (PR 2).
+
+- **`tentarFinanciarViaPrograma`** (`lib/confirmingCore.ts`) — chamado de dentro de `submitEmitir` (`lib/emitirCore.ts`) só **depois** que a duplicata está de fato aprovada (checklist 100%, não suspensa pelo Compliance AI Engine) e nunca em modo sandbox. Identifica o sacado pela mesma amarração de nome que o resto do app já usa (`getSacadoAccountByCompanyName` — igual ao aceite, igual à notificação de emissão), checa programa ativo + matrícula ativa + espaço no limite do programa e no sublimite do cedente (novo `confirming_membros.utilizado`, migração `0063`) antes de financiar.
+- Quando financia: `createPurchase`/`settlePurchase` — os mesmos usados por uma compra manual no mercado aberto ou pelo auto-bid — na taxa do próprio programa, com capital da conta de sistema do Fundo de Fomento do Confirming (criada de forma preguiçosa na primeira compra, no mesmo padrão de conta-nunca-logável já usado por contas só-Google). A duplicata nunca passa por `'no_mercado'` — vai direto pra `'vendida'`.
+- O aceite continua rodando sem nenhuma alteração — o financiamento não espera a confirmação do sacado (esse é o ponto do "confirming"); uma contestação posterior cai no fluxo de disputa que já existe pra qualquer duplicata comprada, sem código novo.
+- **Limitação conhecida e documentada, não desta feature**: a plataforma como um todo ainda não modela um evento real de "recebimento no vencimento" pro caminho feliz (só existe pra recuperação via cobrança jurídica de atraso — `lib/legalCollectionFee.ts`). `fundoRetornoDePagamento` (PR 2) já existe pronta pra quando essa lacuna geral for fechada, mas não é o escopo desta PR resolvê-la.
+- **Client**: tela de sucesso da emissão (`EmitirPage.tsx`) diferencia "financiada na hora pelo Programa Confirming" de "enviada ao Marketplace".
+
+Novos testes: `server/test/confirming-auto-fund.test.ts` (6 casos — financiamento de ponta a ponta com o pool realmente debitado e o leilão genuinamente pulado, cedente não matriculado segue o fluxo normal, programa pausado nunca financia, limite do programa e sublimite do cedente respeitados, modo sandbox nunca financia). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 104 arquivos/635 testes, client 24/24, sdks/node 9/9); `migrations-postgres/0063` conferido byte a byte contra `scripts/postgres/generate-schema.mjs`.
+
 ## Running locally
 
 ```bash

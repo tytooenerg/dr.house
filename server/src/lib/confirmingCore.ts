@@ -1,5 +1,6 @@
-import { getSettings, updateSettings, getUserById } from '../db/users.js';
-import type { UserRow } from '../db/types.js';
+import { getSettings, updateSettings, getUserById, getSacadoAccountByCompanyName } from '../db/users.js';
+import type { UserRow, DuplicataRow } from '../db/types.js';
+import { createPurchase } from '../db/duplicatas.js';
 import {
   getMembro,
   getProgramaById,
@@ -8,7 +9,9 @@ import {
   listMatriculasByCedente,
   listMembrosByPrograma,
   setMembroStatus,
+  setMembroUtilizado,
   setProgramaStatus,
+  setProgramaUtilizado,
   upsertMembro,
   type ConfirmingMembroComCedente,
   type ConfirmingProgramaRow,
@@ -16,6 +19,8 @@ import {
 import { listAceitesBySacadoNome } from '../db/aceites.js';
 import { buildBlendedRiscoViewSync } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
+import { settlePurchase } from './settlement.js';
+import { fundoFinanciarCompra, getOrCreateFundoSistemaUserId } from './confirmingFundo.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 
 // Programa Confirming / Risco Sacado — o sacado (comprador) pré-aprova um programa de
@@ -193,8 +198,7 @@ export interface MinhaMatriculaView {
   programaAtivo: boolean;
 }
 
-// O que um cedente vê: em quais programas de sacados ele está matriculado agora — só
-// leitura nesta fundação (nenhuma emissão ainda reage a isso).
+// O que um cedente vê: em quais programas de sacados ele está matriculado agora.
 export function listMinhasMatriculas(cedenteUser: UserRow): MinhaMatriculaView[] {
   return listMatriculasByCedente(cedenteUser.id).map((m) => ({
     sacadoNome: m.sacado_nome,
@@ -208,4 +212,47 @@ export function listMinhasMatriculas(cedenteUser: UserRow): MinhaMatriculaView[]
 // de criação — evita o sacado ter que redigitar o CNPJ se já o informou noutro lugar.
 export function getCompanyCnpj(user: UserRow): string {
   return getSettings(user).companyCnpj;
+}
+
+export type FinanciamentoAutomaticoResultado =
+  | { financiado: true }
+  | { financiado: false; motivo: 'sacado_sem_conta' | 'sem_programa_ativo' | 'nao_matriculado' | 'limite_programa_excedido' | 'sublimite_excedido' };
+
+// O coração do Programa Confirming: chamado por lib/emitirCore.ts's submitEmitir logo
+// depois que a duplicata está de fato aprovada (checklist 100%, não suspensa pelo
+// Compliance AI Engine) — nunca antes, pra não financiar algo que ainda pode ser barrado
+// segundos depois. Identifica o sacado pela mesma amarração de nome que o resto do app já
+// usa (getSacadoAccountByCompanyName — igual ao aceite, igual à notificação de emissão),
+// não por CNPJ: manter uma única fonte de verdade pra "quem é este sacado".
+//
+// Quando financia: pula o leilão de vez (a duplicata nunca passa por 'no_mercado' — vai
+// direto pra 'vendida' via createPurchase/settlePurchase, os mesmos usados por uma compra
+// manual no mercado aberto ou pelo auto-bid), na taxa do próprio programa, com capital do
+// Fundo de Fomento do Confirming (lib/confirmingFundo.ts), nunca do caixa da Lastro. O
+// aceite continua rodando sem alteração nenhuma — o financiamento não espera a confirmação
+// do sacado (esse é o ponto do "confirming": financiar na hora, e uma contestação
+// posterior cai no fluxo de disputa que já existe pra qualquer duplicata comprada.
+export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedenteUser: UserRow): Promise<FinanciamentoAutomaticoResultado> {
+  const sacadoAccount = getSacadoAccountByCompanyName(duplicata.sacado_nome);
+  if (!sacadoAccount) return { financiado: false, motivo: 'sacado_sem_conta' };
+
+  const programa = getProgramaBySacado(sacadoAccount.id);
+  if (!programa || programa.status !== 'ativo') return { financiado: false, motivo: 'sem_programa_ativo' };
+
+  const membro = getMembro(programa.id, cedenteUser.id);
+  if (!membro || membro.status !== 'ativo') return { financiado: false, motivo: 'nao_matriculado' };
+
+  if (programa.utilizado + duplicata.valor > programa.limite) return { financiado: false, motivo: 'limite_programa_excedido' };
+  if (membro.sublimite !== null && membro.utilizado + duplicata.valor > membro.sublimite) {
+    return { financiado: false, motivo: 'sublimite_excedido' };
+  }
+
+  const fundoUserId = await getOrCreateFundoSistemaUserId();
+  createPurchase(duplicata.id, fundoUserId, duplicata.valor, fmtTaxaAm(programa.taxa_am));
+  settlePurchase({ duplicataId: duplicata.id, sacadoNome: duplicata.sacado_nome, investorId: fundoUserId, cedenteId: cedenteUser.id, valor: duplicata.valor });
+  fundoFinanciarCompra(duplicata.id, duplicata.valor);
+  setProgramaUtilizado(programa.id, programa.utilizado + duplicata.valor);
+  setMembroUtilizado(membro.id, membro.utilizado + duplicata.valor);
+
+  return { financiado: true };
 }

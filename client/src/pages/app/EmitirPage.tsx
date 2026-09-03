@@ -204,7 +204,7 @@ export function EmitirPage() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ registro: string; seguro: boolean; registradora: string } | null>(null);
+  const [result, setResult] = useState<{ registro: string; seguro: boolean; registradora: string; financiadoViaPrograma: boolean } | null>(null);
   const [matriculas, setMatriculas] = useState<MinhaMatricula[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -261,7 +261,7 @@ export function EmitirPage() {
     }
     setSubmitting(true);
     try {
-      const data = await api.post<{ registro: string; seguro: boolean; registradora: string }>('/emitir/submit', {
+      const data = await api.post<{ registro: string; seguro: boolean; registradora: string; financiadoViaPrograma: boolean }>('/emitir/submit', {
         ...form,
         nfAnexada,
         batchValores: batchRows.map((r) => r.valor),
@@ -291,10 +291,13 @@ export function EmitirPage() {
           </div>
           <div className="font-extrabold text-lg">Duplicata registrada com sucesso</div>
           <div className="text-textSecondary text-[13.5px] mt-2">
-            Registro escritural nº {result.registro} confirmado na {result.registradora}. Status: enviada ao Marketplace.
+            {result.financiadoViaPrograma
+              ? `Registro escritural nº ${result.registro} confirmado na ${result.registradora}. Financiada na hora pelo Programa Confirming — sem passar pelo leilão.`
+              : `Registro escritural nº ${result.registro} confirmado na ${result.registradora}. Status: enviada ao Marketplace.`}
           </div>
           <div className="flex justify-center gap-2.5 mt-5.5">
             <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-greenBg text-green">Registrada — {result.registradora}</span>
+            {result.financiadoViaPrograma && <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-chip text-blue">Financiada via Confirming</span>}
             {result.seguro && <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-chip text-blue">Protegida por seguro</span>}
           </div>
           <Button className="mt-6" onClick={reset}>
