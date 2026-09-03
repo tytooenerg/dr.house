@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb, updateKybForm } from '../src/db/users.js';
+import { db } from '../src/db/index.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -125,13 +126,16 @@ describe('Webhooks v2 — sinistro.decidido', () => {
     // cedenteId: null — it exists only to give the demo seguradora account something to
     // look at, not to belong to a real, webhook-registered cedente. So this test builds
     // its own end-to-end sinistro instead of relying on dashboard.sinistros[0]:
-    // a real cedente emits a duplicata (100% lastro -> status 'aprovada') with a past
-    // vencimento, a real investidor insures it (setting insurer_key without buying it —
-    // see routes/market.ts POST /:id/insure, which doesn't require ownership), which
-    // makes it claimable by the matching seguradora per db/duplicatas.ts's
-    // listClaimableByInsurerKey (insurer_key set, sandbox=0, sinistro_status='none',
-    // status != 'vendida', AND overdue — a sinistro is only a real claim once the sacado
-    // has actually missed the payment date, not merely insured).
+    // a real cedente emits a duplicata (100% lastro -> status 'aprovada') with a
+    // still-future vencimento — a real seguradora never sells a policy on a loss that
+    // already happened (routes/market.ts POST /:id/insure now refuses that, 409
+    // 'already_overdue') — a real investidor insures it (setting insurer_key without
+    // buying it — POST /:id/insure doesn't require ownership of the position), and only
+    // then does the vencimento move into the past (simulating time passing after the
+    // policy was already in force), which makes it claimable by the matching seguradora
+    // per db/duplicatas.ts's listClaimableByInsurerKey (insurer_key set, sandbox=0,
+    // sinistro_status='none', status != 'vendida', AND overdue — a sinistro is only a
+    // real claim once the sacado has actually missed the payment date, not merely insured).
     const cedente = await registerEmpresarialCedente();
     let emitStatus = 0;
     let duplicataId = '';
@@ -139,7 +143,7 @@ describe('Webhooks v2 — sinistro.decidido', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedente.token}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-90', valor: '20.000', vencimento: '2020-01-10', seguro: true, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-90', valor: '20.000', vencimento: '2026-09-10', seguro: true, nfAnexada: true });
       emitStatus = res.status;
       if (res.status === 200) duplicataId = res.body.duplicataId as string;
     }
@@ -160,6 +164,7 @@ describe('Webhooks v2 — sinistro.decidido', () => {
       .set('Authorization', `Bearer ${investidor.token}`)
       .send({ key: 'too' });
     expect(insure.status).toBe(200);
+    db.prepare('UPDATE duplicatas SET vencimento = ? WHERE id = ?').run('2020-01-10', duplicataId);
 
     const seguradoraLogin = await request(app).post('/api/auth/login').send({ email: 'seguradora@lastro.demo', password: 'demo1234' });
     const dashboard = await request(app).get('/api/seguradora').set('Authorization', `Bearer ${seguradoraLogin.body.token}`);

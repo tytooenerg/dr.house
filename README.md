@@ -807,6 +807,17 @@ Mesma classe de bug das correções anteriores (deságio real, `recordRecovery`)
 
 Novos testes em `seguradora.test.ts`: aprovar um sinistro credita o cedente e debita a seguradora exatamente pelo valor de face (e marca a duplicata `'Paga'` em `/minhas`), negar um sinistro não altera o extrato do cedente. Verificado: `npm run typecheck`/`test`/`build` todos verdes (server 110 arquivos/679 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
 
+### `POST /market/:id/insure` deixava contratar seguro numa duplicata que já venceu
+
+Achado direto da correção acima: antes, aprovar um sinistro não pagava nada, então essa lacuna era inofensiva na prática. Agora que `decideSinistro` move dinheiro de verdade, ela virou um vetor de fraude real — `POST /:id/insure` nunca checava se o vencimento da duplicata já tinha passado antes de vender uma apólice. Qualquer conta `investidor` podia "segurar" uma duplicata já vencida e nunca vendida (o risco já realizado, uma perda já certa) e imediatamente reivindicar a indenização integral — o oposto de underwriting, que só cobre um risco futuro desconhecido.
+
+- **`lib/insuranceQuotes.ts`**: `diasAteVencimento` exportado (já existia, só era interno) para reuso na validação.
+- **`routes/market.ts`**: `POST /:id/insure` agora recusa (`409 already_overdue`) contratar uma apólice nova (`newKey !== d.insurer_key`) quando `diasAteVencimento(d.vencimento) < 0`. Trocar pra `null` (cancelar) ou resubmeter a mesma seguradora já contratada continuam permitidos mesmo depois do vencimento, já que não movem dinheiro novo.
+
+Novo teste em `seguradora.test.ts` cobrindo a recusa; os testes existentes que seguravam uma duplicata já vencida antes de tentar contratar (`seguradora.test.ts`, `webhooks-v2.test.ts`) foram ajustados pra contratar o seguro com o vencimento ainda no futuro e só depois simular o tempo passando (`UPDATE duplicatas SET vencimento = ...` direto no banco) — o mesmo padrão que o caminho real teria (apólice em vigor antes do sinistro acontecer). Verificado: `npm run typecheck`/`test`/`build` todos verdes (server 110 arquivos/680 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
+
+**Achado em aberto, não corrigido ainda**: `POST /:id/insure` continua sem checar se quem está contratando o seguro realmente detém uma posição na duplicata (nenhuma exigência de que ela esteja `'vendida'` pro mesmo investidor, ou de que ele tenha comprado algo). O comentário do próprio código (`lib/settlement.ts`'s `settleInsurance`) descreve a intenção como "o investidor protegendo a própria posição", mas nada no código impõe isso — qualquer conta `investidor` pode segurar qualquer duplicata de terceiros. Isso é ortogonal ao fix acima (que fecha só a janela temporal) e mais ambíguo: o dado seedado (`db/seed.ts`) mostra duplicatas do marketplace sendo seguradas *antes* de vendidas, como recurso de atratividade — o que sugere que o produto real pode ter sido pensado pra permitir isso deliberadamente. Não corrigido nesta rodada por ser uma decisão de produto, não um bug óbvio.
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).

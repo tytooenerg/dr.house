@@ -19,7 +19,7 @@ function clampPremio(pct: number): number {
   return Math.max(PREMIO_FLOOR_PCT, Math.min(PREMIO_CEIL_PCT, pct));
 }
 
-function diasAteVencimento(vencimento: string): number {
+export function diasAteVencimento(vencimento: string): number {
   const ms = parseFlexibleDate(vencimento).getTime() - Date.now();
   return Math.round(ms / (24 * 3600 * 1000));
 }
