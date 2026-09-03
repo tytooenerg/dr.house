@@ -1,6 +1,7 @@
 import { askClaude, claudeEnabled } from './claude.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { getDisputeByAceite } from '../db/disputes.js';
+import { getOfferingByDuplicata } from '../db/fractionalOfferings.js';
 import { parseFlexibleDate, fmtBRL } from './format.js';
 import { logger } from './logger.js';
 import type { DuplicataRow } from '../db/types.js';
@@ -29,6 +30,16 @@ export interface CollectionEligibility {
 export function checkCollectionEligibility(duplicata: DuplicataRow): CollectionEligibility {
   const diasEmAtraso = Math.floor((Date.now() - parseFlexibleDate(duplicata.vencimento).getTime()) / 86_400_000);
   if (diasEmAtraso <= 0) return { eligible: false, reason: 'Duplicata ainda não vencida.', diasEmAtraso };
+  // lib/legalCollectionFee.ts's recordRecovery credits a single creditor (currentCreditorFor
+  // — a whole-purchase holder or the cedente) — a duplicata fracionada (lib/db/
+  // fractionalOfferings.ts) has many real creditors (the token holders) instead, which
+  // recordRecovery doesn't yet know how to split a recovery across. Refusing here is the
+  // honest choice: silently falling back to a single creditor would repeat the exact same
+  // "cedente credited twice, holders get nothing" bug the pagamento-no-vencimento fix
+  // already closed for the on-time path — not yet supported for cobrança jurídica.
+  if (getOfferingByDuplicata(duplicata.id)) {
+    return { eligible: false, reason: 'Duplicata fracionada — cobrança jurídica ainda não sabe distribuir a recuperação entre os holders.', diasEmAtraso };
+  }
   const aceite = getAceiteByDuplicata(duplicata.id);
   if (!aceite || aceite.status !== 'aceita') {
     return { eligible: false, reason: 'Aceite não confirmado pelo sacado — cobrança jurídica exige aceite confirmado.', diasEmAtraso };
