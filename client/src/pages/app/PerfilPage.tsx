@@ -5,6 +5,7 @@ import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
 
 interface ProfileData {
@@ -98,20 +99,30 @@ export function PerfilPage() {
   const [pushConfig, setPushConfig] = useState<PushConfig | null>(null);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushError, setPushError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.get<ProfileData>('/profile').then(setData);
-    api.get<ReferralData>('/referral').then(setReferral);
-    api.get<TwoFactorStatus>('/auth/2fa/status').then(setTwoFactor);
-    api.get<PushConfig>('/notifications/push/config').then(setPushConfig);
+  const load = () => {
+    setLoadError(null);
+    api
+      .get<ProfileData>('/profile')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar seu perfil.'));
+    api.get<ReferralData>('/referral').then(setReferral).catch(() => {});
+    api.get<TwoFactorStatus>('/auth/2fa/status').then(setTwoFactor).catch(() => {});
+    api.get<PushConfig>('/notifications/push/config').then(setPushConfig).catch(() => {});
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.getRegistration().then(async (registration) => {
         const sub = await registration?.pushManager.getSubscription();
         setPushSubscribed(!!sub);
       });
     }
+  };
+
+  useEffect(() => {
+    load();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   const setField = async (field: keyof ProfileData['profileForm'], value: string) => {

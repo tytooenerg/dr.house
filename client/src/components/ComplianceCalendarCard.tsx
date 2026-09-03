@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { Card } from './ui/Card';
 import { Select } from './ui/Input';
 import { Button } from './ui/Button';
+import { ErrorState } from './ui/ErrorState';
 
 type FaturamentoBracket = 'acima_300m' | 'entre_90m_300m' | 'entre_4_8m_90m' | 'ate_4_8m';
 type Status = 'nao_informado' | 'assistida_disponivel' | 'obrigatorio_pleno';
@@ -39,12 +40,21 @@ export function ComplianceCalendarCard() {
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<FaturamentoBracket>('ate_4_8m');
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    api
+      .get<ComplianceCalendarView>('/conformidade')
+      .then((v) => {
+        setView(v);
+        setEditing(v.bracket === null);
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar seu prazo de conformidade.'));
+  };
 
   useEffect(() => {
-    api.get<ComplianceCalendarView>('/conformidade').then((v) => {
-      setView(v);
-      setEditing(v.bracket === null);
-    });
+    load();
   }, []);
 
   const save = async () => {
@@ -58,6 +68,7 @@ export function ComplianceCalendarCard() {
     }
   };
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!view) return null;
   const style = STATUS_STYLE[view.status];
 

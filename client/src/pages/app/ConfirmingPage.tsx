@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
 
 interface FundoOverview {
@@ -26,8 +27,15 @@ function FundoCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<FundoOverview>('/confirming-fundo').then(setFundo);
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<FundoOverview>('/confirming-fundo')
+      .then(setFundo)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o fundo de fomento.'));
+  };
 
   useEffect(() => {
     load();
@@ -75,6 +83,7 @@ function FundoCard() {
     }
   };
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!fundo) return null;
 
   return (
@@ -175,6 +184,7 @@ export function ConfirmingPage() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = () =>
     api.get<{ programa: ProgramaView | null; cnpjAtual: string }>('/confirming/meu-programa').then((d) => {
@@ -184,11 +194,13 @@ export function ConfirmingPage() {
 
   const loadElegiveis = () => api.get<{ elegiveis: CedenteElegivel[] }>('/confirming/elegiveis').then((d) => setElegiveis(d.elegiveis));
 
+  const loadAll = () => {
+    setLoadError(null);
+    Promise.all([load(), loadElegiveis()]).catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar seu Programa Confirming.'));
+  };
+
   useEffect(() => {
-    if (isSacado) {
-      load();
-      loadElegiveis();
-    }
+    if (isSacado) loadAll();
   }, [isSacado]);
 
   const run = async (key: string, fn: () => Promise<void>, fallbackMessage: string) => {
@@ -270,7 +282,9 @@ export function ConfirmingPage() {
 
       <FundoCard />
 
-      {isSacado && (
+      {isSacado && loadError && <ErrorState message={loadError} onRetry={loadAll} />}
+
+      {isSacado && !loadError && (
         <>
           {error && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold">{error}</div>}
           {notice && <div className="mb-4 px-3.5 py-3 rounded-lg bg-greenBg text-green text-sm font-semibold">{notice}</div>}

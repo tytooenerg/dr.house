@@ -5,6 +5,8 @@ import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { Badge } from '../../components/ui/Badge';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 
 interface Advertisement {
   logoUrl: string;
@@ -35,23 +37,30 @@ export function PublicidadePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [togglingAtivo, setTogglingAtivo] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () =>
-    api.get<AdvertisementData>('/advertisements/me').then((d) => {
-      setData(d);
-      if (d.ad) {
-        setLogoUrl(d.ad.logoUrl);
-        setTitulo(d.ad.titulo);
-        setTexto(d.ad.texto);
-        setLinkUrl(d.ad.linkUrl);
-      }
-    });
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<AdvertisementData>('/advertisements/me')
+      .then((d) => {
+        setData(d);
+        if (d.ad) {
+          setLogoUrl(d.ad.logoUrl);
+          setTitulo(d.ad.titulo);
+          setTexto(d.ad.texto);
+          setLinkUrl(d.ad.linkUrl);
+        }
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar seu anúncio.'));
+  };
 
   useEffect(() => {
     load();
   }, []);
 
-  if (!data) return null;
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
+  if (!data) return <PageSkeleton />;
 
   const save = async () => {
     setSaving(true);

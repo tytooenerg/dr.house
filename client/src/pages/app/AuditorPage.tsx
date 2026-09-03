@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 import { useLang } from '../../lib/i18n';
 
 interface AuditorOverview {
@@ -19,12 +21,22 @@ interface AuditorOverview {
 export function AuditorPage() {
   const { t } = useLang();
   const [data, setData] = useState<AuditorOverview | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    api
+      .get<AuditorOverview>('/auditor/overview')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o painel de auditoria.'));
+  };
 
   useEffect(() => {
-    api.get<AuditorOverview>('/auditor/overview').then(setData);
+    load();
   }, []);
 
-  if (!data) return null;
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
+  if (!data) return <PageSkeleton />;
 
   return (
     <div>

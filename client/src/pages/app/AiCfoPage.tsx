@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Segmented } from '../../components/ui/Segmented';
 import { AiTag } from '../../components/ui/Badge';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 import { useSession } from '../../state/SessionContext';
@@ -115,11 +116,21 @@ export function AiCfoPage() {
   const isEmpresarial = user?.plan === 'empresarial';
   const [forecast, setForecast] = useState<CashflowForecast | null>(null);
   const [scenario, setScenario] = useState<ScenarioResult['scenario']>('base');
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    api
+      .get<CashflowForecast>('/cashflow/forecast')
+      .then(setForecast)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar a projeção de caixa.'));
+  };
 
   useEffect(() => {
-    api.get<CashflowForecast>('/cashflow/forecast').then(setForecast);
+    load();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!forecast) return null;
 
   const active = forecast.scenarios.find((s) => s.scenario === scenario) ?? forecast.scenarios[0];

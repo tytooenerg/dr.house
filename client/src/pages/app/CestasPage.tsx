@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface CestaDef {
   key: 'conservadora' | 'diversificada' | 'agressiva';
@@ -26,9 +27,18 @@ export function CestasPage() {
   const [result, setResult] = useState<InvestResult | null>(null);
   const [error, setError] = useState('');
   const [needsSuitability, setNeedsSuitability] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ cestas: CestaDef[] }>('/cestas')
+      .then((d) => setCestas(d.cestas))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar as cestas de investimento.'));
+  };
 
   useEffect(() => {
-    api.get<{ cestas: CestaDef[] }>('/cestas').then((d) => setCestas(d.cestas));
+    load();
   }, []);
 
   const investir = async () => {
@@ -53,6 +63,9 @@ export function CestasPage() {
     <div>
       <PageHeader title="Cestas de Investimento" subtitle="Invista um valor e deixe a Lastro alocar entre as melhores ofertas do perfil escolhido" />
 
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
+
+      {!loadError && (
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         {cestas.map((c) => (
           <Card
@@ -73,6 +86,7 @@ export function CestasPage() {
           </Card>
         ))}
       </div>
+      )}
 
       {selected && (
         <Card className="mb-4">

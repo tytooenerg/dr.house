@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 
 interface Historico {
@@ -74,30 +75,55 @@ export function HistoricoPage() {
   const [exportingIr, setExportingIr] = useState(false);
   const [performance, setPerformance] = useState<PerformanceDashboard | null>(null);
   const [riskFreeInput, setRiskFreeInput] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [secondaryLoadError, setSecondaryLoadError] = useState(false);
+
+  const loadHistorico = () => {
+    setLoadError(null);
+    api
+      .get<HistoricoData>(`/historico?page=${page}&pageSize=10`)
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o extrato.'));
+  };
 
   useEffect(() => {
-    api.get<HistoricoData>(`/historico?page=${page}&pageSize=10`).then(setData);
+    loadHistorico();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
   useEffect(() => {
-    api.get<RebalanceView>('/historico/rebalanceamento').then(setRebalance);
+    api
+      .get<RebalanceView>('/historico/rebalanceamento')
+      .then(setRebalance)
+      .catch(() => setSecondaryLoadError(true));
   }, []);
 
   const loadPerformance = (riskFree: number) => {
-    api.get<PerformanceDashboard>(`/historico/performance?riskFree=${riskFree}`).then(setPerformance);
+    api
+      .get<PerformanceDashboard>(`/historico/performance?riskFree=${riskFree}`)
+      .then(setPerformance)
+      .catch(() => setSecondaryLoadError(true));
   };
 
   useEffect(() => {
     loadPerformance(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    api.get<InstitutionalStatus>('/historico/institutional/status').then(setInstitutional);
+    api
+      .get<InstitutionalStatus>('/historico/institutional/status')
+      .then(setInstitutional)
+      .catch(() => setSecondaryLoadError(true));
   }, []);
 
   useEffect(() => {
-    if (institutional?.enabled) api.get<InstitutionalAnalytics>('/historico/institutional/analytics').then(setAnalytics);
-    else setAnalytics(null);
+    if (institutional?.enabled) {
+      api
+        .get<InstitutionalAnalytics>('/historico/institutional/analytics')
+        .then(setAnalytics)
+        .catch(() => setSecondaryLoadError(true));
+    } else setAnalytics(null);
   }, [institutional?.enabled]);
 
   const toggleInstitutional = async (enabled: boolean) => {
@@ -157,6 +183,12 @@ export function HistoricoPage() {
         }
       />
 
+      {loadError && <ErrorState message={loadError} onRetry={loadHistorico} />}
+      {secondaryLoadError && (
+        <div className="mb-3 text-[11.5px] text-textSecondary">Algumas seções auxiliares (rebalanceamento, performance ou analytics) não puderam ser carregadas.</div>
+      )}
+
+      {!loadError && (
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <NavyCard>
           <div className="text-[#8B97AC] text-[13px] font-semibold">Total investido</div>
@@ -171,6 +203,7 @@ export function HistoricoPage() {
           <div className="text-2xl font-extrabold mt-2.5">{data?.rentabilidadeMediaFmt ?? '—'}</div>
         </Card>
       </div>
+      )}
 
       {rebalance && rebalance.posicoesAtivas > 0 && (
         <Card className="mb-4 px-6 py-5">
@@ -401,7 +434,7 @@ export function HistoricoPage() {
             </span>
           </div>
         ))}
-        {historico.length === 0 && <EmptyState title={t('historico.emptyTitle', 'Nenhuma operação ainda')} hint={t('historico.emptyHint', 'Suas operações concluídas vão aparecer aqui')} />}
+        {!loadError && historico.length === 0 && <EmptyState title={t('historico.emptyTitle', 'Nenhuma operação ainda')} hint={t('historico.emptyHint', 'Suas operações concluídas vão aparecer aqui')} />}
         {historico.length > 0 && totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-border text-[12.5px] text-textSecondary">
             <span>

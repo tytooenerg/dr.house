@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface Aceite {
   id: number;
@@ -20,9 +21,18 @@ const COLS = '1.1fr 1.3fr 0.9fr 1.2fr 1.3fr';
 
 export function AceitePage() {
   const [aceites, setAceites] = useState<Aceite[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ aceites: Aceite[] }>('/aceites')
+      .then((d) => setAceites(d.aceites))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar os aceites.'));
+  };
 
   useEffect(() => {
-    api.get<{ aceites: Aceite[] }>('/aceites').then((d) => setAceites(d.aceites));
+    load();
   }, []);
 
   return (
@@ -32,6 +42,9 @@ export function AceitePage() {
         subtitle="Acompanhe a manifestação do sacado sobre cada duplicata — só duplicatas aceitas ou com aceite tácito podem ser negociadas com segurança jurídica plena"
       />
 
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
+
+      {!loadError && (
       <div className="bg-white border border-border rounded-card overflow-hidden">
         <div className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
           <div>Duplicata</div>
@@ -60,6 +73,7 @@ export function AceitePage() {
         ))}
         {aceites.length === 0 && <EmptyState title="Nenhuma duplicata aguardando manifestação" hint="Novas duplicatas emitidas para você vão aparecer aqui" />}
       </div>
+      )}
     </div>
   );
 }

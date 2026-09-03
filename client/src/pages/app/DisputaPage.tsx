@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface Dispute {
   id: number;
@@ -19,8 +20,15 @@ export function DisputaPage() {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [errorById, setErrorById] = useState<Record<number, string>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<{ disputes: Dispute[] }>('/disputas').then((d) => setDisputes(d.disputes));
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ disputes: Dispute[] }>('/disputas')
+      .then((d) => setDisputes(d.disputes))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar suas disputas.'));
+  };
 
   useEffect(() => {
     load();
@@ -57,8 +65,11 @@ export function DisputaPage() {
     <div>
       <PageHeader title="Resolução de Disputas" subtitle="Duplicatas contestadas pelo sacado — envie evidências e chegue a um acordo antes de escalar ao Banco Central" />
 
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
+
       <div className="flex flex-col gap-4">
-        {disputes.map((d) => (
+        {!loadError &&
+          disputes.map((d) => (
           <div key={d.id} className="bg-white rounded-card p-6" style={{ border: '1px solid #E9CFCB' }}>
             <div className="flex justify-between items-start mb-4 flex-wrap gap-2.5">
               <div>
@@ -113,7 +124,7 @@ export function DisputaPage() {
             </div>
           </div>
         ))}
-        {disputes.length === 0 && (
+        {!loadError && disputes.length === 0 && (
           <div className="bg-white border border-border rounded-card">
             <EmptyState title="Nenhuma disputa em aberto" hint="Duplicatas contestadas pelo sacado vão aparecer aqui" />
           </div>

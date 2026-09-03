@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 
 interface SuitabilityOption {
   value: string;
@@ -32,12 +33,18 @@ export function SuitabilityPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () =>
-    api.get<{ questions: SuitabilityQuestion[]; current: SuitabilityView }>('/suitability').then((d) => {
-      setQuestions(d.questions);
-      setCurrent(d.current);
-    });
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ questions: SuitabilityQuestion[]; current: SuitabilityView }>('/suitability')
+      .then((d) => {
+        setQuestions(d.questions);
+        setCurrent(d.current);
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o perfil de investidor.'));
+  };
 
   useEffect(() => {
     load();
@@ -67,7 +74,9 @@ export function SuitabilityPage() {
         subtitle="Questionário de suitability (adequação) — determina quais cestas de investimento você pode usar, seguindo o mesmo princípio das normas da CVM sobre adequação de produto ao perfil do investidor"
       />
 
-      {current && (
+      {loadError && <ErrorState message={loadError} onRetry={load} />}
+
+      {!loadError && current && (
         <Card className="mb-4">
           <div className="font-bold text-[15px] mb-2">Seu perfil atual</div>
           {current.hasAssessment ? (
@@ -94,6 +103,7 @@ export function SuitabilityPage() {
         </Card>
       )}
 
+      {!loadError && (
       <Card>
         <div className="font-bold text-[15px] mb-3.5">{current?.hasAssessment ? 'Refazer questionário' : 'Responder questionário'}</div>
         <div className="flex flex-col gap-5">
@@ -124,6 +134,7 @@ export function SuitabilityPage() {
           </Button>
         </div>
       </Card>
+      )}
     </div>
   );
 }

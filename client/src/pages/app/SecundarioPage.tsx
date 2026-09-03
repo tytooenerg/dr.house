@@ -3,6 +3,8 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
+import { ErrorState } from '../../components/ui/ErrorState';
+import { PageSkeleton } from '../../components/ui/Skeleton';
 
 interface ListingView {
   id: number;
@@ -93,7 +95,15 @@ export function SecundarioPage() {
   const [blockResult, setBlockResult] = useState<{ quantidade: number; valorTotalFmt: string; descontoPct: number } | null>(null);
   const [blockSubmitting, setBlockSubmitting] = useState(false);
 
-  const load = () => api.get<SecundarioData>('/secundario').then(setData);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<SecundarioData>('/secundario')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o mercado secundário.'));
+  };
 
   useEffect(() => {
     load();
@@ -110,7 +120,8 @@ export function SecundarioPage() {
     return list;
   }, [data, marketQuery, marketSort]);
 
-  if (!data) return null;
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
+  if (!data) return <PageSkeleton />;
 
   const runAction = async (key: string, fn: () => Promise<SecundarioData>, fallbackMessage: string) => {
     if (busyKey) return; // one money-moving action in flight at a time

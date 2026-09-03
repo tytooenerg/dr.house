@@ -735,6 +735,17 @@ Fecha os itens restantes de uma auditoria mais ampla de "onde falta produto/poli
 
 Novos testes: `server/test/advertisements.test.ts` (screening retorna `null` sem `ANTHROPIC_API_KEY`, 404 em anúncio inexistente, gating de papel) e `server/test/erp-connection-copilot.test.ts` (mesmo fallback real-when-configured, validação de conector/erro, autenticação). Os estados de loading/erro do client não têm um harness de mock de API estabelecido neste repo para testes de painel completo (a cobertura de client hoje é só componentes de UI/utilitários) — cobertos por leitura de código e pelo typecheck, não por um novo teste RTL. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 108 arquivos/653 testes, client 24/24, sdks/node 9/9).
 
+### Loading/erro faltando nas páginas do app fora do admin
+
+Uma segunda rodada de auditoria (a mesma investigação que corrigiu os 17 painéis do admin) achou o mesmo padrão de bug em 22 páginas de `client/src/pages/app/*.tsx` fora da pasta `admin/`, mais o componente compartilhado `ComplianceCalendarCard.tsx` — incluindo o próprio `DashboardPage.tsx` (primeira tela que todo usuário logado vê), `SacadoPage.tsx` (escondia a fila de aceites pendentes), `CompliancePage.tsx`, `AuditorPage.tsx` (retornava `null` pra sempre numa falha), `ContasPagarPage.tsx` (mascarava contas vencidas como "nenhuma") e mais 17 páginas.
+
+- Mesmo componente `components/ui/ErrorState.tsx` já criado para os painéis do admin, aplicado nessas 22 páginas + `ComplianceCalendarCard.tsx`.
+- `AutomacaoPage.tsx` tem uma nuance: como a página faz polling a cada 4s enquanto Auto-Bid está ativo, o erro de carga só bloqueia a tela na primeira falha (antes de qualquer dado real existir) — uma falha isolada de polling depois disso não derruba uma tela que já estava funcionando, só tenta de novo no próximo ciclo.
+- `HistoricoPage.tsx` (5 chamadas independentes) trata o extrato principal com o mesmo tratamento pleno; as 4 seções auxiliares (rebalanceamento, performance, analytics institucional) ganharam só uma nota inline discreta quando falham, sem bloquear o resto da página.
+- `RiscoPage.tsx`'s autocomplete e o card de matrículas do Confirming em `EmitirPage.tsx` foram deixados com falha silenciosa deliberada (o primeiro é uma busca debounced que se corrige sozinha a cada tecla; o segundo é um card decorativo opcional que não esconde nenhuma fila crítica).
+
+Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 108 arquivos/653 testes, client 24/24, sdks/node 9/9).
+
 ## Running locally
 
 ```bash

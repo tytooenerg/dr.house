@@ -4,6 +4,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
 
 type ApiKeyProduct =
@@ -107,12 +108,21 @@ export function DevPage() {
   const [keyError, setKeyError] = useState('');
   const [webhookError, setWebhookError] = useState('');
 
-  const load = () => api.get<DevData>('/dev').then(setData);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<DevData>('/dev')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o Ambiente de Desenvolvedores.'));
+  };
 
   useEffect(() => {
     load();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
 
   const setEndpoint = (key: string) => api.post<DevData>('/dev/playground/endpoint', { key }).then(setData);
