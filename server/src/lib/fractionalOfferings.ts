@@ -11,8 +11,10 @@ import {
 import { getDuplicata, isPurchased, setStatus } from '../db/duplicatas.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { platformFee, pctLabel } from './settlement.js';
+import { computePurchasePrice } from './marketCompute.js';
 import { fmtBRL } from './format.js';
-import type { UserRow } from '../db/types.js';
+import type { UserRow, DuplicataRow } from '../db/types.js';
+import type { FractionalOfferingRow } from '../db/fractionalOfferings.js';
 
 // Tokenização/fracionamento — a large duplicata is split into a fixed number of tokens
 // (each worth the same slice of face value) that multiple investors can buy independently
@@ -103,24 +105,34 @@ export function buyFractionalTokens(investor: UserRow, duplicataId: string, toke
     return { status: 409, body: { error: 'insufficient_tokens', message: `Apenas ${restantes} token(s) ainda disponíveis nesta oferta.` } };
   }
 
-  const valorInvestido = tokens * offering.token_valor;
-  const fee = platformFee(valorInvestido);
+  // O valor de face do lote de tokens (o que o cedente teria recebido cheio, e o que cada
+  // token vale de verdade no vencimento — ver settleFractionalAtMaturity abaixo) é
+  // diferente do preço que o investidor de fato paga agora: mesmo deságio real de
+  // lib/marketCompute.ts's computePurchasePrice que a compra integral já usa, prorateado
+  // por token — antes, o investidor pagava o valor de face inteiro (zero retorno possível)
+  // e o "retorno" mostrado era só um número fabricado por Math.random(), nunca creditado.
+  const facevalorTokens = tokens * offering.token_valor;
+  const fee = platformFee(facevalorTokens);
+  const { precoCompra: precoCompraTotal } = computePurchasePrice(d);
+  const precoPorToken = precoCompraTotal / FRACTIONAL_TOTAL_TOKENS;
+  const valorInvestido = tokens * precoPorToken;
   const net = valorInvestido - fee;
-  // Same simulated-return shape as a whole purchase (db/duplicatas.ts's createPurchase) —
-  // a real, dated liquidation event isn't modeled by this platform for any purchase path,
-  // whole or fractional; both credit a return at purchase time.
-  const retorno = Math.round(valorInvestido * (0.02 + Math.random() * 0.02));
+  // Ganho real (ainda não realizado) capturado nesta compra — a diferença entre o que o
+  // token vale de face e o que foi de fato pago por ele agora. Só vira dinheiro de verdade
+  // quando a duplicata for paga no vencimento (settleFractionalAtMaturity credita cada
+  // holder pelo valor de face cheio dos seus tokens).
+  const descontoCapturado = Math.round(facevalorTokens - valorInvestido);
 
   addLedgerEntry(investor.id, new Date().toLocaleDateString('pt-BR'), `Compra fracionada — duplicata ${duplicataId} (${tokens} token(s)) — ${d.sacado_nome}`, -valorInvestido);
   if (d.cedente_id) {
     addLedgerEntry(
       d.cedente_id,
       new Date().toLocaleDateString('pt-BR'),
-      `Liquidação fracionada da duplicata ${duplicataId} — taxa de plataforma ${pctLabel(valorInvestido)} descontada (${fmtBRL(fee)})`,
+      `Liquidação fracionada da duplicata ${duplicataId} — taxa de plataforma ${pctLabel(facevalorTokens)} descontada (${fmtBRL(fee)})`,
       net
     );
   }
-  createHolding(offering.id, investor.id, tokens, valorInvestido, retorno);
+  createHolding(offering.id, investor.id, tokens, valorInvestido, descontoCapturado);
   const updated = incrementTokensSold(offering.id, tokens);
   if (updated.tokens_vendidos >= updated.total_tokens) {
     markOfferingComplete(offering.id);
@@ -133,6 +145,31 @@ export function buyFractionalTokens(investor: UserRow, duplicataId: string, toke
   };
 }
 
+// Chamado por lib/aceiteCore.ts's reportPayment quando o sacado reporta o pagamento de uma
+// duplicata que tem (ou teve) um fracionamento — currentCreditorFor (legalCollectionFee.ts)
+// só conhece a tabela `purchases` de compra integral, então sem isso o pagamento caía no
+// fallback e creditava o CEDENTE de novo (que já recebeu na emissão/venda dos tokens),
+// deixando todo investidor fracionado sem receber nada de volta. Credita cada holder pelo
+// valor de face cheio dos tokens que ele tem (mesmo espírito de settlement.ts's
+// settleAtMaturity: o deságio já foi capturado na compra, aqui é só o valor de face
+// voltando) — e, se a oferta nunca foi 100% vendida, credita o cedente pela fração de
+// tokens que ele nunca vendeu (ele continua sendo o dono real desse pedaço até vendê-lo).
+export function settleFractionalAtMaturity(duplicata: DuplicataRow, offering: FractionalOfferingRow): void {
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  for (const h of listHoldingsForOffering(offering.id)) {
+    addLedgerEntry(h.investor_id, hoje, `Pagamento recebido no vencimento — duplicata ${duplicata.id} (${h.tokens} token(s) fracionados)`, h.tokens * offering.token_valor);
+  }
+  const tokensNaoVendidos = offering.total_tokens - offering.tokens_vendidos;
+  if (tokensNaoVendidos > 0 && duplicata.cedente_id) {
+    addLedgerEntry(
+      duplicata.cedente_id,
+      hoje,
+      `Pagamento recebido no vencimento — duplicata ${duplicata.id} (${tokensNaoVendidos} token(s) nunca vendidos, ainda seus)`,
+      tokensNaoVendidos * offering.token_valor
+    );
+  }
+}
+
 export function listMyFractionalHoldings(investorId: number) {
   return listHoldingsByInvestor(investorId).map((h) => ({
     duplicataId: h.duplicata_id,
@@ -141,6 +178,9 @@ export function listMyFractionalHoldings(investorId: number) {
     totalTokens: h.total_tokens,
     pctPosicao: Math.round((h.tokens / h.total_tokens) * 100),
     valorInvestidoFmt: fmtBRL(h.valor_investido),
+    // Ganho real (deságio já capturado na compra), ainda NÃO realizado em caixa — só vira
+    // dinheiro de verdade quando a duplicata for paga no vencimento
+    // (settleFractionalAtMaturity acima). Antes era um número fabricado por Math.random().
     retornoFmt: '+' + fmtBRL(h.retorno),
     quando: h.created_at,
   }));
