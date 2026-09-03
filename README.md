@@ -757,6 +757,17 @@ Investigação disparada pelo achado original ("o fundo do Confirming nunca rece
 
 Novos testes: `server/test/duplicata-payment.test.ts` — os 3 caminhos de credor (investidor via compra no marketplace, cedente quando a duplicata nunca foi vendida, fundo do Confirming com `getFundoBalance()`/`computeFundoNav()` conferidos antes/depois) e os bloqueios (papel diferente de sacado, duplicata de outra empresa, disputa em aberto, idempotência). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 109 arquivos/659 testes, client 24/24, sdks/node 9/9).
 
+### Métricas de performance para anunciantes (impressões, cliques, CTR)
+
+O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
+
+- **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).
+- **`db/advertisements.ts`**: `incrementImpressoes(ids)` (batch, chamada a cada request real em `GET /public/advertisements`, propositalmente fora do `cached()` de 30s — o cache evita recalcular a query, nunca deve esconder uma visita real) e `registerClique(id)` (só conta contra um anúncio ainda `aprovado`+`ativo`, mesmo gate do feed público).
+- **`routes/public.ts`**: novo `GET /public/advertisements/:id/click` — redirect de clique (302 pro `linkUrl` real), pra contar mesmo sem depender de JS no cliente; a landing page (`LandingPage.tsx`) agora aponta o `<a href>` do carrossel pra essa rota em vez do link direto do anunciante.
+- **`routes/advertisements.ts`** / **`PublicidadePage.tsx`**: `GET /advertisements/me` retorna `impressoes`/`cliques`, exibidos num card "Performance" com CTR calculado no cliente.
+
+Novos testes em `server/test/advertisements.test.ts`: impressão contada por request real servido (com invalidação explícita do cache em memória entre chamadas do teste), clique contado + redirect correto, clique bloqueado (404, sem incrementar) contra anúncio inexistente ou pausado. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 109 arquivos/662 testes, client 24/24, sdks/node 9/9); `scripts/postgres/generate-schema.mjs` confirma que a migração espelhada em `migrations-postgres/` é idêntica à gerada automaticamente.
+
 ## Running locally
 
 ```bash

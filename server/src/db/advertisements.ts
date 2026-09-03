@@ -10,6 +10,8 @@ export interface AdvertisementRow {
   status: 'pendente' | 'aprovado' | 'rejeitado';
   ativo: number;
   reject_reason: string | null;
+  impressoes: number;
+  cliques: number;
   created_at: string;
   updated_at: string;
 }
@@ -87,4 +89,26 @@ export function listActiveApprovedAdvertiserIds(): number[] {
   return (db.prepare("SELECT advertiser_id FROM advertisements WHERE status = 'aprovado' AND ativo = 1").all() as { advertiser_id: number }[]).map(
     (r) => r.advertiser_id
   );
+}
+
+// Called once per real GET /public/advertisements request (routes/public.ts), for every ad
+// actually returned in that response — regardless of whether the ad list itself came from
+// cache (lib/cache.ts's 30s TTL just avoids recomputing the query, it never should skip
+// counting a real serve). Aggregate counter only, no per-event log — that's all
+// PublicidadePage.tsx needs to show the advertiser.
+export function incrementImpressoes(ids: number[]): void {
+  if (ids.length === 0) return;
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`UPDATE advertisements SET impressoes = impressoes + 1 WHERE id IN (${placeholders})`).run(...ids);
+}
+
+// Called from the public click-through redirect (routes/public.ts's GET
+// /public/advertisements/:id/click) — only counts a click against an ad that's actually
+// live (aprovado + ativo) right now, same gate as the carousel feed itself, so a click on
+// an ad that got paused/rejected between page load and click doesn't inflate the number.
+// Returns the row so the caller can redirect to its real link_url even after incrementing.
+export function registerClique(id: number): AdvertisementRow | undefined {
+  const result = db.prepare("UPDATE advertisements SET cliques = cliques + 1 WHERE id = ? AND status = 'aprovado' AND ativo = 1").run(id);
+  if (result.changes === 0) return undefined;
+  return getAdvertisement(id);
 }

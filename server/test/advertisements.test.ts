@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { resetMemCacheForTests } from '../src/lib/cache.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -227,6 +228,60 @@ describe('Carrossel de publicidade — feed público (routes/public.ts)', () => 
     expect(feed.body.ads).toEqual([]);
 
     await request(app).post('/api/admin/feature-flags/ad_carousel').set('Authorization', `Bearer ${admin}`).send({ enabled: true, rolloutPct: 100 });
+  });
+});
+
+describe('Carrossel de publicidade — métricas de performance (impressões/cliques)', () => {
+  async function registrarEAprovar(titulo: string) {
+    const { token } = await registerAnunciante(`${titulo} ${unique()}`);
+    await request(app).post('/api/advertisements/me').set('Authorization', `Bearer ${token}`).send({ ...VALID_AD, titulo });
+    const admin = await adminToken();
+    const pending = await request(app).get('/api/admin/advertisements').set('Authorization', `Bearer ${admin}`);
+    const mine = pending.body.pending.find((p: { titulo: string }) => p.titulo === titulo);
+    await request(app).post(`/api/admin/advertisements/${mine.id}/decidir`).set('Authorization', `Bearer ${admin}`).send({ decision: 'aprovado' });
+    return { token, adId: mine.id as number };
+  }
+
+  it('GET /public/advertisements conta uma impressão por anúncio servido, refletida em /advertisements/me', async () => {
+    const { token } = await registrarEAprovar(`Impressao ${unique()}`);
+    const before = await request(app).get('/api/advertisements/me').set('Authorization', `Bearer ${token}`);
+    const impressoesBefore = before.body.ad.impressoes as number;
+
+    // O feed público é cacheado por 30s (lib/cache.ts) — sem invalidar aqui, uma chamada
+    // anterior a este teste no mesmo arquivo poderia ter cacheado uma lista sem o anúncio
+    // recém-aprovado, fazendo a impressão nunca ser contada pra ele.
+    resetMemCacheForTests();
+    await request(app).get('/api/public/advertisements');
+    await request(app).get('/api/public/advertisements');
+
+    const after = await request(app).get('/api/advertisements/me').set('Authorization', `Bearer ${token}`);
+    expect(after.body.ad.impressoes).toBe(impressoesBefore + 2);
+    expect(after.body.ad.cliques).toBe(0);
+  });
+
+  it('GET /public/advertisements/:id/click conta o clique e redireciona pro link real', async () => {
+    const { token, adId } = await registrarEAprovar(`Clique ${unique()}`);
+
+    const click = await request(app).get(`/api/public/advertisements/${adId}/click`).redirects(0);
+    expect(click.status).toBe(302);
+    expect(click.headers.location).toBe(VALID_AD.linkUrl);
+
+    const after = await request(app).get('/api/advertisements/me').set('Authorization', `Bearer ${token}`);
+    expect(after.body.ad.cliques).toBe(1);
+  });
+
+  it('clique em anúncio inexistente ou pausado retorna 404 e não conta', async () => {
+    const inexistente = await request(app).get('/api/public/advertisements/999999/click').redirects(0);
+    expect(inexistente.status).toBe(404);
+
+    const { token: pausadoToken, adId } = await registrarEAprovar(`Pausado Clique ${unique()}`);
+    await request(app).post('/api/advertisements/me/toggle').set('Authorization', `Bearer ${pausadoToken}`).send({ ativo: false });
+
+    const click = await request(app).get(`/api/public/advertisements/${adId}/click`).redirects(0);
+    expect(click.status).toBe(404);
+
+    const after = await request(app).get('/api/advertisements/me').set('Authorization', `Bearer ${pausadoToken}`);
+    expect(after.body.ad.cliques).toBe(0);
   });
 });
 

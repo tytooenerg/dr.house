@@ -18,7 +18,7 @@ import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
 import { isFeatureEnabled } from '../lib/featureFlags.js';
-import { listActiveApprovedAdvertisements } from '../db/advertisements.js';
+import { listActiveApprovedAdvertisements, incrementImpressoes, registerClique } from '../db/advertisements.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
 // the embeddable rate simulator widget — all meant to be called from outside the app
@@ -146,7 +146,40 @@ publicRouter.get('/advertisements', async (_req, res) => {
     res.json({ ads: [] });
     return;
   }
-  res.json({ ads: await cached('public:advertisements', 30, () => listActiveApprovedAdvertisements()) });
+  const ads = await cached('public:advertisements', 30, () => listActiveApprovedAdvertisements());
+  // Conta uma impressão por anúncio a cada request real servido — deliberadamente fora do
+  // `cached()` acima, que só evita recalcular a query a cada 30s: o cache nunca deve
+  // esconder uma visita real de quem está vendo o carrossel. Métrica de performance pro
+  // próprio anunciante (client/src/pages/app/PublicidadePage.tsx), contador agregado só.
+  incrementImpressoes(ads.map((a) => a.id));
+  res.json({ ads });
+});
+
+const adClickLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited' },
+});
+
+// Click-through redirect for the carousel's link — the landing page points its <a href>
+// straight at this route instead of the advertiser's own linkUrl, so a real click always
+// counts (works even without JS) before bouncing the visitor to the actual destination.
+// Only counts against a still-live ad (aprovado + ativo, same gate as the feed above) —
+// see db/advertisements.ts's registerClique.
+publicRouter.get('/advertisements/:id/click', adClickLimiter, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  const ad = registerClique(id);
+  if (!ad) {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  res.redirect(ad.link_url);
 });
 
 publicRouter.get('/status', (_req, res) => {
