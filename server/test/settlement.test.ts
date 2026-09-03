@@ -180,4 +180,73 @@ describe('real settlement on a mercado secundário resale', () => {
     expect(debit).toBeTruthy();
     expect(debit.valorFmt.replace(/\D/g, '')).toBe('2000');
   });
+
+  // Achado não coberto por nenhum teste até agora: depois de uma revenda, quem tem que
+  // receber o valor de face no vencimento é quem comprou por último (currentCreditorFor),
+  // não o comprador original — o teste acima só checa a liquidação da própria revenda,
+  // nunca chega até o pagamento no vencimento.
+  it('credita quem detém a posição no vencimento — o comprador original de uma duplicata revendida não recebe nada', async () => {
+    const sacadoCompany = `Sacado Revenda ${unique()} Ltda`;
+    const sacadoRes = await request(app)
+      .post('/api/auth/register')
+      .send({ nome: 'Sacado', email: `sac-resale-${unique()}@example.com`, password: 'senha123', companyName: sacadoCompany, role: 'sacado' });
+    const sacadoToken = sacadoRes.body.token as string;
+
+    const cedenteReg = await request(app)
+      .post('/api/auth/register')
+      .send({ nome: 'Cedente', email: `ced-resale-${unique()}@example.com`, password: 'senha123', companyName: `Cedente Revenda ${unique()}`, role: 'cedente' });
+    const cedenteToken = cedenteReg.body.token as string;
+
+    let duplicataId = '';
+    for (let attempt = 0; attempt < 8 && !duplicataId; attempt++) {
+      const res = await request(app)
+        .post('/api/emitir/submit')
+        .set('Authorization', `Bearer ${cedenteToken}`)
+        .send({ sacado: sacadoCompany, cnpj: '', valor: '18.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+      if (res.status === 200) duplicataId = res.body.duplicataId;
+    }
+    expect(duplicataId).toBeTruthy();
+    await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
+
+    const originalBuyer = await registerInvestidor();
+    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${originalBuyer.token}`);
+    expect(buy.status).toBe(200);
+
+    const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${originalBuyer.token}`);
+    const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId);
+    expect(position).toBeTruthy();
+    const listRes = await request(app)
+      .post('/api/secundario/listar')
+      .set('Authorization', `Bearer ${originalBuyer.token}`)
+      .send({ purchaseId: position.purchaseId, askingValor: '18.500' });
+    const listing = listRes.body.market.find((l: { duplicataId: string }) => l.duplicataId === duplicataId);
+    expect(listing).toBeTruthy();
+
+    const newBuyer = await registerInvestidor();
+    const resaleBuy = await request(app).post(`/api/secundario/${listing.id}/comprar`).set('Authorization', `Bearer ${newBuyer.token}`);
+    expect(resaleBuy.status).toBe(200);
+
+    const aceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacadoToken}`);
+    const aceite = aceites.body.aceites.find((a: { duplicataId?: string; duplicata_id?: string }) => (a.duplicataId ?? a.duplicata_id) === duplicataId);
+    expect(aceite).toBeTruthy();
+
+    const originalBuyerExtratoBefore = await request(app).get('/api/account').set('Authorization', `Bearer ${originalBuyer.token}`);
+    const originalBuyerCountBefore = originalBuyerExtratoBefore.body.extrato.length;
+
+    const pay = await request(app).post(`/api/aceites/${aceite.id}/pagamento`).set('Authorization', `Bearer ${sacadoToken}`);
+    expect(pay.status).toBe(200);
+
+    // Comprador original: nenhum lançamento novo no vencimento — já vendeu a posição.
+    const originalBuyerExtratoAfter = await request(app).get('/api/account').set('Authorization', `Bearer ${originalBuyer.token}`);
+    expect(originalBuyerExtratoAfter.body.extrato.length).toBe(originalBuyerCountBefore);
+
+    // Comprador atual (quem arrematou na revenda): recebe o valor de face integral.
+    const newBuyerExtrato = await request(app).get('/api/account').set('Authorization', `Bearer ${newBuyer.token}`);
+    const credit = newBuyerExtrato.body.extrato.find(
+      (e: { descricao: string; isPositive: boolean }) => e.descricao.includes(duplicataId) && e.descricao.includes('vencimento')
+    );
+    expect(credit).toBeTruthy();
+    expect(credit.isPositive).toBe(true);
+    expect(credit.valorFmt.replace(/\D/g, '')).toBe('18000');
+  });
 });
