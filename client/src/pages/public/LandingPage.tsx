@@ -40,7 +40,7 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
     <div className="px-14 py-10 max-w-[1360px] mx-auto">
       <div className="text-[11px] font-bold text-textTertiary uppercase tracking-wide mb-3 text-center">Publicidade</div>
       <a
-        href={ad.linkUrl}
+        href={`/api/public/advertisements/${ad.id}/click`}
         target="_blank"
         rel="noopener noreferrer sponsored"
         className="flex items-center gap-5 border border-border rounded-card p-6 hover:bg-[#F7F8FA] transition-colors"

@@ -23,6 +23,8 @@ function payload(ad: ReturnType<typeof getAdvertisementByAdvertiser>) {
           status: ad.status,
           ativo: !!ad.ativo,
           rejectReason: ad.reject_reason,
+          impressoes: ad.impressoes,
+          cliques: ad.cliques,
         }
       : null,
     precoMensalFmt: fmtAddOnPrice('publicidade_carrossel'),

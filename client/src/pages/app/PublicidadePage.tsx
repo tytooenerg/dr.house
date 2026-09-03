@@ -16,6 +16,8 @@ interface Advertisement {
   status: 'pendente' | 'aprovado' | 'rejeitado';
   ativo: boolean;
   rejectReason: string | null;
+  impressoes: number;
+  cliques: number;
 }
 interface AdvertisementData {
   ad: Advertisement | null;
@@ -123,6 +125,31 @@ export function PublicidadePage() {
           {data.ad.status === 'pendente' && (
             <div className="text-[12.5px] text-textSecondary mt-2">Um admin vai revisar o conteúdo antes dele ir ao ar — normalmente em até 1 dia útil.</div>
           )}
+        </Card>
+      )}
+
+      {data.ad && (
+        <Card className="mb-4">
+          <div className="font-bold text-[15px] mb-1">Performance</div>
+          <div className="text-textSecondary text-[12.5px] mb-3">
+            Quantas vezes seu anúncio apareceu no carrossel da página inicial e quantos cliques o link recebeu.
+          </div>
+          <div className="flex gap-8">
+            <div>
+              <div className="font-mono-num text-[22px] font-extrabold">{data.ad.impressoes.toLocaleString('pt-BR')}</div>
+              <div className="text-textTertiary text-[11.5px] font-bold uppercase tracking-wide mt-0.5">Impressões</div>
+            </div>
+            <div>
+              <div className="font-mono-num text-[22px] font-extrabold">{data.ad.cliques.toLocaleString('pt-BR')}</div>
+              <div className="text-textTertiary text-[11.5px] font-bold uppercase tracking-wide mt-0.5">Cliques</div>
+            </div>
+            <div>
+              <div className="font-mono-num text-[22px] font-extrabold">
+                {data.ad.impressoes > 0 ? `${((data.ad.cliques / data.ad.impressoes) * 100).toFixed(1)}%` : '—'}
+              </div>
+              <div className="text-textTertiary text-[11.5px] font-bold uppercase tracking-wide mt-0.5">CTR</div>
+            </div>
+          </div>
         </Card>
       )}
 
