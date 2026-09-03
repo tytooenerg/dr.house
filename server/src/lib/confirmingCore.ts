@@ -18,10 +18,12 @@ import {
   type ConfirmingProgramaRow,
 } from '../db/confirming.js';
 import { listAceitesBySacadoNome } from '../db/aceites.js';
+import { listOpenDisputesByCedente } from '../db/disputes.js';
 import { buildBlendedRiscoViewSync } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { settlePurchase } from './settlement.js';
 import { fundoFinanciarCompra, getOrCreateFundoSistemaUserId } from './confirmingFundo.js';
+import { getFundoBalance } from '../db/confirmingFundo.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 
 // Programa Confirming / Risco Sacado — o sacado (comprador) pré-aprova um programa de
@@ -141,29 +143,44 @@ export interface CedenteElegivel {
   cedenteUserId: number;
   cedenteNome: string;
   volumeHistoricoFmt: string;
+  sublimiteSugeridoFmt: string;
+  disputasAbertas: number;
   jaMatriculado: boolean;
 }
 
 // Sugere cedentes com histórico real de aceite contra este sacado (não uma lista
 // arbitrária) — reaproveita listAceitesBySacadoNome, a mesma consulta que já resolve
-// aceites pendentes pro Portal do Sacado, agregando por cedente.
+// aceites pendentes pro Portal do Sacado, agregando por cedente. Ordenado por volume
+// (quem mais already fez negócio primeiro) em vez de ordem arbitrária de inserção, com
+// duas informações a mais que a lista bruta anterior não dava: um sublimite sugerido —
+// a média real do que esse cedente já emitiu contra este sacado, não um número
+// inventado — e disputas em aberto contra o cedente (listOpenDisputesByCedente, o mesmo
+// sinal que já gate a linha de crédito rotativa em lib/creditLine.ts), pro sacado ver
+// risco antes de matricular, não só volume.
 export function listarCedentesElegiveis(sacadoUser: UserRow): CedenteElegivel[] {
   const aceites = listAceitesBySacadoNome(sacadoUser.company_name);
   const programa = getProgramaBySacado(sacadoUser.id);
-  const porCedente = new Map<number, { nome: string; total: number }>();
+  const porCedente = new Map<number, { nome: string; total: number; count: number }>();
   for (const a of aceites) {
     if (a.cedente_id === null) continue;
-    const atual = porCedente.get(a.cedente_id) ?? { nome: a.cedente_nome, total: 0 };
+    const atual = porCedente.get(a.cedente_id) ?? { nome: a.cedente_nome, total: 0, count: 0 };
     atual.total += a.valor;
+    atual.count += 1;
     porCedente.set(a.cedente_id, atual);
   }
   const membrosAtivos = programa ? new Set(listMembrosByPrograma(programa.id).filter((m) => m.status === 'ativo').map((m) => m.cedente_user_id)) : new Set<number>();
-  return [...porCedente.entries()].map(([cedenteUserId, info]) => ({
-    cedenteUserId,
-    cedenteNome: info.nome,
-    volumeHistoricoFmt: fmtBRL(info.total),
-    jaMatriculado: membrosAtivos.has(cedenteUserId),
-  }));
+  return [...porCedente.entries()]
+    .map(([cedenteUserId, info]) => ({
+      cedenteUserId,
+      cedenteNome: info.nome,
+      volumeHistoricoFmt: fmtBRL(info.total),
+      sublimiteSugeridoFmt: fmtBRL(Math.round(info.total / info.count)),
+      disputasAbertas: listOpenDisputesByCedente(cedenteUserId).length,
+      jaMatriculado: membrosAtivos.has(cedenteUserId),
+      _volumeTotal: info.total,
+    }))
+    .sort((a, b) => b._volumeTotal - a._volumeTotal)
+    .map(({ _volumeTotal: _omit, ...rest }) => rest);
 }
 
 export type MatricularOutcome = { status: 200; body: ProgramaView } | { status: 400 | 404; body: { error: string; message: string } };
@@ -217,7 +234,10 @@ export function getCompanyCnpj(user: UserRow): string {
 
 export type FinanciamentoAutomaticoResultado =
   | { financiado: true }
-  | { financiado: false; motivo: 'sacado_sem_conta' | 'sem_programa_ativo' | 'nao_matriculado' | 'limite_programa_excedido' | 'sublimite_excedido' };
+  | {
+      financiado: false;
+      motivo: 'sacado_sem_conta' | 'sem_programa_ativo' | 'nao_matriculado' | 'limite_programa_excedido' | 'sublimite_excedido' | 'fundo_insuficiente';
+    };
 
 // O coração do Programa Confirming: chamado por lib/emitirCore.ts's submitEmitir logo
 // depois que a duplicata está de fato aprovada (checklist 100%, não suspensa pelo
@@ -247,6 +267,13 @@ export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedent
   if (membro.sublimite !== null && membro.utilizado + duplicata.valor > membro.sublimite) {
     return { financiado: false, motivo: 'sublimite_excedido' };
   }
+  // O limite do programa é uma promessa do sacado, não dinheiro de verdade — quem
+  // realmente precisa ter o valor disponível é o fundo (capital real de investidores).
+  // Sem esta checagem, um programa com limite alto e zero aporte real financiaria do
+  // mesmo jeito, deixando o ledger do fundo negativo — exatamente o risco de capital
+  // próprio que este desenho inteiro existe pra evitar (mesmo princípio de
+  // drawCreditLine checar getFundBalance() antes de liberar um saque).
+  if (getFundoBalance() < duplicata.valor) return { financiado: false, motivo: 'fundo_insuficiente' };
 
   const fundoUserId = await getOrCreateFundoSistemaUserId();
   createPurchase(duplicata.id, fundoUserId, duplicata.valor, fmtTaxaAm(programa.taxa_am));
@@ -257,6 +284,11 @@ export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedent
 
   return { financiado: true };
 }
+
+// A partir daqui, utilização ≥ 80% do limite acende o alerta pro admin — mesmo tipo de
+// limiar preventivo já usado alhures no código (ex.: threshold de compliance), pra dar
+// tempo do sacado ajustar o limite antes do programa travar todo mundo por falta de espaço.
+const UTILIZACAO_ALERTA_PCT = 80;
 
 export interface ProgramaAdminView {
   id: number;
@@ -269,22 +301,54 @@ export interface ProgramaAdminView {
   disponivelFmt: string;
   status: 'ativo' | 'pausado';
   membrosAtivos: number;
+  utilizacaoPct: number;
+  alertaLimite: boolean;
 }
 
 // Visão de oversight do admin — todo programa que já existe, quantos cedentes matriculados
 // cada um tem, e quanto já financiou. Somente leitura: quem cria/gerencia um programa é o
 // próprio sacado (routes/confirming.ts), nunca o admin.
 export function listProgramasParaAdmin(): ProgramaAdminView[] {
-  return listProgramas().map((p) => ({
-    id: p.id,
-    sacadoNome: p.sacado_nome,
-    sacadoEmail: p.sacado_email,
-    rating: p.rating,
-    taxaAmFmt: fmtTaxaAm(p.taxa_am),
-    limiteFmt: fmtBRL(p.limite),
-    utilizadoFmt: fmtBRL(p.utilizado),
-    disponivelFmt: fmtBRL(Math.max(0, p.limite - p.utilizado)),
-    status: p.status,
-    membrosAtivos: listMembrosByPrograma(p.id).filter((m) => m.status === 'ativo').length,
-  }));
+  return listProgramas().map((p) => {
+    const utilizacaoPct = p.limite > 0 ? Math.round((p.utilizado / p.limite) * 100) : 0;
+    return {
+      id: p.id,
+      sacadoNome: p.sacado_nome,
+      sacadoEmail: p.sacado_email,
+      rating: p.rating,
+      taxaAmFmt: fmtTaxaAm(p.taxa_am),
+      limiteFmt: fmtBRL(p.limite),
+      utilizadoFmt: fmtBRL(p.utilizado),
+      disponivelFmt: fmtBRL(Math.max(0, p.limite - p.utilizado)),
+      status: p.status,
+      membrosAtivos: listMembrosByPrograma(p.id).filter((m) => m.status === 'ativo').length,
+      utilizacaoPct,
+      alertaLimite: p.status === 'ativo' && utilizacaoPct >= UTILIZACAO_ALERTA_PCT,
+    };
+  });
+}
+
+export interface ConfirmingHealthSummary {
+  headroomTotalFmt: string;
+  fundoBalanceFmt: string;
+  fundoSuficiente: boolean;
+}
+
+// Sinal real de liquidez, não cosmético: soma quanto os programas ATIVOS ainda podem
+// prometer financiar (limite - utilizado) e compara com o caixa de verdade que o fundo
+// tem agora (getFundoBalance — o mesmo saldo que tentarFinanciarViaPrograma checa antes
+// de financiar). limite é uma promessa do sacado; só o saldo do fundo é dinheiro real —
+// se a soma prometida passar do caixa disponível, algum financiamento futuro vai cair no
+// fallback 'fundo_insuficiente' mesmo com programa/matrícula/limite em dia, e o admin
+// deveria saber disso antes de acontecer, não depois.
+export function buildConfirmingHealthSummary(): ConfirmingHealthSummary {
+  const headroomTotal = listProgramas()
+    .filter((p) => p.status === 'ativo')
+    .reduce((sum, p) => sum + Math.max(0, p.limite - p.utilizado), 0);
+  const balance = getFundoBalance();
+  return {
+    headroomTotalFmt: fmtBRL(headroomTotal),
+    fundoBalanceFmt: fmtBRL(balance),
+    fundoSuficiente: balance >= headroomTotal,
+  };
 }

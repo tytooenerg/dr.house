@@ -154,6 +154,8 @@ interface CedenteElegivel {
   cedenteUserId: number;
   cedenteNome: string;
   volumeHistoricoFmt: string;
+  sublimiteSugeridoFmt: string;
+  disputasAbertas: number;
   jaMatriculado: boolean;
 }
 
@@ -370,18 +372,25 @@ export function ConfirmingPage() {
                   {elegiveis.map((c) => (
                     <div key={c.cedenteUserId} className="flex items-center justify-between gap-2 p-3 rounded-[10px] bg-bg">
                       <div>
-                        <div className="font-semibold text-[13px]">{c.cedenteNome}</div>
-                        <div className="text-textSecondary text-[11.5px]">Histórico: {c.volumeHistoricoFmt}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-[13px]">{c.cedenteNome}</span>
+                          {c.disputasAbertas > 0 && (
+                            <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-redBg text-red">
+                              {c.disputasAbertas} disputa{c.disputasAbertas > 1 ? 's' : ''} em aberto
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-textSecondary text-[11.5px]">Histórico: {c.volumeHistoricoFmt} · sugestão de sublimite: {c.sublimiteSugeridoFmt}</div>
                       </div>
                       {c.jaMatriculado ? (
                         <span className="text-[11.5px] font-bold text-green">Matriculado</span>
                       ) : (
                         <div className="flex items-center gap-1.5">
                           <input
-                            placeholder="Sublimite (opcional)"
+                            placeholder={`Sublimite (sugestão: ${c.sublimiteSugeridoFmt})`}
                             value={sublimiteById[c.cedenteUserId] ?? ''}
                             onChange={(e) => setSublimiteById((s) => ({ ...s, [c.cedenteUserId]: e.target.value }))}
-                            className="w-[130px] px-2.5 py-1.5 rounded-md border border-inputBorder text-[12px] outline-none"
+                            className="w-[180px] px-2.5 py-1.5 rounded-md border border-inputBorder text-[12px] outline-none"
                           />
                           <Button size="sm" onClick={() => matricular(c.cedenteUserId)} disabled={busyKey === `matricular:${c.cedenteUserId}`}>
                             {busyKey === `matricular:${c.cedenteUserId}` ? 'Matriculando…' : 'Matricular'}

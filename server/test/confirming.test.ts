@@ -131,6 +131,59 @@ describe('Programa Confirming — matrícula de cedentes', () => {
     expect(found).toBeDefined();
     expect(found.jaMatriculado).toBe(false);
     expect(found.volumeHistoricoFmt).toContain('30.000');
+    // Sublimite sugerido é a própria média histórica — um único aceite de 30.000 sugere
+    // exatamente 30.000, não um número inventado.
+    expect(found.sublimiteSugeridoFmt).toContain('30.000');
+    expect(found.disputasAbertas).toBe(0);
+  });
+
+  it('ranks eligible cedentes by historical volume, and surfaces open disputes as a risk signal', async () => {
+    const sacadoCompany = unique('Sacado Ranking');
+    const { token: sacadoToken } = await register('sacado', sacadoCompany);
+    const { token: cedenteMaiorToken, userId: cedenteMaiorId } = await register('cedente', unique('Fornecedor Maior Volume'));
+    const { token: cedenteMenorToken, userId: cedenteMenorId } = await register('cedente', unique('Fornecedor Menor Volume'));
+
+    const emitMaior = await emitirComRetry(cedenteMaiorToken, {
+      sacado: sacadoCompany,
+      cnpj: '33.333.333/0001-33',
+      valor: '50.000',
+      vencimento: '2026-12-01',
+      seguro: false,
+      nfAnexada: false,
+      batchValores: [],
+    });
+    expect(emitMaior.status).toBe(200);
+    const emitMenor = await emitirComRetry(cedenteMenorToken, {
+      sacado: sacadoCompany,
+      cnpj: '44.444.444/0001-44',
+      valor: '5.000',
+      vencimento: '2026-12-01',
+      seguro: false,
+      nfAnexada: false,
+      batchValores: [],
+    });
+    expect(emitMenor.status).toBe(200);
+
+    // Sacado contesta o aceite do cedente de menor volume — abre uma disputa contra ele.
+    const sacadoAceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacadoToken}`);
+    const pendingMenor = sacadoAceites.body.aceites.find((a: { status: string; valorFmt: string }) => a.status === 'aguardando' && a.valorFmt.includes('5.000'));
+    expect(pendingMenor).toBeTruthy();
+    const contest = await request(app).post(`/api/aceites/${pendingMenor.id}/status`).set('Authorization', `Bearer ${sacadoToken}`).send({ status: 'contestada' });
+    expect(contest.status).toBe(200);
+
+    const elegiveis = await request(app).get('/api/confirming/elegiveis').set('Authorization', `Bearer ${sacadoToken}`);
+    expect(elegiveis.status).toBe(200);
+    const idxMaior = elegiveis.body.elegiveis.findIndex((e: { cedenteUserId: number }) => e.cedenteUserId === cedenteMaiorId);
+    const idxMenor = elegiveis.body.elegiveis.findIndex((e: { cedenteUserId: number }) => e.cedenteUserId === cedenteMenorId);
+    expect(idxMaior).toBeGreaterThanOrEqual(0);
+    expect(idxMenor).toBeGreaterThanOrEqual(0);
+    // Ordenado por volume histórico decrescente.
+    expect(idxMaior).toBeLessThan(idxMenor);
+
+    const foundMenor = elegiveis.body.elegiveis[idxMenor];
+    expect(foundMenor.disputasAbertas).toBe(1);
+    const foundMaior = elegiveis.body.elegiveis[idxMaior];
+    expect(foundMaior.disputasAbertas).toBe(0);
   });
 
   it('matricula a cedente, then lets the cedente see the enrollment, then removes it', async () => {

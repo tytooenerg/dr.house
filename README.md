@@ -702,6 +702,17 @@ Auditoria de "onde falta IA agêntica/automação" (nesta sessão) achou que o C
 
 Novos testes: `server/test/compliance-calendar-reminder.test.ts` (4 casos — nudge de faturamento não informado uma única vez, sem aviso pra prazo distante, aviso de urgência dentro do limiar e só uma vez, sem aviso depois que o prazo já virou regime pleno). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 106 arquivos/641 testes, client 24/24, sdks/node 9/9).
 
+### Monitoramento + ranking do Programa Confirming, e uma correção de segurança financeira
+
+Segundo item da mesma auditoria: o Programa Confirming (série anterior) não tinha nenhum sinal de saúde/risco — taxa e limites ficavam congelados desde a criação, a lista de cedentes elegíveis era plana (sem ordenação, sem sinal de risco), e o admin não tinha como saber se os programas ativos estavam prometendo mais financiamento do que o fundo realmente tem em caixa.
+
+- **Correção de bug** (`tentarFinanciarViaPrograma`, `lib/confirmingCore.ts`): o financiamento automático nunca checava `getFundoBalance()` antes de comprar — um programa com limite alto e pouco (ou nenhum) aporte real de investidor podia financiar do mesmo jeito, deixando o ledger do fundo negativo. Isso violava o mesmo princípio que já levou à remoção do fundo de garantia nesta sessão: a Lastro não carrega risco de capital próprio. Corrigido com um novo motivo de fallback `fundo_insuficiente` (mesmo padrão de `limite_programa_excedido`/`sublimite_excedido`), espelhando o precedente já existente em `drawCreditLine` (`lib/creditLine.ts`), que já checava `getFundBalance()` antes de liberar um saque.
+- **`listarCedentesElegiveis`** agora ordena por volume histórico decrescente e traz duas informações novas por cedente: `sublimiteSugeridoFmt` (a própria média do que esse cedente já emitiu contra este sacado — não um número inventado) e `disputasAbertas` (via `listOpenDisputesByCedente`, o mesmo sinal que já gate a linha de crédito rotativa), pro sacado ver risco antes de matricular alguém, não só volume.
+- **`listProgramasParaAdmin`** ganhou `utilizacaoPct`/`alertaLimite` (≥ 80% do limite acende um aviso), e uma nova **`buildConfirmingHealthSummary`** compara quanto os programas ativos prometem financiar (`limite - utilizado`, uma promessa do sacado) contra o caixa real do fundo (`fundoSuficiente`) — o mesmo saldo que `tentarFinanciarViaPrograma` agora checa antes de financiar.
+- **Client**: `ConfirmingPage.tsx` mostra a sugestão de sublimite e um badge de disputas em aberto por fornecedor elegível; `ConfirmingAdminPanel.tsx` mostra um banner vermelho quando o fundo não tem caixa suficiente pra cobrir a promessa dos programas ativos, e um badge âmbar de utilização por programa perto do limite.
+
+Novos testes: `server/test/confirming-auto-fund.test.ts` (cobertura do fallback `fundo_insuficiente`, mais o teste original de financiamento instantâneo corrigido pra aportar capital no fundo antes de emitir), `server/test/confirming.test.ts` (ranking por volume e sinal de disputas em aberto) e `server/test/confirming-admin.test.ts` (alerta de utilização e resumo de saúde do fundo). Verificado: `npm run typecheck`/`build`/`test` todos verdes.
+
 ## Running locally
 
 ```bash
