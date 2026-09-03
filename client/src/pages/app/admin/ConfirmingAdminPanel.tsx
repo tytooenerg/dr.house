@@ -13,6 +13,8 @@ interface ProgramaAdminView {
   disponivelFmt: string;
   status: 'ativo' | 'pausado';
   membrosAtivos: number;
+  utilizacaoPct: number;
+  alertaLimite: boolean;
 }
 
 interface FundoOverview {
@@ -21,9 +23,16 @@ interface FundoOverview {
   cotaPriceFmt: string;
 }
 
+interface ConfirmingHealthSummary {
+  headroomTotalFmt: string;
+  fundoBalanceFmt: string;
+  fundoSuficiente: boolean;
+}
+
 interface ConfirmingAdminData {
   programas: ProgramaAdminView[];
   fundo: FundoOverview;
+  saude: ConfirmingHealthSummary;
 }
 
 const STATUS_STYLE: Record<'ativo' | 'pausado', { bg: string; color: string; label: string }> = {
@@ -53,6 +62,14 @@ export function ConfirmingAdminPanel() {
         </p>
       </div>
 
+      {!data.saude.fundoSuficiente && (
+        <div className="px-4 py-3 rounded-[10px] text-[12.5px] font-semibold" style={{ background: '#F7E9E7', color: '#B3261E' }}>
+          Atenção: os programas ativos prometem até {data.saude.headroomTotalFmt} em financiamento, mas o fundo tem só{' '}
+          {data.saude.fundoBalanceFmt} em caixa real. Um financiamento automático pode cair no fluxo normal de leilão por falta de capital do
+          fundo, mesmo com limite disponível no programa.
+        </div>
+      )}
+
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <div className="bg-white border border-border rounded-card p-4">
           <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Saldo do fundo</div>
@@ -75,8 +92,14 @@ export function ConfirmingAdminPanel() {
           {data.programas.map((p) => (
             <div key={p.id} className="bg-white border border-border rounded-card px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <div className="font-bold text-[14px]">
-                  {p.sacadoNome} <span className="text-textSecondary font-normal text-[12.5px]">· rating {p.rating}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-[14px]">{p.sacadoNome}</span>
+                  <span className="text-textSecondary font-normal text-[12.5px]">· rating {p.rating}</span>
+                  {p.alertaLimite && (
+                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#FBF1E0', color: '#8A5A00' }}>
+                      {p.utilizacaoPct}% do limite utilizado
+                    </span>
+                  )}
                 </div>
                 <div className="text-textSecondary text-[12.5px]">
                   {p.sacadoEmail} · {p.membrosAtivos} fornecedor(es) matriculado(s) · taxa {p.taxaAmFmt}

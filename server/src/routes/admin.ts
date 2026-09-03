@@ -14,7 +14,7 @@ import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { summarizeDispute } from '../lib/disputeCopilot.js';
 import { listComplianceCalendarSummary } from '../lib/complianceCalendarCore.js';
-import { listProgramasParaAdmin } from '../lib/confirmingCore.js';
+import { listProgramasParaAdmin, buildConfirmingHealthSummary } from '../lib/confirmingCore.js';
 import { buildFundoOverview } from '../lib/confirmingFundo.js';
 import { listPendingComplianceReview, resolveComplianceReview, type ComplianceBreakdownItem } from '../db/complianceEngine.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
@@ -294,7 +294,7 @@ adminRouter.get('/conformidade-escritural', (_req, res) => {
 // (routes/confirming.ts), quem aporta/resgata no fundo é o investidor
 // (routes/confirmingFundo.ts).
 adminRouter.get('/confirming', (_req, res) => {
-  res.json({ programas: listProgramasParaAdmin(), fundo: buildFundoOverview(null) });
+  res.json({ programas: listProgramasParaAdmin(), fundo: buildFundoOverview(null), saude: buildConfirmingHealthSummary() });
 });
 
 const complianceReviewSchema = z.object({ decision: z.enum(['liberado', 'rejeitado']), note: z.string().trim().min(1) });

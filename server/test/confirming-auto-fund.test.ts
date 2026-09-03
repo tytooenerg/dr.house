@@ -12,7 +12,7 @@ function unique(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-async function register(role: 'cedente' | 'sacado', companyName: string) {
+async function register(role: 'cedente' | 'sacado' | 'investidor', companyName: string) {
   const email = `${unique(role)}@example.com`;
   const res = await request(app).post('/api/auth/register').send({ nome: 'Teste', email, password: 'senha123', companyName, role });
   return { token: res.body.token as string, userId: res.body.user.id as number };
@@ -46,12 +46,21 @@ async function criarProgramaEMatricular(sacadoToken: string, cedenteUserId: numb
   await request(app).post('/api/confirming/membros').set('Authorization', `Bearer ${sacadoToken}`).send({ cedenteUserId });
 }
 
+// tentarFinanciarViaPrograma só financia se o fundo tiver caixa real pra isso (ver
+// getFundoBalance() check em confirmingCore.ts) — sem aporte, o teste cairia no fallback
+// 'fundo_insuficiente' em vez de financiar.
+async function aportarNoFundo(valor: number) {
+  const { token } = await register('investidor', unique('Investidor Fundo'));
+  await request(app).post('/api/confirming-fundo/contribuir').set('Authorization', `Bearer ${token}`).send({ valor });
+}
+
 describe('Financiamento automático — cedente matriculado pula o leilão', () => {
   it('funds the duplicata instantly at emission, skipping dispararLeilao entirely', async () => {
     const sacadoCompany = unique('Sacado Programa');
     const { token: sacadoToken } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Confirmado'));
     await criarProgramaEMatricular(sacadoToken, cedenteUserId);
+    await aportarNoFundo(50000);
 
     const balanceBefore = getFundoBalance();
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '10.000'));
@@ -99,6 +108,27 @@ describe('Financiamento automático — cedente matriculado pula o leilão', () 
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '5.000'));
     expect(emit.status).toBe(200);
     expect(emit.body.financiadoViaPrograma).toBe(false);
+  });
+
+  it('falls back to the normal flow when the fund has no real cash, even with room in the program', async () => {
+    const sacadoCompany = unique('Sacado Fundo Vazio');
+    const { token: sacadoToken } = await register('sacado', sacadoCompany);
+    const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Fundo Vazio'));
+    await criarProgramaEMatricular(sacadoToken, cedenteUserId);
+    // Nenhum aporte feito — o programa tem limite de sobra, mas o fundo não tem caixa real
+    // pra financiar. tentarFinanciarViaPrograma deve recusar (motivo fundo_insuficiente) em
+    // vez de deixar o saldo do fundo ir negativo.
+    const balanceBefore = getFundoBalance();
+
+    const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, String(Math.round(balanceBefore) + 1000)));
+    expect(emit.status).toBe(200);
+    expect(emit.body.financiadoViaPrograma).toBe(false);
+    expect(getFundoBalance()).toBe(balanceBefore);
+
+    const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
+    const dup = minhas.body.duplicatas.find((d: { status: string }) => d.status === 'Aprovada');
+    expect(dup).toBeDefined();
+    expect(dup.canDisparar).toBe(true);
   });
 
   it('respects the program limit — over it, falls back to the normal flow instead of over-financing', async () => {

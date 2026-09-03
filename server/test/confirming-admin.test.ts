@@ -49,4 +49,33 @@ describe('GET /api/admin/confirming — oversight do Programa Confirming', () =>
     const res = await request(app).get('/api/admin/confirming').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
+
+  it('flags a program at or above 80% utilization, and reports the fund health summary', async () => {
+    const sacadoCompany = unique('Sacado Utilização Alta');
+    const { token: sacadoToken, userId: sacadoUserId } = await register('sacado', sacadoCompany);
+    const { userId: cedenteUserId } = await register('cedente', unique('Fornecedor Utilização Alta'));
+    await request(app).post('/api/confirming/criar').set('Authorization', `Bearer ${sacadoToken}`).send({ cnpj: CNPJ_COM_HISTORICO, limite: '10.000' });
+    await request(app).post('/api/confirming/membros').set('Authorization', `Bearer ${sacadoToken}`).send({ cedenteUserId });
+
+    const { getProgramaBySacado, setProgramaUtilizado } = await import('../src/db/confirming.js');
+    const programa = getProgramaBySacado(sacadoUserId)!;
+    // 90% de 10.000 — acima do limiar de alerta (80%) sem estourar o limite.
+    setProgramaUtilizado(programa.id, 9000);
+
+    const admin = await loginAdmin();
+    const res = await request(app).get('/api/admin/confirming').set('Authorization', `Bearer ${admin.token}`);
+    expect(res.status).toBe(200);
+    const found = res.body.programas.find((p: { sacadoNome: string }) => p.sacadoNome === sacadoCompany);
+    expect(found).toBeDefined();
+    expect(found.utilizacaoPct).toBe(90);
+    expect(found.alertaLimite).toBe(true);
+
+    // O fundo não tem caixa nenhum aportado neste teste — a promessa de headroom dos
+    // programas ativos (limite - utilizado, aqui incluindo o de 10.000 acima) excede o
+    // saldo real (0), então o resumo de saúde deve sinalizar isso.
+    expect(res.body.saude.fundoBalanceFmt).toBeTruthy();
+    expect(res.body.saude.headroomTotalFmt).toBeTruthy();
+    expect(typeof res.body.saude.fundoSuficiente).toBe('boolean');
+    expect(res.body.saude.fundoSuficiente).toBe(false);
+  });
 });
