@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface AuditorRow {
   id: number;
@@ -18,12 +19,21 @@ export function AuditoresPanel() {
   const [form, setForm] = useState({ nome: '', email: '', password: '', companyName: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => api.get<{ auditores: AuditorRow[] }>('/admin/auditores').then((d) => setAuditores(d.auditores));
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ auditores: AuditorRow[] }>('/admin/auditores')
+      .then((d) => setAuditores(d.auditores))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar contas de auditoria.'));
+  };
 
   useEffect(() => {
     load();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
   const create = async () => {
     setError('');

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface TedPendente {
   referencia: string;
@@ -16,12 +17,21 @@ interface TedPendente {
 export function TedPendentesPanel() {
   const [tedPendentes, setTedPendentes] = useState<TedPendente[]>([]);
   const [confirmingTed, setConfirmingTed] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadTedPendentes = () => api.get<{ pendentes: TedPendente[] }>('/admin/ted/pendentes').then((d) => setTedPendentes(d.pendentes));
+  const loadTedPendentes = () => {
+    setLoadError(null);
+    return api
+      .get<{ pendentes: TedPendente[] }>('/admin/ted/pendentes')
+      .then((d) => setTedPendentes(d.pendentes))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar os TEDs pendentes.'));
+  };
 
   useEffect(() => {
     loadTedPendentes();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadTedPendentes} />;
 
   const confirmarTed = async (referencia: string) => {
     setConfirmingTed(referencia);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface LegalDocRef {
   id: number;
@@ -93,6 +94,7 @@ export function JuridicoPanel() {
   const [regText, setRegText] = useState('');
   const [analyzingReg, setAnalyzingReg] = useState(false);
   const [regError, setRegError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadCobrancaJuridica = () =>
     api.get<{ overdue: OverdueCollectionItem[]; disclaimer: string; feePct: number }>('/admin/juridico/cobranca').then((d) => {
@@ -108,13 +110,18 @@ export function JuridicoPanel() {
     });
   const loadRecoveries = () => api.get<{ recuperacoes: RecoveryEntry[] }>('/admin/juridico/recuperacoes').then((d) => setRecoveries(d.recuperacoes));
 
+  const loadAll = () => {
+    setLoadError(null);
+    Promise.all([loadCobrancaJuridica(), loadMinutas(), loadRegulatorio(), loadFeeConfig(), loadRecoveries()]).catch((err) =>
+      setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o painel jurídico.')
+    );
+  };
+
   useEffect(() => {
-    loadCobrancaJuridica();
-    loadMinutas();
-    loadRegulatorio();
-    loadFeeConfig();
-    loadRecoveries();
+    loadAll();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadAll} />;
 
   const saveFeePct = async () => {
     const n = Number(feePctInput);

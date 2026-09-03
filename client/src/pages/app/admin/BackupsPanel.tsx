@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface BackupInfo {
   filename: string;
@@ -14,16 +15,24 @@ export function BackupsPanel() {
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [backupsEnabled, setBackupsEnabled] = useState(true);
   const [runningBackup, setRunningBackup] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadBackups = () =>
-    api.get<{ enabled: boolean; backups: BackupInfo[] }>('/admin/backups').then((d) => {
-      setBackupsEnabled(d.enabled);
-      setBackups(d.backups);
-    });
+  const loadBackups = () => {
+    setLoadError(null);
+    return api
+      .get<{ enabled: boolean; backups: BackupInfo[] }>('/admin/backups')
+      .then((d) => {
+        setBackupsEnabled(d.enabled);
+        setBackups(d.backups);
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar os backups.'));
+  };
 
   useEffect(() => {
     loadBackups();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadBackups} />;
 
   const runBackupNow = async () => {
     setRunningBackup(true);

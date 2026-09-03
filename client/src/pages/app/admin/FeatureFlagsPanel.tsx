@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface FeatureFlagView {
   key: string;
@@ -19,13 +20,19 @@ export function FeatureFlagsPanel() {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [rolloutInputs, setRolloutInputs] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () =>
-    api.get<{ flags: FeatureFlagView[] }>('/admin/feature-flags').then((d) => {
-      setFlags(d.flags);
-      setRolloutInputs(Object.fromEntries(d.flags.map((f) => [f.key, String(f.rolloutPct)])));
-      setLoading(false);
-    });
+  const load = () => {
+    setLoadError(null);
+    return api
+      .get<{ flags: FeatureFlagView[] }>('/admin/feature-flags')
+      .then((d) => {
+        setFlags(d.flags);
+        setRolloutInputs(Object.fromEntries(d.flags.map((f) => [f.key, String(f.rolloutPct)])));
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar as feature flags.'))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     load();
@@ -46,6 +53,7 @@ export function FeatureFlagsPanel() {
   };
 
   if (loading) return <p className="text-[13px] text-navy/60">Carregando…</p>;
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
   return (
     <div className="flex flex-col gap-4">

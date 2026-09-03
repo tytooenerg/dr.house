@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { approveKyb, listPendingKyb, rejectKyb, getUserById, listUsersByRole } from '../db/users.js';
 import { createAuditorAccount, CreateAuditorError } from '../lib/createAuditorAccount.js';
 import { listPendingAdvertisements, getAdvertisement, decideAdvertisement } from '../db/advertisements.js';
+import { screenAdvertisement } from '../lib/adCopilot.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
@@ -1153,6 +1154,23 @@ adminRouter.get('/advertisements', (_req, res) => {
     })),
   });
 });
+
+// Copilot: flags claims/language problems for the admin to review before deciding — never
+// decides automatically. Returns null (not a fabricated assessment) when
+// ANTHROPIC_API_KEY isn't set, same pattern as sinistroCopilot/disputeCopilot.
+adminRouter.get(
+  '/advertisements/:id/ai-screening',
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    const ad = getAdvertisement(Number(req.params.id));
+    if (!ad) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const assessment = await screenAdvertisement(ad, req.user!.id);
+    res.json({ assessment });
+  })
+);
 
 const advertisementDecisionSchema = z.object({
   decision: z.enum(['aprovado', 'rejeitado']),

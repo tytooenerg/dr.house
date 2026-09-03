@@ -10,6 +10,8 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { fmtAddOnPrice } from '../lib/addOnBilling.js';
 import { upsertErpReceivables } from '../db/erpReceivables.js';
 import { upsertErpPayables } from '../db/payables.js';
+import { diagnoseErpConnectionError } from '../lib/erpConnectionCopilot.js';
+import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 
 export const erpRouter = Router();
 erpRouter.use(requireAuth);
@@ -81,6 +83,26 @@ erpRouter.post('/company-cnpj', (req, res) => {
   const updated = updateSettings(req.user!.id, { companyCnpj: parsed.data.cnpj });
   res.json(payload(updated, req.user!.id));
 });
+
+const erpDiagnosisSchema = z.object({ connector: z.enum(['sap', 'totvs', 'omie']), error: z.string().trim().min(1).max(2000) });
+
+// Copilot on-demand: the cedente clicks "Diagnosticar com IA" after a failed /connect (the
+// raw error already came back in that response) and gets a plain-language cause + next
+// step for it. Never invents a cause beyond the technical error string it's given, and
+// never decides anything — the person still has to fix and reconnect themselves.
+erpRouter.post(
+  '/diagnostico',
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = erpDiagnosisSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const diagnosis = await diagnoseErpConnectionError(parsed.data.connector, parsed.data.error, req.user!.id);
+    res.json({ diagnosis });
+  })
+);
 
 const omieConnectSchema = z.object({ appKey: z.string().trim().min(1), appSecret: z.string().trim().min(1) });
 

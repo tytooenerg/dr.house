@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 interface ProgramaAdminView {
   id: number;
@@ -45,11 +46,21 @@ const STATUS_STYLE: Record<'ativo' | 'pausado', { bg: string; color: string; lab
 // aporta/resgata no fundo é o investidor.
 export function ConfirmingAdminPanel() {
   const [data, setData] = useState<ConfirmingAdminData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    api
+      .get<ConfirmingAdminData>('/admin/confirming')
+      .then(setData)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o Programa Confirming.'));
+  };
 
   useEffect(() => {
-    api.get<ConfirmingAdminData>('/admin/confirming').then(setData);
+    load();
   }, []);
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <p className="text-[13px] text-navy/60">Carregando…</p>;
 
   return (

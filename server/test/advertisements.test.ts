@@ -161,6 +161,33 @@ describe('Carrossel de publicidade — moderação (routes/admin.ts)', () => {
     const again = await request(app).post(`/api/admin/advertisements/${mine.id}/decidir`).set('Authorization', `Bearer ${admin}`).send({ decision: 'aprovado' });
     expect(again.status).toBe(404);
   });
+
+  // Copilot de triagem (lib/adCopilot.ts) — nunca decide sozinho, só sinaliza pro admin
+  // revisar antes de aprovar/rejeitar. Sem ANTHROPIC_API_KEY (ambiente de teste), o
+  // fallback real-when-configured retorna null em vez de fabricar uma avaliação.
+  it('screening da IA retorna null sem ANTHROPIC_API_KEY configurada (real-when-configured)', async () => {
+    const { token } = await registerAnunciante();
+    await request(app).post('/api/advertisements/me').set('Authorization', `Bearer ${token}`).send(VALID_AD);
+    const admin = await adminToken();
+    const pending = await request(app).get('/api/admin/advertisements').set('Authorization', `Bearer ${admin}`);
+    const mine = pending.body.pending.at(-1);
+
+    const screening = await request(app).get(`/api/admin/advertisements/${mine.id}/ai-screening`).set('Authorization', `Bearer ${admin}`);
+    expect(screening.status).toBe(200);
+    expect(screening.body.assessment).toBeNull();
+  });
+
+  it('screening da IA em anúncio inexistente retorna 404', async () => {
+    const admin = await adminToken();
+    const res = await request(app).get('/api/admin/advertisements/999999/ai-screening').set('Authorization', `Bearer ${admin}`);
+    expect(res.status).toBe(404);
+  });
+
+  it('não-admin não acessa o screening', async () => {
+    const { token } = await registerAnunciante();
+    const res = await request(app).get('/api/admin/advertisements/1/ai-screening').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(403);
+  });
 });
 
 describe('Carrossel de publicidade — feed público (routes/public.ts)', () => {

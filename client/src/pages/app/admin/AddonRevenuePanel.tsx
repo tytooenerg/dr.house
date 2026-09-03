@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
+import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ErrorState } from '../../../components/ui/ErrorState';
 
 type AddOnKind =
   | 'api_overage'
@@ -67,6 +68,7 @@ export function AddonRevenuePanel() {
   const [includedCallsInput, setIncludedCallsInput] = useState('');
   const [savingIncluded, setSavingIncluded] = useState(false);
   const [runningAddonJob, setRunningAddonJob] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadAddonPrices = () =>
     api.get<{ precos: AddonPrice[] }>('/admin/addons/precos').then((d) => {
@@ -84,11 +86,18 @@ export function AddonRevenuePanel() {
       setIncludedCallsInput(String(d.included));
     });
 
+  const loadAll = () => {
+    setLoadError(null);
+    Promise.all([loadAddonPrices(), loadAddonCobrancas(), loadApiOverageConfig()]).catch((err) =>
+      setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar receita de add-ons.')
+    );
+  };
+
   useEffect(() => {
-    loadAddonPrices();
-    loadAddonCobrancas();
-    loadApiOverageConfig();
+    loadAll();
   }, []);
+
+  if (loadError) return <ErrorState message={loadError} onRetry={loadAll} />;
 
   const saveAddonPrice = async (kind: AddOnKind) => {
     const n = Number(addonPriceInputs[kind]);
