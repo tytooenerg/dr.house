@@ -7,7 +7,7 @@ import { getSeguradoraByInsurerKey } from '../db/users.js';
 import { buildOfferView, computePurchasePrice } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { settlePurchase, settleInsurance } from '../lib/settlement.js';
-import { computeInsurerQuotePct } from '../lib/insuranceQuotes.js';
+import { computeInsurerQuotePct, diasAteVencimento } from '../lib/insuranceQuotes.js';
 import { checkFractionalEligibility, buyFractionalTokens, buyTokensSchema, buildOfferingView, listMyFractionalHoldings } from '../lib/fractionalOfferings.js';
 import { INSURERS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -112,8 +112,20 @@ marketRouter.post('/:id/insure', (req, res) => {
     return;
   }
   const newKey = parsed.data.key;
+  const isNewContract = !!newKey && newKey !== d.insurer_key;
+  // Underwriting only covers a risk that hasn't happened yet — a real seguradora never
+  // sells a policy on a loss that's already known. Without this, anyone could "insure" a
+  // duplicata the instant its vencimento passes unpaid and immediately file the resulting
+  // sinistro (see lib/seguradoraCore.ts's decideSinistro, which now actually pays out).
+  if (isNewContract && diasAteVencimento(d.vencimento) < 0) {
+    res.status(409).json({
+      error: 'already_overdue',
+      message: 'Não é possível contratar seguro para uma duplicata cujo vencimento já passou — o risco já se realizou, isso não é mais uma apólice, é uma indenização garantida.',
+    });
+    return;
+  }
   setInsurer(d.id, newKey);
-  if (newKey && newKey !== d.insurer_key) {
+  if (isNewContract) {
     const insurer = INSURERS.find((i) => i.key === newKey)!;
     // The premium charged is the live competing quote (lib/insuranceQuotes.ts) at the
     // moment of contracting — each insurer prices this specific duplicata's real risk

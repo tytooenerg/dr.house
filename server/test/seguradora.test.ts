@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { db } from '../src/db/index.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -88,7 +89,7 @@ describe('seguradora role', () => {
       sacado: sacadoCompany,
       cnpj: '33.222.111/0001-77',
       valor: '20.000',
-      vencimento: '2020-01-10', // já vencida — elegível a sinistro assim que segurada
+      vencimento: '2026-09-10', // ainda no futuro no momento da contratação do seguro
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -100,6 +101,11 @@ describe('seguradora role', () => {
 
     const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorToken}`).send({ key: 'too' });
     expect(insure.status).toBe(200);
+
+    // Simula o tempo passando depois da apólice já contratada — não dá pra segurar uma
+    // duplicata que já venceu (ver teste de underwriting abaixo), então o vencimento só
+    // vira passado depois que o seguro já estava em vigor, como seria no mundo real.
+    db.prepare('UPDATE duplicatas SET vencimento = ? WHERE id = ?').run('2020-01-10', duplicataId);
 
     const seguradoraToken = await loginSeguradora();
     const before = await request(app).get('/api/seguradora').set('Authorization', `Bearer ${seguradoraToken}`);
@@ -141,13 +147,14 @@ describe('seguradora role', () => {
       sacado: sacadoCompany,
       cnpj: '33.222.111/0001-77',
       valor: '15.000',
-      vencimento: '2020-01-10',
+      vencimento: '2026-09-10',
       seguro: false,
       nfAnexada: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
     await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorToken}`).send({ key: 'too' });
+    db.prepare('UPDATE duplicatas SET vencimento = ? WHERE id = ?').run('2020-01-10', duplicataId);
 
     const seguradoraToken = await loginSeguradora();
     const before = await request(app).get('/api/account').set('Authorization', `Bearer ${cedenteToken}`);
@@ -161,5 +168,33 @@ describe('seguradora role', () => {
 
     const after = await request(app).get('/api/account').set('Authorization', `Bearer ${cedenteToken}`);
     expect(after.body.extrato.length).toBe(countBefore);
+  });
+
+  it('não deixa contratar seguro numa duplicata que já venceu — o risco já se realizou, não é mais underwriting', async () => {
+    const sacadoCompany = unique('Sacado Ja Vencida');
+    const { token: sacadoToken } = await register('sacado', sacadoCompany);
+    const { token: cedenteToken } = await register('cedente', unique('Cedente Ja Vencida'));
+    const { token: investidorToken } = await register('investidor', unique('Investidor Ja Vencida'));
+
+    const emit = await emitirComRetry(cedenteToken, {
+      sacado: sacadoCompany,
+      cnpj: '33.222.111/0001-77',
+      valor: '10.000',
+      vencimento: '2020-01-10', // já vencida antes mesmo de tentar segurar
+      seguro: false,
+      nfAnexada: true,
+      batchValores: [],
+    });
+    expect(emit.status).toBe(200);
+    const duplicataId = emit.body.duplicataId as string;
+
+    const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorToken}`).send({ key: 'too' });
+    expect(insure.status).toBe(409);
+    expect(insure.body.error).toBe('already_overdue');
+
+    // Sem apólice nenhuma, não pode ter virado sinistro reclamável.
+    const seguradoraToken = await loginSeguradora();
+    const dashboard = await request(app).get('/api/seguradora').set('Authorization', `Bearer ${seguradoraToken}`);
+    expect(dashboard.body.sinistros.some((s: { id: string }) => s.id === duplicataId)).toBe(false);
   });
 });
