@@ -9,7 +9,7 @@ import { useSession } from '../../state/SessionContext';
 
 interface ProfileData {
   profileForm: { nome: string; email: string; telefone: string };
-  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean; digest: boolean };
+  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean; digest: boolean; compliance: boolean };
   notifyViaWhatsapp: boolean;
   whatsappEnabled: boolean;
   teamMembers: { id: number; nome: string; email: string; papel: string; status: 'pending' | 'active' | 'revoked' }[];
@@ -56,6 +56,7 @@ const NOTIF_ROWS: { key: keyof ProfileData['notifPrefs']; label: string; hint: s
   { key: 'leilao', label: 'Leilões em andamento', hint: 'Encerramento e lances concorrentes' },
   { key: 'aceite', label: 'Aceite de duplicatas', hint: 'Quando um sacado confirma ou contesta' },
   { key: 'disputa', label: 'Disputas', hint: 'Contestações e resoluções' },
+  { key: 'compliance', label: 'Conformidade — duplicata escritural', hint: 'Lembretes de faturamento não informado e prazos se aproximando' },
   { key: 'marketing', label: 'Novidades e produto', hint: 'Comunicados de marketing' },
 ];
 

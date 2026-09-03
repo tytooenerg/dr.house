@@ -8,7 +8,7 @@ import { logger } from '../lib/logger.js';
 
 // --- notifications ---
 // `category` is optional — pass it only for real events the user can toggle in
-// Perfil (leilão/aceite/disputa); seed/demo notifications skip it so they never trigger email.
+// Perfil (leilão/aceite/disputa/compliance); seed/demo notifications skip it so they never trigger email.
 //
 // `opts.brand` extends white-label branding (Integrações ERP → White-label Plus) to the two
 // automated channels that previously always said "Lastro" regardless of which cedente the
@@ -22,7 +22,7 @@ export function addNotification(
   userId: number,
   text: string,
   color: string,
-  category?: 'leilao' | 'aceite' | 'disputa',
+  category?: 'leilao' | 'aceite' | 'disputa' | 'compliance',
   opts?: { brand?: string | null }
 ) {
   db.prepare('INSERT INTO notifications (user_id, text, color) VALUES (?, ?, ?)').run(userId, text, color);

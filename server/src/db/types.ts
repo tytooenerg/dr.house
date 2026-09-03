@@ -23,7 +23,7 @@ export interface UserSettings {
   // digest only means anything for an admin account (Resumo diário do back-office —
   // lib/dailyBriefing.ts) but lives on the same shared shape every role's notifPrefs
   // already uses, same as marketing being irrelevant-but-present for every role.
-  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean; digest: boolean };
+  notifPrefs: { leilao: boolean; aceite: boolean; disputa: boolean; marketing: boolean; digest: boolean; compliance: boolean };
   // WhatsApp/SMS is opt-in and separate from email prefs — a real deployment pays per
   // message (Twilio), so it shouldn't default to on the way free email notifications do.
   notifyViaWhatsapp: boolean;
@@ -78,12 +78,19 @@ export interface UserSettings {
   // de duplicatas do próprio Lastro, não o faturamento anual real da empresa — e só existe
   // pra cedente Empresarial, nunca pra sacado. null até a empresa informar pela primeira vez.
   faturamentoAnualBracket: FaturamentoBracket | null;
+  // Controla o job de lembrete do cronograma de conformidade (lib/complianceCalendarReminder.ts)
+  // — dois carimbos separados porque são dois estados distintos e não excludentes ao longo
+  // do tempo: uma empresa pode ser lembrada de informar o faturamento, informar meses
+  // depois, e só então precisar ser lembrada de novo (desta vez por urgência de prazo) —
+  // um carimbo único apagaria essa segunda janela. null até o primeiro envio de cada tipo.
+  complianceReminderNaoInformadoSentAt: string | null;
+  complianceReminderUrgenciaSentAt: string | null;
 }
 
 export function defaultSettings(): UserSettings {
   return {
     onboardingSeen: false,
-    notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false, digest: true },
+    notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false, digest: true, compliance: true },
     notifyViaWhatsapp: false,
     autoBidEnabled: false,
     autoBidRules: { scoreMin: 'A', taxaMax: '2.5', exposicaoSacado: '150.000', exposicaoMensal: '2.000.000' },
@@ -117,6 +124,8 @@ export function defaultSettings(): UserSettings {
     marketMakerMinScore: '60',
     companyCnpj: '',
     faturamentoAnualBracket: null,
+    complianceReminderNaoInformadoSentAt: null,
+    complianceReminderUrgenciaSentAt: null,
   };
 }
 

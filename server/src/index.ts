@@ -25,6 +25,7 @@ import { startPldAgentJob } from './lib/pldAgentJob.js';
 import { startMarketMakerAgentJob } from './lib/marketMakerAgentJob.js';
 import { startReconciliationAgentJob } from './lib/reconciliationAgentJob.js';
 import { startCoafSubmissionReminderJob } from './lib/coafSubmissionReminder.js';
+import { startComplianceCalendarReminderJob } from './lib/complianceCalendarReminder.js';
 import { startDailyBriefingJob } from './lib/dailyBriefing.js';
 import { startMonthlyRegulatoryReportsJob } from './lib/monthlyRegulatoryReportsJob.js';
 import { logger } from './lib/logger.js';
@@ -52,6 +53,7 @@ async function main() {
   startMarketMakerAgentJob();
   startReconciliationAgentJob();
   startCoafSubmissionReminderJob();
+  startComplianceCalendarReminderJob();
   startDailyBriefingJob();
   startMonthlyRegulatoryReportsJob();
   server.listen(PORT, () => {
