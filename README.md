@@ -778,7 +778,21 @@ Auditoria dedicada logo depois da correção anterior, procurando especificament
 
 Novos testes em `server/test/fractional-offerings.test.ts`: preço com deságio real (menor que o valor de face, nunca mais hardcoded), o "retorno" é determinístico (duas compras idênticas geram o mesmo valor, não mais aleatório), pagamento no vencimento distribuído corretamente entre múltiplos holders sem pagar o cedente de novo, e o caso de oferta parcialmente vendida (cedente recebe só pela fração nunca vendida). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 110 arquivos/673 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
 
-### Métricas de performance para anunciantes (impressões, cliques, CTR)
+### O mesmo bug de novo — desta vez na tabela `purchases` inteira, alimentando Carteira & Histórico
+
+Continuação da varredura: `db/duplicatas.ts`'s `createPurchase` — usado por toda compra integral (marketplace, cestas, automação, agente auto-bid, Programa Confirming, revenda no mercado secundário) — gravava `retorno = Math.round(valor * (0.02 + Math.random() * 0.02))` desde sempre. Esse número aleatório alimentava direto:
+
+- **`GET /historico`**: a coluna "Retorno" de cada operação e o card "Retorno acumulado" da tela Carteira & Histórico — a página que se descreve como "suas operações concluídas e retornos obtidos". Todo investidor via um número fabricado como se fosse um ganho real.
+- **`lib/investorPerformance.ts`**: `retornoAnualizadoPct`, `retornoMedioPonderadoPct`, a dispersão/volatilidade e o índice tipo-Sharpe do dashboard de Performance institucional — inteiramente calculados em cima do número aleatório.
+- **`lib/institutionalReporting.ts`**: o relatório institucional em PDF baixado por investidores Empresarial reportava o mesmo "Retorno acumulado" fabricado.
+
+`createPurchase` agora recebe `retorno` como parâmetro explícito, calculado pelo chamador a partir do deságio real (`valor de face − precoCompra`, a mesma `computePurchasePrice` das correções anteriores) em cada um dos 5 pontos de compra integral, e do preço combinado de fato (`valor de face − preço de revenda`) no mercado secundário — honesto mesmo quando negativo (comprar com ágio acima do valor de face é um retorno negativo real, não um erro).
+
+Novo teste em `settlement.test.ts`: o retorno registrado bate exatamente com o deságio real calculado por `computePurchasePrice`, e duas compras equivalentes (mesmo valor/prazo/rating) geram o mesmo retorno — antes, cada uma tinha seu próprio número aleatório e praticamente nunca coincidiam. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 110 arquivos/674 testes, client 24/24, sdks/node 9/9) e `npm run test:e2e` (12/12).
+
+### Achado em aberto, não corrigido ainda: `recordRecovery` (fee de sucesso da cobrança jurídica) só debita, nunca credita o principal recuperado
+
+`lib/legalCollectionFee.ts`'s `recordRecovery` cobra do credor atual um fee de sucesso (5% por padrão, configurável) quando uma duplicata em cobrança jurídica é recuperada — mas nunca credita o principal recuperado em si; o comentário do código documenta isso como intencional ("a recuperação em si, o pagamento de verdade do sacado fora da plataforma, não é processada aqui — só a fee da Lastro por ter ajudado na escalada"). Diferente dos bugs acima, aqui não há um consenso óbvio de qual é o comportamento honesto: pode ser uma decisão de escopo legítima (o dinheiro de uma recuperação judicial muitas vezes vai direto pro credor via ordem judicial, nunca passando pelos trilhos da Lastro) ou pode ser a mesma lacuna do "pagamento no vencimento" (achado numa correção anterior), só que pro caminho de inadimplência. Não corrigido — decisão de produto pendente.
 
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 

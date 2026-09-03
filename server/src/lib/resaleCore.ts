@@ -180,7 +180,11 @@ export function executeResaleTrade(
 ) {
   const desagioPct = duplicata.valor > 0 ? (((duplicata.valor - valor) / duplicata.valor) * 100).toFixed(1).replace('.', ',') + '%' : '0%';
   deactivatePurchase(listing.purchase_id);
-  createPurchase(listing.duplicata_id, buyerId, valor, desagioPct);
+  // Real, determinístico — o mesmo número usado pra desagioPct acima, em reais em vez de
+  // percentual: o novo comprador paga `valor` (preço combinado) e recebe o valor de face
+  // cheio no vencimento, então isso é o ganho real dele (pode ser negativo se comprou com
+  // ágio acima do valor de face — honesto, não um número fabricado por Math.random()).
+  createPurchase(listing.duplicata_id, buyerId, valor, desagioPct, Math.round(duplicata.valor - valor));
   setListingStatus(listing.id, 'vendido');
   return settleResale({ duplicataId: listing.duplicata_id, sacadoNome: duplicata.sacado_nome, buyerId, sellerId: listing.seller_id, valor, feeDiscountPct });
 }

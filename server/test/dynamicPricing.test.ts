@@ -43,7 +43,7 @@ describe('dynamic pricing — liquidity signal', () => {
       id: dupId,
     });
     // ...met with disproportionately large real demand.
-    createPurchase(dupId, investidor.id, 200_000, '2,0');
+    createPurchase(dupId, investidor.id, 200_000, '2,0', 0);
 
     const after = computeLiquiditySignal();
     expect(after.demand30dBRL).toBeGreaterThan(before.demand30dBRL);

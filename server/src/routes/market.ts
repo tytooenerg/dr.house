@@ -81,7 +81,7 @@ marketRouter.post('/:id/buy', (req, res) => {
     return;
   }
   const { precoCompra } = computePurchasePrice(d);
-  createPurchase(d.id, req.user!.id, d.valor, d.desagio ?? '');
+  createPurchase(d.id, req.user!.id, d.valor, d.desagio ?? '', Math.round(d.valor - precoCompra));
   settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: req.user!.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
   if (d.cedente_id) {
     void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: req.user!.id });

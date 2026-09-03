@@ -155,14 +155,14 @@ async function main() {
     if (aceiteStatus !== 'contestada' && Math.random() < 0.75) {
       const investor = rand(investidores);
       const demoRate = 1.5 + Math.random() * 3;
-      createPurchase(d.id, investor.id, valor, `${demoRate.toFixed(1)}%`);
+      const { precoCompra } = computePurchasePrice(d, demoRate);
+      createPurchase(d.id, investor.id, valor, `${demoRate.toFixed(1)}%`, Math.round(valor - precoCompra));
       const purchaseRow = db.prepare('SELECT id, created_at FROM purchases WHERE duplicata_id = ? ORDER BY id DESC LIMIT 1').get(d.id) as {
         id: number;
         created_at: string;
       };
       const purchaseDaysAgo = Math.max(0, daysAgo - randInt(0, 3));
       db.prepare('UPDATE purchases SET created_at = ? WHERE id = ?').run(daysAgoIso(purchaseDaysAgo), purchaseRow.id);
-      const { precoCompra } = computePurchasePrice(d, demoRate);
       const { fee } = settlePurchase({ duplicataId: d.id, sacadoNome, investorId: investor.id, cedenteId: cedente.id, valor, precoCompra });
       totalFinanciado += valor;
       totalTaxas += fee;
@@ -192,7 +192,7 @@ async function main() {
         const askingValor = Math.round(valor * (1 + (Math.random() * 0.06 - 0.02)));
         const listing = createListing(purchaseRow.id, d.id, seller.id, askingValor);
         deactivatePurchase(purchaseRow.id);
-        createPurchase(d.id, buyer.id, askingValor, `${(1.5 + Math.random() * 3).toFixed(1)}%`);
+        createPurchase(d.id, buyer.id, askingValor, `${(1.5 + Math.random() * 3).toFixed(1)}%`, Math.round(valor - askingValor));
         setListingStatus(listing.id, 'vendido');
         const { fee: resaleFee } = settleResale({ duplicataId: d.id, sacadoNome, buyerId: buyer.id, sellerId: seller.id, valor: askingValor });
         totalTaxas += resaleFee;

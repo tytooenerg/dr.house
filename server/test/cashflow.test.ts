@@ -270,7 +270,7 @@ describe('AI CFO — cashflow forecast', () => {
         cedenteId: userId, cedenteNome: 'Cedente DRE', sacadoNome: 'Sacado DRE Receita', sacadoCnpj: '',
         valor: 25000, vencimento: isoDaysFromNow(10), emissao: '10/08/2026', status: 'no_mercado', lastroPct: 100, seguro: false,
       });
-      createPurchase(dup.id, investidorRes.body.user.id, 25000, '2,0');
+      createPurchase(dup.id, investidorRes.body.user.id, 25000, '2,0', 0);
 
       const payableRes = await request(app)
         .post('/api/payables')

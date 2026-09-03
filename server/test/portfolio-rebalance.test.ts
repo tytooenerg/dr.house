@@ -45,7 +45,7 @@ function buyPosition(investorId: number, rating: keyof typeof SACADO_BY_RATING, 
     lastroPct: 100,
     seguro: false,
   });
-  createPurchase(d.id, investorId, valor, '2,0%');
+  createPurchase(d.id, investorId, valor, '2,0%', 0);
   return d.id;
 }
 
@@ -70,7 +70,7 @@ function buyPositionWithScore(investorId: number, sacadoName: string, score: num
     seguro: false,
   });
   db.prepare('UPDATE duplicatas SET score = ? WHERE id = ?').run(score, d.id);
-  createPurchase(d.id, investorId, valor, '2,0%');
+  createPurchase(d.id, investorId, valor, '2,0%', 0);
   return d.id;
 }
 
