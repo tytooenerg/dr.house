@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
+import { getFundoBalance } from '../src/db/confirmingFundo.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -33,7 +34,7 @@ async function registerCedente(companyName: string) {
   return res.body.token as string;
 }
 
-async function submitEmitir(token: string, overrides: Partial<{ vencimento: string; sacado: string; cnpj: string }> = {}) {
+async function submitEmitir(token: string, overrides: Partial<{ vencimento: string; sacado: string; cnpj: string; valor: string }> = {}) {
   let lastStatus = 0;
   let body: Record<string, unknown> = {};
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -43,7 +44,7 @@ async function submitEmitir(token: string, overrides: Partial<{ vencimento: stri
       .send({
         sacado: overrides.sacado ?? 'Grupo Atlas Varejo',
         cnpj: overrides.cnpj ?? '12.345.678/0001-90',
-        valor: '10.000',
+        valor: overrides.valor ?? '10.000',
         vencimento: overrides.vencimento ?? '2020-01-10',
         seguro: false,
         nfAnexada: true,
@@ -55,7 +56,7 @@ async function submitEmitir(token: string, overrides: Partial<{ vencimento: stri
     expect(res.status).toBe(502);
   }
   expect(lastStatus).toBe(200);
-  return body as { duplicataId: string };
+  return body as { duplicataId: string; financiadoViaPrograma?: boolean };
 }
 
 describe('Fee de sucesso — cobrança jurídica', () => {
@@ -124,5 +125,86 @@ describe('Fee de sucesso — cobrança jurídica', () => {
     const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
     expect(recover.status).toBe(200);
     expect(recover.body.chargedRole).toBe('investidor');
+  });
+
+  it('credita o credor pelo valor recuperado líquido da fee — não só debita a fee (achado: recordRecovery nunca creditava a recuperação em si)', async () => {
+    const admin = await adminToken();
+    const cedente = await registerCedente(`Fornecedora Credito Real ${unique()} Ltda`);
+    const emitted = await submitEmitir(cedente, { vencimento: '2020-04-10' });
+
+    const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
+    setAceiteStatus(aceite.id, 'aceita');
+
+    const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
+    expect(recover.status).toBe(200);
+    const net = 10_000 - recover.body.feeValor;
+
+    const extrato = await request(app).get('/api/account').set('Authorization', `Bearer ${cedente}`);
+    const credit = extrato.body.extrato.find((e: { descricao: string }) => e.descricao.includes(emitted.duplicataId) && e.descricao.includes('Recuperação'));
+    expect(credit).toBeTruthy();
+    expect(credit.isPositive).toBe(true);
+    expect(credit.valorFmt.replace(/\D/g, '')).toBe(String(Math.round(net)));
+  });
+
+  it('uma duplicata fracionada não é elegível pra cobrança jurídica ainda — recordRecovery não sabe distribuir entre os holders', async () => {
+    const admin = await adminToken();
+    const cedente = await registerCedente(`Fornecedora Fracionada Juridico ${unique()} Ltda`);
+    const emitted = await submitEmitir(cedente, {
+      vencimento: '2020-05-10',
+      sacado: `Comércio Rio Preto ${unique()} Ltda`,
+      cnpj: '34.567.890/0001-12',
+      valor: '200.000',
+    });
+
+    const investor = await investorToken();
+    const fracionar = await request(app)
+      .post(`/api/market/${emitted.duplicataId}/fracionar`)
+      .set('Authorization', `Bearer ${investor}`)
+      .send({ tokens: 10 });
+    expect(fracionar.status).toBe(200);
+
+    const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
+    setAceiteStatus(aceite.id, 'aceita');
+
+    const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
+    expect(recover.status).toBe(409);
+    expect(recover.body.error).toBe('not_eligible');
+    expect(recover.body.message).toContain('fracionada');
+  });
+
+  it('quando o credor é o fundo do Confirming, o ledger interno do fundo também é atualizado (mesma consistência do pagamento no vencimento)', async () => {
+    const admin = await adminToken();
+    const sacadoCompany = `Sacado Juridico Confirming ${unique()}`;
+    const sacadoRes = await request(app)
+      .post('/api/auth/register')
+      .send({ nome: 'Sacado', email: `sac-jur-conf-${unique()}@example.com`, password: 'senha123', companyName: sacadoCompany, role: 'sacado' });
+    const sacadoToken = sacadoRes.body.token as string;
+    const cedente = await registerCedente(`Fornecedora Confirming Juridico ${unique()} Ltda`);
+    const cedenteMe = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${cedente}`);
+    const cedenteUserId = cedenteMe.body.user.id as number;
+
+    // CNPJ com histórico real seedado (data/seed.ts SACADOS) — necessário pra
+    // buildBlendedRiscoViewSync calcular uma taxa (mesmo CNPJ usado em duplicata-payment.test.ts).
+    const CNPJ_COM_HISTORICO = '12.345.678/0001-90';
+    await request(app).post('/api/confirming/criar').set('Authorization', `Bearer ${sacadoToken}`).send({ cnpj: CNPJ_COM_HISTORICO, limite: '500.000' });
+    await request(app).post('/api/confirming/membros').set('Authorization', `Bearer ${sacadoToken}`).send({ cedenteUserId });
+    const fundoInvestorToken = await investorToken();
+    await request(app).post('/api/confirming-fundo/contribuir').set('Authorization', `Bearer ${fundoInvestorToken}`).send({ valor: 50000 });
+
+    const emitted = await submitEmitir(cedente, { vencimento: '2020-06-10', sacado: sacadoCompany, cnpj: CNPJ_COM_HISTORICO, valor: '10.000' });
+    expect(emitted.financiadoViaPrograma).toBe(true);
+
+    const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
+    setAceiteStatus(aceite.id, 'aceita');
+
+    const balanceBeforeRecovery = getFundoBalance();
+    const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
+    expect(recover.status).toBe(200);
+    expect(recover.body.chargedRole).toBe('investidor');
+
+    // O ledger interno do fundo (não só a conta pessoal do sistema) precisa refletir a
+    // recuperação — mesma consistência que reportPayment já garante no caminho normal.
+    const net = 10_000 - recover.body.feeValor;
+    expect(getFundoBalance()).toBeCloseTo(balanceBeforeRecovery + net, 6);
   });
 });

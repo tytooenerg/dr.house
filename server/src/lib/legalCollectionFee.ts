@@ -3,6 +3,7 @@ import { getActivePurchaseByDuplicata } from '../db/resaleListings.js';
 import { setStatus as setDuplicataStatus } from '../db/duplicatas.js';
 import { getFloatSetting, setPlatformSetting } from '../db/platformSettings.js';
 import { recordLegalCollectionFee, hasFeeAlreadyCharged } from '../db/legalCollectionFees.js';
+import { getFundoSistemaUserIdIfExists, fundoRetornoDePagamento } from './confirmingFundo.js';
 import { fmtBRL } from './format.js';
 import type { DuplicataRow } from '../db/types.js';
 
@@ -43,12 +44,17 @@ export interface RecordRecoveryResult {
   chargedTo: CurrentCreditor;
 }
 
-// Charges the fee against whoever currently holds the receivable and marks the duplicata
-// 'paga' — the natural real use for that status (previously only present in static demo
-// seed data, never set by any real flow). Only ever charged once per duplicata. The
-// recovery itself (the sacado's actual payment, off-platform) isn't processed here — only
-// Lastro's own fee for having assisted the escalation is, same honest scope as the rest
-// of the settlement layer (see lib/settlement.ts).
+// Credits whoever currently holds the receivable with the recovered principal, net of
+// Lastro's success fee, and marks the duplicata 'paga' — the natural real use for that
+// status (previously only present in static demo seed data, never set by any real flow).
+// Only ever charged once per duplicata. Used to only debit the fee and never credit the
+// recovery itself, on the theory that a judicial recovery pays the creditor directly,
+// off-platform — but that's the same gap the "pagamento no vencimento" fix (see
+// lib/settlement.ts's settleAtMaturity) closed for the on-time path: every other real
+// money movement for a duplicata bought through Lastro settles through Lastro's own
+// ledger, and a legal recovery is no different — the admin recording it here has already
+// confirmed the money is real (unlike the happy path's sacado self-report, this is an
+// admin-confirmed event), so crediting it is at least as honest as reportPayment already is.
 export function recordRecovery(duplicata: DuplicataRow, recoveredValor: number, recordedBy?: number): RecordRecoveryResult | null {
   if (hasFeeAlreadyCharged(duplicata.id)) return null;
   const creditor = currentCreditorFor(duplicata);
@@ -56,6 +62,7 @@ export function recordRecovery(duplicata: DuplicataRow, recoveredValor: number, 
 
   const feePct = getSuccessFeePct();
   const feeValor = Math.round(recoveredValor * (feePct / 100) * 100) / 100;
+  const net = recoveredValor - feeValor;
 
   recordLegalCollectionFee({
     duplicataId: duplicata.id,
@@ -69,9 +76,18 @@ export function recordRecovery(duplicata: DuplicataRow, recoveredValor: number, 
   addLedgerEntry(
     creditor.userId,
     new Date().toLocaleDateString('pt-BR'),
-    `Fee de sucesso — cobrança jurídica de ${duplicata.id} (${feePct}% sobre ${fmtBRL(recoveredValor)} recuperado)`,
-    -feeValor
+    `Recuperação via cobrança jurídica — duplicata ${duplicata.id} (${fmtBRL(recoveredValor)} recuperado, fee de sucesso de ${feePct}% descontada: ${fmtBRL(feeValor)})`,
+    net
   );
+  // Mesma consistência que lib/aceiteCore.ts's reportPayment já mantém no caminho normal:
+  // se o credor for a conta de sistema do Programa Confirming, o ledger interno do próprio
+  // fundo (não só a conta pessoal do sistema) também precisa saber que o dinheiro voltou —
+  // senão o NAV/cota do fundo ficaria permanentemente inflado por uma posição que já foi
+  // recuperada e paga.
+  const fundoSistemaUserId = getFundoSistemaUserIdIfExists();
+  if (fundoSistemaUserId !== null && creditor.userId === fundoSistemaUserId) {
+    fundoRetornoDePagamento(duplicata.id, net);
+  }
   setDuplicataStatus(duplicata.id, 'paga');
 
   return { feeValor, feePct, chargedTo: creditor };
