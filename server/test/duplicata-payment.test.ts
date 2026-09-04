@@ -2,12 +2,14 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { db } from '../src/db/index.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
 import { computeFundoNav } from '../src/lib/confirmingFundo.js';
 import { approveKyb } from '../src/db/users.js';
 import { getProgramaBySacado } from '../src/db/confirming.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
+import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
 
 // Nenhuma parte da plataforma modelava "sacado pagou no vencimento, caminho feliz" antes
 // desta feature — nem o marketplace normal, nem a linha de crédito, nem o Confirming. Self-
@@ -53,6 +55,22 @@ async function extratoOf(token: string) {
 async function findAceite(sacadoToken: string, duplicataId: string) {
   const res = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacadoToken}`);
   return res.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
+}
+
+// O cedente dispara o leilão depois do aceite confirmado — mesmo requisito de qualquer
+// duplicata desde a correção do gate de negociação (routes/minhas.ts's dispararLeilao).
+async function aceitarEDisparar(cedenteToken: string, sacadoToken: string, duplicataId: string) {
+  const aceite = await findAceite(sacadoToken, duplicataId);
+  const accept = await request(app).post(`/api/aceites/${aceite.id}/status`).set('Authorization', `Bearer ${sacadoToken}`).send({ status: 'aceita' });
+  expect(accept.status).toBe(200);
+  const leilao = await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
+  expect(leilao.status).toBe(200);
+}
+
+// Controle determinístico da taxa que o fundo vê no leilão — ver o mesmo helper e
+// comentário em confirming-auto-fund.test.ts.
+function setDesagio(duplicataId: string, taxaAmPct: number) {
+  db.prepare('UPDATE duplicatas SET desagio = ? WHERE id = ?').run(taxaAmPct.toFixed(2).replace('.', ','), duplicataId);
 }
 
 describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor', () => {
@@ -138,17 +156,24 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
 
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '10.000'));
     expect(emit.status).toBe(200);
-    expect(emit.body.financiadoViaPrograma).toBe(true);
     const duplicataId = emit.body.duplicataId as string;
 
-    // O fundo paga o preço com deságio (lib/marketCompute.ts's computePurchasePrice, na
-    // taxa negociada do programa), não o valor de face — mesmo cálculo real que
-    // lib/confirmingCore.ts's tentarFinanciarViaPrograma usa. Caixa cai só esse tanto; NAV
+    // Achado corrigido (mudança de modelo de negócio): o fundo não pula mais o leilão — só
+    // compra depois que a duplicata está de fato em 'no_mercado', competindo pelo mesmo
+    // caminho que qualquer investidor usaria, na taxa DINÂMICA de mercado (nunca a taxa
+    // negociada do programa, que virou só um teto — setDesagio garante aqui que a taxa fica
+    // dentro dele, com folga).
+    const programa = getProgramaBySacado(sacadoUserId)!;
+    setDesagio(duplicataId, programa.taxa_am - 0.3);
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(1);
+
+    // Caixa cai só o preço com deságio (lib/marketCompute.ts's computePurchasePrice); NAV
     // (caixa + posições em aberto, valorizadas ao valor de face) SOBE pelo valor do deságio
     // — um ganho ainda não realizado: o fundo trocou dinheiro por um direito a receber que
     // vale mais do que pagou por ele.
-    const programa = getProgramaBySacado(sacadoUserId)!;
-    const { precoCompra, descontoValor } = computePurchasePrice(getDuplicata(duplicataId)!, programa.taxa_am);
+    const { precoCompra, descontoValor } = computePurchasePrice(getDuplicata(duplicataId)!);
     expect(getFundoBalance()).toBeCloseTo(balanceAfterAporte - precoCompra, 6);
     expect(computeFundoNav()).toBeCloseTo(navAfterAporte + descontoValor, 5);
 

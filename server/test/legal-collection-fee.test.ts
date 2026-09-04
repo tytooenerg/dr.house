@@ -2,8 +2,11 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { db } from '../src/db/index.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
+import { getProgramaBySacado } from '../src/db/confirming.js';
+import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -56,7 +59,7 @@ async function submitEmitir(token: string, overrides: Partial<{ vencimento: stri
     expect(res.status).toBe(502);
   }
   expect(lastStatus).toBe(200);
-  return body as { duplicataId: string; financiadoViaPrograma?: boolean };
+  return body as { duplicataId: string };
 }
 
 describe('Fee de sucesso — cobrança jurídica', () => {
@@ -179,6 +182,7 @@ describe('Fee de sucesso — cobrança jurídica', () => {
       .post('/api/auth/register')
       .send({ nome: 'Sacado', email: `sac-jur-conf-${unique()}@example.com`, password: 'senha123', companyName: sacadoCompany, role: 'sacado' });
     const sacadoToken = sacadoRes.body.token as string;
+    const sacadoUserId = sacadoRes.body.user.id as number;
     const cedente = await registerCedente(`Fornecedora Confirming Juridico ${unique()} Ltda`);
     const cedenteMe = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${cedente}`);
     const cedenteUserId = cedenteMe.body.user.id as number;
@@ -192,10 +196,20 @@ describe('Fee de sucesso — cobrança jurídica', () => {
     await request(app).post('/api/confirming-fundo/contribuir').set('Authorization', `Bearer ${fundoInvestorToken}`).send({ valor: 50000 });
 
     const emitted = await submitEmitir(cedente, { vencimento: '2020-06-10', sacado: sacadoCompany, cnpj: CNPJ_COM_HISTORICO, valor: '10.000' });
-    expect(emitted.financiadoViaPrograma).toBe(true);
 
+    // Achado corrigido (mudança de modelo de negócio): o fundo não pula mais o leilão — só
+    // compra depois que a duplicata está de fato em 'no_mercado', na taxa DINÂMICA de
+    // mercado (nunca a taxa negociada do programa, que virou só um teto — db update direto
+    // garante aqui que a taxa fica dentro dele, com folga, mesmo padrão de
+    // confirming-auto-fund.test.ts's setDesagio).
     const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
     setAceiteStatus(aceite.id, 'aceita');
+    const programa = getProgramaBySacado(sacadoUserId)!;
+    db.prepare('UPDATE duplicatas SET desagio = ? WHERE id = ?').run((programa.taxa_am - 0.3).toFixed(2).replace('.', ','), emitted.duplicataId);
+    const leilao = await request(app).post(`/api/minhas/${emitted.duplicataId}/leilao`).set('Authorization', `Bearer ${cedente}`);
+    expect(leilao.status).toBe(200);
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(1);
 
     const balanceBeforeRecovery = getFundoBalance();
     const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);

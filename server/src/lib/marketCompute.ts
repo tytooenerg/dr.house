@@ -29,9 +29,8 @@ function getLiveExtraBids(startedAt: string | null, baseRate: number) {
 }
 
 // Real monthly deságio rate for a specific duplicata — either the rate actually agreed
-// when it entered the book (d.desagio, e.g. the Programa Confirming's own contracted
-// programa.taxa_am — lib/confirmingCore.ts's tentarFinanciarViaPrograma writes it there) or,
-// for an offer still open on the marketplace, the dynamic rating-based estimate
+// when it entered the book (d.desagio) or, for an offer still open on the marketplace,
+// the dynamic rating-based estimate
 // (lib/dynamicPricing.ts's estimateRateBand) reflecting real 30-day supply/demand instead of
 // one fixed number for the whole marketplace.
 export function effectiveMonthlyRatePct(d: DuplicataRow): number {

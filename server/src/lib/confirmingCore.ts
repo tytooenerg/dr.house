@@ -1,8 +1,6 @@
-import { getSettings, updateSettings, getUserById, getSacadoAccountByCompanyName } from '../db/users.js';
-import type { UserRow, DuplicataRow } from '../db/types.js';
-import { createPurchase } from '../db/duplicatas.js';
+import { getSettings, updateSettings, getUserById } from '../db/users.js';
+import type { UserRow } from '../db/types.js';
 import {
-  getMembro,
   getProgramaById,
   getProgramaBySacado,
   insertPrograma,
@@ -10,9 +8,7 @@ import {
   listMembrosByPrograma,
   listProgramas,
   setMembroStatus,
-  setMembroUtilizado,
   setProgramaStatus,
-  setProgramaUtilizado,
   upsertMembro,
   type ConfirmingMembroComCedente,
   type ConfirmingProgramaRow,
@@ -21,10 +17,6 @@ import { listAceitesBySacadoNome } from '../db/aceites.js';
 import { listOpenDisputesByCedente } from '../db/disputes.js';
 import { buildBlendedRiscoViewSync } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
-import { settlePurchase } from './settlement.js';
-import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
-import { computePurchasePrice } from './marketCompute.js';
-import { fundoFinanciarCompra, getOrCreateFundoSistemaUserId } from './confirmingFundo.js';
 import { getFundoBalance } from '../db/confirmingFundo.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 
@@ -33,8 +25,9 @@ import { fmtBRL, parseBRLNumber } from './format.js';
 // aplicaria a ele no mercado aberto (buildBlendedRiscoViewSync + estimateRateBand, as
 // mesmas funções que precificam qualquer oferta hoje) — sem inventar um modelo de
 // precificação novo. Esta é só a fundação: criar/pausar o programa e matricular
-// cedentes elegíveis. O pulo do leilão em si (financiamento automático na emissão) e o
-// fundo de fomento que capitaliza isso vêm em features seguintes.
+// cedentes elegíveis. O financiamento automático em si (lib/confirmingFundoAutoBuy.ts's
+// runFundoAutoBuyTick) mora num arquivo separado — o Fundo de Fomento compra sempre
+// dentro do leilão/marketplace real, nunca por um atalho aqui.
 
 const MIN_LIMITE = 10_000;
 const MAX_LIMITE = 5_000_000;
@@ -234,63 +227,11 @@ export function getCompanyCnpj(user: UserRow): string {
   return getSettings(user).companyCnpj;
 }
 
-export type FinanciamentoAutomaticoResultado =
-  | { financiado: true }
-  | {
-      financiado: false;
-      motivo: 'sacado_sem_conta' | 'sem_programa_ativo' | 'nao_matriculado' | 'limite_programa_excedido' | 'sublimite_excedido' | 'fundo_insuficiente';
-    };
-
-// O coração do Programa Confirming: chamado por lib/emitirCore.ts's submitEmitir logo
-// depois que a duplicata está de fato aprovada (checklist 100%, não suspensa pelo
-// Compliance AI Engine) — nunca antes, pra não financiar algo que ainda pode ser barrado
-// segundos depois. Identifica o sacado pela mesma amarração de nome que o resto do app já
-// usa (getSacadoAccountByCompanyName — igual ao aceite, igual à notificação de emissão),
-// não por CNPJ: manter uma única fonte de verdade pra "quem é este sacado".
-//
-// Quando financia: pula o leilão de vez (a duplicata nunca passa por 'no_mercado' — vai
-// direto pra 'vendida' via createPurchase/settlePurchase, os mesmos usados por uma compra
-// manual no mercado aberto ou pelo auto-bid), na taxa do próprio programa, com capital do
-// Fundo de Fomento do Confirming (lib/confirmingFundo.ts), nunca do caixa da Lastro. O
-// aceite continua rodando sem alteração nenhuma — o financiamento não espera a confirmação
-// do sacado (esse é o ponto do "confirming": financiar na hora, e uma contestação
-// posterior cai no fluxo de disputa que já existe pra qualquer duplicata comprada.
-export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedenteUser: UserRow): Promise<FinanciamentoAutomaticoResultado> {
-  const sacadoAccount = getSacadoAccountByCompanyName(duplicata.sacado_nome);
-  if (!sacadoAccount) return { financiado: false, motivo: 'sacado_sem_conta' };
-
-  const programa = getProgramaBySacado(sacadoAccount.id);
-  if (!programa || programa.status !== 'ativo') return { financiado: false, motivo: 'sem_programa_ativo' };
-
-  const membro = getMembro(programa.id, cedenteUser.id);
-  if (!membro || membro.status !== 'ativo') return { financiado: false, motivo: 'nao_matriculado' };
-
-  if (programa.utilizado + duplicata.valor > programa.limite) return { financiado: false, motivo: 'limite_programa_excedido' };
-  if (membro.sublimite !== null && membro.utilizado + duplicata.valor > membro.sublimite) {
-    return { financiado: false, motivo: 'sublimite_excedido' };
-  }
-  // O que o fundo de fato precisa ter em caixa é o preço com deságio (precoCompra), não o
-  // valor de face — igual a qualquer outro comprador (lib/marketCompute.ts's
-  // computePurchasePrice), usando a taxa negociada do próprio programa (programa.taxa_am)
-  // em vez da estimativa genérica de mercado, já que esse é o contrato real. Sem esta
-  // checagem, um programa com limite alto e zero aporte real financiaria do mesmo jeito,
-  // deixando o ledger do fundo negativo — exatamente o risco de capital próprio que este
-  // desenho inteiro existe pra evitar (mesmo princípio de drawCreditLine checar
-  // getFundBalance() antes de liberar um saque).
-  const { precoCompra } = computePurchasePrice(duplicata, programa.taxa_am);
-  if (getFundoBalance() < precoCompra) return { financiado: false, motivo: 'fundo_insuficiente' };
-
-  const fundoUserId = await getOrCreateFundoSistemaUserId();
-  createPurchase(duplicata.id, fundoUserId, duplicata.valor, fmtTaxaAm(programa.taxa_am), Math.round(duplicata.valor - precoCompra));
-  settlePurchase({ duplicataId: duplicata.id, sacadoNome: duplicata.sacado_nome, investorId: fundoUserId, cedenteId: cedenteUser.id, valor: duplicata.valor, precoCompra });
-  // Res. BCB nº 540/2025 — ver comentário de informarNegociacao (lib/registradoras.ts).
-  void informarNegociacao({ registradoraKey: duplicata.registradora as RegistradoraKey | null, duplicataId: duplicata.id, evento: 'financiamento', valor: precoCompra });
-  fundoFinanciarCompra(duplicata.id, precoCompra);
-  setProgramaUtilizado(programa.id, programa.utilizado + duplicata.valor);
-  setMembroUtilizado(membro.id, membro.utilizado + duplicata.valor);
-
-  return { financiado: true };
-}
+// O financiamento automático do Programa Confirming (antes chamado daqui, na emissão —
+// pulando o leilão inteiramente) foi movido pra lib/confirmingFundoAutoBuy.ts's
+// runFundoAutoBuyTick: o Fundo de Fomento agora compra sempre dentro do leilão/marketplace
+// real, como qualquer banco ou investidor, nunca por um atalho na emissão. Ver o comentário
+// de topo desse arquivo pra por que isso mudou.
 
 // A partir daqui, utilização ≥ 80% do limite acende o alerta pro admin — mesmo tipo de
 // limiar preventivo já usado alhures no código (ex.: threshold de compliance), pra dar
@@ -343,8 +284,9 @@ export interface ConfirmingHealthSummary {
 
 // Sinal real de liquidez, não cosmético: soma quanto os programas ATIVOS ainda podem
 // prometer financiar (limite - utilizado) e compara com o caixa de verdade que o fundo
-// tem agora (getFundoBalance — o mesmo saldo que tentarFinanciarViaPrograma checa antes
-// de financiar). limite é uma promessa do sacado; só o saldo do fundo é dinheiro real —
+// tem agora (getFundoBalance — o mesmo saldo que lib/confirmingFundoAutoBuy.ts's
+// runFundoAutoBuyTick checa antes de financiar). limite é uma promessa do sacado; só o
+// saldo do fundo é dinheiro real —
 // se a soma prometida passar do caixa disponível, algum financiamento futuro vai cair no
 // fallback 'fundo_insuficiente' mesmo com programa/matrícula/limite em dia, e o admin
 // deveria saber disso antes de acontecer, não depois.
