@@ -96,9 +96,16 @@ marketRouter.post('/:id/buy', (req, res) => {
 
 const insureSchema = z.object({ key: z.enum(['too', 'pottencial', 'junto']).nullable() });
 
-// Only an investidor can contract insurance — it's protection on their own position, paid
-// for out of their own ledger, same access rule as buying. Real money moves the moment a
-// *new* insurer key is set (see settleInsurance): switching between two different insurers
+// Apenas contas de investidor podem contratar seguro, pago do próprio extrato — mas a
+// cobertura em si é sobre o risco do CEDENTE nunca ser pago pelo mercado (ver o comentário
+// de listClaimableByInsurerKey em db/duplicatas.ts, e decideSinistro em
+// lib/seguradoraCore.ts, que credita o cedente): uma vez que a duplicata é vendida, esse
+// risco específico deixou de existir — o cedente já foi pago. Achado (auditoria de
+// simulação multi-papel, server/test/full-lifecycle-all-roles.test.ts): sem o bloqueio
+// abaixo, contratar seguro numa duplicata já 'vendida' era aceito e cobrava um prêmio real
+// do investidor, mas listClaimableByInsurerKey exclui status='vendida' pra sempre — a
+// apólice nunca podia virar sinistro reclamável. Real money moves the moment a *new*
+// insurer key is set (see settleInsurance): switching between two different insurers
 // charges the new premium again; re-submitting the same key or removing insurance doesn't
 // charge or refund — a deliberate simplification, not a real-world proration engine.
 marketRouter.post('/:id/insure', (req, res) => {
@@ -126,6 +133,16 @@ marketRouter.post('/:id/insure', (req, res) => {
     res.status(409).json({
       error: 'already_overdue',
       message: 'Não é possível contratar seguro para uma duplicata cujo vencimento já passou — o risco já se realizou, isso não é mais uma apólice, é uma indenização garantida.',
+    });
+    return;
+  }
+  // Mesma lógica: uma duplicata já vendida no mercado não pode mais virar sinistro
+  // reclamável (listClaimableByInsurerKey exige status != 'vendida'), então vender a
+  // apólice sobre ela seria cobrar por uma cobertura estruturalmente impossível de acionar.
+  if (isNewContract && d.status === 'vendida') {
+    res.status(409).json({
+      error: 'already_sold',
+      message: 'Não é possível contratar seguro sobre uma duplicata que já foi vendida no mercado — o cedente já foi pago, o risco que esta apólice cobre (o cedente nunca receber pelo mercado) deixou de existir.',
     });
     return;
   }

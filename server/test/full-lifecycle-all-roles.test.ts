@@ -14,8 +14,11 @@ import { applyTacitAcceptance } from '../src/lib/aceiteCore.js';
 // auditor.test.ts) já cobrem cada papel separadamente ou em combinações de 3-4; nenhum
 // combina os 6 na mesma operação. É exatamente na integração entre eles — o que
 // aconteceu ANTES de uma ação e como isso interage com o que outro papel faz DEPOIS —
-// que os achados abaixo (H1-H4, H8) aparecem; H5 já era um achado conhecido e
-// documentado em admin-dispute-resolution.test.ts, não é reportado de novo aqui.
+// que os achados abaixo aparecem. H1 e H2 já foram corrigidos (routes/market.ts bloqueia
+// contratar seguro numa duplicata já vendida) — os testes correspondentes agora validam a
+// correção em vez de documentar o bug. H3, H4 e H8 ainda aguardam decisão sobre a correção.
+// H5 já era um achado conhecido e documentado em admin-dispute-resolution.test.ts, não é
+// reportado de novo aqui.
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -63,13 +66,13 @@ async function registrarInvestidorAprovado(companyName: string) {
 }
 
 describe('Operação completa — 6 papéis numa única cadeia real', () => {
-  it('cedente emite → leiloa → investidor A compra e segura → sacado aceita → investidor A revende → investidor B paga no vencimento → auditor vê tudo', async () => {
+  it('cedente emite e segura (pré-venda) → leiloa → investidor A compra → sacado aceita → investidor A revende → investidor B paga no vencimento → auditor vê tudo', async () => {
     const sacadoCompany = unique('Sacado Full');
     const cedente = await register('cedente', unique('Cedente Full'));
     const investidorA = await registrarInvestidorAprovado(unique('Fundo A Full'));
     const investidorB = await registrarInvestidorAprovado(unique('Fundo B Full'));
 
-    // 1. CEDENTE emite e dispara o leilão.
+    // 1. CEDENTE emite.
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
       cnpj: '44.333.222/0001-11',
@@ -82,11 +85,23 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     expect(emit.status).toBe(200);
     const duplicataId = emit.body.duplicataId as string;
 
+    // 2. INVESTIDOR A contrata seguro ENQUANTO a duplicata ainda não foi vendida — depois
+    // do fix de H1, essa é a única janela em que contratar seguro é aceito (a apólice
+    // cobre o risco de "o cedente nunca ser pago pelo mercado", que deixa de existir assim
+    // que a venda acontece).
+    const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorA.token}`).send({ key: 'too' });
+    expect(insure.status).toBe(200);
+
+    const seguradoraExtratoAntes = await request(app).get('/api/account').set('Authorization', `Bearer ${await seguradoraLogin()}`);
+    const premioCreditado = seguradoraExtratoAntes.body.extrato.some((e: { descricao: string }) => e.descricao.includes(duplicataId));
+    expect(premioCreditado).toBe(true);
+
+    // 3. CEDENTE dispara o leilão.
     const leilao = await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
     expect(leilao.status).toBe(200);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
 
-    // 2. INVESTIDOR A compra — extrato de ambos os lados confere o movimento real.
+    // 4. INVESTIDOR A compra — extrato de ambos os lados confere o movimento real.
     const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
     expect(buy.status).toBe(200);
     expect(getDuplicata(duplicataId)!.status).toBe('vendida');
@@ -99,7 +114,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     const creditoVenda = cedenteExtrato.body.extrato.find((e: { descricao: string; isPositive: boolean }) => e.descricao.includes(duplicataId) && e.isPositive);
     expect(creditoVenda).toBeTruthy();
 
-    // 3. SACADO aceita explicitamente.
+    // 5. SACADO aceita explicitamente.
     const sacado = await register('sacado', sacadoCompany);
     const aceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacado.token}`);
     const aceite = aceites.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
@@ -107,15 +122,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     const decide = await request(app).post(`/api/aceites/${aceite.id}/status`).set('Authorization', `Bearer ${sacado.token}`).send({ status: 'aceita' });
     expect(decide.status).toBe(200);
 
-    // 4. INVESTIDOR A contrata seguro sobre a própria posição.
-    const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorA.token}`).send({ key: 'too' });
-    expect(insure.status).toBe(200);
-
-    const seguradoraExtratoAntes = await request(app).get('/api/account').set('Authorization', `Bearer ${await seguradoraLogin()}`);
-    const premioCreditado = seguradoraExtratoAntes.body.extrato.some((e: { descricao: string }) => e.descricao.includes(duplicataId));
-    expect(premioCreditado).toBe(true);
-
-    // 5. INVESTIDOR A revende no secundário; INVESTIDOR B compra.
+    // 6. INVESTIDOR A revende no secundário; INVESTIDOR B compra.
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${investidorA.token}`);
     const posicao = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId);
     expect(posicao).toBeTruthy();
@@ -129,7 +136,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     const comprarRevenda = await request(app).post(`/api/secundario/${listing.id}/comprar`).set('Authorization', `Bearer ${investidorB.token}`);
     expect(comprarRevenda.status).toBe(200);
 
-    // 6. Vencimento chega; SACADO reporta pagamento — quem recebe é o credor ATUAL
+    // 7. Vencimento chega; SACADO reporta pagamento — quem recebe é o credor ATUAL
     // (investidor B, que arrematou na revenda), não o investidor A nem o cedente.
     db.prepare("UPDATE duplicatas SET vencimento = date('now', '-1 day') WHERE id = ?").run(duplicataId);
     const pagar = await request(app).post(`/api/aceites/${aceite.id}/pagamento`).set('Authorization', `Bearer ${sacado.token}`);
@@ -142,7 +149,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     expect(creditoVencimento).toBeTruthy();
     expect(creditoVencimento.valorFmt.replace(/\D/g, '')).toBe('50000');
 
-    // 7. ADMIN cria uma conta de AUDITOR real; o auditor confere que a operação ficou
+    // 8. ADMIN cria uma conta de AUDITOR real; o auditor confere que a operação ficou
     // registrada e a hash-chain do audit log está íntegra.
     const admin = await adminLogin();
     const auditorEmail = `auditor-full-${unique('x')}@example.com`;
@@ -163,16 +170,17 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
   });
 });
 
-describe('Achados cross-role expostos por esta simulação (documentação — não corrigidos aqui)', () => {
+describe('Achados corrigidos (validados pela mesma simulação)', () => {
   // H1 original ("sinistro credita sempre o cedente, nunca currentCreditorFor") estava
   // parcialmente errada: listClaimableByInsurerKey (db/duplicatas.ts:181-188) exclui
   // explicitamente status='vendida' da lista de sinistros reclamáveis — "a policy becomes
   // claimable ... it was never sold". Rodar o teste revelou o achado real, mais grave:
-  // /market/:id/insure aceita e cobra um prêmio de verdade pra segurar uma duplicata que
-  // JÁ FOI VENDIDA (o próprio investidor que a comprou pode segurá-la) — mas por desenho
-  // essa apólice NUNCA pode virar sinistro reclamável, pra sempre, mesmo com o vencimento
-  // vencido. O investidor paga por uma cobertura estruturalmente impossível de acionar.
-  it('Achado: segurar uma duplicata já vendida cobra um prêmio real do investidor, mas a apólice nunca pode virar sinistro reclamável — listClaimableByInsurerKey exclui status=\'vendida\' pra sempre (ver db/duplicatas.ts:181-188 e routes/market.ts:104-144, que nunca bloqueia contratar seguro pós-venda)', async () => {
+  // /market/:id/insure aceitava e cobrava um prêmio de verdade pra segurar uma duplicata
+  // que JÁ FOI VENDIDA — mas por desenho essa apólice nunca podia virar sinistro
+  // reclamável, pra sempre. Corrigido em routes/market.ts: contratar um NOVO seguro numa
+  // duplicata 'vendida' agora é bloqueado com 409 'already_sold', antes de cobrar qualquer
+  // prêmio — mesmo padrão do bloqueio já existente pra duplicata vencida.
+  it('Achado corrigido: segurar uma duplicata já vendida agora é bloqueado ANTES de cobrar qualquer prêmio, em vez de vender uma apólice que nunca poderia virar sinistro reclamável', async () => {
     const sacadoCompany = unique('Sacado H1');
     const cedente = await register('cedente', unique('Cedente H1'));
     const investidor = await registrarInvestidorAprovado(unique('Fundo H1'));
@@ -194,34 +202,58 @@ describe('Achados cross-role expostos por esta simulação (documentação — n
     expect(buy.status).toBe(200);
     expect(getDuplicata(duplicataId)!.status).toBe('vendida');
 
-    // Mesmo assim, contratar seguro é aceito normalmente e cobra o prêmio real — nenhuma
-    // checagem de status barra isso.
+    const investidorExtratoAntes = await request(app).get('/api/account').set('Authorization', `Bearer ${investidor.token}`);
+    const totalAntes = investidorExtratoAntes.body.extrato.length;
+
+    // Corrigido: agora é bloqueado com 409 antes de cobrar qualquer prêmio.
     const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidor.token}`).send({ key: 'too' });
-    expect(insure.status).toBe(200);
+    expect(insure.status).toBe(409);
+    expect(insure.body.error).toBe('already_sold');
 
-    const investidorExtratoAposSeguro = await request(app).get('/api/account').set('Authorization', `Bearer ${investidor.token}`);
-    const premioDebitado = investidorExtratoAposSeguro.body.extrato.find(
-      (e: { descricao: string; isPositive: boolean }) => e.descricao.includes(duplicataId) && !e.isPositive
-    );
-    expect(premioDebitado).toBeTruthy(); // prêmio real, já saiu do bolso do investidor
+    const investidorExtratoDepois = await request(app).get('/api/account').set('Authorization', `Bearer ${investidor.token}`);
+    expect(investidorExtratoDepois.body.extrato.length).toBe(totalAntes); // nenhum prêmio cobrado
 
+    // Consequência: a duplicata nunca aparece pra seguradora como sinistro reclamável,
+    // porque nem chegou a ter uma apólice — igual antes da correção, mas agora sem custo
+    // nenhum pro investidor.
     db.prepare("UPDATE duplicatas SET vencimento = ? WHERE id = ?").run('2020-01-10', duplicataId);
-
-    // Achado: mesmo com vencimento vencido e apólice ativa, essa duplicata NUNCA aparece
-    // pra seguradora como sinistro reclamável — porque já foi vendida.
     const seguradoraToken = await seguradoraLogin();
     const dashboard = await request(app).get('/api/seguradora').set('Authorization', `Bearer ${seguradoraToken}`);
     expect(dashboard.body.sinistros.some((s: { id: string }) => s.id === duplicataId)).toBe(false);
-
-    const decidir = await request(app)
-      .post(`/api/seguradora/sinistro/${duplicataId}/decidir`)
-      .set('Authorization', `Bearer ${seguradoraToken}`)
-      .send({ decision: 'aprovado', note: 'Documentação conferida.' });
-    // Achado: 404 pra sempre — a apólice paga é estruturalmente inacionável, e nada no
-    // fluxo de contratação avisou o investidor disso.
-    expect(decidir.status).toBe(404);
   });
 
+  // H2 original ("/market/:id/insure nunca valida posse") ficou coberto pelo mesmo fix do
+  // H1: como agora não dá mais pra segurar uma duplicata depois de vendida, o cenário
+  // concreto que expunha H2 (um investidor que nunca comprou nada segurando a posição de
+  // outro, já vendida) também passou a ser bloqueado — não precisou de uma checagem de
+  // posse separada.
+  it('Achado corrigido (efeito colateral do fix de H1): um investidor que nunca comprou a duplicata também não consegue mais segurá-la depois que ela foi vendida a outro', async () => {
+    const sacadoCompany = unique('Sacado H2');
+    const cedente = await register('cedente', unique('Cedente H2'));
+    const investidorA = await registrarInvestidorAprovado(unique('Fundo H2 A'));
+    const investidorB = await registrarInvestidorAprovado(unique('Fundo H2 B — nunca compra nada'));
+
+    const emit = await emitirComRetry(cedente.token, {
+      sacado: sacadoCompany,
+      cnpj: '77.888.999/0001-00',
+      valor: '12.000',
+      vencimento: '2026-12-20',
+      seguro: false,
+      nfAnexada: true,
+      batchValores: [],
+    });
+    const duplicataId = emit.body.duplicataId as string;
+    await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
+    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
+    expect(buy.status).toBe(200);
+
+    const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorB.token}`).send({ key: 'pottencial' });
+    expect(insure.status).toBe(409);
+    expect(insure.body.error).toBe('already_sold');
+  });
+});
+
+describe('Achados cross-role ainda não corrigidos (documentação — aguardando decisão)', () => {
   it('Achado: uma duplicata já indenizada por sinistro pode ser "recuperada" de novo via cobrança jurídica — checkCollectionEligibility nunca olha duplicata.status, e recordRecovery só se protege por uma flag separada (hasFeeAlreadyCharged) que o sinistro nunca seta (ver lib/legalCollection.ts:30-52 e lib/legalCollectionFee.ts:58-59)', async () => {
     const sacadoCompany = unique('Sacado H3');
     const cedente = await register('cedente', unique('Cedente H3'));
@@ -286,31 +318,6 @@ describe('Achados cross-role expostos por esta simulação (documentação — n
       (e: { descricao: string; isPositive: boolean }) => e.descricao.includes(duplicataId) && e.descricao.includes('Recuperação') && e.isPositive
     );
     expect(segundaCredito).toBeTruthy();
-  });
-
-  it('Achado: um investidor pode contratar seguro sobre uma duplicata que nunca comprou — /market/:id/insure nunca valida posse via currentCreditorFor (ver routes/market.ts:104-144)', async () => {
-    const sacadoCompany = unique('Sacado H2');
-    const cedente = await register('cedente', unique('Cedente H2'));
-    const investidorA = await registrarInvestidorAprovado(unique('Fundo H2 A'));
-    const investidorB = await registrarInvestidorAprovado(unique('Fundo H2 B — nunca compra nada'));
-
-    const emit = await emitirComRetry(cedente.token, {
-      sacado: sacadoCompany,
-      cnpj: '77.888.999/0001-00',
-      valor: '12.000',
-      vencimento: '2026-12-20',
-      seguro: false,
-      nfAnexada: true,
-      batchValores: [],
-    });
-    const duplicataId = emit.body.duplicataId as string;
-    await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
-    expect(buy.status).toBe(200);
-
-    // Investidor B nunca comprou nada desta duplicata — mesmo assim consegue segurá-la.
-    const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorB.token}`).send({ key: 'pottencial' });
-    expect(insure.status).toBe(200);
   });
 
   it('Achado: uma duplicata contestada pelo sacado pode ser vendida no mercado secundário mesmo assim — só o mercado primário (routes/market.ts:75-78) checa aceite.status; lib/resaleCore.ts nunca faz essa checagem', async () => {
