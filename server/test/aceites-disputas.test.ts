@@ -62,14 +62,35 @@ describe('Aceite → Disputa flow across cedente and sacado accounts', () => {
     const dispute = disputes.body.disputes[0];
     expect(dispute.canSend).toBe(true);
 
-    // Cedente sends evidence, then resolves the dispute.
+    // Cedente sends evidence, then proposes a resolution — this alone never resolves the
+    // dispute anymore (the old unilateral /resolve let the accused party close a dispute
+    // against them with zero counterparty involvement; see server/test/dispute-proposal.test.ts
+    // for the dedicated regression coverage of that fix).
     const evidence = await request(app).post(`/api/disputas/${dispute.id}/evidence`).set('Authorization', `Bearer ${cedenteToken}`);
     expect(evidence.status).toBe(200);
     expect(evidence.body.disputes[0].isSent).toBe(true);
 
-    const resolve = await request(app).post(`/api/disputas/${dispute.id}/resolve`).set('Authorization', `Bearer ${cedenteToken}`);
-    expect(resolve.status).toBe(200);
-    expect(resolve.body.disputes).toHaveLength(0); // resolved disputes drop out of the open list
+    const propor = await request(app).post(`/api/disputas/${dispute.id}/propor`).set('Authorization', `Bearer ${cedenteToken}`);
+    expect(propor.status).toBe(200);
+    expect(propor.body.disputes).toHaveLength(1); // still open — a proposal alone doesn't resolve it
+    expect(propor.body.disputes[0].isProposed).toBe(true);
+
+    // The aceite stays 'contestada' until the sacado actually confirms.
+    const stillContested = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacadoToken}`);
+    expect(stillContested.body.aceites.find((a: { id: number }) => a.id === pending.id).status).toBe('contestada');
+
+    // The sacado sees the proposal and confirms it — only now does the dispute resolve.
+    const sacadoView = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacadoToken}`);
+    const proposalSeen = sacadoView.body.aceites.find((a: { id: number }) => a.id === pending.id).disputeProposal;
+    expect(proposalSeen).toBeTruthy();
+
+    const confirm = await request(app).post(`/api/disputas/${proposalSeen.disputeId}/confirmar`).set('Authorization', `Bearer ${sacadoToken}`);
+    expect(confirm.status).toBe(200);
+
+    // Only a cedente-authenticated request lists the open queue (routes/disputas.ts's
+    // GET / returns [] for any other role), so re-check via the cedente's own listing.
+    const afterConfirm = await request(app).get('/api/disputas').set('Authorization', `Bearer ${cedenteToken}`);
+    expect(afterConfirm.body.disputes).toHaveLength(0); // resolved disputes drop out of the open list
 
     // The underlying aceite is back to "aceita".
     const finalAceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacadoToken}`);

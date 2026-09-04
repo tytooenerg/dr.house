@@ -374,4 +374,10 @@ export interface DisputeRow {
   resolved_by: number | null;
   resolved_at: string | null;
   created_at: string;
+  // Autocomposição real exige as duas partes: o cedente propõe (estes 3 campos), e só
+  // vira resolução de verdade (resolved=1) quando o próprio sacado confirma — ver
+  // routes/disputas.ts. Uma proposta pendente nunca muda `resolved` nem o aceite.
+  proposed_resolution: string | null;
+  proposed_by: number | null;
+  proposed_at: string | null;
 }
