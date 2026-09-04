@@ -852,9 +852,7 @@ Novo `server/test/revenue.test.ts`: fee real de uma compra primária, de uma rev
 
 Também fechadas as lacunas de cobertura de teste em `lib/cestasCore.ts` (`server/test/cestas-investir.test.ts`, novo — ledger real, retorno determinístico, e o cruzamento nunca testado de uma posição comprada via cesta sendo revendida no mercado secundário) e em `lib/blockTrade.ts` (`server/test/block-trade.test.ts`, estendido — retorno realizado do vendedor após o sweep, débito agregado do comprador, faixas de desconto por volume 10%/20%/30%, `quantidadeMax`, lance superado numa posição varrida). Nenhum bug financeiro achado em `cestasCore.ts` — reusa `computePurchasePrice`/`settlePurchase`/`createPurchase` exatamente como `routes/market.ts` já faz.
 
-**Achados em aberto, não corrigidos** (mudança de arquitetura maior, decisão de produto):
-- O desconto institucional (`feeDiscountPct`) contradiz o próprio comentário no código (repetido 3x: "nunca uma redução no que o vendedor recebe") — como não existe nenhuma conta de ledger representando "a plataforma" nesta modelagem, descontar a taxa mecanicamente **aumenta** o líquido que o vendedor recebe (`net = valor - fee`), não fica neutro como o comentário promete. Não é dinheiro sumindo nem duplicado — é a plataforma abrindo mão de receita em favor do vendedor — mas contradiz o texto do próprio código. Documentado (não escondido) no novo teste de `block-trade.test.ts` que cobre retorno/crédito do vendedor.
-- `discountRatio` (a ordenação de quem entra primeiro num block trade, em `lib/blockTrade.ts`) usa `original_valor`, um join com `purchases.valor` — mesma ambiguidade do achado acima (valor de face vs. preço pago dependendo da origem), aqui afetando a ordem real de execução do sweep, não só um valor de exibição.
+**Achados em aberto na época, fechados nas duas seções a seguir**: o desconto institucional não sendo neutro pro vendedor, e `discountRatio` usando `purchases.valor` em vez do valor de face real.
 
 ### Disputa: o próprio cedente podia encerrar sozinho qualquer contestação aberta contra ele
 
@@ -866,6 +864,15 @@ Fechando o primeiro dos "achados em aberto" documentados nas PRs anteriores. Inv
 - **`DisputaPage.tsx`/`AceitePage.tsx`**: "Resolver — marcar aceita" virou "Propor resolução ao sacado"; nova UI do lado do sacado pra confirmar ou recusar.
 
 Novo `server/test/dispute-proposal.test.ts`: uma proposta sozinha do cedente não muda o aceite nem libera cobrança jurídica; confirmação do sacado muda os dois; recusa mantém a disputa aberta; um sacado de outra empresa não consegue confirmar/recusar a proposta de terceiros. `server/test/aceites-disputas.test.ts` atualizado pro novo fluxo bilateral.
+
+### Desconto institucional de block trade: comentário corrigido + transparência real pro vendedor
+
+Fechando o segundo achado em aberto da PR #55. Confirmei lendo `lib/settlement.ts`'s `settleResale` que `net = valor - fee`, onde `fee = baseFee * (1 - feeDiscountPct)` — uma taxa menor credita mecanicamente mais dinheiro no vendedor. Os 3 comentários que diziam "nunca uma redução no que o vendedor recebe" (`lib/blockTrade.ts`, `lib/resaleCore.ts`, `lib/settlement.ts`) estavam tecnicamente certos (nunca é menos) mas escondiam que também nunca é neutro — é sempre mais, porque não existe conta de ledger representando "a plataforma" neste modelo. Não há exigência legal de neutralidade de taxa (Res. CMN 4.656/2018 pras SCD/SEP regula é dever de informação clara, CDC art. 6º, IV) — a correção foi deixar o comportamento real explícito, tanto no código quanto pro vendedor.
+
+- **Comentários** reescritos nos 3 arquivos pra descrever o efeito real: a plataforma abre mão de receita, e como não há conta separada representando ela, isso vira dinheiro extra pro vendedor.
+- **`lib/settlement.ts`'s `settleResale`**: a descrição do lançamento no extrato do vendedor agora inclui o valor exato do benefício em reais (`", RX a menos que a taxa padrão"`) quando há desconto institucional aplicado, em vez de só "com desconto institucional" de forma opaca.
+
+`server/test/block-trade.test.ts` estendido: a descrição do lançamento contém o valor exato do benefício. Verificado: `npm run typecheck`/`test` todos verdes.
 
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 

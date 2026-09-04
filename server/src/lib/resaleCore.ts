@@ -171,6 +171,9 @@ export function cancelResaleListing(user: UserRow, listingId: number): ResaleOut
 // actually receives. A seller's asking price (or an accepted bid) is what they consented
 // to be paid; a block trade sweeping their listing pays exactly that, same as any other
 // buyer, so undercutting it without consent would be a real, not simulated, unfairness.
+// Isso não significa que o desconto é neutro: como não há conta de ledger representando
+// "a plataforma" (ver lib/settlement.ts's settleResale), uma taxa menor vira dinheiro
+// extra creditado no próprio vendedor, nunca uma perda — mas também nunca um efeito zero.
 export function executeResaleTrade(
   listing: { id: number; purchase_id: number; duplicata_id: string; seller_id: number },
   duplicata: { valor: number; sacado_nome: string },

@@ -98,13 +98,22 @@ export function settleAtMaturity(opts: { duplicataId: string; creditorId: number
 // Same fee schedule applies to trades on the mercado secundário — the platform still
 // facilitates the transfer, so the reselling investor pays the fee out of their proceeds.
 // feeDiscountPct (0-1) discounts the *platform's own fee* for institutional block trades
-// (lib/blockTrade.ts) — a volume perk on what the platform charges itself, never a markdown
-// on what the seller actually receives per unit of what they listed at.
+// (lib/blockTrade.ts). Nunca é uma redução no que o vendedor recebe (ele sempre recebe
+// pelo menos valor − taxa cheia) — mas isso não é neutro pro vendedor como um comentário
+// anterior chegou a sugerir: como não existe nenhuma conta de ledger representando "a
+// plataforma" neste modelo, `net` abaixo é literalmente maior quando a taxa é menor —
+// a plataforma abre mão da própria receita, e esse valor vira dinheiro extra pro
+// vendedor, não fica com ninguém mais. Por dever de informação clara (CDC art. 6º, IV —
+// não há exigência regulatória de neutralidade de taxa, Res. CMN 4.656/2018), o
+// benefício em reais é explicitado na descrição do lançamento do vendedor abaixo.
 export function settleResale(opts: { duplicataId: string; sacadoNome: string; buyerId: number; sellerId: number; valor: number; feeDiscountPct?: number }) {
   const baseFee = platformFee(opts.valor);
   const fee = baseFee * (1 - (opts.feeDiscountPct ?? 0));
+  const beneficio = baseFee - fee;
   const net = opts.valor - fee;
-  const feeLabel = opts.feeDiscountPct ? `${pctLabel(opts.valor)} com desconto institucional` : pctLabel(opts.valor);
+  const feeLabel = opts.feeDiscountPct
+    ? `${pctLabel(opts.valor)} com desconto institucional, ${fmtBRL(beneficio)} a menos que a taxa padrão`
+    : pctLabel(opts.valor);
   addLedgerEntry(opts.buyerId, today(), `Compra no mercado secundário — duplicata ${opts.duplicataId} (${opts.sacadoNome})`, -opts.valor);
   addLedgerEntry(
     opts.sellerId,
