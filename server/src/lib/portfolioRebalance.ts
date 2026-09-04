@@ -59,9 +59,19 @@ export interface RebalanceView {
   suggestions: RebalanceSuggestion[];
 }
 
+// purchases.valor é valor de face numa compra primária/cesta/Confirming, mas preço pago
+// numa compra originada de revenda — a alocação sugerida aqui precisa refletir o
+// dinheiro de fato investido, recuperado via faceValor - retorno. Essa identidade só vale
+// pra uma posição ainda ativa (buildRebalanceView já filtra .active abaixo — só sugere
+// rebalancear posições vivas, não faz sentido pra uma já revendida), mas mantém o mesmo
+// guard das outras 3 funções que leem listPurchasesByInvestor por segurança.
+function precoPago(p: { faceValor: number; retorno: number; valor: number; active: number }): number {
+  return p.active ? p.faceValor - p.retorno : p.valor;
+}
+
 export function buildRebalanceView(userId: number): RebalanceView {
   const purchases = listPurchasesByInvestor(userId).filter((p) => p.active);
-  const totalInvestido = purchases.reduce((sum, p) => sum + p.valor, 0);
+  const totalInvestido = purchases.reduce((sum, p) => sum + precoPago(p), 0);
 
   const suitability = getSuitability(userId);
   const suitabilityValid = !!suitability && new Date(suitability.expires_at).getTime() > Date.now();
@@ -73,8 +83,8 @@ export function buildRebalanceView(userId: number): RebalanceView {
   const sacadoTotals = new Map<string, number>();
   for (const p of purchases) {
     const rating = ratingFromScore(p.score ?? 50);
-    ratingTotals[rating] += p.valor;
-    sacadoTotals.set(p.sacado_nome, (sacadoTotals.get(p.sacado_nome) ?? 0) + p.valor);
+    ratingTotals[rating] += precoPago(p);
+    sacadoTotals.set(p.sacado_nome, (sacadoTotals.get(p.sacado_nome) ?? 0) + precoPago(p));
   }
 
   const ratingComparison: RatingComparison[] = (Object.keys(ratingTotals) as Rating[]).map((rating) => ({

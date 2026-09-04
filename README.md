@@ -874,6 +874,22 @@ Fechando o segundo achado em aberto da PR #55. Confirmei lendo `lib/settlement.t
 
 `server/test/block-trade.test.ts` estendido: a descrição do lançamento contém o valor exato do benefício. Verificado: `npm run typecheck`/`test` todos verdes.
 
+### `purchases.valor` ambíguo: "Investido" e retorno % usavam valor de face, não o preço pago real
+
+Fechando o terceiro achado em aberto da PR #55. `purchases.valor` guarda valor de face numa compra primária/cesta/Confirming (`market.ts`, `cestasCore.ts`, `confirmingCore.ts` sempre chamam `createPurchase` com `duplicata.valor`) mas preço pago numa compra originada de revenda (`resaleCore.ts` passa o preço da revenda) — só que `purchases.retorno` já é, de forma universal e comprovada desde a correção do retorno fabricado, `valor de face − preço pago`. Ou seja: **preço pago real = valor de face (`duplicatas.valor`) − retorno**, sempre, enquanto a posição não foi revendida — sem precisar de coluna nova.
+
+Isso expunha dois bugs reais, não só o `discountRatio` já documentado:
+- **`routes/historico.ts`, `lib/institutionalReporting.ts`, `lib/portfolioRebalance.ts`, `lib/investorPerformance.ts`** somavam/dividiam por `purchases.valor` direto — pra uma compra primária (a maioria), isso é valor de face, não o dinheiro que de fato saiu do bolso do investidor. `totalInvestido`/"Investido" ficavam superestimados, e toda métrica derivada (`rentMedia`, `retornoAnualizadoPct`, `retornoMedioPonderadoPct`, `volatilidadePct`, `sharpeLike` do dashboard de performance institucional) saía sistematicamente subestimada.
+- **`db/resaleListings.ts`'s `listActiveListings`** juntava `original_valor` com `purchases.valor` em vez de `duplicatas.valor` — pra um anúncio originado de uma revenda anterior, isso comparava contra um preço de revenda anterior em vez do valor de face real, afetando tanto a exibição (`variacaoPct` no mercado secundário) quanto a ORDEM real de execução de um block trade sweep (`discountRatio`, `lib/blockTrade.ts`).
+
+**Cuidado importante na correção**: a identidade `preço pago = valor de face − retorno` só vale enquanto a posição nunca foi revendida — `deactivatePurchase` (`db/resaleListings.ts`) sobrescreve `retorno` com o ganho/perda REALIZADO da revenda assim que a posição é fechada, quebrando essa relação. Pra uma posição já revendida (`active = 0`), "Investido" continua vindo de `purchases.valor` direto (nunca tocado por `deactivatePurchase`) — o registro histórico correto de quanto foi investido pra abrir aquela posição encerrada — em vez de recalcular por cima de um `retorno` que já significa outra coisa.
+
+- **`db/duplicatas.ts`'s `listPurchasesByInvestor`**: passou a selecionar `d.valor as faceValor` (join com `duplicatas` que já existia).
+- **`db/resaleListings.ts`'s `listActiveListings`**: `original_valor` agora vem de `d.valor` (valor de face real), não de `purchases.valor`.
+- Nos 4 arquivos afetados: `precoPago(p) = p.active ? p.faceValor - p.retorno : p.valor`.
+
+Novo `server/test/purchases-valor-preco-pago.test.ts`: `totalInvestidoFmt` do relatório institucional e do rebalanceamento batem com o preço pago real, não o valor de face; `retornoAnualizadoPct` do dashboard de performance sai maior que a versão ingênua (dividida por valor de face); uma posição já revendida mantém "Investido" como o registro original; `discountRatio` do block trade escolhe corretamente o anúncio com maior desconto real vs. valor de face, mesmo quando ele vem de uma revenda anterior com um preço-base diferente. `server/test/settlement.test.ts`/`investor-performance.test.ts` atualizados (assumiam valor de face como "Investido" — exatamente o bug). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 116 arquivos/710 testes).
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).

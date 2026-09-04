@@ -27,9 +27,20 @@ export interface InstitutionalAnalytics {
   maioresExposicoes: { sacado: string; valorFmt: string; pct: number }[];
 }
 
+// purchases.valor é valor de face numa compra primária/cesta/Confirming, mas preço pago
+// numa compra originada de revenda — "totalInvestido" e tudo que se apoia nele aqui
+// precisam ser sempre o dinheiro que de fato saiu do bolso do investidor. Só recupera via
+// faceValor - retorno enquanto a posição está ativa (retorno = faceValor - preço pago só
+// vale antes de qualquer revenda); uma posição já revendida (active=0) tem retorno
+// sobrescrito com o ganho/perda realizado da revenda (deactivatePurchase), então p.valor
+// (nunca tocado) já é o registro correto do que foi investido pra abrir aquela posição.
+function precoPago(p: { faceValor: number; retorno: number; valor: number; active: number }): number {
+  return p.active ? p.faceValor - p.retorno : p.valor;
+}
+
 export function buildInstitutionalAnalytics(investorId: number): InstitutionalAnalytics {
   const purchases = listPurchasesByInvestor(investorId);
-  const totalInvestido = purchases.reduce((sum, p) => sum + p.valor, 0);
+  const totalInvestido = purchases.reduce((sum, p) => sum + precoPago(p), 0);
   const totalRetorno = purchases.reduce((sum, p) => sum + p.retorno, 0);
   const rentMedia = totalInvestido > 0 ? (totalRetorno / totalInvestido) * 100 : 0;
   const comRegresso = purchases.filter((p) => p.com_regresso).length;
@@ -38,7 +49,7 @@ export function buildInstitutionalAnalytics(investorId: number): InstitutionalAn
   const ratingTotals: Record<Rating, number> = { AA: 0, A: 0, B: 0, C: 0 };
   for (const p of purchases) {
     const rating = ratingFromScore(p.score ?? 50);
-    ratingTotals[rating] += p.valor;
+    ratingTotals[rating] += precoPago(p);
   }
   const ratingDistribution = (Object.keys(ratingTotals) as Rating[]).map((rating) => ({
     rating,
@@ -51,7 +62,7 @@ export function buildInstitutionalAnalytics(investorId: number): InstitutionalAn
   for (const p of purchases) {
     const mes = new Date(toIsoUtc(p.created_at)).toISOString().slice(0, 7);
     const entry = monthlyTotals.get(mes) ?? { investido: 0, retorno: 0 };
-    entry.investido += p.valor;
+    entry.investido += precoPago(p);
     entry.retorno += p.retorno;
     monthlyTotals.set(mes, entry);
   }
@@ -60,7 +71,7 @@ export function buildInstitutionalAnalytics(investorId: number): InstitutionalAn
     .map(([mes, t]) => ({ mes, investidoFmt: fmtBRL(t.investido), retornoFmt: fmtBRLSigned(t.retorno) }));
 
   const sacadoTotals = new Map<string, number>();
-  for (const p of purchases) sacadoTotals.set(p.sacado_nome, (sacadoTotals.get(p.sacado_nome) ?? 0) + p.valor);
+  for (const p of purchases) sacadoTotals.set(p.sacado_nome, (sacadoTotals.get(p.sacado_nome) ?? 0) + precoPago(p));
   const maioresExposicoes = [...sacadoTotals.entries()]
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
