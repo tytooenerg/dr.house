@@ -68,6 +68,7 @@ export function resetDbForTests() {
     DELETE FROM fractional_offerings;
     DELETE FROM insurance_settlements;
     DELETE FROM legal_collection_fees;
+    DELETE FROM platform_fee_events;
     DELETE FROM legal_documents;
     DELETE FROM resale_bids;
     DELETE FROM resale_listings;

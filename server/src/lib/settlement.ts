@@ -1,5 +1,6 @@
 import { addLedgerEntry } from '../db/misc.js';
 import { recordInsuranceSettlement } from '../db/insuranceSettlements.js';
+import { recordPlatformFeeEvent } from '../db/platformFeeEvents.js';
 import { fmtBRL } from './format.js';
 
 // Single source of truth for the platform fee — reused by the Emitir Duplicata preview
@@ -46,6 +47,7 @@ export function settlePurchase(opts: { duplicataId: string; sacadoNome: string; 
       net
     );
   }
+  recordPlatformFeeEvent(opts.duplicataId, opts.valor, fee, 'compra');
   return { fee, net, precoCompra: opts.precoCompra };
 }
 
@@ -110,5 +112,6 @@ export function settleResale(opts: { duplicataId: string; sacadoNome: string; bu
     `Venda no mercado secundário — duplicata ${opts.duplicataId}, taxa de plataforma ${feeLabel} descontada (${fmtBRL(fee)})`,
     net
   );
+  recordPlatformFeeEvent(opts.duplicataId, opts.valor, fee, 'revenda');
   return { fee, net };
 }
