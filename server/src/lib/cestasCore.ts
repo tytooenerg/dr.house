@@ -3,6 +3,7 @@ import { listMarketplace, isPurchased, createPurchase } from '../db/duplicatas.j
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
+import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
 import { settlePurchase } from './settlement.js';
 import { computePurchasePrice } from './marketCompute.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
@@ -93,6 +94,8 @@ export function investInBasket(user: UserRow, cestaKey: CestaKey, valorRaw: stri
     if (precoCompra > remaining) continue;
     createPurchase(d.id, user.id, d.valor, d.desagio ?? '', Math.round(d.valor - precoCompra));
     settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: user.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
+    // Res. BCB nº 540/2025 — ver comentário de informarNegociacao (lib/registradoras.ts).
+    void informarNegociacao({ registradoraKey: d.registradora as RegistradoraKey | null, duplicataId: d.id, evento: 'compra', valor: precoCompra });
     if (d.cedente_id) {
       void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: user.id });
     }

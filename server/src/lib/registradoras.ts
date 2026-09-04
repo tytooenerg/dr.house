@@ -89,6 +89,50 @@ export async function registrarNaRegistradora(opts: {
   return { registro: data.registro, simulado: false };
 }
 
+export type NegociacaoEvento = 'compra' | 'revenda' | 'financiamento';
+
+// Achado corrigido (auditoria de conformidade): a Resolução BCB nº 540/2025 reforça que
+// o sacador deve informar a registradora sobre atos/contratos de negociação da duplicata
+// — independente do ambiente em que aconteçam — não só registrar a emissão original.
+// Antes desta função, registrarNaRegistradora só era chamada em lib/emitirCore.ts (na
+// emissão); nada informava a registradora quando a duplicata de fato mudava de mãos
+// (compra, revenda, financiamento). Mesmo padrão dual real-when-configured de
+// registrarNaRegistradora acima, mas nunca bloqueia a operação real: informar a
+// registradora é uma obrigação de compliance sobre uma negociação que já aconteceu, não
+// uma condição pra ela acontecer — uma falha aqui é logada, nunca propagada pra reverter
+// dinheiro já movido (mesmo espírito de lib/webhookDelivery.ts's deliverWebhookEvent).
+export async function informarNegociacao(opts: {
+  registradoraKey: RegistradoraKey | null;
+  duplicataId: string;
+  evento: NegociacaoEvento;
+  valor: number;
+}): Promise<{ confirmado: boolean; simulado: boolean }> {
+  if (!opts.registradoraKey) {
+    logger.warn({ duplicataId: opts.duplicataId, evento: opts.evento }, '[registradoras] duplicata sem registradora conhecida — negociação não pôde ser informada');
+    return { confirmado: false, simulado: true };
+  }
+  const cfg = REGISTRY_ENV[opts.registradoraKey];
+  try {
+    if (!cfg.url || !cfg.key) {
+      logger.info(
+        { registradoraKey: opts.registradoraKey, duplicataId: opts.duplicataId, evento: opts.evento },
+        '[registradoras] negociação informada (simulada) — Resolução BCB nº 540/2025'
+      );
+      return { confirmado: true, simulado: true };
+    }
+    const res = await fetch(`${cfg.url}/registros/${encodeURIComponent(opts.duplicataId)}/negociacoes`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ evento: opts.evento, valor: opts.valor.toFixed(2) }),
+    });
+    if (!res.ok) throw new Error(`registradora_negociacao_failed: ${res.status} ${await res.text()}`);
+    return { confirmado: true, simulado: false };
+  } catch (err) {
+    logger.warn({ err, registradoraKey: opts.registradoraKey, duplicataId: opts.duplicataId, evento: opts.evento }, '[registradoras] falha ao informar negociação');
+    return { confirmado: false, simulado: !cfg.url || !cfg.key };
+  }
+}
+
 // Duplicidade check against the chosen registradora's own book (in addition to Lastro's
 // own — see lib/dupCheck.ts). Returns null (meaning "couldn't check externally, don't
 // claim otherwise") when unconfigured, rather than silently reporting "no duplicidade".

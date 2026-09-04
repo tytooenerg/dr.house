@@ -23,6 +23,7 @@ import {
 } from '../db/resaleBids.js';
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
 import { settleResale } from './settlement.js';
 import { fmtBRL, parseFlexibleDate } from './format.js';
 import { COLORS } from '../data/seed.js';
@@ -176,7 +177,7 @@ export function cancelResaleListing(user: UserRow, listingId: number): ResaleOut
 // extra creditado no próprio vendedor, nunca uma perda — mas também nunca um efeito zero.
 export function executeResaleTrade(
   listing: { id: number; purchase_id: number; duplicata_id: string; seller_id: number },
-  duplicata: { valor: number; sacado_nome: string },
+  duplicata: { valor: number; sacado_nome: string; registradora: string | null },
   buyerId: number,
   valor: number,
   feeDiscountPct = 0
@@ -208,6 +209,8 @@ export function executeResaleTrade(
   // ágio acima do valor de face — honesto, não um número fabricado por Math.random()).
   createPurchase(listing.duplicata_id, buyerId, valor, desagioPct, Math.round(duplicata.valor - valor));
   setListingStatus(listing.id, 'vendido');
+  // Res. BCB nº 540/2025 — ver comentário de informarNegociacao (lib/registradoras.ts).
+  void informarNegociacao({ registradoraKey: duplicata.registradora as RegistradoraKey | null, duplicataId: listing.duplicata_id, evento: 'revenda', valor });
   return settlement;
 }
 
