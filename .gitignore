@@ -11,6 +11,7 @@ coverage/
 e2e/test-results/
 e2e/playwright-report/
 e2e/blob-report/
+/test-results/
 __pycache__/
 *.egg-info/
 .pytest_cache/
