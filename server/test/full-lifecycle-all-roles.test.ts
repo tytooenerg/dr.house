@@ -14,11 +14,10 @@ import { applyTacitAcceptance } from '../src/lib/aceiteCore.js';
 // auditor.test.ts) já cobrem cada papel separadamente ou em combinações de 3-4; nenhum
 // combina os 6 na mesma operação. É exatamente na integração entre eles — o que
 // aconteceu ANTES de uma ação e como isso interage com o que outro papel faz DEPOIS —
-// que os achados abaixo aparecem. H1 e H2 já foram corrigidos (routes/market.ts bloqueia
-// contratar seguro numa duplicata já vendida) — os testes correspondentes agora validam a
-// correção em vez de documentar o bug. H3, H4 e H8 ainda aguardam decisão sobre a correção.
-// H5 já era um achado conhecido e documentado em admin-dispute-resolution.test.ts, não é
-// reportado de novo aqui.
+// que os achados abaixo aparecem. Todos os achados desta simulação (H1-H4, H8) já foram
+// corrigidos — os testes correspondentes agora validam a correção em vez de documentar o
+// bug. H5 já era um achado conhecido e documentado em admin-dispute-resolution.test.ts,
+// não é reportado de novo aqui. H6 nunca foi um bug — é uma verificação de regressão.
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -368,10 +367,12 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
     expect(comprar.status).toBe(409);
     expect(comprar.body.error).toBe('contested');
   });
-});
 
-describe('Achados cross-role ainda não corrigidos (documentação — aguardando decisão)', () => {
-  it('Achado (cobertura, não dinheiro): o auditor não tem nenhuma visão de disputas — GET /auditor/overview não expõe nada equivalente a GET /admin/disputes (ver lib/auditorOverview.ts)', async () => {
+  // H8 original: o auditor não tinha nenhuma visão de disputas — GET /auditor/overview não
+  // expunha nada equivalente a GET /admin/disputes. Corrigido: nova seção `disputas` em
+  // lib/auditorOverview.ts (db/disputes.ts's listAllDisputesForAudit), mesmo formato
+  // abertas/resolvidas/recentes que `reconciliation` já usa.
+  it('Achado corrigido: o auditor agora vê as disputas (abertas e resolvidas), mesmo formato que reconciliation já usa', async () => {
     const sacadoCompany = unique('Sacado H8');
     const cedente = await register('cedente', unique('Cedente H8'));
     const sacado = await register('sacado', sacadoCompany);
@@ -396,15 +397,19 @@ describe('Achados cross-role ainda não corrigidos (documentação — aguardand
     const disputasAdmin = await request(app).get('/api/admin/disputes').set('Authorization', `Bearer ${admin}`);
     expect(disputasAdmin.body.disputes.some((d: { duplicataId: string }) => d.duplicataId === duplicataId)).toBe(true);
 
-    // AUDITOR não vê nada relacionado — nenhuma chave do overview referencia disputas.
+    // Corrigido: AUDITOR agora vê a mesma disputa em aberto.
     const auditorEmail = `auditor-h8-${unique('x')}@example.com`;
     await request(app).post('/api/admin/auditores').set('Authorization', `Bearer ${admin}`).send({ nome: 'Auditor H8', email: auditorEmail, password: 'senhaforte123' });
     const loginAuditor = await request(app).post('/api/auth/login').send({ email: auditorEmail, password: 'senhaforte123' });
     const overview = await request(app).get('/api/auditor/overview').set('Authorization', `Bearer ${loginAuditor.body.token}`);
     expect(overview.status).toBe(200);
-    expect(Object.keys(overview.body)).toEqual(['auditLog', 'compliance', 'reconciliation', 'sars']);
+    expect(Object.keys(overview.body)).toEqual(['auditLog', 'compliance', 'reconciliation', 'sars', 'disputas']);
+    expect(overview.body.disputas.abertas).toBeGreaterThan(0);
+    expect(overview.body.disputas.recentes.some((d: { duplicataId: string }) => d.duplicataId === duplicataId)).toBe(true);
   });
+});
 
+describe('Verificações de regressão (não são achados — comportamento já correto)', () => {
   // Não é um bug — é uma garantia de segurança que vale travar como regressão: o job de
   // aceite tácito só pega aceites com status='aguardando' (db/aceites.ts's
   // listAguardandoComPrazo), então uma contestação manual feita bem no limite do prazo não

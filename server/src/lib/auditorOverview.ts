@@ -2,6 +2,7 @@ import { listAuditLog, verifyAuditChain } from '../db/audit.js';
 import { listFlags } from '../db/reconciliation.js';
 import { listSuspiciousActivityReports } from '../db/suspiciousActivity.js';
 import { listPendingComplianceReview } from '../db/complianceEngine.js';
+import { listAllDisputesForAudit } from '../db/disputes.js';
 import { fmtBRL, fmtRelative } from './format.js';
 
 // Read-only aggregation for the 'auditor' role (routes/auditor.ts) — every number here is
@@ -15,6 +16,14 @@ export interface AuditorOverview {
   compliance: { pendentes: number; itens: { duplicataId: string; sacadoNome: string; valorFmt: string; score: number }[] };
   reconciliation: { abertas: number; resolvidas: number; recentes: { tipo: string; empresa: string; valorFmt: string; status: string; quando: string }[] };
   sars: { aberto: number; descartado: number; reportado_coaf: number };
+  // Achado corrigido (simulação multi-papel): o auditor não tinha nenhuma visão de
+  // disputas — o admin via tudo em GET /admin/disputes, o auditor não via nada
+  // equivalente. Mesmo formato abertas/resolvidas/recentes que reconciliation já usa.
+  disputas: {
+    abertas: number;
+    resolvidas: number;
+    recentes: { duplicataId: string; sacado: string; cedente: string; valorFmt: string; resolved: boolean; quando: string }[];
+  };
 }
 
 export function buildAuditorOverview(): AuditorOverview {
@@ -44,5 +53,19 @@ export function buildAuditorOverview(): AuditorOverview {
     reportado_coaf: allSars.filter((r) => r.status === 'reportado_coaf').length,
   };
 
-  return { auditLog, compliance, reconciliation, sars };
+  const allDisputes = listAllDisputesForAudit();
+  const disputas = {
+    abertas: allDisputes.filter((d) => !d.resolved).length,
+    resolvidas: allDisputes.filter((d) => d.resolved).length,
+    recentes: allDisputes.slice(0, 20).map((d) => ({
+      duplicataId: d.duplicata_id,
+      sacado: d.sacado_nome,
+      cedente: d.cedente_nome,
+      valorFmt: fmtBRL(d.valor),
+      resolved: !!d.resolved,
+      quando: fmtRelative(d.created_at),
+    })),
+  };
+
+  return { auditLog, compliance, reconciliation, sars, disputas };
 }

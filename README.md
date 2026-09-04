@@ -952,6 +952,15 @@ O teste correspondente em `full-lifecycle-all-roles.test.ts` agora valida a corr
 
 O teste correspondente em `full-lifecycle-all-roles.test.ts` agora valida a correção (409 `contested`). Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do server).
 
+**Quarto e último achado corrigido: o auditor não tinha nenhuma visão de disputas.** `GET /admin/disputes` mostrava tudo pro admin; `GET /auditor/overview` (`lib/auditorOverview.ts`) não expunha nada equivalente — nenhuma chave do payload referenciava disputas, abertas ou resolvidas.
+
+- **`db/disputes.ts`**: nova `listAllDisputesForAudit` — diferente de `listAllOpenDisputes` (só as abertas, pra fila de arbitragem do admin), traz TODAS (abertas e resolvidas), porque o auditor precisa do quadro completo.
+- **`lib/auditorOverview.ts`**: nova seção `disputas` (`abertas`/`resolvidas`/`recentes`), mesmo formato que `reconciliation` já usa.
+
+O teste correspondente em `full-lifecycle-all-roles.test.ts` agora valida a correção (auditor vê a mesma disputa que o admin vê). Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do server).
+
+**Fecha a simulação multi-papel e a correção dos 4 achados que ela expôs** (PRs #63-#66) — os 6 papéis (cedente, investidor, sacado, seguradora, admin, auditor) numa operação real, ponta a ponta.
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).
