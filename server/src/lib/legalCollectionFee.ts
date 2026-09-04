@@ -57,6 +57,16 @@ export interface RecordRecoveryResult {
 // admin-confirmed event), so crediting it is at least as honest as reportPayment already is.
 export function recordRecovery(duplicata: DuplicataRow, recoveredValor: number, recordedBy?: number): RecordRecoveryResult | null {
   if (hasFeeAlreadyCharged(duplicata.id)) return null;
+  // Achado corrigido (simulação multi-papel, server/test/full-lifecycle-all-roles.test.ts):
+  // hasFeeAlreadyCharged só sabe de uma recuperação jurídica ANTERIOR — nunca de uma
+  // duplicata já paga por outro canal (sinistro aprovado em lib/seguradoraCore.ts,
+  // reportPayment no vencimento). checkCollectionEligibility (lib/legalCollection.ts)
+  // também não olha duplicata.status, e listOverdueDuplicatas só filtra a LISTAGEM (status
+  // IN ('aprovada','vendida')) — um POST .../recuperar/:duplicataId chamado direto pelo ID
+  // (sem passar pela listagem) conseguia "recuperar" de novo uma duplicata já 'paga',
+  // creditando o credor uma segunda vez pelo mesmo valor. Mesmo tratamento (retorna null,
+  // a rota já responde 409 'already_recovered') que uma recuperação jurídica repetida.
+  if (duplicata.status === 'paga') return null;
   const creditor = currentCreditorFor(duplicata);
   if (!creditor) return null;
 

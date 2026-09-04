@@ -251,10 +251,14 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
     expect(insure.status).toBe(409);
     expect(insure.body.error).toBe('already_sold');
   });
-});
 
-describe('Achados cross-role ainda não corrigidos (documentação — aguardando decisão)', () => {
-  it('Achado: uma duplicata já indenizada por sinistro pode ser "recuperada" de novo via cobrança jurídica — checkCollectionEligibility nunca olha duplicata.status, e recordRecovery só se protege por uma flag separada (hasFeeAlreadyCharged) que o sinistro nunca seta (ver lib/legalCollection.ts:30-52 e lib/legalCollectionFee.ts:58-59)', async () => {
+  // H3 original: uma duplicata já indenizada por sinistro podia ser "recuperada" de novo
+  // via cobrança jurídica — checkCollectionEligibility nunca olhava duplicata.status, e
+  // recordRecovery só se protegia por uma flag separada (hasFeeAlreadyCharged) que o
+  // sinistro nunca seta. Corrigido em lib/legalCollectionFee.ts: recordRecovery agora
+  // também recusa (mesmo tratamento de "already_recovered" que já existia pra uma segunda
+  // recuperação jurídica) quando a duplicata já está 'paga' por qualquer outro canal.
+  it('Achado corrigido: uma duplicata já indenizada por sinistro não pode mais ser "recuperada" de novo via cobrança jurídica', async () => {
     const sacadoCompany = unique('Sacado H3');
     const cedente = await register('cedente', unique('Cedente H3'));
 
@@ -308,18 +312,18 @@ describe('Achados cross-role ainda não corrigidos (documentação — aguardand
       .set('Authorization', `Bearer ${admin}`)
       .send({});
 
-    // Achado: em vez de 409 (já recuperada / não elegível), o endpoint aceita e credita o
-    // cedente uma SEGUNDA vez pelo mesmo valor — dinheiro real duplicado.
-    expect(recuperar.status).toBe(200);
+    // Corrigido: bloqueado com 409 already_recovered — mesma resposta que já existia pra
+    // uma segunda recuperação jurídica repetida, agora estendida pra "já paga por
+    // qualquer canal".
+    expect(recuperar.status).toBe(409);
+    expect(recuperar.body.error).toBe('already_recovered');
 
     const cedenteExtratoDepois = await request(app).get('/api/account').set('Authorization', `Bearer ${cedente.token}`);
-    expect(cedenteExtratoDepois.body.extrato.length).toBeGreaterThan(totalAntes);
-    const segundaCredito = cedenteExtratoDepois.body.extrato.find(
-      (e: { descricao: string; isPositive: boolean }) => e.descricao.includes(duplicataId) && e.descricao.includes('Recuperação') && e.isPositive
-    );
-    expect(segundaCredito).toBeTruthy();
+    expect(cedenteExtratoDepois.body.extrato.length).toBe(totalAntes); // nenhum crédito duplicado
   });
+});
 
+describe('Achados cross-role ainda não corrigidos (documentação — aguardando decisão)', () => {
   it('Achado: uma duplicata contestada pelo sacado pode ser vendida no mercado secundário mesmo assim — só o mercado primário (routes/market.ts:75-78) checa aceite.status; lib/resaleCore.ts nunca faz essa checagem', async () => {
     const sacadoCompany = unique('Sacado H4');
     const cedente = await register('cedente', unique('Cedente H4'));
