@@ -14,6 +14,9 @@ interface Dispute {
   isSending: boolean;
   isSent: boolean;
   canSend: boolean;
+  isProposed: boolean;
+  proposedResolution: string | null;
+  proposedAt: string | null;
 }
 
 export function DisputaPage() {
@@ -48,16 +51,37 @@ export function DisputaPage() {
     }
   };
 
-  const resolve = async (id: number) => {
+  const [escalatingId, setEscalatingId] = useState<number | null>(null);
+  const [escalatedIds, setEscalatedIds] = useState<Set<number>>(new Set());
+
+  const propor = async (id: number) => {
     setErrorById((prev) => ({ ...prev, [id]: '' }));
     setResolvingId(id);
     try {
-      const data = await api.post<{ disputes: Dispute[] }>(`/disputas/${id}/resolve`, { outcome: 'aceita' });
+      const data = await api.post<{ disputes: Dispute[] }>(`/disputas/${id}/propor`, {});
       setDisputes(data.disputes);
     } catch (err) {
-      setErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível resolver a disputa agora — tente de novo.' }));
+      setErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível enviar a proposta agora — tente de novo.' }));
     } finally {
       setResolvingId(null);
+    }
+  };
+
+  // Não existe uma rota de "arbitragem" separada — o admin já vê toda disputa aberta
+  // (listAllOpenDisputes) independente disso. Este botão só deixa explícito, no audit
+  // log e pra quem está acompanhando, que o cedente não pretende esperar o sacado
+  // confirmar uma autocomposição e quer que o Banco Central arbitre diretamente.
+  const escalar = async (id: number) => {
+    setErrorById((prev) => ({ ...prev, [id]: '' }));
+    setEscalatingId(id);
+    try {
+      const data = await api.post<{ disputes: Dispute[] }>(`/disputas/${id}/escalar`, {});
+      setDisputes(data.disputes);
+      setEscalatedIds((prev) => new Set(prev).add(id));
+    } catch (err) {
+      setErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível escalar agora — tente de novo.' }));
+    } finally {
+      setEscalatingId(null);
     }
   };
 
@@ -110,16 +134,26 @@ export function DisputaPage() {
               {d.isSending && <div className="text-[13px] font-semibold text-textSecondary">Enviando evidência…</div>}
               {d.isSent && <div className="text-[13px] font-semibold text-green">Evidência enviada ✓</div>}
               <div className="flex-1" />
+              {d.isProposed ? (
+                <div className="text-[13px] font-semibold text-textSecondary">Aguardando confirmação do sacado{d.proposedAt ? ` — proposto ${d.proposedAt}` : ''}</div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => propor(d.id)}
+                  disabled={resolvingId === d.id}
+                  className="px-3.5 py-2.5 rounded-lg border-none bg-green text-white text-[13px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                >
+                  {resolvingId === d.id ? 'Enviando…' : 'Propor resolução ao sacado'}
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => resolve(d.id)}
-                disabled={resolvingId === d.id}
-                className="px-3.5 py-2.5 rounded-lg border-none bg-green text-white text-[13px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                onClick={() => escalar(d.id)}
+                disabled={escalatingId === d.id || escalatedIds.has(d.id)}
+                className="px-3.5 py-2.5 rounded-lg bg-redBg text-red text-[13px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                style={{ border: '1px solid #E9CFCB' }}
               >
-                {resolvingId === d.id ? 'Resolvendo…' : 'Resolver — marcar aceita'}
-              </button>
-              <button type="button" className="px-3.5 py-2.5 rounded-lg bg-redBg text-red text-[13px] font-bold cursor-pointer" style={{ border: '1px solid #E9CFCB' }}>
-                Escalar para arbitragem BC
+                {escalatedIds.has(d.id) ? 'Arbitragem solicitada ✓' : escalatingId === d.id ? 'Solicitando…' : 'Escalar para arbitragem BC'}
               </button>
             </div>
           </div>

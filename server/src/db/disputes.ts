@@ -40,6 +40,19 @@ export function resolveDispute(id: number, resolution = '', resolvedBy: number |
   );
 }
 
+// O cedente propõe uma resolução (ex: "evidência aceita, aceite restabelecido") mas isso
+// nunca fecha a disputa sozinho — só o sacado confirmando (confirmProposedResolution) ou
+// o admin arbitrando (routes/admin.ts) de fato resolvem. Ver migração 0066.
+export function proposeResolution(id: number, note: string, proposedBy: number) {
+  db.prepare("UPDATE disputes SET proposed_resolution = ?, proposed_by = ?, proposed_at = datetime('now') WHERE id = ?").run(note, proposedBy, id);
+}
+
+// O sacado recusa a proposta: a disputa continua aberta (resolved permanece 0), visível
+// pro admin arbitrar, e o cedente pode propor de novo depois.
+export function clearProposedResolution(id: number) {
+  db.prepare('UPDATE disputes SET proposed_resolution = NULL, proposed_by = NULL, proposed_at = NULL WHERE id = ?').run(id);
+}
+
 // Disputes have no v1 partner-API surface (internal SPA + admin only), so unlike
 // aceites/duplicatas these always operate on the live data plane — a dispute raised
 // against a sandbox aceite (created by a test-mode key contesting its own seeded data)

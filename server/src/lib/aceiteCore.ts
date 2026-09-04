@@ -11,7 +11,7 @@ import { settleAtMaturity } from './settlement.js';
 import { getFundoSistemaUserIdIfExists, fundoRetornoDePagamento } from './confirmingFundo.js';
 import { getOfferingByDuplicata, listHoldingsForOffering } from '../db/fractionalOfferings.js';
 import { settleFractionalAtMaturity } from './fractionalOfferings.js';
-import { fmtBRL } from './format.js';
+import { fmtBRL, fmtRelative } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow, DuplicataRow } from '../db/types.js';
 
@@ -41,6 +41,17 @@ function view(
 ) {
   const meta = STATUS_META[a.status];
   const sla = aceiteSlaStatus(a);
+  // Proposta de resolução do cedente (routes/disputas.ts's POST /:id/propor) — só o
+  // próprio sacado (editable) vê e só quando há uma pendente de fato, pra confirmar
+  // (POST /disputas/:id/confirmar) ou recusar (POST /disputas/:id/recusar). Uma proposta
+  // nunca resolve a disputa sozinha — precisa da confirmação do sacado.
+  let disputeProposal: { disputeId: number; note: string; quando: string } | null = null;
+  if (editable && a.status === 'contestada') {
+    const dispute = getDisputeByAceite(a.id);
+    if (dispute?.proposed_resolution) {
+      disputeProposal = { disputeId: dispute.id, note: dispute.proposed_resolution, quando: dispute.proposed_at ? fmtRelative(dispute.proposed_at) : '' };
+    }
+  }
   // White-label Plus (lib/whitelabelBilling.ts): a sacado viewing their own aceite sees the
   // cedente's brand instead of "Lastro", same substitution already applied to WhatsApp
   // reminders (lib/aceiteReminder.ts) — but gated behind the paid tier, not the free
@@ -73,6 +84,7 @@ function view(
     brandLabel,
     slaDiasRestantes: sla.diasRestantes,
     slaVencido: sla.vencido,
+    disputeProposal,
   };
 }
 
