@@ -13,6 +13,7 @@ import { backfillDuplicataSetor } from './db/duplicatas.js';
 import { attachWebSocketServer } from './ws.js';
 import { startHealthMonitor } from './lib/healthMonitor.js';
 import { startAceiteReminderJob } from './lib/aceiteReminder.js';
+import { startAceiteTacitoJob } from './lib/aceiteTacito.js';
 import { startAutoEmitJob } from './lib/autoEmitJob.js';
 import { startBackupJob } from './lib/backup.js';
 import { startSuspiciousActivityJob } from './lib/suspiciousActivityMonitor.js';
@@ -41,6 +42,7 @@ async function main() {
   attachWebSocketServer(server);
   startHealthMonitor();
   startAceiteReminderJob();
+  startAceiteTacitoJob();
   startAutoEmitJob();
   startBackupJob();
   startSuspiciousActivityJob();

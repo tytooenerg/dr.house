@@ -93,3 +93,27 @@ export function listAguardandoSemLembrete(): AceiteAguardandoComContato[] {
 export function markReminderSent(id: number) {
   db.prepare('UPDATE aceites SET reminder_sent = 1 WHERE id = ?').run(id);
 }
+
+export interface AceiteAguardandoComPrazo extends AceiteRow {
+  sacado_nome: string;
+  sacado_cnpj: string;
+  valor: number;
+  cedente_id: number | null;
+}
+
+// Feeds lib/aceiteTacito.ts's job: todo aceite ainda 'aguardando' com prazo definido —
+// o próprio job filtra quais já venceram via aceiteSlaStatus (comparação de data em JS,
+// mesmo padrão de aceiteReminder.ts's runCheck, não em SQL) e aplica o aceite tácito só
+// nesses. A UI e o texto de compliance já prometem "aceite tácito" quando o prazo vence
+// (client/src/pages/app/AceitePage.tsx, data/seed.ts's FINANCIADOR_REQS), mas até essa
+// correção nada de fato acontecia. sandbox=0 só, mesmo padrão de listAguardandoSemLembrete.
+export function listAguardandoComPrazo(): AceiteAguardandoComPrazo[] {
+  return db
+    .prepare(
+      `SELECT a.*, d.sacado_nome as sacado_nome, d.sacado_cnpj as sacado_cnpj, d.valor as valor, d.cedente_id as cedente_id
+       FROM aceites a
+       JOIN duplicatas d ON d.id = a.duplicata_id
+       WHERE a.status = 'aguardando' AND a.prazo_limite IS NOT NULL AND d.sandbox = 0`
+    )
+    .all() as AceiteAguardandoComPrazo[];
+}
