@@ -961,6 +961,8 @@ O teste correspondente em `full-lifecycle-all-roles.test.ts` agora valida a corr
 
 **Fecha a simulação multi-papel e a correção dos 4 achados que ela expôs** (PRs #63-#66) — os 6 papéis (cedente, investidor, sacado, seguradora, admin, auditor) numa operação real, ponta a ponta.
 
+**H10 verificado, sem achado: negar o sinistro não deixa o cedente sem recurso nenhum.** Hipótese do plano original da simulação, nunca testada até agora: será que negar o sinistro também bloquearia a cobrança jurídica, deixando o cedente sem seguro e sem jurídico? Verificado por execução real: `setSinistroStatus` (`lib/seguradoraCore.ts`) só grava `sinistro_status='negado'` — nunca toca `duplicata.status`, que segue `'aprovada'`. `checkCollectionEligibility` (`lib/legalCollection.ts`) nunca olha `sinistro_status`, só dias em atraso/fracionamento/aceite/disputa — negar o sinistro não impede a cobrança jurídica normal de seguir. Novo teste em `full-lifecycle-all-roles.test.ts` trava essa garantia como regressão.
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).
