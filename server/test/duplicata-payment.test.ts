@@ -66,6 +66,14 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
     expect(emit.status).toBe(200);
     const duplicataId = emit.body.duplicataId as string;
 
+    // Achado corrigido: dispararLeilao/buy agora exigem aceite confirmado — o sacado
+    // aceita de verdade (via HTTP, como faria no Portal do Sacado) antes de a duplicata
+    // poder ir a leilão.
+    const aceiteInicial = await findAceite(sacadoToken, duplicataId);
+    expect(aceiteInicial).toBeTruthy();
+    const accept = await request(app).post(`/api/aceites/${aceiteInicial.id}/status`).set('Authorization', `Bearer ${sacadoToken}`).send({ status: 'aceita' });
+    expect(accept.status).toBe(200);
+
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
     const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorToken}`);
     expect(buy.status).toBe(200);

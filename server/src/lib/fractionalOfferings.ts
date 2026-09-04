@@ -9,6 +9,7 @@ import {
   listHoldingsByInvestor,
 } from '../db/fractionalOfferings.js';
 import { getDuplicata, isPurchased, setStatus } from '../db/duplicatas.js';
+import { aceiteConfirmado } from './aceiteCore.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { platformFee, pctLabel } from './settlement.js';
 import { computePurchasePrice } from './marketCompute.js';
@@ -42,6 +43,13 @@ export function checkFractionalEligibility(duplicataId: string): FractionalEligi
   }
   if (d.status !== 'aprovada' && d.status !== 'no_mercado') {
     return { eligible: false, reason: 'Esta duplicata não está disponível para fracionamento no momento.' };
+  }
+  // Achado corrigido: esta checagem nunca olhava o aceite do sacado — nem sequer o
+  // padrão fraco de excluir 'contestada' que os outros pontos de compra tinham. Uma
+  // duplicata só pode ser negociada (fracionada inclusive) depois que o sacado aceita
+  // (explícito ou tácito).
+  if (!aceiteConfirmado(duplicataId)) {
+    return { eligible: false, reason: 'Aguardando aceite do sacado (ou o prazo tácito vencer) antes de poder fracionar esta duplicata.' };
   }
   return { eligible: true };
 }

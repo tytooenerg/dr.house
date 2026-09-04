@@ -77,6 +77,16 @@ marketRouter.post('/:id/buy', (req, res) => {
     res.status(409).json({ error: 'contested', message: 'Esta duplicata está contestada e não pode ser comprada.' });
     return;
   }
+  // Achado corrigido: uma duplicata só pode ser negociada depois que o sacado aceita
+  // (explícito ou tácito) — antes só se bloqueava 'contestada', 'aguardando' passava
+  // normalmente. Defesa em profundidade além do bloqueio em dispararLeilao
+  // (routes/minhas.ts), já que dispararLeilao é o único jeito de uma duplicata chegar
+  // aqui hoje, mas nada impede um caminho futuro de reabastecer 'no_mercado' sem passar
+  // por ele.
+  if (aceite?.status !== 'aceita') {
+    res.status(409).json({ error: 'aceite_pendente', message: 'Aguardando aceite do sacado (ou o prazo tácito vencer) antes de poder comprar esta duplicata.' });
+    return;
+  }
   if (isPurchased(d.id)) {
     res.status(409).json({ error: 'already_purchased', message: 'Esta duplicata já foi comprada.' });
     return;

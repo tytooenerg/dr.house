@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { approveKyb } from '../src/db/users.js';
 import * as registradoras from '../src/lib/registradoras.js';
 
@@ -54,6 +55,7 @@ describe('informarNegociacao é chamada nos pontos reais de negociação, não s
     }
     expect(duplicataId).toBeTruthy();
     const registradoraKey = getDuplicata(duplicataId)!.registradora;
+    setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
 
     spy.mockClear(); // limpa qualquer chamada residual (não há nenhuma na emissão, mas por segurança)
     const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investorToken}`);

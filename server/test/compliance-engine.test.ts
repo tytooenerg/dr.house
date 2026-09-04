@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -103,6 +104,9 @@ describe('Compliance AI Engine', () => {
 
     const queueAfter = await request(app).get('/api/admin/compliance-queue').set('Authorization', `Bearer ${admin}`);
     expect((queueAfter.body.pending as { duplicataId: string }[]).some((p) => p.duplicataId === result.duplicataId)).toBe(false);
+
+    // Achado corrigido: canDisparar agora também exige aceite confirmado do sacado.
+    setAceiteStatus(getAceiteByDuplicata(result.duplicataId)!.id, 'aceita');
 
     const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteFlagged}`);
     const own = (minhas.body.duplicatas as { id: string; status: string; canDisparar: boolean }[]).find((d) => d.id === result.duplicataId);

@@ -96,6 +96,17 @@ function view(
   };
 }
 
+// Achado corrigido (usuário apontou o requisito regulatório): uma duplicata só pode
+// entrar em negociação (leilão, compra direta, cesta, auto-bid, fracionamento,
+// financiamento automático via Confirming) depois que o sacado aceita — ou depois que o
+// prazo do Banco Central pro aceite tácito vence, que no sistema já se traduz em
+// aceite.status virar 'aceita' (applyTacitAcceptance, mais abaixo). Antes deste fix, todo
+// ponto de compra só bloqueava 'contestada' — 'aguardando' passava normalmente, alguns
+// nem isso. Predicado único, reutilizado em todos os pontos de compra/negociação.
+export function aceiteConfirmado(duplicataId: string): boolean {
+  return getAceiteByDuplicata(duplicataId)?.status === 'aceita';
+}
+
 // Shared by the internal /api/aceites route (used by the SPA, always sandbox=false) and
 // the public /api/v1/aceites partner endpoints (sandbox = calling key's mode === 'test')
 // — same visibility rules either way, just scoped to a different data plane.

@@ -57,8 +57,14 @@ export async function seedIfEmpty() {
   updateSubscription(cedente.id, { plan: 'empresarial', subscriptionStatus: 'active_demo' });
 
   // Marketplace offers — other (unregistered) companies' duplicatas available for auction.
-  const OFFER_ACEITE_STATUS: Record<number, 'aceita' | 'aguardando' | 'contestada'> = {
-    1: 'aceita', 2: 'aguardando', 3: 'aceita', 4: 'contestada', 5: 'aceita', 6: 'aguardando',
+  // Achado corrigido: duas ofertas seedadas aqui costumavam ter aceite 'aguardando'
+  // enquanto já estavam 'no_mercado' — exatamente o estado que dispararLeilao
+  // (routes/minhas.ts) agora bloqueia (uma duplicata só entra em negociação depois do
+  // aceite confirmado). O cenário "aguardando aceite" continua demonstrado, só que nas
+  // duplicatas certas (ACEITES_RAW/extraForSacado abaixo, que ficam 'pendente_analise' —
+  // nunca leiloadas — não neste marketplace).
+  const OFFER_ACEITE_STATUS: Record<number, 'aceita' | 'contestada'> = {
+    1: 'aceita', 2: 'aceita', 3: 'aceita', 4: 'contestada', 5: 'aceita', 6: 'aceita',
   };
   for (const o of OFFERS_RAW) {
     const vencimento = daysFromNow(o.vencimentoDiasOffset);
@@ -113,6 +119,12 @@ export async function seedIfEmpty() {
       seguro: false,
     });
     if (d.status === 'no_mercado') {
+      // Achado corrigido: dispararLeilao (routes/minhas.ts) agora exige aceite
+      // confirmado antes de sair de 'aprovada' — sem isso, uma duplicata seedada
+      // diretamente como 'no_mercado' ficava sem nenhum registro de aceite (a rota
+      // HTTP real nunca deixaria chegar nesse estado).
+      const aceite = ensureAceite(d.id, 'Aceite confirmado na emissão');
+      setAceiteStatus(aceite.id, 'aceita');
       dispararLeilao(d.id, new Date(Date.now() + 3600 * 6 * 1000).toISOString());
     }
   }
