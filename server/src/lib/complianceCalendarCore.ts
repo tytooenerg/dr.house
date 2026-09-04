@@ -1,4 +1,5 @@
 import { getSettings, listUsersByRole } from '../db/users.js';
+import { COLORS } from '../data/seed.js';
 import type { FaturamentoBracket, UserRow } from '../db/types.js';
 
 export type { FaturamentoBracket };
@@ -86,6 +87,60 @@ export function classifyCompliance(bracket: FaturamentoBracket | null, today: Da
 
 export function buildComplianceCalendarView(user: UserRow, today: Date = new Date()): ComplianceCalendarView {
   return classifyCompliance(getSettings(user).faturamentoAnualBracket, today);
+}
+
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function fmtMesAno(d: Date): string {
+  return `${MESES[d.getUTCMonth()]}/${d.getUTCFullYear()}`;
+}
+
+export interface CronogramaItem {
+  label: string;
+  periodo: string;
+  status: string;
+  statusBg: string;
+  statusColor: string;
+  dotColor: string;
+}
+
+// Achado corrigido (auditoria de conformidade): esta lista costumava ser mantida à parte,
+// como um array estático em data/seed.ts (3 estágios, datas vagas — "A partir do fim de
+// 2026", "Ao longo de 2027") — uma segunda fonte de verdade pro mesmo fato regulatório que
+// OBRIGATORIEDADE_POR_BRACKET acima já modela com precisão, e as duas podiam divergir. Um
+// cedente lendo o card estático do Compliance e o próprio calendário pessoal
+// (buildComplianceCalendarView) podia ver dois prazos diferentes pro mesmo evento. Agora é
+// gerada dinamicamente a partir das MESMAS constantes — nunca mais duas fontes.
+export function buildCronogramaEstatico(today: Date = new Date()): CronogramaItem[] {
+  const adesaoAtiva = today.getTime() >= PRODUCAO_ASSISTIDA_INICIO.getTime();
+  const items: CronogramaItem[] = [
+    {
+      label: 'Adesão voluntária',
+      periodo: `Desde ${fmtMesAno(PRODUCAO_ASSISTIDA_INICIO)} — sacadores e sacados podem aderir`,
+      status: adesaoAtiva ? 'Ativo' : 'Planejado',
+      statusBg: adesaoAtiva ? '#EAF3EE' : '#FBF1E0',
+      statusColor: adesaoAtiva ? COLORS.GREEN : COLORS.AMBER,
+      dotColor: adesaoAtiva ? COLORS.GREEN : COLORS.AMBER,
+    },
+  ];
+  // Ordenado por data (a própria ordem de definição do Record já é cronológica), e o
+  // primeiro prazo futuro (a próxima obrigatoriedade a valer) fica em âmbar — os demais,
+  // mais distantes, em cinza — mesmo esquema visual que o array estático usava.
+  let proximoFuturoJaMarcado = false;
+  for (const bracket of Object.keys(OBRIGATORIEDADE_POR_BRACKET) as FaturamentoBracket[]) {
+    const data = OBRIGATORIEDADE_POR_BRACKET[bracket];
+    const ativo = today.getTime() >= data.getTime();
+    const ehProximoFuturo = !ativo && !proximoFuturoJaMarcado;
+    if (!ativo) proximoFuturoJaMarcado = true;
+    items.push({
+      label: `Obrigatoriedade — ${FATURAMENTO_BRACKET_LABELS[bracket]}`,
+      periodo: `A partir de ${fmtMesAno(data)}`,
+      status: ativo ? 'Ativo' : 'Planejado',
+      statusBg: ativo ? '#EAF3EE' : ehProximoFuturo ? '#FBF1E0' : '#F0F2F5',
+      statusColor: ativo ? COLORS.GREEN : ehProximoFuturo ? COLORS.AMBER : '#5B6472',
+      dotColor: ativo ? COLORS.GREEN : ehProximoFuturo ? COLORS.AMBER : '#B8C2D4',
+    });
+  }
+  return items;
 }
 
 export interface ComplianceCalendarAdminRow extends ComplianceCalendarView {

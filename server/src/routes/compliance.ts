@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { getSettings, updateSettings } from '../db/users.js';
 import { db } from '../db/index.js';
-import { AUDIT_LOG, CRONOGRAMA, CONTRACT_FLAGS, FINANCIADOR_REQS, TRUST_BRIDGE } from '../data/seed.js';
+import { AUDIT_LOG, CONTRACT_FLAGS, FINANCIADOR_REQS, TRUST_BRIDGE } from '../data/seed.js';
+import { buildCronogramaEstatico } from '../lib/complianceCalendarCore.js';
 import { REGISTRADORAS } from '../lib/registradoras.js';
 import { checkDuplicidade } from '../lib/dupCheck.js';
 import { computeFraudFlags } from '../lib/fraudDetection.js';
@@ -53,7 +54,7 @@ complianceRouter.get('/', (req, res) => {
   res.json({
     trustBridge: TRUST_BRIDGE,
     financiadorReqs: FINANCIADOR_REQS,
-    cronograma: CRONOGRAMA,
+    cronograma: buildCronogramaEstatico(),
     auditLog: AUDIT_LOG,
     fraudFlags: computeFraudFlags(),
     ...contractFlagsPayload(req.user!.id),
