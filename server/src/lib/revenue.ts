@@ -1,8 +1,8 @@
 import { REVENUE_RAW, REV_COLORS } from '../data/seed.js';
-import { db } from '../db/index.js';
-import { platformFee, platformFeePct, INSURANCE_COMMISSION_PCT } from './settlement.js';
+import { platformFeePct, INSURANCE_COMMISSION_PCT } from './settlement.js';
 import { sumInsuranceCommission } from '../db/insuranceSettlements.js';
 import { sumLegalCollectionFees } from '../db/legalCollectionFees.js';
+import { sumPlatformFeeEvents } from '../db/platformFeeEvents.js';
 import { getSuccessFeePct } from './legalCollectionFee.js';
 import { fmtBRL } from './format.js';
 
@@ -32,16 +32,20 @@ export function getRevenueStreams() {
 }
 
 // Unlike the illustrative streams above (a static projected mix for the product's
-// "how we make money" explainer), this is computed live from every settled purchase —
-// the same tiered fee schedule shown in the Emitir preview and actually deducted in the
-// ledger at liquidação (lib/settlement.ts).
+// "how we make money" explainer), this is computed from platform_fee_events — an exact
+// log of every real fee actually deducted at liquidação (lib/settlement.ts's
+// settlePurchase/settleResale), same pattern as getRealInsuranceCommission/
+// getRealLegalCollectionFees below. Used to be recomputed live as platformFee(p.valor)
+// over every row of `purchases`, which had no way to know a given resale's fee had
+// already been discounted for an institutional block trade (lib/blockTrade.ts's
+// feeDiscountPct) — that always overstated totalColetadoFmt/mediaEfetivaPct whenever a
+// block trade happened, since it recomputed the full undiscounted fee instead of using
+// what was actually collected.
 function getRealPlatformFees() {
-  const purchases = db.prepare('SELECT valor FROM purchases').all() as { valor: number }[];
-  const totalFees = purchases.reduce((sum, p) => sum + platformFee(p.valor), 0);
-  const totalVolume = purchases.reduce((sum, p) => sum + p.valor, 0);
+  const { totalFees, totalVolume, totalEventos } = sumPlatformFeeEvents();
   return {
     totalColetadoFmt: fmtBRL(totalFees),
-    totalLiquidacoes: purchases.length,
+    totalLiquidacoes: totalEventos,
     faixasFmt: [
       { ateFmt: 'até R$ 200 mil', pctFmt: (platformFeePct(1) * 100).toFixed(2).replace('.', ',') + '%' },
       { ateFmt: 'R$ 200 mil – R$ 1 milhão', pctFmt: (platformFeePct(300_000) * 100).toFixed(2).replace('.', ',') + '%' },

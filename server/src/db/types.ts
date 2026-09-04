@@ -270,6 +270,15 @@ export interface InsuranceSettlementRow {
   created_at: string;
 }
 
+export interface PlatformFeeEventRow {
+  id: number;
+  duplicata_id: string;
+  valor: number;
+  fee_valor: number;
+  origem: 'compra' | 'revenda';
+  created_at: string;
+}
+
 export type WebhookDeliveryStatus = 'pending' | 'success' | 'failed';
 
 export interface WebhookDeliveryRow {
