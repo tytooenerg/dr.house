@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { listAceitesByCedente, listAceitesBySacadoNome, getAceite, getAceiteByDuplicata, setAceiteStatus, aceiteSlaStatus } from '../db/aceites.js';
+import {
+  listAceitesByCedente,
+  listAceitesBySacadoNome,
+  getAceite,
+  getAceiteByDuplicata,
+  setAceiteStatus,
+  aceiteSlaStatus,
+  listAguardandoComPrazo,
+} from '../db/aceites.js';
 import { getDuplicata, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
 import { addNotification } from '../db/misc.js';
 import { createDispute, getDisputeByAceite } from '../db/disputes.js';
@@ -101,6 +109,56 @@ export function listAceitesForUser(user: UserRow, sandbox = false) {
   return [];
 }
 
+// Efeitos colaterais reais de uma decisão de aceite — extraído pra ser reutilizado tanto
+// por decideAceite (o próprio sacado decidindo) quanto por applyTacitAcceptance (o
+// sistema aplicando aceite tácito quando o prazo vence sem manifestação, mesma mecânica,
+// nenhum UserRow de sacado disponível). Não inclui a checagem de autorização nem o
+// recordAuditEvent (cada chamador registra o evento com o autor certo).
+function applyAceiteDecision(aceite: { id: number }, duplicata: DuplicataRow, decision: AceiteStatusInput['status']) {
+  setAceiteStatus(aceite.id, decision);
+  if (decision === 'contestada' && !getDisputeByAceite(aceite.id)) {
+    createDispute(aceite.id, 'Sacado contestou os dados da duplicata — divergência a esclarecer com o cedente.', {
+      autor: duplicata.sacado_nome,
+      texto: 'Contestou a duplicata.',
+    });
+  }
+  if (duplicata.cedente_id) {
+    const verb = decision === 'aceita' ? 'aceitou' : 'contestou';
+    addNotification(
+      duplicata.cedente_id,
+      `${duplicata.sacado_nome} ${verb} a duplicata ${duplicata.id} (${fmtBRL(duplicata.valor)})`,
+      decision === 'aceita' ? COLORS.GREEN : COLORS.RED,
+      'aceite'
+    );
+    // A real aceite outcome is exactly the kind of first-party evidence the shared risk
+    // network is meant to aggregate — feeds the same pool partners contribute to via the
+    // public API, seeded by Lastro's own real activity instead of starting empty.
+    if (duplicata.sacado_cnpj) {
+      addSignal(duplicata.sacado_cnpj, duplicata.cedente_id, decision === 'aceita' ? 'pagamento_pontual' : 'contestacao');
+    }
+  }
+}
+
+// Achado corrigido: a UI (AceitePage.tsx) e o texto de compliance (data/seed.ts's
+// FINANCIADOR_REQS) sempre prometeram "aceite tácito" quando o sacado não se manifesta
+// dentro do prazo legal (aceites.ts's ACEITE_PRAZO_DIAS) — mas nada no sistema de fato
+// aplicava isso; o aceite ficava 'aguardando' pra sempre. Chamado pelo job diário em
+// lib/aceiteTacito.ts. `autor = null` porque não há um usuário agindo — é o próprio
+// sistema aplicando uma consequência legal automática do silêncio do sacado.
+export function applyTacitAcceptance(): number {
+  let aplicados = 0;
+  for (const a of listAguardandoComPrazo()) {
+    const { vencido } = aceiteSlaStatus(a);
+    if (!vencido) continue;
+    const duplicata = getDuplicata(a.duplicata_id);
+    if (!duplicata) continue;
+    applyAceiteDecision(a, duplicata, 'aceita');
+    recordAuditEvent(null, 'Aceite tácito (automático)', 'aceite.tacito', { duplicataId: duplicata.id, aceiteId: a.id });
+    aplicados++;
+  }
+  return aplicados;
+}
+
 export type DecideAceiteOutcome =
   | { status: 200; body: { aceites: ReturnType<typeof listAceitesForUser> } }
   | { status: 403; body: { error: 'forbidden'; message: string } }
@@ -131,28 +189,7 @@ export async function decideAceite(user: UserRow, aceiteId: number, decision: Ac
     return { status: 403, body: { error: 'forbidden', message: 'Esta duplicata não pertence à sua empresa.' } };
   }
   await new Promise((r) => setTimeout(r, 700));
-  setAceiteStatus(aceite.id, decision);
-  if (decision === 'contestada' && !getDisputeByAceite(aceite.id)) {
-    createDispute(aceite.id, 'Sacado contestou os dados da duplicata — divergência a esclarecer com o cedente.', {
-      autor: duplicata.sacado_nome,
-      texto: 'Contestou a duplicata.',
-    });
-  }
-  if (duplicata.cedente_id) {
-    const verb = decision === 'aceita' ? 'aceitou' : 'contestou';
-    addNotification(
-      duplicata.cedente_id,
-      `${duplicata.sacado_nome} ${verb} a duplicata ${duplicata.id} (${fmtBRL(duplicata.valor)})`,
-      decision === 'aceita' ? COLORS.GREEN : COLORS.RED,
-      'aceite'
-    );
-    // A real aceite outcome is exactly the kind of first-party evidence the shared risk
-    // network is meant to aggregate — feeds the same pool partners contribute to via the
-    // public API, seeded by Lastro's own real activity instead of starting empty.
-    if (duplicata.sacado_cnpj) {
-      addSignal(duplicata.sacado_cnpj, duplicata.cedente_id, decision === 'aceita' ? 'pagamento_pontual' : 'contestacao');
-    }
-  }
+  applyAceiteDecision(aceite, duplicata, decision);
   recordAuditEvent(user.id, user.company_name, `aceite.${decision}`, { duplicataId: duplicata.id });
   return { status: 200, body: { aceites: listAceitesForUser(user, sandbox) } };
 }
