@@ -161,7 +161,12 @@ describe('POST /api/market/:id/insure', () => {
   it('rejects an unknown insurer key', async () => {
     const token = await registerInvestidor();
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
-    const offerId = market.body.offers[0].id;
+    // listMarketplace inclui ofertas 'vendida' (pra ainda renderem como "Comprada" na
+    // lista) — pegar a primeira sem checar canBuy pode escolher uma já vendida, que agora
+    // (achado corrigido: contratar seguro pós-venda) é bloqueada com 409 antes mesmo de
+    // validar o corpo, mascarando o que este teste quer provar (rejeição de insurer_key
+    // inválida). Mesmo padrão de settlement.test.ts's `o.canBuy`.
+    const offerId = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy).id;
     const res = await request(app).post(`/api/market/${offerId}/insure`).set('Authorization', `Bearer ${token}`).send({ key: 'not-a-real-insurer' });
     expect(res.status).toBe(400);
   });
@@ -169,7 +174,9 @@ describe('POST /api/market/:id/insure', () => {
   it('attaches a valid insurer to an offer', async () => {
     const token = await registerInvestidor();
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
-    const offerId = market.body.offers[0].id;
+    // Idem — precisa ser uma oferta ainda não vendida, senão o bloqueio de "seguro
+    // pós-venda" (achado corrigido) faz esse teste falhar por um motivo que não é o dele.
+    const offerId = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy).id;
     const res = await request(app).post(`/api/market/${offerId}/insure`).set('Authorization', `Bearer ${token}`).send({ key: 'too' });
     expect(res.status).toBe(200);
     const offer = res.body.offers.find((o: { id: string }) => o.id === offerId);

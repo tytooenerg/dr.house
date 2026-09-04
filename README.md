@@ -923,6 +923,22 @@ Novo `server/test/cronograma-obrigatoriedade.test.ts`: cada item do cronograma c
 
 Novo `client/src/pages/public/DevelopersPage.test.tsx`: a página não afirma "sete registradoras" nem nomeia as três fictícias; exibe exatamente as 4 reais. Verificado: `npm run typecheck`/`build`/`test` todos verdes — **fecha a auditoria de conformidade com as regras mais recentes da duplicata escritural** (PRs #59-#62).
 
+### Simulação de uma operação real com os 6 papéis — achados de integração entre partes
+
+Pedido do usuário: refazer os testes simulando o papel de cada parte (cedente, investidor, sacado, seguradora, admin, auditor) numa única operação real, pra achar bugs de integração que testes isolados (que já cobriam no máximo 3-4 papéis por vez) não pegam. Novo `server/test/full-lifecycle-all-roles.test.ts`: cedente emite → investidor segura a duplicata ainda não vendida → leiloa → investidor compra → sacado aceita → investidor revende → outro investidor paga no vencimento (credor atual, não o comprador original) → admin cria um auditor real, que confere a hash-chain do audit log — tudo via chamadas HTTP reais, sem mock de dinheiro.
+
+**Seguro contratado numa duplicata já vendida cobrava um prêmio real, mas a apólice nunca podia virar sinistro reclamável.** `listClaimableByInsurerKey` (`db/duplicatas.ts`) exclui `status='vendida'` da lista de sinistros reclamáveis por desenho ("a policy becomes claimable ... it was never sold" — a cobertura é sobre o risco do cedente nunca ser pago pelo mercado, que deixa de existir assim que a venda acontece). Mas `routes/market.ts`'s `POST /:id/insure` nunca bloqueava contratar um seguro NOVO numa duplicata já `'vendida'` — cobrava o prêmio do investidor normalmente, vendendo uma cobertura estruturalmente impossível de acionar, pra sempre.
+
+- **`routes/market.ts`**: novo bloqueio (409 `already_sold`) pra uma tentativa de contratar seguro numa duplicata já vendida, mesmo padrão do bloqueio já existente pra duplicata vencida (`already_overdue`) — antes de cobrar qualquer prêmio.
+
+Esse mesmo fix fechou de graça o achado relacionado ("um investidor que nunca comprou a duplicata conseguia segurar a posição de outro investidor já vendida" — `/market/:id/insure` nunca validava posse): como agora não dá mais pra contratar seguro depois da venda, esse cenário concreto também ficou bloqueado, sem precisar de uma checagem de posse separada.
+
+Dois testes existentes precisaram de ajuste: `market.test.ts`'s "attaches a valid insurer to an offer"/"rejects an unknown insurer key" pegavam `offers[0]` sem checar se já tinha sido vendida (`listMarketplace` inclui `'vendida'` de propósito, pra a oferta continuar aparecendo como "Comprada") — passaram a filtrar por `canBuy`, mesmo padrão já usado em `settlement.test.ts`.
+
+Os testes de `full-lifecycle-all-roles.test.ts` que documentavam H1/H2 agora validam a correção (409, sem cobrança) em vez de documentar o bug. Outros 3 achados da mesma simulação (dupla recuperação sinistro+jurídico, revenda de duplicata contestada, auditor sem visão de disputas) seguem catalogados no mesmo arquivo, aguardando decisão sobre a correção.
+
+Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do server).
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).
