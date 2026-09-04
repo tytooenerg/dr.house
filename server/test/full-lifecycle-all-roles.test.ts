@@ -442,4 +442,54 @@ describe('Verificações de regressão (não são achados — comportamento já 
     const depois = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacado.token}`);
     expect(depois.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId).status).toBe('contestada');
   });
+
+  // H10 (hipótese do plano original, nunca verificada): a seguradora negar o sinistro
+  // deixaria o cedente sem seguro E sem cobrança jurídica, se checkCollectionEligibility
+  // dependesse de sinistro_status. Verificado por execução real: setSinistroStatus só
+  // grava sinistro_status='negado' (lib/seguradoraCore.ts) — nunca toca duplicata.status,
+  // que segue 'aprovada'. checkCollectionEligibility (lib/legalCollection.ts) nunca olha
+  // sinistro_status, só dias em atraso/fracionamento/aceite/disputa — então negar o
+  // sinistro não bloqueia a cobrança jurídica normal.
+  it('Verificado, sem achado: negar o sinistro não impede a cobrança jurídica de seguir normalmente', async () => {
+    const sacadoCompany = unique('Sacado H10');
+    const cedente = await register('cedente', unique('Cedente H10'));
+    const investidor = await registrarInvestidorAprovado(unique('Fundo H10'));
+    const sacado = await register('sacado', sacadoCompany);
+
+    const emit = await emitirComRetry(cedente.token, {
+      sacado: sacadoCompany,
+      cnpj: '11.222.333/0001-44',
+      valor: '8.000',
+      vencimento: '2026-12-20',
+      seguro: false,
+      nfAnexada: true,
+      batchValores: [],
+    });
+    const duplicataId = emit.body.duplicataId as string;
+
+    // Segura pré-venda (única janela possível depois do fix de H1) — 'too' pra bater com a
+    // conta demo seguradora@lastro.demo (Too Seguros) que seguradoraLogin() usa.
+    await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidor.token}`).send({ key: 'too' });
+
+    const aceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacado.token}`);
+    const aceite = aceites.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
+    await request(app).post(`/api/aceites/${aceite.id}/status`).set('Authorization', `Bearer ${sacado.token}`).send({ status: 'aceita' });
+
+    db.prepare("UPDATE duplicatas SET vencimento = ? WHERE id = ?").run('2020-01-10', duplicataId);
+
+    const seguradoraToken = await seguradoraLogin();
+    const negar = await request(app)
+      .post(`/api/seguradora/sinistro/${duplicataId}/decidir`)
+      .set('Authorization', `Bearer ${seguradoraToken}`)
+      .send({ decision: 'negado', note: 'Sinistro não caracterizado.' });
+    expect(negar.status).toBe(200);
+    expect(getDuplicata(duplicataId)!.status).not.toBe('paga'); // negar não move status nenhum
+
+    const admin = await adminLogin();
+    const recuperar = await request(app)
+      .post(`/api/admin/juridico/cobranca/${duplicataId}/recuperar`)
+      .set('Authorization', `Bearer ${admin}`)
+      .send({});
+    expect(recuperar.status).toBe(200); // cobrança jurídica segue disponível normalmente
+  });
 });
