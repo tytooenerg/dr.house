@@ -82,3 +82,21 @@ export function listAllOpenDisputes() {
     )
     .all() as (DisputeRow & { duplicata_id: string; sacado_nome: string; cedente_nome: string; valor: number })[];
 }
+
+// Achado corrigido (simulação multi-papel, server/test/full-lifecycle-all-roles.test.ts):
+// lib/auditorOverview.ts não tinha nenhuma seção sobre disputas — o admin via tudo em
+// GET /admin/disputes, o auditor não via nada. Diferente de listAllOpenDisputes (só as
+// abertas, pra fila de arbitragem do admin), esta traz TODAS (abertas e resolvidas) — o
+// auditor precisa ver o quadro completo, não só o que ainda está pendente.
+export function listAllDisputesForAudit() {
+  return db
+    .prepare(
+      `SELECT dis.*, a.duplicata_id as duplicata_id, d.sacado_nome as sacado_nome, d.cedente_nome as cedente_nome, d.valor as valor
+       FROM disputes dis
+       JOIN aceites a ON a.id = dis.aceite_id
+       JOIN duplicatas d ON d.id = a.duplicata_id
+       WHERE d.sandbox = 0
+       ORDER BY dis.created_at DESC`
+    )
+    .all() as (DisputeRow & { duplicata_id: string; sacado_nome: string; cedente_nome: string; valor: number })[];
+}
