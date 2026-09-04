@@ -945,6 +945,13 @@ Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do serve
 
 O teste correspondente em `full-lifecycle-all-roles.test.ts` agora valida a correção (409 `already_recovered`, sem crédito duplicado) em vez de documentar o bug. Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do server).
 
+**Terceiro achado corrigido: duplicata contestada podia ser vendida no mercado secundário mesmo assim.** Só o mercado primário (`routes/market.ts`) checava `aceite.status === 'contestada'` antes de executar uma compra. `lib/resaleCore.ts` (compra direta, aceite de lance) e `lib/blockTrade.ts` (varredura institucional) nunca faziam essa checagem — uma duplicata listada no secundário e depois contestada pelo sacado continuava vendável, sem avisar o novo comprador.
+
+- **`lib/resaleCore.ts`**: `buyResaleListing` e `acceptBid` agora checam `getAceiteByDuplicata(...)?.status === 'contestada'` antes de executar a troca (mesmo 409 `contested` que o mercado primário já usa).
+- **`lib/blockTrade.ts`**: `runBlockTrade` filtra listings contestados da lista de candidatos antes de montar o pacote — mesma checagem, no ponto certo (o block trade varre vários anúncios de uma vez, não faz sentido rejeitar o pacote inteiro por um item).
+
+O teste correspondente em `full-lifecycle-all-roles.test.ts` agora valida a correção (409 `contested`). Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do server).
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).

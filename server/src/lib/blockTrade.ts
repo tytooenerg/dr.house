@@ -3,6 +3,7 @@ import type { UserRow } from '../db/types.js';
 import { listActiveListings } from '../db/resaleListings.js';
 import { supersedeOtherActiveBids } from '../db/resaleBids.js';
 import { getDuplicata } from '../db/duplicatas.js';
+import { getAceiteByDuplicata } from '../db/aceites.js';
 import { addBlockTradeItem, createBlockTrade, listBlockTradeItems, listMyBlockTrades } from '../db/blockTrades.js';
 import { executeResaleTrade, parseValor, viewResaleMarket, type ResaleOutcome } from './resaleCore.js';
 import { addNotification } from '../db/misc.js';
@@ -98,9 +99,14 @@ export function runBlockTrade(user: UserRow, criteriaRaw: BlockTradeCriteria): R
     };
   }
 
+  // Achado corrigido (simulação multi-papel): um block trade varria anúncios sem checar se
+  // a duplicata correspondente foi contestada pelo sacado depois de listada — mesma
+  // checagem que buyResaleListing/acceptBid (lib/resaleCore.ts) e o mercado primário
+  // (routes/market.ts) já fazem.
   const candidates = listActiveListings()
     .filter((l) => l.seller_id !== user.id)
     .filter((l) => criteriaRaw.scoreMin == null || (l.score ?? 0) >= criteriaRaw.scoreMin)
+    .filter((l) => getAceiteByDuplicata(l.duplicata_id)?.status !== 'contestada')
     .map((l) => ({ ...l, discountRatio: l.original_valor > 0 ? (l.original_valor - l.asking_valor) / l.original_valor : 0 }))
     .sort((a, b) => b.discountRatio - a.discountRatio);
 

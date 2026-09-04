@@ -321,10 +321,13 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
     const cedenteExtratoDepois = await request(app).get('/api/account').set('Authorization', `Bearer ${cedente.token}`);
     expect(cedenteExtratoDepois.body.extrato.length).toBe(totalAntes); // nenhum crédito duplicado
   });
-});
 
-describe('Achados cross-role ainda não corrigidos (documentação — aguardando decisão)', () => {
-  it('Achado: uma duplicata contestada pelo sacado pode ser vendida no mercado secundário mesmo assim — só o mercado primário (routes/market.ts:75-78) checa aceite.status; lib/resaleCore.ts nunca faz essa checagem', async () => {
+  // H4 original: uma duplicata contestada pelo sacado podia ser vendida no mercado
+  // secundário mesmo assim — só o mercado primário (routes/market.ts:75-78) checava
+  // aceite.status; lib/resaleCore.ts nunca fazia essa checagem. Corrigido: mesma checagem
+  // adicionada em buyResaleListing, acceptBid (resaleCore.ts) e no filtro de candidatos do
+  // block trade (blockTrade.ts).
+  it('Achado corrigido: uma duplicata contestada pelo sacado não pode mais ser vendida no mercado secundário', async () => {
     const sacadoCompany = unique('Sacado H4');
     const cedente = await register('cedente', unique('Cedente H4'));
     const investidorA = await registrarInvestidorAprovado(unique('Fundo H4 A'));
@@ -359,13 +362,15 @@ describe('Achados cross-role ainda não corrigidos (documentação — aguardand
     const contestar = await request(app).post(`/api/aceites/${aceite.id}/status`).set('Authorization', `Bearer ${sacado.token}`).send({ status: 'contestada' });
     expect(contestar.status).toBe(200);
 
-    // Achado: INVESTIDOR B compra o listing mesmo assim — não é avisado de que a duplicata
-    // está contestada. O mesmo comprador tentando o mercado PRIMÁRIO seria bloqueado com
-    // 409 'contested' (routes/market.ts:75-78); no secundário, passa.
+    // Corrigido: bloqueado com 409 'contested' — mesma resposta que o mercado primário já
+    // dava (routes/market.ts:75-78).
     const comprar = await request(app).post(`/api/secundario/${listing.id}/comprar`).set('Authorization', `Bearer ${investidorB.token}`);
-    expect(comprar.status).toBe(200);
+    expect(comprar.status).toBe(409);
+    expect(comprar.body.error).toBe('contested');
   });
+});
 
+describe('Achados cross-role ainda não corrigidos (documentação — aguardando decisão)', () => {
   it('Achado (cobertura, não dinheiro): o auditor não tem nenhuma visão de disputas — GET /auditor/overview não expõe nada equivalente a GET /admin/disputes (ver lib/auditorOverview.ts)', async () => {
     const sacadoCompany = unique('Sacado H8');
     const cedente = await register('cedente', unique('Cedente H8'));
