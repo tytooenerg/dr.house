@@ -64,8 +64,12 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     const analytics = await request(app).get('/api/historico/institutional/analytics').set('Authorization', `Bearer ${investor.token}`);
     expect(analytics.status).toBe(200);
     const totalInvestido = parseBRL(analytics.body.totalInvestidoFmt);
-    // O bug antigo faria isso bater com 50000 (valor de face) em vez do preço pago real.
-    expect(Math.round(totalInvestido)).toBe(Math.round(precoCompra));
+    // Mesma cadeia de arredondamento da produção: faceValor - Math.round(faceValor -
+    // precoCompra), não Math.round(precoCompra) direto — Math.round(x) e
+    // N - Math.round(N - x) só divergem no caso extremo de x cair exatamente em ",50",
+    // mas usar a fórmula exata elimina esse risco em vez de confiar em não bater nele.
+    const investidoEsperado = 50000 - Math.round(50000 - precoCompra);
+    expect(Math.round(totalInvestido)).toBe(investidoEsperado);
     expect(Math.round(totalInvestido)).not.toBe(50000);
   });
 
@@ -80,7 +84,9 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     const rebalance = await request(app).get('/api/historico/rebalanceamento').set('Authorization', `Bearer ${investor.token}`);
     expect(rebalance.status).toBe(200);
     const totalInvestido = parseBRL(rebalance.body.totalInvestidoFmt);
-    expect(Math.round(totalInvestido)).toBe(Math.round(precoCompra));
+    // Mesma cadeia de arredondamento da produção — ver comentário do teste anterior.
+    const investidoEsperado = 40000 - Math.round(40000 - precoCompra);
+    expect(Math.round(totalInvestido)).toBe(investidoEsperado);
     expect(Math.round(totalInvestido)).not.toBe(40000);
   });
 

@@ -22,6 +22,7 @@ import { listOpenDisputesByCedente } from '../db/disputes.js';
 import { buildBlendedRiscoViewSync } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { settlePurchase } from './settlement.js';
+import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
 import { computePurchasePrice } from './marketCompute.js';
 import { fundoFinanciarCompra, getOrCreateFundoSistemaUserId } from './confirmingFundo.js';
 import { getFundoBalance } from '../db/confirmingFundo.js';
@@ -282,6 +283,8 @@ export async function tentarFinanciarViaPrograma(duplicata: DuplicataRow, cedent
   const fundoUserId = await getOrCreateFundoSistemaUserId();
   createPurchase(duplicata.id, fundoUserId, duplicata.valor, fmtTaxaAm(programa.taxa_am), Math.round(duplicata.valor - precoCompra));
   settlePurchase({ duplicataId: duplicata.id, sacadoNome: duplicata.sacado_nome, investorId: fundoUserId, cedenteId: cedenteUser.id, valor: duplicata.valor, precoCompra });
+  // Res. BCB nº 540/2025 — ver comentário de informarNegociacao (lib/registradoras.ts).
+  void informarNegociacao({ registradoraKey: duplicata.registradora as RegistradoraKey | null, duplicataId: duplicata.id, evento: 'financiamento', valor: precoCompra });
   fundoFinanciarCompra(duplicata.id, precoCompra);
   setProgramaUtilizado(programa.id, programa.utilizado + duplicata.valor);
   setMembroUtilizado(membro.id, membro.utilizado + duplicata.valor);

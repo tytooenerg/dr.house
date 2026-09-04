@@ -902,6 +902,13 @@ Pesquisa das mudanças regulatórias reais desde meados de 2023 (Resolução BCB
 
 Novo `server/test/aceite-tacito.test.ts`: aceite vencido vira `'aceita'` e notifica o cedente; aceite ainda dentro do prazo não é tocado; aceite já contestado/aceito não é sobrescrito mesmo com prazo vencido; idempotente (rodar duas vezes não duplica o efeito). Verificado: `npm run typecheck`/`build`/`test` todos verdes.
 
+**Resolução BCB nº 540/2025 — negociação nunca era informada à registradora.** A 540/2025 reforça que o sacador deve informar a registradora sobre atos/contratos de negociação da duplicata (independente do ambiente em que aconteçam) — não só registrar a emissão original. Confirmei lendo o código que `registrarNaRegistradora` (`lib/registradoras.ts`) só era chamada em `lib/emitirCore.ts` (emissão) e `routes/v1.ts` (emissão via API pública) — nunca quando a duplicata de fato mudava de mãos.
+
+- **`lib/registradoras.ts`**: nova `informarNegociacao`, mesmo padrão dual real-when-configured de `registrarNaRegistradora` — chama a API real quando `REGISTRADORA_<CHAVE>_API_URL/KEY` está configurado, simula com log claramente rotulado quando não. Nunca bloqueia a operação real (a compra/revenda já foi liquidada): uma falha é logada, nunca propagada.
+- Chamada a partir de `routes/market.ts` (compra primária), `lib/cestasCore.ts` (compra via cesta), `lib/resaleCore.ts`'s `executeResaleTrade` (cobre revenda, aceite de lance e block trade) e `lib/confirmingCore.ts` (financiamento automático do Programa Confirming).
+
+Novo `server/test/registradoras-negociacao.test.ts`: `informarNegociacao` em isolamento (simulado quando não configurado, não confirmado quando a duplicata não tem registradora conhecida); uma compra real no mercado chama `informarNegociacao` com o evento e a registradora certos (via `vi.spyOn` — único jeito honesto de observar um efeito colateral que não move dinheiro nenhum). Verificado: `npm run typecheck`/`build`/`test` todos verdes.
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).

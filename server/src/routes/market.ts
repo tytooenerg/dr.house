@@ -6,6 +6,7 @@ import { getAceiteByDuplicata } from '../db/aceites.js';
 import { getSeguradoraByInsurerKey } from '../db/users.js';
 import { buildOfferView, computePurchasePrice } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
+import { informarNegociacao, type RegistradoraKey } from '../lib/registradoras.js';
 import { settlePurchase, settleInsurance } from '../lib/settlement.js';
 import { computeInsurerQuotePct, diasAteVencimento } from '../lib/insuranceQuotes.js';
 import { checkFractionalEligibility, buyFractionalTokens, buyTokensSchema, buildOfferingView, listMyFractionalHoldings } from '../lib/fractionalOfferings.js';
@@ -83,6 +84,10 @@ marketRouter.post('/:id/buy', (req, res) => {
   const { precoCompra } = computePurchasePrice(d);
   createPurchase(d.id, req.user!.id, d.valor, d.desagio ?? '', Math.round(d.valor - precoCompra));
   settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: req.user!.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
+  // Res. BCB nº 540/2025: o sacador deve informar a registradora sobre a negociação, não
+  // só a emissão original. Nunca bloqueia a compra (já liquidada acima) — ver comentário
+  // de informarNegociacao.
+  void informarNegociacao({ registradoraKey: d.registradora as RegistradoraKey | null, duplicataId: d.id, evento: 'compra', valor: precoCompra });
   if (d.cedente_id) {
     void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: req.user!.id });
   }
