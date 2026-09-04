@@ -64,8 +64,8 @@ export function setProgramaStatus(id: number, status: 'ativo' | 'pausado') {
   db.prepare('UPDATE confirming_programas SET status = ?, updated_at = datetime(\'now\') WHERE id = ?').run(status, id);
 }
 
-// Incrementado por lib/confirmingCore.ts's tentarFinanciarViaPrograma sempre que uma
-// duplicata é financiada automaticamente dentro do programa.
+// Incrementado por lib/confirmingFundoAutoBuy.ts's runFundoAutoBuyTick sempre que o
+// Fundo de Fomento compra uma duplicata dentro do programa (via leilão, nunca por bypass).
 export function setProgramaUtilizado(id: number, utilizado: number) {
   db.prepare('UPDATE confirming_programas SET utilizado = ?, updated_at = datetime(\'now\') WHERE id = ?').run(Math.max(0, utilizado), id);
 }

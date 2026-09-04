@@ -983,6 +983,29 @@ Novo `server/test/comparador-dashboard-cestas.test.ts`:
 
 Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 110 arquivos/670 testes, client 24/24, sdks/node 9/9).
 
+### Duplicata só entra em negociação/leilão depois do aceite do sacado (explícito ou tácito)
+
+Achado regulatório apontado pelo usuário: nada no código de fato impedia negociar (leilão, compra, cesta, automação de lances, agente de auto-bid, fracionamento) uma duplicata cujo aceite do sacado ainda estava `'aguardando'` — a maioria dos pontos só bloqueava `'contestada'`, e dois (agente `autoBid`, fracionamento) não checavam nada. Era possível emitir uma duplicata e vendê-la no mesmo instante, sem o sacado nunca ter visto nada.
+
+- Novo predicado único, `aceiteConfirmado()` em `lib/aceiteCore.ts`, aplicado nos 6 pontos reais que movem titularidade financeira (todos passam por `createPurchase`): `routes/minhas.ts`'s `dispararLeilao` (409 `aceite_pendente` antes de sair de `'aprovada'` — fecha de graça a maioria dos outros, já que operam sobre `listMarketplace()`), `routes/market.ts`'s `POST /:id/buy`, `lib/cestasCore.ts`'s `isBuyable`, `routes/automation.ts`'s `maybeTick`, `lib/agents/autoBid.ts`'s `comprar_oferta`, `lib/fractionalOfferings.ts`'s `checkFractionalEligibility` — defesa em profundidade em todos, não só no chokepoint principal.
+- `lib/marketCompute.ts`'s `canBuy`/`btnLabel` (view-model do marketplace) refletem o mesmo requisito.
+- O prazo de aceite tácito continua em 15 dias (`ACEITE_PRAZO_DIAS`, `db/aceites.ts`) — fora de escopo desta correção, que é só o gate em si (que antes não esperava prazo nenhum). O mercado secundário (`resaleCore`/`blockTrade`) não precisou de mudança — opera só sobre posições já compradas, já cobertas pelo gate.
+- `db/seed.ts`: duas ofertas de demo tinham aceite `'aguardando'` já em `'no_mercado'` (inconsistente com o que a rota HTTP real permitiria hoje) — corrigido pra `'aceita'`.
+
+Suíte inteira do server ajustada (13 arquivos): todo teste que criava uma duplicata e ia direto pro leilão/compra sem simular o aceite do sacado agora batia em `aceite_pendente` — corrigido caso a caso (aceite via HTTP real quando o teste já tinha um sacado de verdade, ou avançando `aceites.status` direto no banco quando o aceite não é o que o teste quer exercitar). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 728 testes, client 26/26, sdks/node 9/9).
+
+### Fundo de Fomento do Confirming passa a disputar dentro do leilão — nunca mais um atalho pro próprio fundo
+
+Mudança de modelo de negócio pedida pelo usuário: o financiamento automático do Programa Confirming (PR "3/4" acima) pulava o leilão inteiramente — a duplicata nunca passava por `'no_mercado'`, o Fundo de Fomento da própria Lastro comprava direto na emissão. Isso dava ao fundo da plataforma um atalho que nenhum banco ou investidor externo tinha — incompatível com o modelo de negócio declarado: a Lastro é infraestrutura neutra pro mercado de duplicata (o mesmo papel que a Stripe tem pra pagamentos), nunca uma parte que se autobeneficia.
+
+- **Removido**: `lib/confirmingCore.ts`'s antiga `tentarFinanciarViaPrograma`, chamada em `lib/emitirCore.ts` na emissão. O campo `financiadoViaPrograma` (resposta de `submitEmitir`, sempre `false` desde a mudança de gate acima nesse instante) saiu da API interna e da tela de sucesso da emissão (`EmitirPage.tsx`) — não é usado por `routes/v1.ts` (API pública) nem pelos SDKs.
+- **Novo**: `lib/confirmingFundoAutoBuy.ts`'s `runFundoAutoBuyTick` — job periódico (a cada 30s, `startFundoAutoBuyJob` em `src/index.ts`, mesmo padrão do job diário de aceite tácito em `lib/aceiteTacito.ts`) que varre o marketplace aberto (`listMarketplace()`, só `'no_mercado'`) e compra em nome do fundo pelo mesmo caminho que qualquer investidor usaria (`createPurchase`/`settlePurchase`, idêntico a `routes/market.ts`'s `/buy`) — sem nenhum atalho.
+- **Preço**: taxa **dinâmica de mercado** (`computePurchasePrice(d)`, sem override) — a mesma fórmula que qualquer outro comprador pagaria pela mesma oferta. `programa.taxa_am` (a taxa negociada com o sacado) deixa de fixar o preço e vira só um **teto**: o fundo só tenta comprar se a taxa de mercado do momento estiver dentro do que foi negociado.
+- **Mecanismo de disputa**: a plataforma não tem lance concorrente real (é sempre "primeiro que compra ganha" a um preço já calculado — confirmado por varredura completa de `lib/marketCompute.ts`, não existe tabela de lances nem fechamento de leilão) — o job dá ao fundo a mesma vantagem de velocidade que qualquer investidor Pro com Automação de Lances (`routes/automation.ts`, poll a cada 4s) já tem hoje. Sem vantagem estrutural: se um humano ou outro bot for mais rápido, ganha ele.
+- Limite agregado do programa e sublimite do cedente continuam respeitados exatamente como antes — só migraram de `tentarFinanciarViaPrograma` pro novo job.
+
+`server/test/confirming-auto-fund.test.ts` reescrito: o contrato muda de "financia instantaneamente na emissão, pulando o leilão" pra "emite → sacado aceita → cedente dispara leilão → `runFundoAutoBuyTick()` (chamado direto no teste, mesma convenção de `applyTacitAcceptance()`) → duplicata vendida pro fundo, se elegível". Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 729 testes, client 26/26, sdks/node 9/9).
+
 ## Running locally
 
 ```bash

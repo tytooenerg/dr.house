@@ -2,11 +2,21 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { db } from '../src/db/index.js';
+import { approveKyb } from '../src/db/users.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
 import { getProgramaBySacado } from '../src/db/confirming.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
-import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
+import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
+
+// Achado corrigido (mudança de modelo de negócio): o financiamento automático do Programa
+// Confirming costumava pular o leilão inteiramente na emissão (a suíte antiga cobria esse
+// desenho). O Fundo de Fomento agora nunca tem atalho — só compra depois que a duplicata
+// passou pelo aceite e foi de fato a leilão, competindo pelo mesmo caminho de compra que
+// qualquer banco/investidor usaria, na taxa DINÂMICA de mercado (nunca a taxa negociada do
+// programa, que virou só um teto). Ver README ("Fundo de Fomento do Confirming passa a
+// disputar dentro do leilão") pro raciocínio completo.
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -24,8 +34,7 @@ async function register(role: 'cedente' | 'sacado' | 'investidor', companyName: 
 
 // Grupo Atlas Varejo tem perfil interno seedado (score 84 → rating AA) — a única forma
 // determinística de dar ao programa uma taxa real sem depender de sinais de rede. Usado só
-// pelo CNPJ na criação do programa, não pelo nome da conta sacado (que é o que amarra a
-// emissão ao programa — ver lib/confirmingCore.ts's tentarFinanciarViaPrograma).
+// pelo CNPJ na criação do programa, não pelo nome da conta sacado.
 const CNPJ_COM_HISTORICO = '12.345.678/0001-90';
 
 // /api/emitir/submit passa pelo registro simulado (~12% de indisponibilidade de
@@ -38,9 +47,8 @@ async function emitirComRetry(token: string, body: Record<string, unknown>) {
   return res;
 }
 
-// Checklist de lastro precisa bater 100% (nfAnexada + os demais campos) pra emitirCore.ts
-// sequer tentar o financiamento automático — mesmo gate que already existe pra uma
-// duplicata chegar em 'aprovada' em vez de 'pendente_analise'.
+// Checklist de lastro precisa bater 100% (nfAnexada + os demais campos) pra dispararLeilao
+// funcionar — mesmo gate que já existe pra uma duplicata chegar em 'aprovada'.
 function formCompleto(sacado: string, valor: string) {
   return { sacado, cnpj: '99.999.999/0001-99', valor, vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] };
 }
@@ -50,49 +58,77 @@ async function criarProgramaEMatricular(sacadoToken: string, cedenteUserId: numb
   await request(app).post('/api/confirming/membros').set('Authorization', `Bearer ${sacadoToken}`).send({ cedenteUserId });
 }
 
-// tentarFinanciarViaPrograma só financia se o fundo tiver caixa real pra isso (ver
-// getFundoBalance() check em confirmingCore.ts) — sem aporte, o teste cairia no fallback
-// 'fundo_insuficiente' em vez de financiar.
+// runFundoAutoBuyTick só financia se o fundo tiver caixa real (getFundoBalance) — sem
+// aporte, o teste cairia no fallback (não compra) em vez de financiar.
 async function aportarNoFundo(valor: number) {
   const { token } = await register('investidor', unique('Investidor Fundo'));
   await request(app).post('/api/confirming-fundo/contribuir').set('Authorization', `Bearer ${token}`).send({ valor });
 }
 
-describe('Financiamento automático — cedente matriculado pula o leilão', () => {
-  it('funds the duplicata instantly at emission, skipping dispararLeilao entirely', async () => {
+async function findAceite(sacadoToken: string, duplicataId: string) {
+  const res = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacadoToken}`);
+  return res.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
+}
+
+// O sacado aceita de verdade (via HTTP, como faria no Portal do Sacado) e o cedente
+// dispara o leilão — mesmo requisito de qualquer duplicata desde a correção do gate de
+// negociação (routes/minhas.ts's dispararLeilao exige aceite confirmado).
+async function aceitarEDisparar(cedenteToken: string, sacadoToken: string, duplicataId: string) {
+  const aceite = await findAceite(sacadoToken, duplicataId);
+  const accept = await request(app).post(`/api/aceites/${aceite.id}/status`).set('Authorization', `Bearer ${sacadoToken}`).send({ status: 'aceita' });
+  expect(accept.status).toBe(200);
+  const leilao = await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
+  expect(leilao.status).toBe(200);
+}
+
+// computePurchasePrice(d) sem override lê a taxa dinâmica de mercado real (via
+// estimateRateBand, que muda com o tempo/atividade — lib/dynamicPricing.ts) OU, se
+// d.desagio já estiver setado, usa esse valor fixo direto (lib/marketCompute.ts's
+// effectiveMonthlyRatePct) — mesmo campo que uma duplicata real nunca tem preenchido até
+// ser negociada. Setar aqui direto no banco dá controle determinístico sobre a taxa que o
+// fundo vê pra comparar contra o teto do programa (programa.taxa_am), sem depender do
+// sinal de liquidez ao vivo (que muda conforme outros testes deste arquivo emitem/compram).
+function setDesagio(duplicataId: string, taxaAmPct: number) {
+  db.prepare('UPDATE duplicatas SET desagio = ? WHERE id = ?').run(taxaAmPct.toFixed(2).replace('.', ','), duplicataId);
+}
+
+describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por atalho', () => {
+  it('compra a duplicata pelo caminho normal de compra quando a taxa de mercado cabe no teto negociado', async () => {
     const sacadoCompany = unique('Sacado Programa');
     const { token: sacadoToken, userId: sacadoUserId } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Confirmado'));
     await criarProgramaEMatricular(sacadoToken, cedenteUserId);
     await aportarNoFundo(50000);
 
-    const balanceBefore = getFundoBalance();
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '10.000'));
     expect(emit.status).toBe(200);
-    expect(emit.body.financiadoViaPrograma).toBe(true);
+    const duplicataId = emit.body.duplicataId as string;
 
-    // O fundo pagou pela compra de verdade — saldo do pool caiu no preço com deságio
-    // (lib/marketCompute.ts's computePurchasePrice, na taxa negociada do programa), não no
-    // valor de face — mesmo cálculo que lib/confirmingCore.ts's tentarFinanciarViaPrograma
-    // faz de verdade antes de financiar.
-    const duplicata = getDuplicata(emit.body.duplicataId)!;
     const programa = getProgramaBySacado(sacadoUserId)!;
-    const { precoCompra } = computePurchasePrice(duplicata, programa.taxa_am);
+    setDesagio(duplicataId, programa.taxa_am - 0.3); // dentro do teto, com folga
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+
+    const balanceBefore = getFundoBalance();
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(1);
+
+    // O fundo pagou pela compra de verdade — saldo do pool caiu no preço com deságio da
+    // taxa DINÂMICA de mercado (sem override), não a taxa negociada do programa.
+    const duplicata = getDuplicata(duplicataId)!;
+    expect(duplicata.status).toBe('vendida');
+    const { precoCompra } = computePurchasePrice(duplicata);
     expect(getFundoBalance()).toBeCloseTo(balanceBefore - precoCompra, 6);
 
-    // A duplicata foi direto pra 'vendida' — nunca passou por 'no_mercado', e não há mais
-    // leilão pra disparar (canDisparar reflete isso).
     const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
-    const dup = minhas.body.duplicatas.find((d: { status: string }) => d.status === 'Vendida');
-    expect(dup).toBeDefined();
-    expect(dup.canDisparar).toBe(false);
+    const dup = minhas.body.duplicatas.find((d: { id: string }) => d.id === duplicataId);
+    expect(dup.status).toBe('Vendida');
 
     // O programa e a matrícula do cedente registraram o uso.
     const meuPrograma = await request(app).get('/api/confirming/meu-programa').set('Authorization', `Bearer ${sacadoToken}`);
     expect(meuPrograma.body.programa.utilizadoFmt).toContain('10.000');
   });
 
-  it('a cedente not enrolled in any program follows the normal marketplace flow, unaffected', async () => {
+  it('cedente não matriculado segue o fluxo normal do marketplace — o fundo não compra', async () => {
     const sacadoCompany = unique('Sacado Sem Matricula');
     const { token: sacadoToken } = await register('sacado', sacadoCompany);
     await request(app).post('/api/confirming/criar').set('Authorization', `Bearer ${sacadoToken}`).send({ cnpj: CNPJ_COM_HISTORICO, limite: '500.000' });
@@ -100,99 +136,148 @@ describe('Financiamento automático — cedente matriculado pula o leilão', () 
     const { token: cedenteToken } = await register('cedente', unique('Fornecedor Não Matriculado'));
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '5.000'));
     expect(emit.status).toBe(200);
-    expect(emit.body.financiadoViaPrograma).toBe(false);
+    const duplicataId = emit.body.duplicataId as string;
+    setDesagio(duplicataId, 1.0); // taxa baixa — não é o motivo do bloqueio aqui
 
-    const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
-    const dup = minhas.body.duplicatas.find((d: { status: string }) => d.status === 'Aprovada');
-    expect(dup).toBeDefined();
-    // Achado corrigido: canDisparar também exige aceite confirmado do sacado.
-    setAceiteStatus(getAceiteByDuplicata(dup.id)!.id, 'aceita');
-    const minhasAfter = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
-    const dupAfter = minhasAfter.body.duplicatas.find((d: { id: string }) => d.id === dup.id);
-    expect(dupAfter.canDisparar).toBe(true);
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(0);
+    expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
-  it('a paused program never auto-funds, even for an enrolled cedente', async () => {
+  it('programa pausado nunca financia, mesmo com cedente matriculado', async () => {
     const sacadoCompany = unique('Sacado Pausado');
     const { token: sacadoToken } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Programa Pausado'));
     await criarProgramaEMatricular(sacadoToken, cedenteUserId);
+    await aportarNoFundo(50000);
     await request(app).post('/api/confirming/pausar').set('Authorization', `Bearer ${sacadoToken}`);
 
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '5.000'));
     expect(emit.status).toBe(200);
-    expect(emit.body.financiadoViaPrograma).toBe(false);
+    const duplicataId = emit.body.duplicataId as string;
+    setDesagio(duplicataId, 1.0);
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(0);
+    expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
-  it('falls back to the normal flow when the fund has no real cash, even with room in the program', async () => {
+  it('sem caixa real no fundo, cai no fallback — a oferta segue disponível pra qualquer investidor', async () => {
     const sacadoCompany = unique('Sacado Fundo Vazio');
     const { token: sacadoToken } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Fundo Vazio'));
     await criarProgramaEMatricular(sacadoToken, cedenteUserId);
-    // Nenhum aporte feito — o programa tem limite de sobra, mas o fundo não tem caixa real
-    // pra financiar. tentarFinanciarViaPrograma deve recusar (motivo fundo_insuficiente) em
-    // vez de deixar o saldo do fundo ir negativo. O que precisa faltar é o preço COM
-    // deságio (computePurchasePrice), não o valor de face — pedir só balanceBefore + 1000
-    // de face não bastaria mais, já que o preço real pago é sempre menor que a face (o
-    // desconto máximo é limitado a 60% — ver MAX_DESCONTO_PCT em lib/marketCompute.ts), por
-    // isso o valor de face pedido aqui é generosamente maior que o caixa disponível.
+    // Nenhum aporte feito nesta rodada — o programa tem limite de sobra, mas o fundo pode
+    // ter algum resíduo de caixa de outros testes deste arquivo (mesma instância de banco,
+    // sem reset entre os `it()`s). Pede um valor de face generosamente maior que 3x o que
+    // já existe em caixa, pra garantir que o preço com deságio (sempre > 40% do valor de
+    // face — o desconto máximo é limitado a 60%, MAX_DESCONTO_PCT em lib/marketCompute.ts)
+    // ainda assim exceda o saldo disponível.
     const balanceBefore = getFundoBalance();
 
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, String(Math.round(balanceBefore * 3) + 1000)));
     expect(emit.status).toBe(200);
-    expect(emit.body.financiadoViaPrograma).toBe(false);
-    expect(getFundoBalance()).toBe(balanceBefore);
+    const duplicataId = emit.body.duplicataId as string;
+    setDesagio(duplicataId, 1.0); // taxa baixa — não é o motivo do bloqueio aqui
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
-    const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
-    const dup = minhas.body.duplicatas.find((d: { status: string }) => d.status === 'Aprovada');
-    expect(dup).toBeDefined();
-    // Achado corrigido: canDisparar também exige aceite confirmado do sacado.
-    setAceiteStatus(getAceiteByDuplicata(dup.id)!.id, 'aceita');
-    const minhasAfter = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
-    const dupAfter = minhasAfter.body.duplicatas.find((d: { id: string }) => d.id === dup.id);
-    expect(dupAfter.canDisparar).toBe(true);
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(0);
+    expect(getFundoBalance()).toBe(balanceBefore);
+    expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
+
+    // Limpeza: sem isso, um aporte feito por um teste seguinte (mesma instância de banco,
+    // sem reset entre os `it()`s) tornaria esta oferta retroativamente elegível — o único
+    // motivo do bloqueio aqui foi caixa insuficiente NO MOMENTO, não uma condição
+    // permanente como os outros testes deste arquivo (limite, sublimite, teto de taxa).
+    db.prepare("UPDATE duplicatas SET status = 'vendida' WHERE id = ?").run(duplicataId);
   });
 
-  it('respects the program limit — over it, falls back to the normal flow instead of over-financing', async () => {
+  it('respeita o limite agregado do programa — acima dele, cai no fallback em vez de sobrefinanciar', async () => {
     const sacadoCompany = unique('Sacado Limite Baixo');
     const { token: sacadoToken } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Estourou Limite'));
     await criarProgramaEMatricular(sacadoToken, cedenteUserId, '10.000');
+    await aportarNoFundo(500000);
 
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '50.000'));
     expect(emit.status).toBe(200);
-    expect(emit.body.financiadoViaPrograma).toBe(false);
+    const duplicataId = emit.body.duplicataId as string;
+    setDesagio(duplicataId, 1.0);
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(0);
+    expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
-  it('respects a per-cedente sublimite even when the program limit has room', async () => {
+  it('respeita um sublimite por cedente mesmo quando o limite do programa tem espaço', async () => {
     const sacadoCompany = unique('Sacado Sublimite');
     const { token: sacadoToken } = await register('sacado', sacadoCompany);
     const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Sublimite'));
     await request(app).post('/api/confirming/criar').set('Authorization', `Bearer ${sacadoToken}`).send({ cnpj: CNPJ_COM_HISTORICO, limite: '500.000' });
     await request(app).post('/api/confirming/membros').set('Authorization', `Bearer ${sacadoToken}`).send({ cedenteUserId, sublimite: '5.000' });
+    await aportarNoFundo(500000);
 
     const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '20.000'));
     expect(emit.status).toBe(200);
-    expect(emit.body.financiadoViaPrograma).toBe(false);
+    const duplicataId = emit.body.duplicataId as string;
+    setDesagio(duplicataId, 1.0);
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(0);
+    expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
-  it('never auto-funds a sandbox-mode emission', async () => {
-    // opts.sandbox só é passado pelo caminho de partner API — replicado aqui chamando o
-    // core diretamente, já que o único caminho de rota pra sandbox exige uma chave de
-    // API de teste completa (fora do escopo deste teste específico).
-    const { submitEmitir, emitirFormSchema } = await import('../src/lib/emitirCore.js');
-    const { getUserById } = await import('../src/db/users.js');
-    const sacadoCompany = unique('Sacado Sandbox');
-    const { token: sacadoToken } = await register('sacado', sacadoCompany);
-    const { userId: cedenteUserId } = await register('cedente', unique('Fornecedor Sandbox'));
+  it('taxa de mercado acima do teto negociado com o sacado — o fundo não compra', async () => {
+    const sacadoCompany = unique('Sacado Taxa Alta');
+    const { token: sacadoToken, userId: sacadoUserId } = await register('sacado', sacadoCompany);
+    const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Taxa Alta'));
     await criarProgramaEMatricular(sacadoToken, cedenteUserId);
+    await aportarNoFundo(500000);
 
-    const cedenteUser = getUserById(cedenteUserId)!;
-    const form = emitirFormSchema.parse(formCompleto(sacadoCompany, '5.000'));
-    const outcome = await submitEmitir(cedenteUser, form, { sandbox: true });
-    expect(outcome.status).toBe(200);
-    if (outcome.status === 200) {
-      expect(outcome.body.financiadoViaPrograma).toBe(false);
-    }
+    const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '10.000'));
+    expect(emit.status).toBe(200);
+    const duplicataId = emit.body.duplicataId as string;
+
+    const programa = getProgramaBySacado(sacadoUserId)!;
+    setDesagio(duplicataId, programa.taxa_am + 1.0); // acima do teto negociado
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(0);
+    expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
+  });
+
+  it('outro investidor comprando primeiro ganha a corrida — o tick do fundo não faz nada, sem erro', async () => {
+    const sacadoCompany = unique('Sacado Corrida');
+    const { token: sacadoToken, userId: sacadoUserId } = await register('sacado', sacadoCompany);
+    const { token: cedenteToken, userId: cedenteUserId } = await register('cedente', unique('Fornecedor Corrida'));
+    await criarProgramaEMatricular(sacadoToken, cedenteUserId);
+    await aportarNoFundo(500000);
+
+    const emit = await emitirComRetry(cedenteToken, formCompleto(sacadoCompany, '10.000'));
+    expect(emit.status).toBe(200);
+    const duplicataId = emit.body.duplicataId as string;
+
+    const programa = getProgramaBySacado(sacadoUserId)!;
+    setDesagio(duplicataId, programa.taxa_am - 0.3); // dentro do teto — o fundo compraria, se chegasse primeiro
+    await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
+
+    const { token: outroInvestidorToken, userId: outroInvestidorId } = await register('investidor', unique('Investidor Rápido'));
+    approveKyb(outroInvestidorId);
+    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${outroInvestidorToken}`);
+    expect(buy.status).toBe(200);
+
+    const balanceBefore = getFundoBalance();
+    const { compradas } = await runFundoAutoBuyTick();
+    expect(compradas).toBe(0);
+    expect(getFundoBalance()).toBe(balanceBefore); // fundo não gastou nada — não era mais dele pra comprar
+
+    const purchase = db.prepare('SELECT investor_id FROM purchases WHERE duplicata_id = ?').get(duplicataId) as { investor_id: number };
+    expect(purchase.investor_id).toBe(outroInvestidorId);
   });
 });

@@ -172,7 +172,9 @@ interface CedenteElegivel {
 // pra sua cadeia de fornecedores, na taxa da própria classificação de risco. Esta é a
 // fundação: criar/pausar o programa e matricular cedentes com histórico real de aceite
 // contra este sacado (listarCedentesElegiveis, server-side). O financiamento automático
-// em si — pular o leilão na emissão — vem numa feature seguinte.
+// em si acontece depois, dentro do leilão/marketplace real — o Fundo de Fomento compra
+// como qualquer outro investidor (server/src/lib/confirmingFundoAutoBuy.ts), nunca por
+// um atalho na emissão.
 export function ConfirmingPage() {
   const { user } = useSession();
   const isSacado = user?.role === 'sacado';
