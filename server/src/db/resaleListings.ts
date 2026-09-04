@@ -41,13 +41,19 @@ export function deactivatePurchase(id: number, retorno: number) {
   db.prepare('UPDATE purchases SET active = 0, retorno = ? WHERE id = ?').run(retorno, id);
 }
 
+// original_valor precisa ser o valor de face real (d.valor), não purchases.valor — essa
+// coluna guarda valor de face numa compra primária mas preço pago numa compra originada
+// de revenda (ver comentário de listPurchasesByInvestor em db/duplicatas.ts), então um
+// anúncio que já passou por uma revenda anterior faria variacaoPct (o "desconto vs.
+// original" mostrado ao comprador) e o discountRatio do block trade (lib/blockTrade.ts,
+// decide a ORDEM real de execução de um sweep) compararem contra um preço de revenda
+// anterior em vez do valor de face verdadeiro.
 export function listActiveListings(): (ResaleListingRow & { sacado_nome: string; cedente_nome: string; vencimento: string; score: number | null; original_valor: number })[] {
   return db
     .prepare(
-      `SELECT rl.*, d.sacado_nome as sacado_nome, d.cedente_nome as cedente_nome, d.vencimento as vencimento, d.score as score, p.valor as original_valor
+      `SELECT rl.*, d.sacado_nome as sacado_nome, d.cedente_nome as cedente_nome, d.vencimento as vencimento, d.score as score, d.valor as original_valor
        FROM resale_listings rl
        JOIN duplicatas d ON d.id = rl.duplicata_id
-       JOIN purchases p ON p.id = rl.purchase_id
        WHERE rl.status = 'ativo'
        ORDER BY rl.created_at DESC`
     )

@@ -63,14 +63,17 @@ describe('Investor performance dashboard — degenerate/empty portfolio', () => 
 describe('Investor performance dashboard — real weighted math', () => {
   it('computes a real weighted annualized return and null Sharpe with a single position', async () => {
     const { token, userId } = await registerInvestidor();
-    // 100000 invested, 2% retorno (2000), applied for exactly 365 days (2031-06-15 -> 2032-06-14)
-    // so the annualization factor is ~1x and retornoAnualizadoPct ~= 2%.
+    // Valor de face 100000, retorno de 2000 -> preço pago real 98000 (achado corrigido:
+    // totalInvestido usava valor de face direto, não faceValor - retorno). Aplicado por
+    // exatamente 365 dias (2031-06-15 -> 2032-06-14) pra fator de anualização ~1x.
     buyPosition(userId, 'Fixed Sacado A', 100000, 2000, '2031-06-15T12:00:00.000Z', '2032-06-14');
 
     const res = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.positionsCount).toBe(1);
-    expect(res.body.totalInvestido).toBe(100000);
+    expect(res.body.totalInvestido).toBe(98000);
+    // retornoPct real = 2000/98000*100 ≈ 2,04% — maior que o 2% ingênuo (2000/100000),
+    // porque o capital de fato investido é menor que o valor de face.
     expect(res.body.retornoMedioPonderadoPct).toBeGreaterThan(1.9);
     expect(res.body.retornoMedioPonderadoPct).toBeLessThan(2.1);
     // A single position has zero dispersion and <2 positions -> no Sharpe-like ratio.
@@ -89,7 +92,7 @@ describe('Investor performance dashboard — real weighted math', () => {
     const res = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.positionsCount).toBe(2);
-    expect(res.body.totalInvestido).toBe(100000);
+    expect(res.body.totalInvestido).toBe(98000); // (50000-1000) + (50000-1000), não 100000
     expect(res.body.volatilidadePct).toBeGreaterThan(0);
     expect(res.body.sharpeLike).not.toBeNull();
     expect(res.body.sacadosDistintos).toBe(2);

@@ -242,16 +242,24 @@ export interface PurchaseRow {
   created_at: string;
 }
 
+// purchases.valor tem dois significados dependendo da origem da compra: valor de face
+// numa compra primária/cesta/Confirming (market.ts, cestasCore.ts, confirmingCore.ts
+// sempre chamam createPurchase com duplicata.valor), mas preço pago numa compra
+// originada de revenda (resaleCore.ts's executeResaleTrade passa o preço da revenda).
+// `faceValor` (d.valor, sempre o valor de face real) permite recuperar o preço
+// efetivamente pago em qualquer caso via `faceValor - retorno` — retorno já é, de forma
+// universal, valor de face menos preço pago (mesma fórmula usada desde a correção do
+// retorno fabricado) — sem precisar saber a origem da linha.
 export function listPurchasesByInvestor(
   investorId: number
-): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string })[] {
+): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number })[] {
   return db
     .prepare(
-      `SELECT p.*, d.sacado_nome as sacado_nome, d.score as score, d.seguro as seguro, d.vencimento as vencimento FROM purchases p
+      `SELECT p.*, d.sacado_nome as sacado_nome, d.score as score, d.seguro as seguro, d.vencimento as vencimento, d.valor as faceValor FROM purchases p
        JOIN duplicatas d ON d.id = p.duplicata_id
        WHERE p.investor_id = ? ORDER BY p.created_at DESC`
     )
-    .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string })[];
+    .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number })[];
 }
 
 // Face value of every position this investor still actually holds — an active purchase

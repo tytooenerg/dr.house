@@ -38,6 +38,17 @@ export interface PerformanceDashboard {
   positions: PerformancePosition[];
 }
 
+// purchases.valor é valor de face numa compra primária/cesta/Confirming, mas preço pago
+// numa compra originada de revenda — um ROI real (retornoPct) tem que dividir o ganho
+// pelo capital de fato desembolsado, não pelo valor de face, senão a rentabilidade
+// anualizada sai sistematicamente subestimada. Só recupera via faceValor - retorno
+// enquanto a posição está ativa (essa identidade só vale antes de qualquer revenda —
+// deactivatePurchase sobrescreve retorno com o ganho/perda realizado quando a posição é
+// fechada); nesse caso p.valor já é o preço pago correto, registrado na hora da compra.
+function precoPago(p: { faceValor: number; retorno: number; valor: number; active: number }): number {
+  return p.active ? p.faceValor - p.retorno : p.valor;
+}
+
 export function buildPerformanceDashboard(userId: number, opts: { year?: number | null; riskFreeRateAnnualPct?: number } = {}): PerformanceDashboard {
   const riskFree = opts.riskFreeRateAnnualPct ?? 0;
   let purchases = listPurchasesByInvestor(userId);
@@ -49,9 +60,10 @@ export function buildPerformanceDashboard(userId: number, opts: { year?: number 
     const dataAplicacao = new Date(toIsoUtc(p.created_at));
     const dataResgate = parseFlexibleDate(p.vencimento);
     const diasCarencia = Math.max(1, Math.round((dataResgate.getTime() - dataAplicacao.getTime()) / (24 * 3600 * 1000)));
-    const retornoPct = p.valor > 0 ? (p.retorno / p.valor) * 100 : 0;
+    const valor = precoPago(p);
+    const retornoPct = valor > 0 ? (p.retorno / valor) * 100 : 0;
     const retornoAnualizadoPct = retornoPct * (365 / diasCarencia);
-    return { duplicataId: p.duplicata_id, sacado: p.sacado_nome, valor: p.valor, retorno: p.retorno, diasCarencia, retornoAnualizadoPct };
+    return { duplicataId: p.duplicata_id, sacado: p.sacado_nome, valor, retorno: p.retorno, diasCarencia, retornoAnualizadoPct };
   });
 
   const totalInvestido = positions.reduce((s, p) => s + p.valor, 0);

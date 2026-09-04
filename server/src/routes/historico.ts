@@ -17,11 +17,25 @@ historicoRouter.use(requireAuth);
 
 const INSTITUTIONAL_REPORTING_MIN_PLAN = 'pro';
 
+// purchases.valor é valor de face numa compra primária/cesta/Confirming, mas preço pago
+// numa compra originada de revenda (ver comentário de listPurchasesByInvestor em
+// db/duplicatas.ts) — "Investido" precisa sempre ser o dinheiro que de fato saiu do
+// bolso do investidor. Só vale recuperar via faceValor - retorno enquanto a posição
+// ainda está ativa: retorno = faceValor - preço pago é uma identidade real enquanto a
+// posição nunca foi revendida, mas deactivatePurchase (db/resaleListings.ts) sobrescreve
+// retorno com o ganho/perda REALIZADO da revenda assim que a posição é fechada — nesse
+// ponto p.valor (nunca tocado por deactivatePurchase) já é o registro correto e final de
+// quanto foi investido para abrir aquela posição encerrada, e recalcular por cima dele
+// corromperia um número que já estava certo.
+function precoPago(p: { faceValor: number; retorno: number; valor: number; active: number }): number {
+  return p.active ? p.faceValor - p.retorno : p.valor;
+}
+
 function rows(req: import('express').Request) {
   return listPurchasesByInvestor(effectiveOwnerId(req.user!)).map((p) => ({
     data: new Date(toIsoUtc(p.created_at)).toLocaleDateString('pt-BR'),
     empresa: p.sacado_nome,
-    investidoFmt: fmtBRL(p.valor),
+    investidoFmt: fmtBRL(precoPago(p)),
     retornoFmt: fmtBRLSigned(p.retorno),
     status: 'Concluída',
     comRegresso: !!p.com_regresso,
@@ -30,7 +44,7 @@ function rows(req: import('express').Request) {
 
 historicoRouter.get('/', (req, res) => {
   const purchases = listPurchasesByInvestor(effectiveOwnerId(req.user!));
-  const totalInvestido = purchases.reduce((sum, p) => sum + p.valor, 0);
+  const totalInvestido = purchases.reduce((sum, p) => sum + precoPago(p), 0);
   const totalRetorno = purchases.reduce((sum, p) => sum + p.retorno, 0);
   const rentMedia = totalInvestido > 0 ? (totalRetorno / totalInvestido) * 100 : 0;
 

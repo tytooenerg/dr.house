@@ -122,8 +122,10 @@ describe('real settlement on a marketplace purchase', () => {
     const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
     expect(buy.status).toBe(200);
 
+    // "Investido" é o preço realmente pago (achado corrigido: usava valor de face, 20000,
+    // direto — este era exatamente o bug), não mais o valor de face da duplicata.
     const historico = await request(app).get('/api/historico?pageSize=100').set('Authorization', `Bearer ${investor.token}`);
-    const row = historico.body.historico.find((h: { empresa: string; investidoFmt: string }) => h.investidoFmt.replace(/\D/g, '') === '20000');
+    const row = historico.body.historico.find((h: { empresa: string; investidoFmt: string }) => h.investidoFmt.replace(/\D/g, '') === String(Math.round(precoCompra)));
     expect(row).toBeTruthy();
     expect(row.retornoFmt.replace(/\D/g, '')).toBe(String(retornoEsperado));
 
@@ -142,10 +144,13 @@ describe('real settlement on a marketplace purchase', () => {
     const buy2 = await request(app).post(`/api/market/${duplicataId2}/buy`).set('Authorization', `Bearer ${investor.token}`);
     expect(buy2.status).toBe(200);
 
+    // Mesmo preço de compra determinístico pras duas (mesmo prazo/rating) — daí o mesmo
+    // "Investido" real, não o valor de face 20000 usado antes da correção.
     const historico2 = await request(app).get('/api/historico?pageSize=100').set('Authorization', `Bearer ${investor.token}`);
-    const rows20k = historico2.body.historico.filter((h: { investidoFmt: string }) => h.investidoFmt.replace(/\D/g, '') === '20000');
-    expect(rows20k).toHaveLength(2);
-    expect(rows20k[0].retornoFmt).toBe(rows20k[1].retornoFmt);
+    const investidoEsperado = String(Math.round(precoCompra));
+    const rowsEquivalentes = historico2.body.historico.filter((h: { investidoFmt: string }) => h.investidoFmt.replace(/\D/g, '') === investidoEsperado);
+    expect(rowsEquivalentes).toHaveLength(2);
+    expect(rowsEquivalentes[0].retornoFmt).toBe(rowsEquivalentes[1].retornoFmt);
   });
 });
 
