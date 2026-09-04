@@ -220,11 +220,11 @@ export const FINANCIADOR_REQS = [
   { label: 'Provisionamento por estágio de risco', desc: 'Segue a Res. CMN 4.966: Estágio 1 (normal), Estágio 2 (atraso >30 dias, provisão integral do contrato) e Estágio 3 (atraso >90 dias, provisão total), com modelos de PD/LGD/EAD.', color: COLORS.GREEN },
 ];
 
-export const CRONOGRAMA = [
-  { label: 'Adesão voluntária', periodo: 'Desde jul/2026 — sacadores e sacados podem aderir', status: 'Ativo', statusBg: '#EAF3EE', statusColor: COLORS.GREEN, dotColor: COLORS.GREEN },
-  { label: 'Obrigatoriedade — grandes empresas', periodo: 'A partir do fim de 2026', status: 'Planejado', statusBg: '#FBF1E0', statusColor: COLORS.AMBER, dotColor: COLORS.AMBER },
-  { label: 'Obrigatoriedade — médias e pequenas empresas', periodo: 'Ao longo de 2027', status: 'Planejado', statusBg: '#F0F2F5', statusColor: '#5B6472', dotColor: '#B8C2D4' },
-];
+// O cronograma de obrigatoriedade que costumava viver aqui (um array estático com datas
+// vagas — "A partir do fim de 2026") virou uma segunda fonte de verdade divergente da
+// data exata que lib/complianceCalendarCore.ts's OBRIGATORIEDADE_POR_BRACKET já modela —
+// achado corrigido na auditoria de conformidade. Ver buildCronogramaEstatico lá, que
+// gera esta mesma lista dinamicamente a partir das constantes reais, nunca mais duas.
 
 export const AUDIT_LOG = [
   { timestamp: '08/07/2026 09:14', ator: 'Marina Costa', acao: 'Comprou duplicata #1 — Grupo Atlas Varejo' },
