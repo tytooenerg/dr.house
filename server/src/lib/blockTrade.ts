@@ -23,7 +23,11 @@ import { isFeatureEnabled } from './featureFlags.js';
 //    fancier name,
 //  - a volume-based discount on the *platform's own fee* for the buyer — never a markdown
 //    on what each seller actually receives; every swept listing is still bought at exactly
-//    its posted asking price, the same price any other buyer would have paid it.
+//    its posted asking price, the same price any other buyer would have paid it. Isso não
+//    é neutro pro vendedor, só nunca uma perda: sem conta de ledger representando "a
+//    plataforma", uma taxa menor sobre o mesmo preço vira dinheiro extra no vendedor (ver
+//    lib/settlement.ts's settleResale) — a plataforma abre mão de receita, o vendedor
+//    recebe o valor.
 export const INSTITUTIONAL_PL_THRESHOLD = 10_000_000;
 export const MIN_BLOCK_TRADE_VALOR = 300_000;
 

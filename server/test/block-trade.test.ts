@@ -166,6 +166,13 @@ describe('institutional block trade', () => {
     const netSemDesconto = 180000 - platformFee(180000);
     expect(Math.round(parseBRL(creditA.valorFmt))).toBeGreaterThan(Math.round(netSemDesconto));
 
+    // Dever de informação clara (achado corrigido): a descrição do lançamento expõe o
+    // benefício em reais do desconto institucional, não só "com desconto institucional"
+    // de forma opaca.
+    const beneficioA = platformFee(180000) - feeA;
+    expect(creditA.descricao).toContain(fmtBRL(beneficioA));
+    expect(creditA.descricao).toContain('a menos que a taxa padrão');
+
     // Débito agregado do comprador: soma de todos os itens varridos no mesmo block trade,
     // não um débito por item isolado.
     const buyerBalAfter = await request(app).get('/api/account').set('Authorization', `Bearer ${buyer.token}`);
