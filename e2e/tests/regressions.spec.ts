@@ -34,7 +34,10 @@ test('investidor can edit an auto-bid rule on Automação de Lances without the 
   // replacing its *entire* page state with that response. Every other field went
   // `undefined`, and the next render (`data.diversification.AA`, `data.autoBidActivity.map`)
   // threw and took the whole page down behind the ErrorBoundary — reproducing exactly what
-  // an investor hit typing into "Taxa máxima a oferecer" or toggling "Lance automático".
+  // an investor hit typing into "Exposição máxima por sacado" or toggling "Lance automático".
+  // POST /automacao/ladder (a escada de taxa por classe de rating, que substituiu o antigo
+  // campo único "Taxa máxima a oferecer") é o mesmo tipo de rota nova — mesma classe de bug
+  // se algum dia parar de devolver o payload inteiro, por isso testado aqui também.
   const pageErrors: string[] = [];
   page.on('pageerror', (err) => pageErrors.push(err.message));
 
@@ -52,11 +55,18 @@ test('investidor can edit an auto-bid rule on Automação de Lances without the 
   // is shared with other e2e specs running in parallel, and flipping it on would start the
   // real auto-purchase engine against the live marketplace those specs depend on. The rule
   // and diversification routes hit the identical buggy code path without that side effect.
-  const taxaField = page.locator('div', { hasText: 'Taxa máxima a oferecer (% a.m.)' }).locator('input').first();
-  await taxaField.fill('4,25');
+  const exposicaoField = page.locator('div', { hasText: 'Exposição máxima por sacado (R$)' }).locator('input').first();
+  await exposicaoField.fill('200.000');
   await expect(page.getByText('Algo deu errado nesta tela')).not.toBeVisible();
 
   await page.locator('input[type="range"]').first().fill('35');
+  await expect(page.getByText('Algo deu errado nesta tela')).not.toBeVisible();
+
+  // A escada só envia POST /automacao/ladder no blur (não a cada tecla) — ver comentário em
+  // AutomacaoPage.tsx sobre por que os campos da escada não são controlados direto por `data`.
+  const taxaInicialField = page.locator('div', { hasText: 'Taxa inicial (% a.m.)' }).locator('input').first();
+  await taxaInicialField.fill('3,5');
+  await taxaInicialField.blur();
   await expect(page.getByText('Algo deu errado nesta tela')).not.toBeVisible();
 
   expect(pageErrors).toEqual([]);
