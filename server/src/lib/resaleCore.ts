@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getDuplicata, createPurchase, listPurchasesByInvestor } from '../db/duplicatas.js';
+import { getAceiteByDuplicata } from '../db/aceites.js';
 import {
   createListing,
   deactivatePurchase,
@@ -235,6 +236,14 @@ export function buyResaleListing(user: UserRow, listingId: number): ResaleOutcom
   if (!duplicata || parseFlexibleDate(duplicata.vencimento).getTime() < Date.now()) {
     return { status: 409, body: { error: 'expired', message: 'Esta duplicata já venceu.' } };
   }
+  // Achado corrigido (simulação multi-papel): só o mercado primário (routes/market.ts)
+  // checava aceite.status === 'contestada' antes de executar a compra — uma duplicata
+  // contestada pelo sacado depois de já listada no secundário passava sem aviso pro novo
+  // comprador. Mesma checagem, mesmo padrão.
+  const aceite = getAceiteByDuplicata(listing.duplicata_id);
+  if (aceite?.status === 'contestada') {
+    return { status: 409, body: { error: 'contested', message: 'Esta duplicata está contestada pelo sacado e não pode ser comprada.' } };
+  }
   const existingActive = getActivePurchaseByDuplicata(listing.duplicata_id);
   if (!existingActive || existingActive.id !== listing.purchase_id) {
     return { status: 409, body: { error: 'stale_listing', message: 'Esta posição já mudou de mãos — atualize a página.' } };
@@ -318,6 +327,13 @@ export function acceptBid(user: UserRow, bidId: number): ResaleOutcome<{ market:
   const duplicata = getDuplicata(listing.duplicata_id);
   if (!duplicata || parseFlexibleDate(duplicata.vencimento).getTime() < Date.now()) {
     return { status: 409, body: { error: 'expired', message: 'Esta duplicata já venceu.' } };
+  }
+  // Achado corrigido (simulação multi-papel): mesma checagem de buyResaleListing — aceitar
+  // um lance também executa a troca de mãos, então também precisa recusar uma duplicata
+  // contestada pelo sacado.
+  const aceite = getAceiteByDuplicata(listing.duplicata_id);
+  if (aceite?.status === 'contestada') {
+    return { status: 409, body: { error: 'contested', message: 'Esta duplicata está contestada pelo sacado e não pode ser vendida.' } };
   }
   const existingActive = getActivePurchaseByDuplicata(listing.duplicata_id);
   if (!existingActive || existingActive.id !== listing.purchase_id) {
