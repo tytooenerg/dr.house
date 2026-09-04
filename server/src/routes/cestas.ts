@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../auth/middleware.js';
-import { CESTAS, investInBasket, investSchema } from '../lib/cestasCore.js';
+import { CESTAS, investInBasket, investSchema, buildCestaRange } from '../lib/cestasCore.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const cestasRouter = Router();
 cestasRouter.use(requireAuth, requireRole('investidor'));
 
 cestasRouter.get('/', (_req, res) => {
-  res.json({ cestas: Object.entries(CESTAS).map(([key, c]) => ({ key, label: c.label, desc: c.desc, ratings: c.ratings })) });
+  res.json({
+    cestas: Object.entries(CESTAS).map(([key, c]) => ({ key, label: c.label, desc: c.desc, ratings: c.ratings, faixa: buildCestaRange([...c.ratings]) })),
+  });
 });
 
 cestasRouter.post(

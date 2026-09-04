@@ -1,3 +1,5 @@
+import type { Rating } from '../data/seed.js';
+
 // 'api_partner' is a self-service, no-KYB role for a company that only wants the
 // standalone data products (Score API / PLD Screening API — see lib/addOnBilling.ts and
 // routes/v1.ts) without becoming a marketplace participant (cedente/investidor/sacado/
@@ -18,6 +20,20 @@ export type SubscriptionStatus = 'none' | 'active' | 'active_demo' | 'canceled' 
 // sem criar um ciclo de import.
 export type FaturamentoBracket = 'acima_300m' | 'entre_90m_300m' | 'entre_4_8m_90m' | 'ate_4_8m';
 
+// Escada de lances por classe de rating (Automação de Lances) — substitui o antigo teto
+// único `autoBidRules.taxaMax`. A automação começa exigente (só aceita o deságio mais alto
+// que essa classe costuma ter — mais favorável ao investidor) e relaxa um degrau a cada
+// `intervaloHoras` sem compra, até o piso `taxaAlvo`. `taxaInicial`/`taxaAlvo` nulos usam a
+// banda ao vivo de lib/dynamicPricing.ts's estimateRateBand(rating) (max/min, já ajustada
+// por liquidez real) em vez de duplicar esses números aqui — ver lib/autoBidLadder.ts.
+export interface LadderConfig {
+  taxaInicial: number | null;
+  taxaAlvo: number | null;
+  decrementoPorEtapa: number;
+  intervaloHoras: number;
+  iniciadoEm: string | null;
+}
+
 export interface UserSettings {
   onboardingSeen: boolean;
   // digest only means anything for an admin account (Resumo diário do back-office —
@@ -28,7 +44,8 @@ export interface UserSettings {
   // message (Twilio), so it shouldn't default to on the way free email notifications do.
   notifyViaWhatsapp: boolean;
   autoBidEnabled: boolean;
-  autoBidRules: { scoreMin: string; taxaMax: string; exposicaoSacado: string; exposicaoMensal: string };
+  autoBidRules: { scoreMin: string; exposicaoSacado: string; exposicaoMensal: string };
+  autoBidLadder: Record<Rating, LadderConfig>;
   diversification: { AA: number; A: number; B: number; C: number };
   sectorDiversification: { varejo: number; industria: number; construcao: number; servicos: number };
   erpConnections: { sap: boolean; totvs: boolean; omie: boolean; whitelabel: boolean };
@@ -93,7 +110,13 @@ export function defaultSettings(): UserSettings {
     notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false, digest: true, compliance: true },
     notifyViaWhatsapp: false,
     autoBidEnabled: false,
-    autoBidRules: { scoreMin: 'A', taxaMax: '2.5', exposicaoSacado: '150.000', exposicaoMensal: '2.000.000' },
+    autoBidRules: { scoreMin: 'A', exposicaoSacado: '150.000', exposicaoMensal: '2.000.000' },
+    autoBidLadder: {
+      AA: { taxaInicial: null, taxaAlvo: null, decrementoPorEtapa: 0.1, intervaloHoras: 4, iniciadoEm: null },
+      A: { taxaInicial: null, taxaAlvo: null, decrementoPorEtapa: 0.1, intervaloHoras: 4, iniciadoEm: null },
+      B: { taxaInicial: null, taxaAlvo: null, decrementoPorEtapa: 0.1, intervaloHoras: 4, iniciadoEm: null },
+      C: { taxaInicial: null, taxaAlvo: null, decrementoPorEtapa: 0.1, intervaloHoras: 4, iniciadoEm: null },
+    },
     diversification: { AA: 20, A: 35, B: 30, C: 15 },
     sectorDiversification: { varejo: 30, industria: 25, construcao: 20, servicos: 25 },
     erpConnections: { sap: false, totvs: false, omie: false, whitelabel: false },

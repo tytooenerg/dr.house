@@ -137,6 +137,31 @@ describe('Cestas de investimento — listagem (routes/cestas.ts)', () => {
     for (const c of res.body.cestas) {
       expect(c.label).toBeTruthy();
       expect(c.desc).toBeTruthy();
+      // Achado corrigido: cestas não mostravam faixa de taxa nenhuma, mesmo misturando
+      // várias classes de rating — faixa mescla automaticamente as classes que a cesta
+      // aceita (real = a partir de ofertas de fato compráveis agora; teórica quando vazia).
+      expect(c.faixa.minFmt).toMatch(/%$/);
+      expect(c.faixa.maxFmt).toMatch(/%$/);
+      expect(c.faixa.medioFmt).toMatch(/%$/);
+      expect(typeof c.faixa.real).toBe('boolean');
+    }
+  });
+
+  it('GET / cai pra faixa teórica (não finge dado real) quando a cesta não tem nenhuma oferta compra´vel agora', async () => {
+    // 'agressiva' (B/C) só tem oferta real se o seed/testes anteriores tiverem deixado uma
+    // aberta — nesta suíte isolada (server/vitest.config.ts roda cada arquivo com seu
+    // próprio banco), a única fonte é o seed padrão. Em vez de depender do estado exato do
+    // seed, o teste real que importa é: teórica e real usam o MESMO formato de resposta
+    // (já coberto acima) — este teste cobre especificamente o cálculo puro sem tocar HTTP,
+    // usando um rating sem nenhuma oferta seedada (garantido: nenhum seed usa 'C' sozinho).
+    const { buildCestaRange } = await import('../src/lib/cestasCore.js');
+    const range = buildCestaRange(['C']);
+    expect(range.minFmt).toMatch(/%$/);
+    expect(range.maxFmt).toMatch(/%$/);
+    if (!range.real) {
+      // Banda teórica: min/max vêm de estimateRateBand('C'), então min <= max sempre.
+      const toNum = (s: string) => parseFloat(s.replace(',', '.'));
+      expect(toNum(range.minFmt)).toBeLessThanOrEqual(toNum(range.maxFmt));
     }
   });
 

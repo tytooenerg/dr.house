@@ -1006,6 +1006,18 @@ Mudança de modelo de negócio pedida pelo usuário: o financiamento automático
 
 `server/test/confirming-auto-fund.test.ts` reescrito: o contrato muda de "financia instantaneamente na emissão, pulando o leilão" pra "emite → sacado aceita → cedente dispara leilão → `runFundoAutoBuyTick()` (chamado direto no teste, mesma convenção de `applyTacitAcceptance()`) → duplicata vendida pro fundo, se elegível". Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 729 testes, client 26/26, sdks/node 9/9).
 
+### Automação de Lances: escada de taxa por classe de rating (substitui o teto fixo) + faixa mesclada nas cestas
+
+Pedido do usuário: a Automação de Lances tinha um único campo, "Taxa máxima a oferecer" (`autoBidRules.taxaMax`) — na prática um teto de risco (`offerRate <= taxaMax`), não uma proposta de negociação real (o preço sempre foi calculado pelo servidor, `computePurchasePrice(d)`, sem nenhum override vindo do investidor — confirmado em `routes/market.ts`, `maybeTick` e `lib/agents/autoBid.ts`). O pedido: configurar, **por classe de rating (AA/A/B/C)**, onde a automação começa exigente (o melhor deságio da classe) e o quanto relaxa a cada etapa até uma meta/piso mínimo aceitável — e, ao montar uma cesta que mistura classes, mostrar a faixa média mesclando-as.
+
+- **`UserSettings.autoBidLadder`** (`db/types.ts`) — um `LadderConfig` por rating (`taxaInicial`/`taxaAlvo` nulos por padrão, `decrementoPorEtapa: 0.1`, `intervaloHoras: 4`). `taxaMax` saiu de `autoBidRules` — era vestigial.
+- **`lib/autoBidLadder.ts`** (novo) — funções puras: `currentFloor` (o piso que a automação aceita agora — começa em `taxaInicial ?? estimateRateBand(rating).max` e decai `decrementoPorEtapa` a cada `intervaloHoras` sem compra, nunca abaixo de `taxaAlvo ?? estimateRateBand(rating).min` — a banda ao vivo, ajustada por liquidez real, é o default sem duplicar número nenhum), `nextStepAt`, `armLadder`.
+- **`routes/automation.ts`**: `passesTaxa` inverte de teto (`offerRate <= taxaMax`) pra piso decrescente (`offerRate >= currentFloor(...)`). Uma compra bem-sucedida **rearma** a escada da classe comprada (o próximo ciclo volta a ser exigente); ligar a automação rearma toda classe com alocação > 0 na diversificação. Nova rota `POST /automacao/ladder` (`{rating, field, value}`, mesmo padrão de `/rule`/`/diversification`) — recusa taxa inicial menor que a taxa alvo (a escada só desce) e decremento/intervalo ≤ 0.
+- **Cestas** (`lib/cestasCore.ts`'s `buildCestaRange`, exposto em `GET /cestas`): faixa de deságio mesclando automaticamente as classes que a cesta aceita — olha as ofertas de todas elas juntas (peso real = quanto tem aberto agora em cada uma, não um peso arbitrário por classe). Real quando há oferta compra´vel; cai pra banda teórica (`estimateRateBand` por classe) quando a cesta está vazia — mesmo espírito de "simulado quando não há dado real" já usado no resto do código.
+- **Client**: `AutomacaoPage.tsx` troca o campo único por um card "Escada de lances por classe de rating" (uma linha por classe com alocação > 0, 4 campos + piso atual e próxima queda); `CestasPage.tsx` mostra "Faixa hoje"/"Faixa teórica" por cesta.
+
+Novo `server/test/automation-ladder.test.ts` (15 casos — decaimento por etapa, nunca abaixo do alvo, banda ao vivo como default, validação da rota, rearme após compra numa duplicata criada direto pro teste). `automation-routes.test.ts`/`comparador-dashboard-cestas.test.ts` ajustados pro novo formato. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 747 testes, client 26/26, sdks/node 9/9).
+
 ## Running locally
 
 ```bash

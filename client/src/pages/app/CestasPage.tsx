@@ -11,6 +11,7 @@ interface CestaDef {
   label: string;
   desc: string;
   ratings: string[];
+  faixa: { minFmt: string; maxFmt: string; medioFmt: string; real: boolean };
 }
 interface InvestResult {
   comprados: { duplicataId: string; sacado: string; rating: string; valorFmt: string; desagio: string }[];
@@ -76,12 +77,19 @@ export function CestasPage() {
           >
             <div className="font-bold text-[15px] mb-1.5">{c.label}</div>
             <div className="text-textSecondary text-[12.5px] mb-3">{c.desc}</div>
-            <div className="flex gap-1.5 flex-wrap">
+            <div className="flex gap-1.5 flex-wrap mb-3">
               {c.ratings.map((r) => (
                 <span key={r} className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">
                   {r}
                 </span>
               ))}
+            </div>
+            <div className="text-[12px] font-semibold" style={{ color: c.faixa.real ? '#0A5C36' : '#8B97AC' }}>
+              {c.faixa.real ? 'Faixa hoje' : 'Faixa teórica (sem oferta aberta agora)'}:{' '}
+              <span className="font-mono-num">
+                {c.faixa.minFmt}–{c.faixa.maxFmt}
+              </span>{' '}
+              <span className="text-textTertiary font-normal">(média {c.faixa.medioFmt})</span>
             </div>
           </Card>
         ))}
