@@ -191,10 +191,14 @@ async function main() {
         while (buyer.id === seller.id) buyer = rand(investidores);
         const askingValor = Math.round(valor * (1 + (Math.random() * 0.06 - 0.02)));
         const listing = createListing(purchaseRow.id, d.id, seller.id, askingValor);
-        deactivatePurchase(purchaseRow.id);
+        const { fee: resaleFee, net: resaleNet } = settleResale({ duplicataId: d.id, sacadoNome, buyerId: buyer.id, sellerId: seller.id, valor: askingValor });
+        // Retorno real do vendedor: líquido recebido na revenda menos o que ele pagou
+        // originalmente (precoCompra) — mesmo cálculo de lib/resaleCore.ts's
+        // executeResaleTrade, pra dado seedado não mostrar o mesmo número fabricado que a
+        // correção real fechou.
+        deactivatePurchase(purchaseRow.id, Math.round(resaleNet - precoCompra));
         createPurchase(d.id, buyer.id, askingValor, `${(1.5 + Math.random() * 3).toFixed(1)}%`, Math.round(valor - askingValor));
         setListingStatus(listing.id, 'vendido');
-        const { fee: resaleFee } = settleResale({ duplicataId: d.id, sacadoNome, buyerId: buyer.id, sellerId: seller.id, valor: askingValor });
         totalTaxas += resaleFee;
         countResold++;
       }

@@ -29,8 +29,16 @@ export function setListingStatus(id: number, status: 'vendido' | 'cancelado') {
   db.prepare('UPDATE resale_listings SET status = ? WHERE id = ?').run(status, id);
 }
 
-export function deactivatePurchase(id: number) {
-  db.prepare('UPDATE purchases SET active = 0 WHERE id = ?').run(id);
+// `retorno` aqui precisa ser o ganho real que o vendedor efetivamente realizou ao revender
+// (líquido recebido − o que ele pagou originalmente), não o valor "se tivesse segurado até
+// o vencimento" que a linha já carregava desde a compra — esse número desatualizado, sem
+// isso, continuaria alimentando Carteira & Histórico, o dashboard de Performance
+// institucional, o relatório PDF institucional, o Informe de Rendimentos e o gerador de
+// DARF como se o investidor tivesse recebido o valor de face na data do vencimento, quando
+// na verdade ele saiu da posição antes disso por um valor diferente (ver
+// lib/resaleCore.ts's executeResaleTrade, o único chamador real).
+export function deactivatePurchase(id: number, retorno: number) {
+  db.prepare('UPDATE purchases SET active = 0, retorno = ? WHERE id = ?').run(retorno, id);
 }
 
 export function listActiveListings(): (ResaleListingRow & { sacado_nome: string; cedente_nome: string; vencimento: string; score: number | null; original_valor: number })[] {

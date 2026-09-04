@@ -179,14 +179,33 @@ export function executeResaleTrade(
   feeDiscountPct = 0
 ) {
   const desagioPct = duplicata.valor > 0 ? (((duplicata.valor - valor) / duplicata.valor) * 100).toFixed(1).replace('.', ',') + '%' : '0%';
-  deactivatePurchase(listing.purchase_id);
+  const originalPurchase = getPurchaseById(listing.purchase_id);
+  const settlement = settleResale({ duplicataId: listing.duplicata_id, sacadoNome: duplicata.sacado_nome, buyerId, sellerId: listing.seller_id, valor, feeDiscountPct });
+  // O ganho real do vendedor ao sair da posição antes do vencimento é o que ele efetivamente
+  // recebeu na revenda (líquido da taxa de plataforma) menos o que ele pagou originalmente —
+  // não o "retorno esperado se tivesse segurado até o vencimento" que a linha carregava desde
+  // a compra. Sem atualizar isso aqui, Carteira & Histórico, Performance institucional, o
+  // relatório PDF, o Informe de Rendimentos e o DARF continuariam mostrando um número que o
+  // investidor nunca recebeu de verdade (ver db/resaleListings.ts's deactivatePurchase).
+  //
+  // O que o vendedor pagou não dá pra ler direto de originalPurchase.valor: essa coluna
+  // guarda o valor de face pra uma compra primária (routes/market.ts e afins), mas o preço
+  // efetivamente pago pra uma posição que já veio de uma revenda anterior — o mesmo campo
+  // significa duas coisas diferentes dependendo da origem da linha. `duplicata.valor` (o
+  // valor de face real, que não muda entre revendas) menos o retorno que a linha já carregava
+  // recupera o custo de aquisição corretamente nos dois casos: pra uma compra primária,
+  // retorno = faceValue − precoCompra, então faceValue − retorno = precoCompra; pra uma
+  // posição já revendida, retorno = faceValue − precoPago, então faceValue − retorno =
+  // precoPago igualmente.
+  const oQueOVendedorPagou = duplicata.valor - (originalPurchase?.retorno ?? 0);
+  deactivatePurchase(listing.purchase_id, Math.round(settlement.net - oQueOVendedorPagou));
   // Real, determinístico — o mesmo número usado pra desagioPct acima, em reais em vez de
   // percentual: o novo comprador paga `valor` (preço combinado) e recebe o valor de face
   // cheio no vencimento, então isso é o ganho real dele (pode ser negativo se comprou com
   // ágio acima do valor de face — honesto, não um número fabricado por Math.random()).
   createPurchase(listing.duplicata_id, buyerId, valor, desagioPct, Math.round(duplicata.valor - valor));
   setListingStatus(listing.id, 'vendido');
-  return settleResale({ duplicataId: listing.duplicata_id, sacadoNome: duplicata.sacado_nome, buyerId, sellerId: listing.seller_id, valor, feeDiscountPct });
+  return settlement;
 }
 
 // Buying a resale listing closes out the seller's position (their original purchase row is

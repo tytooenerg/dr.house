@@ -4,7 +4,7 @@ import { listPurchasesByInvestor } from '../db/duplicatas.js';
 import { listUsersWithInstitutionalReporting } from '../db/users.js';
 import { chargeOncePerPeriod, fmtAddOnPrice } from './addOnBilling.js';
 import { ratingFromScore } from './riscoCore.js';
-import { fmtBRL, toIsoUtc } from './format.js';
+import { fmtBRL, fmtBRLSigned, toIsoUtc } from './format.js';
 import { logger } from './logger.js';
 import type { Rating } from '../data/seed.js';
 
@@ -57,7 +57,7 @@ export function buildInstitutionalAnalytics(investorId: number): InstitutionalAn
   }
   const desempenhoMensal = [...monthlyTotals.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([mes, t]) => ({ mes, investidoFmt: fmtBRL(t.investido), retornoFmt: '+' + fmtBRL(t.retorno) }));
+    .map(([mes, t]) => ({ mes, investidoFmt: fmtBRL(t.investido), retornoFmt: fmtBRLSigned(t.retorno) }));
 
   const sacadoTotals = new Map<string, number>();
   for (const p of purchases) sacadoTotals.set(p.sacado_nome, (sacadoTotals.get(p.sacado_nome) ?? 0) + p.valor);
@@ -68,7 +68,7 @@ export function buildInstitutionalAnalytics(investorId: number): InstitutionalAn
 
   return {
     totalInvestidoFmt: fmtBRL(totalInvestido),
-    retornoAcumuladoFmt: '+' + fmtBRL(totalRetorno),
+    retornoAcumuladoFmt: fmtBRLSigned(totalRetorno),
     rentabilidadeMediaFmt: rentMedia.toFixed(1).replace('.', ',') + '% a.m.',
     posicoesAtivas: purchases.filter((p) => p.active).length,
     comRegressoPct: purchases.length > 0 ? Math.round((comRegresso / purchases.length) * 100) : 0,

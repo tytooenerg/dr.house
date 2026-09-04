@@ -12,7 +12,7 @@ import { getDuplicata, isPurchased, setStatus } from '../db/duplicatas.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { platformFee, pctLabel } from './settlement.js';
 import { computePurchasePrice } from './marketCompute.js';
-import { fmtBRL } from './format.js';
+import { fmtBRL, fmtBRLSigned } from './format.js';
 import type { UserRow, DuplicataRow } from '../db/types.js';
 import type { FractionalOfferingRow } from '../db/fractionalOfferings.js';
 
@@ -181,7 +181,7 @@ export function listMyFractionalHoldings(investorId: number) {
     // Ganho real (deságio já capturado na compra), ainda NÃO realizado em caixa — só vira
     // dinheiro de verdade quando a duplicata for paga no vencimento
     // (settleFractionalAtMaturity acima). Antes era um número fabricado por Math.random().
-    retornoFmt: '+' + fmtBRL(h.retorno),
+    retornoFmt: fmtBRLSigned(h.retorno),
     quando: h.created_at,
   }));
 }
