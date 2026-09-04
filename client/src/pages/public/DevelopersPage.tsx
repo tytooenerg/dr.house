@@ -22,7 +22,14 @@ const STATS = [
   { value: '2027', desc: 'ano em que a obrigatoriedade chega às médias e pequenas empresas' },
 ];
 
-const REGISTRADORAS = ['CERC', 'B3', 'Núclea', 'TAG', 'CRDC', 'Grafeno', 'Quicksoft'];
+// Achado corrigido (auditoria de conformidade): esta lista incluía "TAG", "CRDC" e
+// "Quicksoft" — nomes nunca confirmados como registradoras homologadas de duplicata
+// escritural — junto com uma contagem exata ("sete") não verificável. Mantida em sincronia
+// manual com as 4 que server/src/lib/registradoras.ts de fato modela e roteia operações
+// reais (CERC, B3, Núclea, Grafeno/SPC — Resolução BCB nº 339/2023); o card "+ novas"
+// abaixo já comunica honestamente que mais podem ser homologadas sem precisar nomear ou
+// contar as que ainda não são reais.
+const REGISTRADORAS = ['CERC', 'B3', 'Núclea', 'Grafeno (SPC)'];
 
 const ENDPOINTS = [
   { method: 'POST', path: '/v1/duplicatas', desc: 'Emite e registra uma duplicata escritural' },
@@ -165,11 +172,11 @@ export function DevelopersPage() {
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Regulação</div>
             <div className="text-[30px] font-extrabold tracking-tight mb-4">Conector universal, não mais um silo.</div>
             <div className="text-textSecondary text-[15px] leading-relaxed">
-              Grandes bancos já fecham parceria individual com uma escrituradora só para seus próprios clientes. A Lastro faz o caminho inverso: uma integração conecta você às sete
-              registradoras homologadas pelo Banco Central, em conformidade com a Resolução BCB nº 339/2023 e nº 540/2025 — sem escolher um silo e ficar preso a ele.
+              Grandes bancos já fecham parceria individual com uma escrituradora só para seus próprios clientes. A Lastro faz o caminho inverso: uma integração conecta você às
+              registradoras autorizadas pelo Banco Central (CERC, B3, Núclea e demais em processo de homologação, incluindo a Grafeno/SPC), em conformidade com a Resolução BCB nº 339/2023 e nº 540/2025 — sem escolher um silo e ficar preso a ele.
             </div>
           </div>
-          <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
             {REGISTRADORAS.map((r) => (
               <div key={r} className="border border-border rounded-xl p-4 text-center">
                 <div className="font-extrabold text-sm">{r}</div>

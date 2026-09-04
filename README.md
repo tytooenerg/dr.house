@@ -917,6 +917,12 @@ Novo `server/test/registradoras-negociacao.test.ts`: `informarNegociacao` em iso
 
 Novo `server/test/cronograma-obrigatoriedade.test.ts`: cada item do cronograma cita exatamente o mesmo mês/ano que o calendário pessoal do bracket correspondente (a prova direta de que as duas visões não podem mais divergir); status "Ativo"/"Planejado" muda corretamente conforme a data avança; um item por faixa, sempre na ordem cronológica certa. Verificado: `npm run typecheck`/`build`/`test` todos verdes.
 
+**`DevelopersPage.tsx` inventava registradoras que não existem no código.** Afirmava "sete registradoras homologadas pelo Banco Central... CERC, B3, Núclea, TAG, CRDC, Grafeno, Quicksoft" — mas `lib/registradoras.ts` só modela 4 (o próprio comentário do arquivo diz "Banco Central authorized four registradoras"), e a pesquisa regulatória não confirma "TAG", "CRDC" ou "Quicksoft" como registradoras homologadas de duplicata escritural (a Grafeno/SPC em si ainda estava em fase de testes de homologação em fontes de 2025-2026). Fechando o quarto e último achado da auditoria de conformidade.
+
+- **`DevelopersPage.tsx`**: lista de registradoras exibidas reduzida às 4 reais (CERC, B3, Núclea, Grafeno/SPC — mantida em sincronia manual com `lib/registradoras.ts`, comentário explica o porquê), e o texto não afirma mais uma contagem exata não verificável.
+
+Novo `client/src/pages/public/DevelopersPage.test.tsx`: a página não afirma "sete registradoras" nem nomeia as três fictícias; exibe exatamente as 4 reais. Verificado: `npm run typecheck`/`build`/`test` todos verdes — **fecha a auditoria de conformidade com as regras mais recentes da duplicata escritural** (PRs #59-#62).
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).
