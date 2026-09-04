@@ -939,6 +939,12 @@ Os testes de `full-lifecycle-all-roles.test.ts` que documentavam H1/H2 agora val
 
 Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do server).
 
+**Segundo achado corrigido: dupla recuperação — sinistro pago + cobrança jurídica creditava de novo.** `checkCollectionEligibility` (`lib/legalCollection.ts`) nunca olhava `duplicata.status` — só dias em atraso, fracionamento, aceite confirmado e ausência de disputa. `recordRecovery` (`lib/legalCollectionFee.ts`) só se protegia contra recuperação duplicada via `hasFeeAlreadyCharged`, uma flag que registra apenas uma recuperação JURÍDICA anterior — nunca setada quando a duplicata foi paga por outro canal (sinistro aprovado, `reportPayment` no vencimento). `listOverdueDuplicatas` já filtra a listagem por status, mas um `POST .../recuperar/:duplicataId` chamado direto pelo ID (sem passar pela listagem — ex: um admin ou agente de IA que já tinha o ID de antes do sinistro ser decidido) conseguia recuperar de novo, creditando o credor uma segunda vez pelo mesmo valor.
+
+- **`lib/legalCollectionFee.ts`**: `recordRecovery` agora também recusa (mesmo retorno `null` → 409 `already_recovered` que já existia pra uma segunda recuperação jurídica) quando `duplicata.status === 'paga'` por qualquer canal — fix minimal e cirúrgico, sem tocar `checkCollectionEligibility` (evita quebrar o contrato de erro já testado em `legal-collection-fee.test.ts`, que espera especificamente `already_recovered` numa segunda tentativa).
+
+O teste correspondente em `full-lifecycle-all-roles.test.ts` agora valida a correção (409 `already_recovered`, sem crédito duplicado) em vez de documentar o bug. Verificado: `npm run typecheck`/`build`/`test` todos verdes (727 testes do server).
+
 O papel `anunciante` pagava mensalidade fixa pelo carrossel de publicidade (`lib/advertisementBilling.ts`) sem nenhum retorno de performance — nenhuma parte da plataforma contava quantas vezes o anúncio foi servido nem quantos cliques o link recebeu.
 
 - **Migração `0064_advertisement_metrics.sql`**: duas colunas agregadas em `advertisements` — `impressoes` e `cliques` (contador simples, sem log por evento, que é tudo que o caso de uso pede).
