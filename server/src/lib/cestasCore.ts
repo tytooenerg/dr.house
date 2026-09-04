@@ -5,7 +5,8 @@ import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
 import { settlePurchase } from './settlement.js';
-import { computePurchasePrice } from './marketCompute.js';
+import { computePurchasePrice, effectiveMonthlyRatePct } from './marketCompute.js';
+import { estimateRateBand } from './dynamicPricing.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { SACADOS, type Rating } from '../data/seed.js';
 import { checkCestaSuitability } from './suitability.js';
@@ -36,6 +37,42 @@ function isBuyable(d: DuplicataRow): boolean {
   if (isPurchased(d.id)) return false;
   const aceite = getAceiteByDuplicata(d.id);
   return aceite?.status === 'aceita';
+}
+
+function fmtPct(n: number): string {
+  return n.toFixed(2).replace('.', ',') + '%';
+}
+
+export interface CestaRange {
+  minFmt: string;
+  maxFmt: string;
+  medioFmt: string;
+  // true = calculada a partir de ofertas de fato compráveis agora (effectiveMonthlyRatePct
+  // de cada uma); false = a cesta está vazia neste instante e a faixa caiu pra banda
+  // teórica por classe (estimateRateBand) — mesmo espírito de "simulado quando não há
+  // dado real" já usado no resto do código, nunca finge uma faixa real que não existe.
+  real: boolean;
+}
+
+// Faixa de deságio desta cesta agora, mesclando automaticamente todas as classes que ela
+// aceita — olha as ofertas de TODAS elas juntas (sem peso arbitrário por classe: o peso
+// real é "quanto tem aberto pra comprar agora em cada uma", não um número inventado).
+export function buildCestaRange(ratings: Rating[]): CestaRange {
+  const ofertas = listMarketplace()
+    .filter(isBuyable)
+    .filter((d) => ratings.includes(ratingForOffer(d)));
+  if (ofertas.length > 0) {
+    const taxas = ofertas.map(effectiveMonthlyRatePct);
+    const min = Math.min(...taxas);
+    const max = Math.max(...taxas);
+    const media = taxas.reduce((s, t) => s + t, 0) / taxas.length;
+    return { minFmt: fmtPct(min), maxFmt: fmtPct(max), medioFmt: fmtPct(media), real: true };
+  }
+  const bands = ratings.map((r) => estimateRateBand(r));
+  const min = Math.min(...bands.map((b) => b.min));
+  const max = Math.max(...bands.map((b) => b.max));
+  const media = bands.reduce((s, b) => s + b.mid, 0) / bands.length;
+  return { minFmt: fmtPct(min), maxFmt: fmtPct(max), medioFmt: fmtPct(media), real: false };
 }
 
 export const investSchema = z.object({ cesta: z.enum(['conservadora', 'diversificada', 'agressiva']), valor: z.string().trim() });

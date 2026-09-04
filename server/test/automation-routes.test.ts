@@ -33,6 +33,7 @@ async function registerProInvestidor() {
 const FULL_SHAPE_KEYS = [
   'autoBidEnabled',
   'autoBidRules',
+  'ladder',
   'diversification',
   'sectorDiversification',
   'autoBidActivity',
@@ -54,9 +55,33 @@ describe('Automação de Lances routes respond with the full page shape, not a p
     const res = await request(app)
       .post('/api/automacao/rule')
       .set('Authorization', `Bearer ${inv.token}`)
-      .send({ field: 'taxaMax', value: '3,5' });
+      .send({ field: 'scoreMin', value: 'B' });
     expect(res.status).toBe(200);
-    expect(res.body.autoBidRules.taxaMax).toBe('3,5');
+    expect(res.body.autoBidRules.scoreMin).toBe('B');
+    for (const key of FULL_SHAPE_KEYS) expect(res.body).toHaveProperty(key);
+  });
+
+  // Achado corrigido: "taxa máxima a oferecer" era um teto de risco vestigial (o preço
+  // sempre foi calculado pelo servidor, nunca proposto pelo investidor) — substituído pela
+  // escada de lances por classe de rating (server/src/lib/autoBidLadder.ts).
+  it('POST /automacao/rule recusa o campo taxaMax removido', async () => {
+    const inv = await registerProInvestidor();
+    const res = await request(app)
+      .post('/api/automacao/rule')
+      .set('Authorization', `Bearer ${inv.token}`)
+      .send({ field: 'taxaMax', value: '3,5' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('validation_error');
+  });
+
+  it('POST /automacao/ladder', async () => {
+    const inv = await registerProInvestidor();
+    const res = await request(app)
+      .post('/api/automacao/ladder')
+      .set('Authorization', `Bearer ${inv.token}`)
+      .send({ rating: 'AA', field: 'taxaInicial', value: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body.ladder.AA.taxaInicial).toBe(3);
     for (const key of FULL_SHAPE_KEYS) expect(res.body).toHaveProperty(key);
   });
 

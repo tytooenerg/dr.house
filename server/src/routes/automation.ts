@@ -10,7 +10,11 @@ import { settlePurchase } from '../lib/settlement.js';
 import { computePurchasePrice } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { ratingFromScore, sectorFor } from '../lib/riscoCore.js';
-import type { UserRow, UserSettings } from '../db/types.js';
+import { currentFloor, nextStepAt, armLadder, getLadderBand } from '../lib/autoBidLadder.js';
+import type { UserRow, UserSettings, LadderConfig } from '../db/types.js';
+import type { Rating } from '../data/seed.js';
+
+const RATINGS: Rating[] = ['AA', 'A', 'B', 'C'];
 
 export const automationRouter = Router();
 automationRouter.use(requireAuth, requirePlan('pro'));
@@ -67,9 +71,16 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   const minOrder = SCORE_ORDER[settings.autoBidRules.scoreMin] || SCORE_ORDER.A;
   const passesScore = SCORE_ORDER[rating] >= minOrder;
 
+  // Achado corrigido: "taxa máxima a oferecer" era, na prática, um teto de risco
+  // (offerRate <= taxaMax) — o preço é sempre calculado pelo servidor, o investidor nunca
+  // propunha nada de verdade. A escada por classe inverte isso pra um PISO que decai com o
+  // tempo (offerRate >= piso atual): começa só aceitando o melhor deságio da classe, e
+  // relaxa a exigência a cada intervaloHoras sem compra, até o piso configurado
+  // (taxaAlvo) — ver lib/autoBidLadder.ts.
   const offerRate = parseFloat((offer.desagio ?? '0').replace('%', '').replace(',', '.')) || 0;
-  const taxaMax = parseFloat(settings.autoBidRules.taxaMax.replace(',', '.')) || Infinity;
-  const passesTaxa = offerRate <= taxaMax;
+  const ladderCfg = settings.autoBidLadder[rating];
+  const piso = currentFloor(ladderCfg, rating);
+  const passesTaxa = offerRate >= piso;
 
   const classAlloc = (settings.diversification as Record<string, number>)[rating] || 0;
   const passesDiversificacao = classAlloc > 0;
@@ -105,6 +116,8 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
     if (offer.cedente_id) {
       void deliverWebhookEvent(offer.cedente_id, 'pagamento.confirmado', { duplicataId: offer.id, valor: offer.valor, investorId: user.id });
     }
+    // Fechou um ciclo nesta classe — rearma a escada pra voltar a ser exigente na próxima.
+    updateSettings(user.id, { autoBidLadder: { ...settings.autoBidLadder, [rating]: { ...ladderCfg, ...armLadder() } } });
     addAutomationActivity(
       user.id,
       `Automação aplicada — compra de ${fmtBRL(offer.valor)} em ${offer.sacado_nome} a ${offer.desagio} (rating ${rating}), dentro de todos os parâmetros configurados`,
@@ -116,7 +129,7 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   const reason = !passesScore
     ? `rating ${rating} abaixo do mínimo configurado (${settings.autoBidRules.scoreMin})`
     : !passesTaxa
-      ? `deságio ${offer.desagio} acima da taxa máxima configurada (${settings.autoBidRules.taxaMax}%)`
+      ? `deságio ${offer.desagio} ainda abaixo do piso atual da escada pro rating ${rating} (${piso.toFixed(2).replace('.', ',')}%)`
       : !passesDiversificacao
         ? `classe de rating ${rating} está zerada na diversificação da carteira`
         : !passesSetor
@@ -125,6 +138,36 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
             ? `excederia o limite de exposição por sacado (${settings.autoBidRules.exposicaoSacado})`
             : `excederia o limite de exposição mensal (${settings.autoBidRules.exposicaoMensal})`;
   addAutomationActivity(user.id, `Oferta de ${offer.sacado_nome} (${fmtBRL(offer.valor)}) ignorada — ${reason}`, '#5B6472');
+}
+
+function fmtPct(n: number): string {
+  return n.toFixed(2).replace('.', ',') + '%';
+}
+
+// View da escada por classe — sempre recalculada na hora (currentFloor/nextStepAt são
+// funções puras de tempo decorrido, não dependem de nenhum job de fundo rodando).
+function buildLadderView(settings: UserSettings) {
+  const view = {} as Record<Rating, {
+    taxaInicial: number; taxaAlvo: number; decrementoPorEtapa: number; intervaloHoras: number;
+    pisoAtualFmt: string; proximaQuedaEm: string | null; bandaAoVivo: { minFmt: string; maxFmt: string };
+  }>;
+  for (const rating of RATINGS) {
+    const cfg = settings.autoBidLadder[rating];
+    const band = getLadderBand(rating);
+    const proxima = nextStepAt(cfg, rating);
+    view[rating] = {
+      // Valores crus (não formatados) — editáveis direto num input numérico no client,
+      // já resolvidos contra a banda ao vivo quando taxaInicial/taxaAlvo estão null.
+      taxaInicial: cfg.taxaInicial ?? band.max,
+      taxaAlvo: cfg.taxaAlvo ?? band.min,
+      decrementoPorEtapa: cfg.decrementoPorEtapa,
+      intervaloHoras: cfg.intervaloHoras,
+      pisoAtualFmt: fmtPct(currentFloor(cfg, rating)),
+      proximaQuedaEm: proxima ? proxima.toISOString() : null,
+      bandaAoVivo: { minFmt: fmtPct(band.min), maxFmt: fmtPct(band.max) },
+    };
+  }
+  return view;
 }
 
 // Every route below hands the client the exact same AutomationData shape the client's
@@ -141,6 +184,7 @@ function buildAutomationPayload(userId: number, settings: UserSettings) {
   return {
     autoBidEnabled: settings.autoBidEnabled,
     autoBidRules: settings.autoBidRules,
+    ladder: buildLadderView(settings),
     diversification: settings.diversification,
     sectorDiversification: settings.sectorDiversification,
     autoBidActivity: listAutomationActivity(userId).map((a) => ({ text: a.text, color: a.color, time: fmtRelative(a.created_at) })),
@@ -153,16 +197,28 @@ function buildAutomationPayload(userId: number, settings: UserSettings) {
 automationRouter.get('/', (req, res) => {
   const settings = getSettings(req.user!);
   maybeTick(req.user!, settings);
-  res.json(buildAutomationPayload(req.user!.id, settings));
+  // maybeTick pode ter rearmado a escada de uma classe (compra bem-sucedida) via
+  // updateSettings — relê do banco em vez de devolver o `settings` já desatualizado.
+  const latest = getSettings(req.user!);
+  res.json(buildAutomationPayload(req.user!.id, latest));
 });
 
 automationRouter.post('/toggle', (req, res) => {
   const settings = getSettings(req.user!);
-  const updated = updateSettings(req.user!.id, { autoBidEnabled: !settings.autoBidEnabled });
+  const turningOn = !settings.autoBidEnabled;
+  // Ligar a automação rearma toda classe em escopo (diversification > 0) — cada ciclo
+  // novo começa exigente, não retomando de onde uma sessão anterior tinha relaxado.
+  const ladder = turningOn
+    ? RATINGS.reduce(
+        (acc, r) => ({ ...acc, [r]: (settings.diversification as Record<string, number>)[r] > 0 ? { ...settings.autoBidLadder[r], ...armLadder() } : settings.autoBidLadder[r] }),
+        settings.autoBidLadder
+      )
+    : settings.autoBidLadder;
+  const updated = updateSettings(req.user!.id, { autoBidEnabled: turningOn, autoBidLadder: ladder });
   res.json(buildAutomationPayload(req.user!.id, updated));
 });
 
-const ruleSchema = z.object({ field: z.enum(['scoreMin', 'taxaMax', 'exposicaoSacado', 'exposicaoMensal']), value: z.string() });
+const ruleSchema = z.object({ field: z.enum(['scoreMin', 'exposicaoSacado', 'exposicaoMensal']), value: z.string() });
 
 automationRouter.post('/rule', (req, res) => {
   const parsed = ruleSchema.safeParse(req.body);
@@ -172,6 +228,40 @@ automationRouter.post('/rule', (req, res) => {
   }
   const settings = getSettings(req.user!);
   const updated = updateSettings(req.user!.id, { autoBidRules: { ...settings.autoBidRules, [parsed.data.field]: parsed.data.value } });
+  res.json(buildAutomationPayload(req.user!.id, updated));
+});
+
+// value: null em taxaInicial/taxaAlvo volta a usar a banda ao vivo (estimateRateBand) como
+// default — mesmo padrão de "campo nulo cai pro cálculo dinâmico" já usado por d.desagio.
+const ladderSchema = z.object({
+  rating: z.enum(['AA', 'A', 'B', 'C']),
+  field: z.enum(['taxaInicial', 'taxaAlvo', 'decrementoPorEtapa', 'intervaloHoras']),
+  value: z.number().nullable(),
+});
+
+automationRouter.post('/ladder', (req, res) => {
+  const parsed = ladderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const { rating, field, value } = parsed.data;
+  if ((field === 'decrementoPorEtapa' || field === 'intervaloHoras') && (value === null || value <= 0)) {
+    res.status(400).json({ error: 'validation_error', message: `${field} precisa ser um número maior que zero.` });
+    return;
+  }
+  const settings = getSettings(req.user!);
+  const cfg = settings.autoBidLadder[rating];
+  // Rearma ao editar — mudou a régua, o relógio desta classe recomeça do degrau mais exigente.
+  const updatedCfg: LadderConfig = { ...cfg, [field]: value, ...armLadder() };
+  const band = getLadderBand(rating);
+  const inicial = updatedCfg.taxaInicial ?? band.max;
+  const alvo = updatedCfg.taxaAlvo ?? band.min;
+  if (inicial < alvo) {
+    res.status(400).json({ error: 'validation_error', message: 'A taxa inicial precisa ser maior ou igual à taxa alvo — a escada só desce.' });
+    return;
+  }
+  const updated = updateSettings(req.user!.id, { autoBidLadder: { ...settings.autoBidLadder, [rating]: updatedCfg } });
   res.json(buildAutomationPayload(req.user!.id, updated));
 });
 
