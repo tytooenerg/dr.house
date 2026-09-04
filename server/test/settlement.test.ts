@@ -6,6 +6,7 @@ import { approveKyb } from '../src/db/users.js';
 import { platformFee, platformFeePct } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -13,6 +14,16 @@ beforeAll(async () => {
 
 function unique() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+// Achado corrigido (usuário): uma duplicata só pode ser leiloada/comprada depois que o
+// sacado aceita (explícito ou tácito) — routes/minhas.ts's dispararLeilao agora exige
+// isso. Direto no banco, mesmo padrão já usado pra simular aceite tácito — o objetivo
+// aqui é só destravar o leilão, não testar o fluxo de aceite em si (já coberto em
+// outros arquivos).
+function aceitarDuplicata(duplicataId: string) {
+  const aceite = getAceiteByDuplicata(duplicataId);
+  if (aceite) setAceiteStatus(aceite.id, 'aceita');
 }
 
 async function registerInvestidor() {
@@ -67,6 +78,7 @@ describe('real settlement on a marketplace purchase', () => {
 
     // The freshly-emitted duplicata isn't 'no_mercado' yet (needs the leilão disparado
     // via /api/minhas/:id/leilao) — dispatch it so the marketplace lists it for purchase.
+    aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
 
     const investor = await registerInvestidor();
@@ -113,6 +125,7 @@ describe('real settlement on a marketplace purchase', () => {
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).not.toBe('');
+    aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
 
     const { precoCompra } = computePurchasePrice(getDuplicata(duplicataId)!);
@@ -140,6 +153,7 @@ describe('real settlement on a marketplace purchase', () => {
         .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '20.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
       if (res.status === 200) duplicataId2 = res.body.duplicataId;
     }
+    aceitarDuplicata(duplicataId2);
     await request(app).post(`/api/minhas/${duplicataId2}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
     const buy2 = await request(app).post(`/api/market/${duplicataId2}/buy`).set('Authorization', `Bearer ${investor.token}`);
     expect(buy2.status).toBe(200);
@@ -211,6 +225,7 @@ describe('real settlement on a mercado secundário resale', () => {
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).toBeTruthy();
+    aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
 
     const originalBuyer = await registerInvestidor();

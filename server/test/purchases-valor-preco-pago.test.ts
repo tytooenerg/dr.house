@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb, updateKybForm, setInstitutionalReportingEnabled } from '../src/db/users.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { platformFee } from '../src/lib/settlement.js';
 
 // Achado corrigido: "Investido"/totalInvestido em routes/historico.ts,
@@ -48,6 +49,9 @@ async function emitirELeiloar(valor: string) {
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();
+  // Achado corrigido: buy agora exige aceite confirmado — este helper nunca disparava
+  // leilão (o /buy real não exige isso), então o único passo que falta é o aceite em si.
+  setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
   return duplicataId;
 }
 

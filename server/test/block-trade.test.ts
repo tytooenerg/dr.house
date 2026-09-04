@@ -7,6 +7,7 @@ import { fmtBRL, fmtBRLSigned } from '../src/lib/format.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 
 function parseBRL(s: string): number {
   return Number(s.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
@@ -58,6 +59,9 @@ async function sellerWithListing(askingValor: string, faceValor = '20.000') {
       .send({ sacado: `Sacado Block ${unique()} Ltda`, cnpj: '77.666.555/0001-44', valor: faceValor, vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
+  // Achado corrigido (usuário): dispararLeilao agora exige aceite confirmado — direto no
+  // banco, o objetivo aqui é só destravar o leilão pros testes de block trade.
+  setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
   const leilao = await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
   if (leilao.status !== 200) throw new Error(`leilão falhou: ${JSON.stringify(leilao.body)}`);
 

@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
 import { getProgramaBySacado } from '../src/db/confirming.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 
 beforeAll(async () => {
@@ -104,7 +105,11 @@ describe('Financiamento automático — cedente matriculado pula o leilão', () 
     const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
     const dup = minhas.body.duplicatas.find((d: { status: string }) => d.status === 'Aprovada');
     expect(dup).toBeDefined();
-    expect(dup.canDisparar).toBe(true);
+    // Achado corrigido: canDisparar também exige aceite confirmado do sacado.
+    setAceiteStatus(getAceiteByDuplicata(dup.id)!.id, 'aceita');
+    const minhasAfter = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
+    const dupAfter = minhasAfter.body.duplicatas.find((d: { id: string }) => d.id === dup.id);
+    expect(dupAfter.canDisparar).toBe(true);
   });
 
   it('a paused program never auto-funds, even for an enrolled cedente', async () => {
@@ -141,7 +146,11 @@ describe('Financiamento automático — cedente matriculado pula o leilão', () 
     const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
     const dup = minhas.body.duplicatas.find((d: { status: string }) => d.status === 'Aprovada');
     expect(dup).toBeDefined();
-    expect(dup.canDisparar).toBe(true);
+    // Achado corrigido: canDisparar também exige aceite confirmado do sacado.
+    setAceiteStatus(getAceiteByDuplicata(dup.id)!.id, 'aceita');
+    const minhasAfter = await request(app).get('/api/minhas').set('Authorization', `Bearer ${cedenteToken}`);
+    const dupAfter = minhasAfter.body.duplicatas.find((d: { id: string }) => d.id === dup.id);
+    expect(dupAfter.canDisparar).toBe(true);
   });
 
   it('respects the program limit — over it, falls back to the normal flow instead of over-financing', async () => {

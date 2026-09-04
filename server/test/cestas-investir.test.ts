@@ -6,6 +6,7 @@ import { approveKyb } from '../src/db/users.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { fmtBRLSigned } from '../src/lib/format.js';
 
 // lib/cestasCore.ts's investInBasket reusa computePurchasePrice/settlePurchase/
@@ -72,6 +73,7 @@ async function emitirDuplicata(cedenteToken: string, sacadoCompany: string, valo
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();
+  setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
   const leilao = await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
   expect(leilao.status).toBe(200);
   return duplicataId;

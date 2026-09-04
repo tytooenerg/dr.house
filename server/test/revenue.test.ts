@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb, updateKybForm } from '../src/db/users.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { platformFee } from '../src/lib/settlement.js';
 
 // lib/revenue.ts's getRealPlatformFees usava recomputar platformFee(purchases.valor) do
@@ -60,6 +61,7 @@ async function emitirELeiloar(cedenteToken: string, valor: string) {
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();
+  setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
   return duplicataId;
 }
 

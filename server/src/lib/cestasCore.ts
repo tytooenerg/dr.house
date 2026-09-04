@@ -29,10 +29,13 @@ function ratingForOffer(d: DuplicataRow): Rating {
   return 'C';
 }
 
+// Achado corrigido: uma duplicata só pode ser negociada depois que o sacado aceita
+// (explícito ou tácito) — antes só se excluía 'contestada', 'aguardando' passava
+// normalmente. Defesa em profundidade além do bloqueio em dispararLeilao.
 function isBuyable(d: DuplicataRow): boolean {
   if (isPurchased(d.id)) return false;
   const aceite = getAceiteByDuplicata(d.id);
-  return aceite?.status !== 'contestada';
+  return aceite?.status === 'aceita';
 }
 
 export const investSchema = z.object({ cesta: z.enum(['conservadora', 'diversificada', 'agressiva']), valor: z.string().trim() });

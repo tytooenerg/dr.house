@@ -50,7 +50,10 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   const candidates = listMarketplace().filter((d) => {
     if (d.status !== 'no_mercado') return false;
     if (isPurchased(d.id)) return false;
-    if (getAceiteByDuplicata(d.id)?.status === 'contestada') return false;
+    // Achado corrigido: exige aceite confirmado (explícito ou tácito), não só
+    // "diferente de contestada" — defesa em profundidade além do bloqueio em
+    // dispararLeilao (routes/minhas.ts).
+    if (getAceiteByDuplicata(d.id)?.status !== 'aceita') return false;
     return !seen.has(d.id);
   });
   if (candidates.length === 0) return;

@@ -27,6 +27,14 @@ function unique(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+// Achado corrigido (usuário): uma duplicata só pode ser leiloada/negociada depois que o
+// sacado aceita (explícito ou tácito) — routes/minhas.ts's dispararLeilao agora exige
+// isso. Direto no banco (mesmo padrão já usado neste arquivo pra simular aceite tácito)
+// nos testes que só precisam destravar o leilão, não exercitar o fluxo de aceite em si.
+function aceitarDuplicata(duplicataId: string) {
+  db.prepare("UPDATE aceites SET status = 'aceita' WHERE duplicata_id = ?").run(duplicataId);
+}
+
 async function register(role: 'cedente' | 'sacado' | 'investidor', companyName: string) {
   const email = `${unique(role)}@example.com`;
   const res = await request(app).post('/api/auth/register').send({ nome: 'Teste', email, password: 'senha123', companyName, role });
@@ -65,7 +73,7 @@ async function registrarInvestidorAprovado(companyName: string) {
 }
 
 describe('Operação completa — 6 papéis numa única cadeia real', () => {
-  it('cedente emite e segura (pré-venda) → leiloa → investidor A compra → sacado aceita → investidor A revende → investidor B paga no vencimento → auditor vê tudo', async () => {
+  it('cedente emite → sacado aceita → segura pré-venda → leiloa → investidor A compra → investidor A revende → investidor B paga no vencimento → auditor vê tudo', async () => {
     const sacadoCompany = unique('Sacado Full');
     const cedente = await register('cedente', unique('Cedente Full'));
     const investidorA = await registrarInvestidorAprovado(unique('Fundo A Full'));
@@ -84,7 +92,17 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     expect(emit.status).toBe(200);
     const duplicataId = emit.body.duplicataId as string;
 
-    // 2. INVESTIDOR A contrata seguro ENQUANTO a duplicata ainda não foi vendida — depois
+    // 2. SACADO aceita explicitamente — achado corrigido (usuário): uma duplicata só
+    // pode ser leiloada/negociada DEPOIS do aceite confirmado, nunca antes. O caminho
+    // feliz de verdade é aceite primeiro, tudo o resto depois.
+    const sacado = await register('sacado', sacadoCompany);
+    const aceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacado.token}`);
+    const aceite = aceites.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
+    expect(aceite).toBeTruthy();
+    const decide = await request(app).post(`/api/aceites/${aceite.id}/status`).set('Authorization', `Bearer ${sacado.token}`).send({ status: 'aceita' });
+    expect(decide.status).toBe(200);
+
+    // 3. INVESTIDOR A contrata seguro ENQUANTO a duplicata ainda não foi vendida — depois
     // do fix de H1, essa é a única janela em que contratar seguro é aceito (a apólice
     // cobre o risco de "o cedente nunca ser pago pelo mercado", que deixa de existir assim
     // que a venda acontece).
@@ -95,12 +113,12 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     const premioCreditado = seguradoraExtratoAntes.body.extrato.some((e: { descricao: string }) => e.descricao.includes(duplicataId));
     expect(premioCreditado).toBe(true);
 
-    // 3. CEDENTE dispara o leilão.
+    // 4. CEDENTE dispara o leilão — só funciona porque o aceite já foi confirmado.
     const leilao = await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
     expect(leilao.status).toBe(200);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
 
-    // 4. INVESTIDOR A compra — extrato de ambos os lados confere o movimento real.
+    // 5. INVESTIDOR A compra — extrato de ambos os lados confere o movimento real.
     const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
     expect(buy.status).toBe(200);
     expect(getDuplicata(duplicataId)!.status).toBe('vendida');
@@ -112,14 +130,6 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     const cedenteExtrato = await request(app).get('/api/account').set('Authorization', `Bearer ${cedente.token}`);
     const creditoVenda = cedenteExtrato.body.extrato.find((e: { descricao: string; isPositive: boolean }) => e.descricao.includes(duplicataId) && e.isPositive);
     expect(creditoVenda).toBeTruthy();
-
-    // 5. SACADO aceita explicitamente.
-    const sacado = await register('sacado', sacadoCompany);
-    const aceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${sacado.token}`);
-    const aceite = aceites.body.aceites.find((a: { duplicataId: string }) => a.duplicataId === duplicataId);
-    expect(aceite).toBeTruthy();
-    const decide = await request(app).post(`/api/aceites/${aceite.id}/status`).set('Authorization', `Bearer ${sacado.token}`).send({ status: 'aceita' });
-    expect(decide.status).toBe(200);
 
     // 6. INVESTIDOR A revende no secundário; INVESTIDOR B compra.
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${investidorA.token}`);
@@ -194,6 +204,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
+    aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
 
     // O investidor compra — status vira 'vendida'.
@@ -242,6 +253,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
+    aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
     const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
     expect(buy.status).toBe(200);
@@ -342,6 +354,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
+    aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
     await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
 

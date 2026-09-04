@@ -1,5 +1,6 @@
 import { getDuplicata, isPurchased, createPurchase, listPurchasesByInvestor } from '../../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../../db/aceites.js';
+import { aceiteConfirmado } from '../aceiteCore.js';
 import { getUserById, getSettings } from '../../db/users.js';
 import { settlePurchase } from '../settlement.js';
 import { computePurchasePrice } from '../marketCompute.js';
@@ -78,6 +79,10 @@ export const autoBidAgent: AgentDefinition = {
         const offer = getDuplicata(input.duplicataId);
         if (!offer) throw new Error('Oferta não encontrada.');
         if (isPurchased(offer.id)) throw new Error('Oferta já foi comprada.');
+        // Achado corrigido: este handler nunca checava o aceite do sacado, nem sequer
+        // 'contestada' — uma duplicata só pode ser negociada depois que o sacado aceita
+        // (explícito ou tácito). Mesmo padrão de erro do fluxo manual (routes/market.ts).
+        if (!aceiteConfirmado(offer.id)) throw new Error('Aguardando aceite do sacado (ou o prazo tácito vencer) antes de poder comprar esta duplicata.');
         const { precoCompra } = computePurchasePrice(offer);
         createPurchase(offer.id, input.userId, offer.valor, offer.desagio ?? '', Math.round(offer.valor - precoCompra));
         settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: input.userId, cedenteId: offer.cedente_id, valor: offer.valor, precoCompra });

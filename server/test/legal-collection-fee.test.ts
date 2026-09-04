@@ -113,14 +113,14 @@ describe('Fee de sucesso — cobrança jurídica', () => {
     const cedente = await registerCedente(`Fornecedora Vendida ${unique()} Ltda`);
     const emitted = await submitEmitir(cedente, { vencimento: '2020-03-20', sacado: 'Metalúrgica Serrana S.A.', cnpj: '23.456.789/0001-01' });
 
+    const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
+    setAceiteStatus(aceite.id, 'aceita');
+
     const leilao = await request(app).post(`/api/minhas/${emitted.duplicataId}/leilao`).set('Authorization', `Bearer ${cedente}`);
     expect(leilao.status).toBe(200);
 
     const buy = await request(app).post(`/api/market/${emitted.duplicataId}/buy`).set('Authorization', `Bearer ${investor}`);
     expect(buy.status).toBe(200);
-
-    const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
-    setAceiteStatus(aceite.id, 'aceita');
 
     const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
     expect(recover.status).toBe(200);
@@ -156,15 +156,15 @@ describe('Fee de sucesso — cobrança jurídica', () => {
       valor: '200.000',
     });
 
+    const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
+    setAceiteStatus(aceite.id, 'aceita');
+
     const investor = await investorToken();
     const fracionar = await request(app)
       .post(`/api/market/${emitted.duplicataId}/fracionar`)
       .set('Authorization', `Bearer ${investor}`)
       .send({ tokens: 10 });
     expect(fracionar.status).toBe(200);
-
-    const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
-    setAceiteStatus(aceite.id, 'aceita');
 
     const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
     expect(recover.status).toBe(409);

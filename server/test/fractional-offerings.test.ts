@@ -4,7 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { createDuplicata, getDuplicata } from '../src/db/duplicatas.js';
-import { ensureAceite } from '../src/db/aceites.js';
+import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { FRACTIONAL_MIN_VALOR, FRACTIONAL_TOTAL_TOKENS } from '../src/lib/fractionalOfferings.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 
@@ -25,8 +25,12 @@ async function registerInvestidor() {
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }
 
+// Achado corrigido: fracionar/comprar exige aceite confirmado — createDuplicata sozinho
+// não cria nenhum registro de aceite, então toda duplicata criada direto aqui (sem passar
+// pela rota HTTP de emissão) precisa do aceite avançado manualmente pro estado 'aceita'
+// pra continuar elegível.
 function makeLargeDuplicata(valor = 300000) {
-  return createDuplicata({
+  const d = createDuplicata({
     cedenteId: null,
     cedenteNome: 'Cedente Grande Ltda',
     sacadoNome: 'Fractional Test Sacado',
@@ -38,6 +42,9 @@ function makeLargeDuplicata(valor = 300000) {
     lastroPct: 100,
     seguro: false,
   });
+  const aceite = ensureAceite(d.id, 'Aceite confirmado na emissão');
+  setAceiteStatus(aceite.id, 'aceita');
+  return d;
 }
 
 async function registerCedente(companyName: string) {
@@ -190,7 +197,7 @@ describe('Fractional offerings — pagamento no vencimento distribuído entre os
       lastroPct: 100,
       seguro: false,
     });
-    ensureAceite(d.id, '15 dias úteis restantes');
+    setAceiteStatus(ensureAceite(d.id, '15 dias úteis restantes').id, 'aceita');
 
     const investorA = await registerInvestidor(); // vai comprar 60 tokens
     const investorB = await registerInvestidor(); // vai comprar 40 tokens
@@ -245,7 +252,7 @@ describe('Fractional offerings — pagamento no vencimento distribuído entre os
       lastroPct: 100,
       seguro: false,
     });
-    ensureAceite(d.id, '15 dias úteis restantes');
+    setAceiteStatus(ensureAceite(d.id, '15 dias úteis restantes').id, 'aceita');
 
     const investor = await registerInvestidor();
     // Só 40 dos 100 tokens vendidos — a oferta fica 'aberta', a duplicata nunca vira

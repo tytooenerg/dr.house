@@ -133,8 +133,14 @@ export function buildOfferView(d: DuplicataRow) {
     scoreBg: sc === COLORS.GREEN ? '#EAF3EE' : sc === COLORS.AMBER ? '#FBF1E0' : '#F7E9E7',
     scoreColor: sc,
     isBought: bought,
-    btnLabel: bought ? 'Comprada' : aceiteStatus === 'contestada' ? 'Bloqueada' : 'Comprar',
-    canBuy: !bought && aceiteStatus !== 'contestada',
+    // Achado corrigido: uma duplicata só pode ser negociada depois que o sacado aceita
+    // (explícito ou tácito) — canBuy/btnLabel refletiam só "não contestada". Na prática,
+    // uma oferta com status 'no_mercado' hoje já implica aceite confirmado (dispararLeilao
+    // exige isso antes de sair de 'aprovada'), então 'aguardando' aqui só apareceria por
+    // dado legado/seed inconsistente — mantido como defesa em profundidade e pra não
+    // prometer "Comprar" num estado que o backend recusaria.
+    btnLabel: bought ? 'Comprada' : aceiteStatus === 'contestada' ? 'Bloqueada' : aceiteStatus !== 'aceita' ? 'Aguardando aceite' : 'Comprar',
+    canBuy: !bought && aceiteStatus === 'aceita',
     bidCount: bids.length,
     bids,
     countdown,

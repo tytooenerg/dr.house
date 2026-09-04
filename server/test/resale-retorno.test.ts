@@ -6,6 +6,7 @@ import { approveKyb } from '../src/db/users.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
+import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { fmtBRLSigned } from '../src/lib/format.js';
 
 // Achado ao simular o mercado secundário de ponta a ponta: revender uma posição antes do
@@ -57,6 +58,7 @@ async function emitirEComprar(valor: string, buyer: { token: string }) {
   expect(duplicataId).toBeTruthy();
 
   const precoCompra = computePurchasePrice(getDuplicata(duplicataId)!).precoCompra;
+  setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
   const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${buyer.token}`);
   expect(buy.status).toBe(200);
 
