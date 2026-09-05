@@ -26,7 +26,7 @@ export function Input({ className = '', mono = false, ...props }: InputHTMLAttri
 export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`px-3.5 py-3 rounded-lg border border-inputBorder outline-none text-[13.5px] bg-white cursor-pointer ${className}`}
+      className={`px-3.5 py-3 rounded-lg border border-inputBorder outline-none text-[13px] bg-white cursor-pointer ${className}`}
       {...props}
     />
   );

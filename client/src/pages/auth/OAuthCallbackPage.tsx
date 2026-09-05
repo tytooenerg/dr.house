@@ -41,10 +41,10 @@ export function OAuthCallbackPage() {
         {error ? (
           <>
             <div className="text-xl font-extrabold mb-2">Não foi possível entrar</div>
-            <div className="text-textSecondary text-[13.5px]">{error}</div>
+            <div className="text-textSecondary text-[13px]">{error}</div>
           </>
         ) : (
-          <div className="text-textSecondary text-[13.5px]">Entrando com sua conta Google…</div>
+          <div className="text-textSecondary text-[13px]">Entrando com sua conta Google…</div>
         )}
       </div>
     </div>

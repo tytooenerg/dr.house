@@ -113,7 +113,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
         <div key={p.id} className="bg-white border border-border rounded-card p-6">
           <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
             <div>
-              <div className="font-bold text-[16px]">{p.companyName}</div>
+              <div className="font-bold text-[15px]">{p.companyName}</div>
               <div className="text-textSecondary text-[13px]">
                 {p.nome} · {p.email}
               </div>
@@ -176,7 +176,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
               <div className="text-[12.5px] text-textSecondary whitespace-pre-wrap">{p.aiTriage.summary || 'Investigação em andamento…'}</div>
               {p.aiTriage.pendingActionId && (
                 <div className="flex items-center gap-2 mt-3">
-                  <span className="text-[12px] font-bold">
+                  <span className="text-[12.5px] font-bold">
                     A IA recomenda: {p.aiTriage.pendingActionTool === 'aprovar_kyb' ? 'aprovar' : 'rejeitar'} — confirmar?
                   </span>
                   <Button size="sm" disabled={decidingTriageId === p.aiTriage.pendingActionId} onClick={() => decideAiTriage(p.aiTriage!.pendingActionId!, 'approve')}>
@@ -212,7 +212,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
                       <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className="text-[11px] font-bold px-2.5 py-1 rounded-md"
+                            className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
                             style={
                               s.classificacao === 'profissional' ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.hairline, color: PALETTE.textSecondary }
                             }
@@ -220,19 +220,19 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
                             {s.classificacao === 'profissional' ? 'Investidor profissional' : 'Não classificado'}
                           </span>
                           <span
-                            className="text-[11px] font-bold px-2.5 py-1 rounded-md"
+                            className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
                             style={s.jurisdicaoFavorecida ? { background: PALETTE.redBg, color: PALETTE.red } : { background: PALETTE.greenBg, color: PALETTE.green }}
                           >
                             {s.jurisdicaoFavorecida ? 'Jurisdição de tributação favorecida' : 'IRRF zero elegível (sujeito a confirmação jurídica)'}
                           </span>
                           <span
-                            className="text-[11px] font-bold px-2.5 py-1 rounded-md"
+                            className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
                             style={s.pldStatus === 'flagged' ? { background: PALETTE.redBg, color: PALETTE.red } : { background: PALETTE.greenBg, color: PALETTE.green }}
                           >
                             PLD: {s.pldStatus === 'flagged' ? 'correspondência encontrada' : 'sem correspondência'}
                           </span>
                         </div>
-                        <span className="text-[11px] text-textTertiary">{s.quando}</span>
+                        <span className="text-[11.5px] text-textTertiary">{s.quando}</span>
                       </div>
                       <pre className="text-[11.5px] text-textSecondary whitespace-pre-wrap font-sans leading-relaxed">{s.memo}</pre>
                     </div>

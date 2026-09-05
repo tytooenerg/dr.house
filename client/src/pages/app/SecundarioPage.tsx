@@ -199,10 +199,10 @@ export function SecundarioPage() {
             {data.minhasPosicoes.map((p) => (
               <div key={p.purchaseId} className="bg-surface border border-border rounded-lg px-3.5 py-3">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="font-semibold text-[13.5px]">{p.sacado}</div>
+                  <div className="font-semibold text-[13px]">{p.sacado}</div>
                   <div className="text-textTertiary text-[11.5px]">{p.diasRestantes}d até vencer</div>
                 </div>
-                <div className="text-textSecondary text-[12px] mb-2.5">Pago: {p.valorPagoFmt} · vence {p.vencimento}</div>
+                <div className="text-textSecondary text-[12.5px] mb-2.5">Pago: {p.valorPagoFmt} · vence {p.vencimento}</div>
                 <div className="flex items-center gap-2">
                   <Input
                     placeholder="Preço de venda"
@@ -222,7 +222,7 @@ export function SecundarioPage() {
           {data.meusAnuncios.length > 0 && (
             <>
               <div className="h-px bg-hairline my-4" />
-              <div className="font-bold text-[13.5px] mb-2.5">Seus anúncios</div>
+              <div className="font-bold text-[13px] mb-2.5">Seus anúncios</div>
               <div className="flex flex-col gap-2.5">
                 {data.meusAnuncios.map((a) => (
                   <div key={a.id} className="text-[12.5px]">
@@ -279,7 +279,7 @@ export function SecundarioPage() {
           {data.meusLances.length > 0 && (
             <>
               <div className="h-px bg-hairline my-4" />
-              <div className="font-bold text-[13.5px] mb-2.5">Seus lances</div>
+              <div className="font-bold text-[13px] mb-2.5">Seus lances</div>
               <div className="flex flex-col gap-1.5">
                 {data.meusLances.map((b) => (
                   <div key={b.id} className="flex items-center justify-between text-[12.5px]">
@@ -318,10 +318,10 @@ export function SecundarioPage() {
             {sortedMarket.map((l) => (
               <div key={l.id} className="bg-surface border border-border rounded-lg px-3.5 py-3">
                 <div className="flex items-center justify-between mb-1">
-                  <div className="font-semibold text-[13.5px]">{l.sacado}</div>
+                  <div className="font-semibold text-[13px]">{l.sacado}</div>
                   <div className="text-textTertiary text-[11.5px]">{l.diasRestantes}d até vencer</div>
                 </div>
-                <div className="text-textSecondary text-[12px] mb-1">
+                <div className="text-textSecondary text-[12.5px] mb-1">
                   Preço original {l.valorOriginalFmt} → agora {l.precoFmt} ({l.variacaoPct > 0 ? '+' : ''}
                   {l.variacaoPct}%)
                 </div>
@@ -385,7 +385,7 @@ export function SecundarioPage() {
         {data.meusBlockTrades.length > 0 && (
           <>
             <div className="h-px bg-hairline my-3.5" />
-            <div className="font-bold text-[13.5px] mb-2.5">Histórico de block trades</div>
+            <div className="font-bold text-[13px] mb-2.5">Histórico de block trades</div>
             <div className="flex flex-col gap-2">
               {data.meusBlockTrades.map((bt) => (
                 <div key={bt.id} className="bg-surface border border-border rounded-lg px-3.5 py-2.5 text-[12.5px]">

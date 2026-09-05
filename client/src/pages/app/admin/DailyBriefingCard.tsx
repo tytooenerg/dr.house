@@ -51,7 +51,7 @@ export function DailyBriefingCard({ onNavigate }: { onNavigate: (tab: string) =>
   // Card puramente informativo — uma falha aqui não deve travar o resto do back-office, mas
   // também não pode desaparecer em silêncio como se não houvesse nada pendente hoje.
   if (loadError) {
-    return <div className="bg-white border border-border rounded-card px-4 py-3 mb-4 text-[12px] text-red">Não foi possível carregar o resumo do dia: {loadError}</div>;
+    return <div className="bg-white border border-border rounded-card px-4 py-3 mb-4 text-[12.5px] text-red">Não foi possível carregar o resumo do dia: {loadError}</div>;
   }
 
   if (!briefing || briefing.items.length === 0) return null;
@@ -63,7 +63,7 @@ export function DailyBriefingCard({ onNavigate }: { onNavigate: (tab: string) =>
         const tab = tabFor(item.label);
         const chip = (
           <span
-            className="text-[12px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap"
+            className="text-[12.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap"
             style={{ background: `${SEVERITY_COLOR[item.severity]}18`, color: SEVERITY_COLOR[item.severity] }}
           >
             {item.count} {item.label.toLowerCase()}

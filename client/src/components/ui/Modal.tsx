@@ -49,7 +49,7 @@ export function Table({ children }: { children: React.ReactNode }) {
 export function TableHead({ columns, labels }: { columns: string; labels: string[] }) {
   return (
     <div
-      className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-[12px] font-bold text-textSecondary uppercase tracking-wide"
+      className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-[12.5px] font-bold text-textSecondary uppercase tracking-wide"
       style={{ gridTemplateColumns: columns }}
     >
       {labels.map((l) => (

@@ -84,7 +84,7 @@ export function AceitePage() {
                   {a.statusLabel}
                 </span>
                 {a.slaDiasRestantes !== null && (
-                  <span className="text-[11px] font-semibold" style={{ color: a.slaVencido ? PALETTE.red : PALETTE.amber }}>
+                  <span className="text-[11.5px] font-semibold" style={{ color: a.slaVencido ? PALETTE.red : PALETTE.amber }}>
                     {a.slaVencido ? 'Prazo legal vencido' : `${a.slaDiasRestantes}d restantes`}
                   </span>
                 )}

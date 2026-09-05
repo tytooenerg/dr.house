@@ -75,7 +75,7 @@ export function SacadoPage() {
         <div className="text-textSecondary text-sm mt-1">Visão que a empresa pagadora vê ao entrar na Lastro para confirmar ou contestar duplicatas emitidas contra ela</div>
       </div>
       <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-chip text-blue text-[12.5px] font-bold mb-6">
-        <span className="w-[22px] h-[22px] rounded-full bg-blue text-white flex items-center justify-center text-[10px]">
+        <span className="w-[22px] h-[22px] rounded-full bg-blue text-white flex items-center justify-center text-[10.5px]">
           {user?.companyName.slice(0, 2).toUpperCase()}
         </span>
         Logado como: {user?.companyName} (sacado)

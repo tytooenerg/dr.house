@@ -178,7 +178,7 @@ function LoteEmissaoCard() {
           </div>
           <div className="flex flex-col gap-1.5">
             {outcome.resultados.map((r) => (
-              <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md" style={{ background: r.ok ? PALETTE.greenBg : PALETTE.redBg }}>
+              <div key={r.index} className="flex items-center justify-between text-[12.5px] px-2.5 py-1.5 rounded-md" style={{ background: r.ok ? PALETTE.greenBg : PALETTE.redBg }}>
                 <span className="font-semibold">{r.sacado || `linha ${r.index + 1}`}</span>
                 <span style={{ color: r.ok ? PALETTE.green : PALETTE.red }}>{r.ok ? `Registrada — ${r.registro}` : r.error}</span>
               </div>
@@ -291,7 +291,7 @@ export function EmitirPage() {
             <div className="w-6 h-6 rounded-full border-[3px] border-green" />
           </div>
           <div className="font-extrabold text-lg">Duplicata registrada com sucesso</div>
-          <div className="text-textSecondary text-[13.5px] mt-2">
+          <div className="text-textSecondary text-[13px] mt-2">
             {`Registro escritural nº ${result.registro} confirmado na ${result.registradora}. Status: enviada ao Marketplace.`}
           </div>
           <div className="flex justify-center gap-2.5 mt-5.5">
@@ -353,7 +353,7 @@ export function EmitirPage() {
             }}
           />
           <button type="button" onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
-            <div className="font-bold text-[13.5px]">{nfAnexada ? 'NF-e anexada ✓' : uploading ? 'Enviando…' : 'Anexar NF-e (XML, PDF ou imagem)'}</div>
+            <div className="font-bold text-[13px]">{nfAnexada ? 'NF-e anexada ✓' : uploading ? 'Enviando…' : 'Anexar NF-e (XML, PDF ou imagem)'}</div>
             <div className="text-textSecondary text-[12.5px] mt-1">
               {nfAnexada ? 'Sacado, CNPJ, valor e vencimento extraídos automaticamente por IA' : 'Lastro fiscal necessário para registro escritural — clique para enviar o arquivo'}
             </div>
@@ -384,7 +384,7 @@ export function EmitirPage() {
 
           <div className="flex items-center justify-between p-3.5 rounded-[10px] bg-surface">
             <div>
-              <div className="font-bold text-[13.5px]">Contratar seguro sobre o recebível</div>
+              <div className="font-bold text-[13px]">Contratar seguro sobre o recebível</div>
               <div className="text-textSecondary text-xs mt-0.5">Protege o investidor contra inadimplência do sacado — prêmio de 0,6% do valor</div>
             </div>
             <Toggle on={form.seguro} onClick={() => setField('seguro', !form.seguro)} />
@@ -399,7 +399,7 @@ export function EmitirPage() {
         <div className="flex flex-col gap-4">
           <Card>
             <div className="flex items-center justify-between mb-1">
-              <div className="font-bold text-[14.5px]">Checklist de lastro</div>
+              <div className="font-bold text-[14px]">Checklist de lastro</div>
               <div className="text-[13px] font-extrabold" style={{ color: preview?.lastroChecklist.color }}>
                 {preview?.lastroChecklist.pct ?? 0}%
               </div>
@@ -436,7 +436,7 @@ export function EmitirPage() {
                   <div key={m.sacadoNome} className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface">
                     <div>
                       <div className="font-semibold text-[12.5px]">{m.sacadoNome}</div>
-                      {!m.programaAtivo && <div className="text-textSecondary text-[11px]">Programa pausado no momento</div>}
+                      {!m.programaAtivo && <div className="text-textSecondary text-[11.5px]">Programa pausado no momento</div>}
                     </div>
                     <div className="font-bold font-mono-num text-[12.5px]">{m.taxaAmFmt}</div>
                   </div>
@@ -447,7 +447,7 @@ export function EmitirPage() {
 
           <Card className="px-6 py-5">
             <div className="font-bold text-sm mb-1">Limite pré-aprovado</div>
-            <div className="text-[22px] font-extrabold text-blue mb-1">{fmtBRL(preview?.preApprovedLimit ?? 40000)}</div>
+            <div className="text-[20px] font-extrabold text-blue mb-1">{fmtBRL(preview?.preApprovedLimit ?? 40000)}</div>
             <div className="text-textSecondary text-xs leading-snug">Com base no seu Checklist de Lastro atual e histórico de sacados já usados na plataforma</div>
           </Card>
 
@@ -468,8 +468,8 @@ export function EmitirPage() {
           </Card>
 
           <NavyCard className="px-6.5 py-6.5">
-            <div className="font-bold text-[14.5px] mb-4">Resumo do registro</div>
-            <div className="flex flex-col gap-3 text-[13.5px]">
+            <div className="font-bold text-[14px] mb-4">Resumo do registro</div>
+            <div className="flex flex-col gap-3 text-[13px]">
               <div className="flex justify-between">
                 <span className="text-onNavy">Valor da duplicata</span>
                 <span className="font-bold font-mono-num">{preview?.emitSummary.valorFmt ?? '—'}</span>

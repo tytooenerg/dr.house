@@ -129,7 +129,7 @@ export function DocsPage() {
 
       <div className="px-14 py-16 max-w-[900px]">
         <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Referência da API</div>
-        <div className="text-[38px] font-extrabold tracking-tight leading-tight">Documentação da Lastro Partner API</div>
+        <div className="text-[34px] font-extrabold tracking-tight leading-tight">Documentação da Lastro Partner API</div>
         <div className="text-base text-textSecondary mt-4 leading-relaxed">
           Esta página renderiza a especificação OpenAPI real, servida ao vivo em{' '}
           <a href="/api/v1/openapi.json" target="_blank" rel="noreferrer" className="text-blue font-semibold">
@@ -184,11 +184,11 @@ export function DocsPage() {
               </div>
             ))}
           </div>
-          <div className="text-textTertiary text-[12px] mt-2">Uma requisição além do limite retorna 429 com cabeçalhos padrão de rate limit.</div>
+          <div className="text-textTertiary text-[12.5px] mt-2">Uma requisição além do limite retorna 429 com cabeçalhos padrão de rate limit.</div>
         </div>
         <div>
           <div className="font-bold text-lg mb-3">Webhooks</div>
-          <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">
+          <div className="text-textSecondary text-[13px] leading-relaxed mb-3">
             Cada entrega é um POST assinado (HMAC-SHA256 sobre o corpo, cabeçalho <code className="font-mono-num">X-Lastro-Signature</code>), com retry
             (imediato / 30s / 5min / 30min) e log de entregas visível em Desenvolvedores.
           </div>
@@ -204,7 +204,7 @@ export function DocsPage() {
 
       <div className="px-14 pb-10 max-w-[900px]">
         <div className="font-bold text-lg mb-2">Estabilidade e versionamento</div>
-        <div className="text-textSecondary text-[13.5px] leading-relaxed">
+        <div className="text-textSecondary text-[13px] leading-relaxed">
           <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">/v1</code> nunca foi descontinuada — nenhum parceiro jamais recebeu um aviso de
           migração. Se um dia isso mudar, uma futura <code className="font-mono-num">/v2</code> coexistirá com <code className="font-mono-num">/v1</code>{' '}
           por no mínimo 12 meses antes de qualquer desligamento, e toda resposta de <code className="font-mono-num">/v1</code> passará a carregar
@@ -216,7 +216,7 @@ export function DocsPage() {
 
       <div className="px-14 pb-10 max-w-[900px]">
         <div className="font-bold text-lg mb-2">Idempotência</div>
-        <div className="text-textSecondary text-[13.5px] leading-relaxed">
+        <div className="text-textSecondary text-[13px] leading-relaxed">
           Todo endpoint de mutação aceita um cabeçalho opcional <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">Idempotency-Key</code>.
           Reenviar a mesma chave com o mesmo corpo replica a resposta original em vez de repetir o efeito colateral (emitir de novo, decidir de novo);
           reenviar com um corpo diferente retorna <code className="font-mono-num">409</code>. Mesmo contrato que o Stripe usa.
@@ -226,7 +226,7 @@ export function DocsPage() {
       <div className="px-14 py-12 bg-surface border-t border-b border-hairline">
         <div className="max-w-[900px]">
           <div className="font-bold text-xl mb-1">Endpoints</div>
-          <div className="text-textSecondary text-[13.5px] mb-6">
+          <div className="text-textSecondary text-[13px] mb-6">
             Gerado ao vivo a partir da especificação real — {spec ? `${Object.keys(spec.paths).length} rotas documentadas` : 'carregando…'}.
           </div>
           {error && <div className="text-red text-[13px] font-semibold">{error}</div>}
@@ -252,7 +252,7 @@ export function DocsPage() {
                       {op.description && <div className="text-textSecondary text-[12.5px] leading-relaxed mb-3">{op.description}</div>}
                       {op.parameters && op.parameters.filter((p) => p.name !== undefined && p.in === 'path').length > 0 && (
                         <div className="mb-3">
-                          <div className="text-[11px] font-bold text-textTertiary uppercase mb-1.5">Parâmetros de rota</div>
+                          <div className="text-[11.5px] font-bold text-textTertiary uppercase mb-1.5">Parâmetros de rota</div>
                           {op.parameters
                             .filter((p) => p.in === 'path')
                             .map((p) => (
@@ -264,7 +264,7 @@ export function DocsPage() {
                       )}
                       {props && (
                         <div className="mb-3">
-                          <div className="text-[11px] font-bold text-textTertiary uppercase mb-1.5">Corpo da requisição</div>
+                          <div className="text-[11.5px] font-bold text-textTertiary uppercase mb-1.5">Corpo da requisição</div>
                           <CodeBlock>{paramExample(props)}</CodeBlock>
                           <div className="text-[11.5px] text-textTertiary mt-1">
                             Obrigatório(s): {required.length > 0 ? required.join(', ') : '—'}
@@ -273,7 +273,7 @@ export function DocsPage() {
                       )}
                       {op.responses && (
                         <div>
-                          <div className="text-[11px] font-bold text-textTertiary uppercase mb-1.5">Respostas</div>
+                          <div className="text-[11.5px] font-bold text-textTertiary uppercase mb-1.5">Respostas</div>
                           <div className="flex flex-col gap-1">
                             {Object.entries(op.responses).map(([status, r]) => (
                               <div key={status} className="text-[12.5px] flex gap-2">
@@ -295,7 +295,7 @@ export function DocsPage() {
       </div>
 
       <div className="px-14 py-16 text-center">
-        <div className="text-[28px] font-extrabold tracking-tight">Pronto para gerar sua primeira chave?</div>
+        <div className="text-[26px] font-extrabold tracking-tight">Pronto para gerar sua primeira chave?</div>
         <div className="flex gap-3 justify-center mt-6">
           <Link to="/login" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
             Criar conta de desenvolvedor

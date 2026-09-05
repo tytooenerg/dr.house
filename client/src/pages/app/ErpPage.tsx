@@ -137,7 +137,7 @@ export function ErpPage() {
       );
     }
     if (!diagnosis) {
-      return <div className="text-[11px] text-textSecondary">Diagnóstico indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>;
+      return <div className="text-[11.5px] text-textSecondary">Diagnóstico indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>;
     }
     return (
       <div className="rounded-md px-3 py-2.5 bg-chip text-[11.5px] flex flex-col gap-1">
@@ -320,7 +320,7 @@ export function ErpPage() {
         {data.connectors.map((c) => (
           <Card key={c.key}>
             <div className="w-11 h-11 rounded-[10px] bg-bg flex items-center justify-center font-extrabold text-[15px] text-navy mb-4">{c.name}</div>
-            <div className="font-bold text-[15.5px] mb-2">{c.name}</div>
+            <div className="font-bold text-[15px] mb-2">{c.name}</div>
             <div className="text-textSecondary text-[13px] leading-snug mb-4.5 min-h-14">{c.desc}</div>
 
             {c.key === 'omie' && c.connected ? (
@@ -328,10 +328,10 @@ export function ErpPage() {
                 <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: PALETTE.greenBg, color: PALETTE.green }}>
                   Conectado ✓
                 </button>
-                <button type="button" onClick={() => buscarContas('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                <button type="button" onClick={() => buscarContas('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12.5px] font-bold cursor-pointer">
                   Buscar contas a receber
                 </button>
-                <button type="button" onClick={() => buscarContasPagar('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                <button type="button" onClick={() => buscarContasPagar('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12.5px] font-bold cursor-pointer">
                   Buscar contas a pagar
                 </button>
                 <button type="button" onClick={disconnectOmie} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
@@ -344,7 +344,7 @@ export function ErpPage() {
                 <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder="app_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 {omieError && (
                   <>
-                    <div className="text-[11px] text-red-600">{omieError}</div>
+                    <div className="text-[11.5px] text-red-600">{omieError}</div>
                     {renderDiagnosisBlock('omie', omieRawError ?? omieError)}
                   </>
                 )}
@@ -357,10 +357,10 @@ export function ErpPage() {
                 <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: PALETTE.greenBg, color: PALETTE.green }}>
                   Conectado ✓
                 </button>
-                <button type="button" onClick={() => buscarContas('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                <button type="button" onClick={() => buscarContas('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12.5px] font-bold cursor-pointer">
                   Buscar faturas em aberto
                 </button>
-                <button type="button" onClick={() => buscarContasPagar('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                <button type="button" onClick={() => buscarContasPagar('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12.5px] font-bold cursor-pointer">
                   Buscar contas a pagar
                 </button>
                 <button type="button" onClick={disconnectSap} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
@@ -375,7 +375,7 @@ export function ErpPage() {
                 <input value={sapPassword} onChange={(e) => setSapPassword(e.target.value)} placeholder="Senha" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 {sapError && (
                   <>
-                    <div className="text-[11px] text-red-600">{sapError}</div>
+                    <div className="text-[11.5px] text-red-600">{sapError}</div>
                     {renderDiagnosisBlock('sap', sapError)}
                   </>
                 )}
@@ -388,10 +388,10 @@ export function ErpPage() {
                 <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: PALETTE.greenBg, color: PALETTE.green }}>
                   Conectado ✓
                 </button>
-                <button type="button" onClick={() => buscarContas('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                <button type="button" onClick={() => buscarContas('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12.5px] font-bold cursor-pointer">
                   Buscar contas a receber
                 </button>
-                <button type="button" onClick={() => buscarContasPagar('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
+                <button type="button" onClick={() => buscarContasPagar('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12.5px] font-bold cursor-pointer">
                   Buscar contas a pagar
                 </button>
                 <button type="button" onClick={disconnectTotvs} className="w-full py-1.5 text-[11.5px] font-semibold text-textSecondary cursor-pointer bg-transparent border-none">
@@ -405,7 +405,7 @@ export function ErpPage() {
                 <input value={totvsClientSecret} onChange={(e) => setTotvsClientSecret(e.target.value)} placeholder="client_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 {totvsError && (
                   <>
-                    <div className="text-[11px] text-red-600">{totvsError}</div>
+                    <div className="text-[11.5px] text-red-600">{totvsError}</div>
                     {renderDiagnosisBlock('totvs', totvsError)}
                   </>
                 )}
@@ -493,7 +493,7 @@ export function ErpPage() {
             {savingAutoEmit ? 'Salvando…' : 'Salvar limite'}
           </Button>
         </div>
-        {autoEmitError && <div className="text-red text-[12px] font-semibold mt-2">{autoEmitError}</div>}
+        {autoEmitError && <div className="text-red text-[12.5px] font-semibold mt-2">{autoEmitError}</div>}
       </Card>
 
       <Card className="mb-4">
@@ -518,7 +518,7 @@ export function ErpPage() {
         <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
           <div>
             <div className="font-bold text-[15px] mb-1.5">Programa white-label para sacados grandes</div>
-            <div className="text-onNavy text-[13.5px] leading-relaxed max-w-[600px]">
+            <div className="text-onNavy text-[13px] leading-relaxed max-w-[600px]">
               Ofereça antecipação de recebíveis aos seus próprios fornecedores com sua marca, cores e logo — a Lastro cuida da infraestrutura por trás.
               Disponível no plano Empresarial.
             </div>
@@ -528,7 +528,7 @@ export function ErpPage() {
           <div className="flex items-center justify-between gap-3 flex-wrap bg-navy border border-navyBorder rounded-lg p-3.5">
             <div className="flex items-center gap-2.5">
               <span className="rounded-md" style={{ width: 20, height: 20, background: data.whitelabelBrand.corPrimaria }} />
-              <span className="font-bold text-[13.5px]">{data.whitelabelBrand.nome}</span>
+              <span className="font-bold text-[13px]">{data.whitelabelBrand.nome}</span>
             </div>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="secondary" onClick={() => setBrandForm(true)}>
@@ -563,8 +563,8 @@ export function ErpPage() {
         {data.whitelabelBrand && (
           <div className="mt-3.5 pt-3.5 border-t border-navyBorder flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div className="font-bold text-[13.5px]">White-label Plus</div>
-              <div className="text-onNavy text-[12px] mt-0.5 max-w-[520px]">
+              <div className="font-bold text-[13px]">White-label Plus</div>
+              <div className="text-onNavy text-[12.5px] mt-0.5 max-w-[520px]">
                 Estende sua marca à própria tela de aceite do sacado (hoje só o WhatsApp de lembrete é personalizado) — {data.whitelabelPlusPriceFmt}/mês.
               </div>
             </div>
@@ -582,7 +582,7 @@ export function ErpPage() {
             'Você mantém o "botão de comando" — a emissão automática é opt-in e pode ser desligada a qualquer momento',
             'Aprovação em minutos, dinheiro na conta em até 24h após o leilão fechar',
           ].map((t) => (
-            <div key={t} className="flex items-center gap-2.5 text-[13.5px]">
+            <div key={t} className="flex items-center gap-2.5 text-[13px]">
               <span className="rounded-full bg-blue flex-shrink-0" style={{ width: 6, height: 6 }} />
               {t}
             </div>

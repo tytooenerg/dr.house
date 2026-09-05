@@ -13,7 +13,7 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 
 const SIZE_CLASSES: Record<Size, string> = {
   sm: 'px-2.5 py-1.5 text-[12.5px] rounded-md',
-  md: 'px-4 py-2.5 text-[13.5px] rounded-lg',
+  md: 'px-4 py-2.5 text-[13px] rounded-lg',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }>(

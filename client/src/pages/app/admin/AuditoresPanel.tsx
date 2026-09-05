@@ -59,7 +59,7 @@ export function AuditoresPanel() {
       <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
         <div>
           <div className="font-bold text-[14px]">Contas de auditoria (somente leitura)</div>
-          <div className="text-[12px] text-textMuted mt-0.5">Acesso a trilha de auditoria, compliance, reconciliação e relatórios regulatórios — sem nenhuma ação de escrita</div>
+          <div className="text-[12.5px] text-textMuted mt-0.5">Acesso a trilha de auditoria, compliance, reconciliação e relatórios regulatórios — sem nenhuma ação de escrita</div>
         </div>
         <Button size="sm" variant="secondary" onClick={() => setShowForm((v) => !v)}>
           {showForm ? 'Fechar' : '+ Nova conta'}
@@ -87,7 +87,7 @@ export function AuditoresPanel() {
             <Button size="sm" disabled={saving} onClick={create}>
               {saving ? 'Criando…' : 'Criar conta'}
             </Button>
-            {error && <span className="text-red text-[12px] font-semibold">{error}</span>}
+            {error && <span className="text-red text-[12.5px] font-semibold">{error}</span>}
           </div>
         </div>
       )}

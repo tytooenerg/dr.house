@@ -67,7 +67,7 @@ export function ConfirmingAdminPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-[16px] font-bold text-navy">Programa Confirming</h2>
+        <h2 className="text-[15px] font-bold text-navy">Programa Confirming</h2>
         <p className="text-[13px] text-navy/60 mt-1 max-w-2xl">
           Todo programa criado por um sacado, quantos cedentes tem matriculados, e o saldo real do fundo de fomento que financia cada compra
           automática.
@@ -119,7 +119,7 @@ export function ConfirmingAdminPanel() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <div className="text-[11px] font-bold text-textSecondary uppercase">Utilizado / Limite</div>
+                  <div className="text-[11.5px] font-bold text-textSecondary uppercase">Utilizado / Limite</div>
                   <div className="font-mono-num text-[12.5px]">
                     {p.utilizadoFmt} / {p.limiteFmt}
                   </div>

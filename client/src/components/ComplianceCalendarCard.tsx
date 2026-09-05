@@ -97,7 +97,7 @@ export function ComplianceCalendarCard() {
       ) : (
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <div className="text-[13.5px] font-semibold">{view.bracketLabel}</div>
+            <div className="text-[13px] font-semibold">{view.bracketLabel}</div>
             <span className="inline-block mt-1.5 text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: style.bg, color: style.color }}>
               {view.statusLabel}
             </span>

@@ -137,15 +137,15 @@ export function PublicidadePage() {
           </div>
           <div className="flex gap-8">
             <div>
-              <div className="font-mono-num text-[22px] font-extrabold">{data.ad.impressoes.toLocaleString('pt-BR')}</div>
+              <div className="font-mono-num text-[20px] font-extrabold">{data.ad.impressoes.toLocaleString('pt-BR')}</div>
               <div className="text-textTertiary text-[11.5px] font-bold uppercase tracking-wide mt-0.5">Impressões</div>
             </div>
             <div>
-              <div className="font-mono-num text-[22px] font-extrabold">{data.ad.cliques.toLocaleString('pt-BR')}</div>
+              <div className="font-mono-num text-[20px] font-extrabold">{data.ad.cliques.toLocaleString('pt-BR')}</div>
               <div className="text-textTertiary text-[11.5px] font-bold uppercase tracking-wide mt-0.5">Cliques</div>
             </div>
             <div>
-              <div className="font-mono-num text-[22px] font-extrabold">
+              <div className="font-mono-num text-[20px] font-extrabold">
                 {data.ad.impressoes > 0 ? `${((data.ad.cliques / data.ad.impressoes) * 100).toFixed(1)}%` : '—'}
               </div>
               <div className="text-textTertiary text-[11.5px] font-bold uppercase tracking-wide mt-0.5">CTR</div>

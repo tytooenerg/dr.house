@@ -39,7 +39,7 @@ export function TeamInviteAcceptPage() {
       <div className="w-full min-h-screen flex items-center justify-center bg-bg p-6">
         <div className="w-full max-w-[420px] bg-white border border-border rounded-2xl p-9 text-center">
           <div className="text-xl font-extrabold mb-2">Link de convite inválido</div>
-          <div className="text-textSecondary text-[13.5px]">O link está incompleto. Peça um novo convite a quem te convidou.</div>
+          <div className="text-textSecondary text-[13px]">O link está incompleto. Peça um novo convite a quem te convidou.</div>
         </div>
       </div>
     );
@@ -52,7 +52,7 @@ export function TeamInviteAcceptPage() {
           <Logo />
         </div>
         <div className="text-xl font-extrabold mb-1">Aceitar convite de equipe</div>
-        <div className="text-textSecondary text-[13.5px] mb-6">
+        <div className="text-textSecondary text-[13px] mb-6">
           Crie sua senha para acessar a conta com permissão de leitura em Dashboard, Minhas Duplicatas, Histórico e Receita.
         </div>
         <form onSubmit={handleSubmit}>

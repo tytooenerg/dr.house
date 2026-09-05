@@ -25,7 +25,7 @@ export function StatusPage() {
     <div className="w-full text-navy min-h-screen">
       <PublicNav active="status" />
       <div className="max-w-[720px] mx-auto px-6 py-16">
-        <div className="text-[38px] font-extrabold tracking-tight mb-2">Status da plataforma</div>
+        <div className="text-[34px] font-extrabold tracking-tight mb-2">Status da plataforma</div>
         <div className="text-textSecondary text-[15px] mb-8">
           Verificações reais da API, registradas automaticamente a cada minuto — não é um selo estático.
         </div>
@@ -36,7 +36,7 @@ export function StatusPage() {
           <>
             <div className="flex items-center gap-2.5 mb-7">
               <span className="rounded-full" style={{ width: 9, height: 9, background: ok ? PALETTE.green : PALETTE.red }} />
-              <span className="text-[14.5px] font-bold" style={{ color: ok ? PALETTE.green : PALETTE.red }}>
+              <span className="text-[14px] font-bold" style={{ color: ok ? PALETTE.green : PALETTE.red }}>
                 {data.current ? (ok ? 'Operacional' : 'Degradado') : 'Sem dados ainda'}
               </span>
               {data.current && <span className="text-textTertiary text-[13px]">· última verificação {data.current.checkedAt}</span>}

@@ -149,7 +149,7 @@ export function AgentesIaPanel() {
         Ferramentas que escrevem algo com consequência real (dinheiro, decisão de compliance/KYB, registro jurídico/regulatório) nunca executam
         automaticamente — ficam como <strong>ação pendente</strong> abaixo até um admin aprovar ou rejeitar.
         {!llmEnabled && (
-          <div className="mt-2 px-3 py-2 rounded-md bg-amberBg text-amber font-bold text-[12px] w-fit">
+          <div className="mt-2 px-3 py-2 rounded-md bg-amberBg text-amber font-bold text-[12.5px] w-fit">
             ANTHROPIC_API_KEY não configurado — os agentes rodam em modo simulado (não investigam nem agem de verdade).
           </div>
         )}
@@ -175,7 +175,7 @@ export function AgentesIaPanel() {
                     type="button"
                     disabled={savingGov === g.id}
                     onClick={() => toggleAgentEnabled(g.id, !g.enabled)}
-                    className="px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer border-none"
+                    className="px-2.5 py-1 rounded-md text-[11.5px] font-bold cursor-pointer border-none"
                     style={{ background: g.enabled ? PALETTE.greenBg : PALETTE.redBg, color: g.enabled ? PALETTE.green : PALETTE.red }}
                   >
                     {g.enabled ? 'Ativo' : 'Desativado'}
@@ -275,7 +275,7 @@ export function AgentesIaPanel() {
                     <span
                       key={t.name}
                       title={t.description}
-                      className="px-2 py-1 rounded-md text-[11px] font-bold"
+                      className="px-2 py-1 rounded-md text-[11.5px] font-bold"
                       style={{ background: t.sensitive ? PALETTE.redBg : PALETTE.greenBg, color: t.sensitive ? PALETTE.red : PALETTE.green }}
                     >
                       {t.name}
@@ -312,7 +312,7 @@ export function AgentesIaPanel() {
                   <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
                     <span className="font-bold text-[14px]">Execução #{lastRun.runId}</span>
                     <span
-                      className="px-2.5 py-1 rounded-full text-[11px] font-bold"
+                      className="px-2.5 py-1 rounded-full text-[11.5px] font-bold"
                       style={{
                         background: lastRun.status === 'concluido' ? PALETTE.greenBg : lastRun.status === 'simulado' ? PALETTE.hairline : PALETTE.amberBg,
                         color: lastRun.status === 'concluido' ? PALETTE.green : lastRun.status === 'simulado' ? PALETTE.textSecondary : PALETTE.amber,
@@ -324,7 +324,7 @@ export function AgentesIaPanel() {
                   <div className="px-5 py-4 flex flex-col gap-3">
                     {lastRun.steps.map((s, i) => (
                       <div key={i} className="border-l-2 pl-3" style={{ borderColor: STEP_COLOR[s.type] ?? PALETTE.border }}>
-                        <div className="text-[11px] font-bold uppercase" style={{ color: STEP_COLOR[s.type] ?? PALETTE.textSecondary }}>
+                        <div className="text-[11.5px] font-bold uppercase" style={{ color: STEP_COLOR[s.type] ?? PALETTE.textSecondary }}>
                           {STEP_LABELS[s.type] ?? s.type}
                           {s.toolName ? ` — ${s.toolName}` : ''}
                         </div>

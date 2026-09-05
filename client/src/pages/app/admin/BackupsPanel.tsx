@@ -51,7 +51,7 @@ export function BackupsPanel() {
       <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
         <div>
           <div className="font-bold text-[14px]">Backups do banco de dados</div>
-          <div className="text-[12px] text-textMuted mt-0.5">Snapshots automáticos a cada 6h, retenção configurável (padrão: últimos 28)</div>
+          <div className="text-[12.5px] text-textMuted mt-0.5">Snapshots automáticos a cada 6h, retenção configurável (padrão: últimos 28)</div>
         </div>
         <Button onClick={runBackupNow} disabled={runningBackup || !backupsEnabled} variant="secondary">
           {runningBackup ? 'Gerando…' : 'Rodar backup agora'}
@@ -63,7 +63,7 @@ export function BackupsPanel() {
       {backupsEnabled &&
         backups.map((b) => (
           <div key={b.filename} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
-            <div className="font-mono-num text-[12px]">{b.filename}</div>
+            <div className="font-mono-num text-[12.5px]">{b.filename}</div>
             <div className="flex items-center gap-3 text-textMuted">
               <span>{(b.sizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
               <span>{b.quando}</span>

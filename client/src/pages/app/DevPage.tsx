@@ -228,7 +228,7 @@ export function DevPage() {
                       </span>
                     )}
                   </div>
-                  <div className="text-textTertiary text-[11px] mt-0.5">
+                  <div className="text-textTertiary text-[11.5px] mt-0.5">
                     Criada {k.createdAt} · usada pela última vez: {k.lastUsed} · {k.callsThisMonth} chamada{k.callsThisMonth === 1 ? '' : 's'} este mês
                   </div>
                 </div>
@@ -264,7 +264,7 @@ export function DevPage() {
           <Button size="sm" variant="secondary" onClick={generateKey}>
             Gerar {data.apiKeys.length > 0 ? 'nova chave' : 'chave de produção'}
           </Button>
-          {keyError && <div className="mt-2 text-[12px] font-semibold text-red">{keyError}</div>}
+          {keyError && <div className="mt-2 text-[12.5px] font-semibold text-red">{keyError}</div>}
           {keyProduct !== 'platform' && (
             <div className="mt-2 text-[11.5px] text-textTertiary">
               Produto avulso, vendável a empresas que não são clientes Lastro — cobrado por chamada, sem exigir plano Empresarial.
@@ -354,9 +354,9 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           <Button size="sm" variant="secondary" onClick={addWebhook}>
             Adicionar webhook
           </Button>
-          {webhookError && <div className="mt-2 text-[12px] font-semibold text-red">{webhookError}</div>}
+          {webhookError && <div className="mt-2 text-[12.5px] font-semibold text-red">{webhookError}</div>}
           {newWebhookSecret && (
-            <div className="mt-3 p-3 rounded-lg bg-amberBg text-[12px] text-amber">
+            <div className="mt-3 p-3 rounded-lg bg-amberBg text-[12.5px] text-amber">
               Assinatura para verificar as requisições (guarde agora, não será mostrada de novo):
               <div className="font-mono-num break-all mt-1">{newWebhookSecret}</div>
             </div>
@@ -369,7 +369,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
         <div className="text-textSecondary text-[12.5px] mb-3.5">
           Um simulador de antecipação que você pode embutir no seu site — usa o mesmo modelo de taxa da Lastro, sem precisar de chave de API.
         </div>
-        <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12px] leading-loose text-blueSoft overflow-x-auto whitespace-pre">{`<iframe
+        <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12.5px] leading-loose text-blueSoft overflow-x-auto whitespace-pre">{`<iframe
   src="${window.location.origin}/embed/simulador"
   width="100%" height="420" style="border:0;border-radius:12px"
   title="Simulador de antecipação Lastro">
@@ -434,21 +434,21 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
         </div>
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <div className="bg-surface rounded-lg p-3.5">
-            <div className="text-textTertiary text-[11px] font-bold uppercase">Franquia mensal</div>
+            <div className="text-textTertiary text-[11.5px] font-bold uppercase">Franquia mensal</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.includedCallsPerMonth.toLocaleString('pt-BR')}</div>
           </div>
           <div className="bg-surface rounded-lg p-3.5">
-            <div className="text-textTertiary text-[11px] font-bold uppercase">Chamadas este mês</div>
+            <div className="text-textTertiary text-[11.5px] font-bold uppercase">Chamadas este mês</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.callsThisMonth.toLocaleString('pt-BR')}</div>
           </div>
           <div className="bg-surface rounded-lg p-3.5">
-            <div className="text-textTertiary text-[11px] font-bold uppercase">Excedente</div>
+            <div className="text-textTertiary text-[11.5px] font-bold uppercase">Excedente</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">
-              {data.apiOverage.overageThisMonth.toLocaleString('pt-BR')} <span className="text-textTertiary text-[11px] font-semibold">({data.apiOverage.pricePerCallFmt}/chamada)</span>
+              {data.apiOverage.overageThisMonth.toLocaleString('pt-BR')} <span className="text-textTertiary text-[11.5px] font-semibold">({data.apiOverage.pricePerCallFmt}/chamada)</span>
             </div>
           </div>
           <div className="bg-surface rounded-lg p-3.5">
-            <div className="text-textTertiary text-[11px] font-bold uppercase">Estimativa a cobrar</div>
+            <div className="text-textTertiary text-[11.5px] font-bold uppercase">Estimativa a cobrar</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.estimatedChargeFmt}</div>
           </div>
         </div>
@@ -458,7 +458,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
             <div className="font-bold text-[13px] mb-2.5">Cobranças recentes</div>
             <div className="flex flex-col gap-1.5">
               {data.addonCharges.map((c) => (
-                <div key={c.id} className="flex items-center justify-between text-[12px] gap-2">
+                <div key={c.id} className="flex items-center justify-between text-[12.5px] gap-2">
                   <span className="text-textSecondary flex-1 min-w-0 truncate">{c.descricao}</span>
                   <span className="font-mono-num font-bold flex-shrink-0">{c.valorFmt}</span>
                   <span className="text-textTertiary flex-shrink-0">{c.quando}</span>
@@ -474,7 +474,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
         {data.apiLog.map((r, i) => (
           <div key={i} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13px]" style={{ gridTemplateColumns: '0.7fr 1fr 1.6fr 0.7fr' }}>
             <span
-              className="text-[11px] font-bold px-2 py-1 rounded-md w-fit"
+              className="text-[11.5px] font-bold px-2 py-1 rounded-md w-fit"
               style={r.status.startsWith('2') ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.redBg, color: PALETTE.red }}
             >
               {r.status}

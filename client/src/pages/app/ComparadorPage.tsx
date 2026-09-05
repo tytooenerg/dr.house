@@ -101,7 +101,7 @@ export function ComparadorPage() {
             <div key={ch.label}>
               <div className="flex justify-between items-baseline mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="font-bold text-[14.5px]">{ch.label}</div>
+                  <div className="font-bold text-[14px]">{ch.label}</div>
                   {ch.isLastro && <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-chip text-blue">LASTRO</span>}
                 </div>
                 <div className="font-mono-num font-bold text-sm">{ch.rangeLabel}</div>
@@ -114,15 +114,15 @@ export function ComparadorPage() {
 
       <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <Card className="p-5.5">
-          <div className="font-bold text-[14.5px] mb-2.5">Por que o leilão comprime a taxa</div>
-          <div className="text-textSecondary text-[13.5px] leading-relaxed">
+          <div className="font-bold text-[14px] mb-2.5">Por que o leilão comprime a taxa</div>
+          <div className="text-textSecondary text-[13px] leading-relaxed">
             Quando vários financiadores disputam a mesma duplicata, a competição empurra o deságio para baixo — o mesmo efeito que a duplicata escritural amplia ao tornar o recebível
             auditável e negociável por qualquer instituição, não só pelo banco do sacado.
           </div>
         </Card>
         <Card className="p-5.5">
-          <div className="font-bold text-[14.5px] mb-2.5">Escala do mercado endereçável</div>
-          <div className="text-textSecondary text-[13.5px] leading-relaxed">
+          <div className="font-bold text-[14px] mb-2.5">Escala do mercado endereçável</div>
+          <div className="text-textSecondary text-[13px] leading-relaxed">
             O Banco Central estima um mercado potencial de R$ 10–11 trilhões/ano em recebíveis mercantis — hoje apenas 10–15% das duplicatas emitidas chegam ao mercado financeiro como
             garantia de crédito.
           </div>

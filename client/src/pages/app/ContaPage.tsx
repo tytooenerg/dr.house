@@ -322,7 +322,7 @@ export function ContaPage() {
           <div className="flex flex-col gap-3">
             {data.kycChecklist.map((k) => (
               <div key={k.label} className="flex items-center justify-between gap-2.5">
-                <div className="text-[13.5px] font-semibold">{k.label}</div>
+                <div className="text-[13px] font-semibold">{k.label}</div>
                 <div className="flex items-center gap-2">
                   {k.action?.key === 'biometria' ? (
                     <label className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">
@@ -358,7 +358,7 @@ export function ContaPage() {
 
         <Card>
           <div className="font-bold text-[15px] mb-4">Conta Pix para liquidação</div>
-          <div className="p-3.5 rounded-[10px] bg-surface text-[13.5px] font-semibold mb-4">{data.bankAccountDisplay}</div>
+          <div className="p-3.5 rounded-[10px] bg-surface text-[13px] font-semibold mb-4">{data.bankAccountDisplay}</div>
           {!data.pixChave && (
             <div className="flex gap-2 mb-4">
               <input
@@ -391,7 +391,7 @@ export function ContaPage() {
             <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
           </div>
           {!data.pixEnabled && (
-            <div className="text-[12px] text-textSecondary mb-3">
+            <div className="text-[12.5px] text-textSecondary mb-3">
               Modo simulado — nenhum PSP real configurado (PIX_PSP_*). O depósito precisa ser confirmado manualmente abaixo.
             </div>
           )}
@@ -417,7 +417,7 @@ export function ContaPage() {
                   {c.brcode ? <div className="break-all text-[10.5px] text-textSecondary">{c.brcode}</div> : <div className="text-textSecondary">Aguardando pagamento (simulado)</div>}
                 </div>
                 {c.simulado && (
-                  <button type="button" onClick={() => confirmarSimulado(c.txid)} className="px-2.5 py-1.5 rounded-md border-none bg-green text-white text-[11px] font-bold cursor-pointer whitespace-nowrap">
+                  <button type="button" onClick={() => confirmarSimulado(c.txid)} className="px-2.5 py-1.5 rounded-md border-none bg-green text-white text-[11.5px] font-bold cursor-pointer whitespace-nowrap">
                     Confirmar (simulado)
                   </button>
                 )}
@@ -455,7 +455,7 @@ export function ContaPage() {
           <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
         </div>
         {!data.boletoEnabled && (
-          <div className="text-[12px] text-textSecondary mb-3">
+          <div className="text-[12.5px] text-textSecondary mb-3">
             Modo simulado — nenhum PSP de boleto real configurado (BOLETO_PSP_*). O depósito precisa ser confirmado manualmente abaixo.
           </div>
         )}
@@ -487,7 +487,7 @@ export function ContaPage() {
                 <button
                   type="button"
                   onClick={() => confirmarBoletoSimulado(b.nossoNumero)}
-                  className="px-2.5 py-1.5 rounded-md border-none bg-green text-white text-[11px] font-bold cursor-pointer whitespace-nowrap"
+                  className="px-2.5 py-1.5 rounded-md border-none bg-green text-white text-[11.5px] font-bold cursor-pointer whitespace-nowrap"
                 >
                   Confirmar (simulado)
                 </button>
@@ -502,7 +502,7 @@ export function ContaPage() {
             <div className="font-bold text-[15px]">Depositar via TED</div>
             <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
           </div>
-          <div className="text-[12px] text-textSecondary mb-3">
+          <div className="text-[12.5px] text-textSecondary mb-3">
             {data.tedEnabled
               ? 'Conta virtual dedicada gerada via provedor bancário real — confirmação automática por webhook.'
               : data.tedInstructionsAvailable
@@ -529,7 +529,7 @@ export function ContaPage() {
                 <div className="text-textSecondary">
                   {t.banco} · ag. {t.agencia} · cc {t.conta} — {t.favorecidoNome}
                 </div>
-                <div className="text-textTertiary text-[11px] mt-1">Ref. {t.referencia} · aguardando confirmação{t.simulado ? ' (simulado)' : ''}</div>
+                <div className="text-textTertiary text-[11.5px] mt-1">Ref. {t.referencia} · aguardando confirmação{t.simulado ? ' (simulado)' : ''}</div>
               </div>
             ))}
         </Card>
@@ -615,7 +615,7 @@ export function ContaPage() {
             <div className="font-bold text-[15px]">Depositar via {data.stablecoinAsset}</div>
             <div className="text-[13px] font-mono-num text-textSecondary">Saldo: {data.saldoDisponivelFmt}</div>
           </div>
-          <div className="text-[12px] text-textSecondary mb-3">
+          <div className="text-[12.5px] text-textSecondary mb-3">
             {data.stablecoinEnabled
               ? `Endereço de depósito dedicado gerado via custodiante real — confirmação automática por webhook. Rede ${data.stablecoinNetwork}.`
               : data.stablecoinInstructionsAvailable
@@ -642,7 +642,7 @@ export function ContaPage() {
                 <div className="break-all text-textSecondary">
                   {s.asset} ({s.network}): {s.endereco}
                 </div>
-                <div className="text-textTertiary text-[11px] mt-1">Ref. {s.referencia} · aguardando confirmação{s.simulado ? ' (simulado)' : ''}</div>
+                <div className="text-textTertiary text-[11.5px] mt-1">Ref. {s.referencia} · aguardando confirmação{s.simulado ? ' (simulado)' : ''}</div>
               </div>
             ))}
         </Card>
@@ -687,7 +687,7 @@ export function ContaPage() {
       <div className="bg-white border border-border rounded-card overflow-hidden mb-4">
         <div className="px-5 py-4.5 font-bold text-[15px] border-b border-border">Extrato de liquidação</div>
         {data.extrato.map((e, i) => (
-          <div key={i} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13.5px]" style={{ gridTemplateColumns: '1fr 1.6fr 0.9fr 0.9fr' }}>
+          <div key={i} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13px]" style={{ gridTemplateColumns: '1fr 1.6fr 0.9fr 0.9fr' }}>
             <div className="text-textSecondary font-mono-num text-[12.5px]">{e.data}</div>
             <div>{e.descricao}</div>
             <div className="font-mono-num font-bold" style={{ color: e.isPositive ? PALETTE.green : PALETTE.navy }}>
@@ -700,21 +700,21 @@ export function ContaPage() {
 
       <NavyCard className="p-6.5">
         <div className="font-bold text-[15px] mb-2.5">Como a Lastro monetiza</div>
-        <div className="text-onNavy text-[13.5px] leading-relaxed mb-4.5 max-w-[640px]">
+        <div className="text-onNavy text-[13px] leading-relaxed mb-4.5 max-w-[640px]">
           Cobramos uma taxa de plataforma de 0,35% sobre o valor de cada operação, descontada automaticamente na liquidação — sem mensalidade e sem taxa de adesão.
         </div>
         <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div className="text-onNavy text-xs font-semibold">Valor da operação</div>
-            <div className="text-[19px] font-extrabold mt-1.5">R$ 84.500</div>
+            <div className="text-[20px] font-extrabold mt-1.5">R$ 84.500</div>
           </div>
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div className="text-onNavy text-xs font-semibold">Taxa da plataforma (0,35%)</div>
-            <div className="text-[19px] font-extrabold mt-1.5">R$ 295,75</div>
+            <div className="text-[20px] font-extrabold mt-1.5">R$ 295,75</div>
           </div>
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div className="text-onNavy text-xs font-semibold">Líquido repassado</div>
-            <div className="text-[19px] font-extrabold mt-1.5 text-greenOnNavy">R$ 84.204,25</div>
+            <div className="text-[20px] font-extrabold mt-1.5 text-greenOnNavy">R$ 84.204,25</div>
           </div>
         </div>
       </NavyCard>

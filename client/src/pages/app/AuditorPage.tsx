@@ -81,7 +81,7 @@ export function AuditorPage() {
                   <b>{e.actor}</b> — {e.action}
                   <span className="text-textSecondary"> · {e.quando}</span>
                 </div>
-                <span className="font-mono-num text-[11px] text-textTertiary">#{e.hash}</span>
+                <span className="font-mono-num text-[11.5px] text-textTertiary">#{e.hash}</span>
               </div>
             ))}
           </div>

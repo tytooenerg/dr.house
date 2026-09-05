@@ -209,8 +209,8 @@ export function HistoricoPage() {
       {rebalance && rebalance.posicoesAtivas > 0 && (
         <Card className="mb-4 px-6 py-5">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-            <div className="font-bold text-[14.5px]">Rebalanceamento sugerido</div>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
+            <div className="font-bold text-[14px]">Rebalanceamento sugerido</div>
+            <span className="text-[11.5px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
               Perfil {rebalance.profile === 'conservador' ? 'Conservador' : rebalance.profile === 'moderado' ? 'Moderado' : 'Arrojado'}
               {rebalance.usingDefaultProfile ? ' (padrão — responda o questionário de suitability)' : ''}
             </span>
@@ -244,7 +244,7 @@ export function HistoricoPage() {
 
       <Card className="mb-4 px-6 py-5">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-          <div className="font-bold text-[14.5px]">Central fiscal — informe de rendimentos</div>
+          <div className="font-bold text-[14px]">Central fiscal — informe de rendimentos</div>
         </div>
         <div className="text-textSecondary text-[12.5px] mb-3.5">
           Estimativa de IRRF pela tabela regressiva sobre suas operações reais do ano-calendário — documento de apoio à sua declaração de IR, não uma
@@ -268,7 +268,7 @@ export function HistoricoPage() {
       {performance && performance.positionsCount > 0 && (
         <Card className="mb-4 px-6 py-5">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-            <div className="font-bold text-[14.5px]">Desempenho ajustado ao risco</div>
+            <div className="font-bold text-[14px]">Desempenho ajustado ao risco</div>
           </div>
           <div className="text-textSecondary text-[12.5px] mb-3.5">
             Retorno anualizado ponderado e dispersão entre suas posições atuais — não é uma volatilidade de série temporal (a duplicata não tem
@@ -321,7 +321,7 @@ export function HistoricoPage() {
       )}
 
       <Card className="mb-4 px-6 py-5">
-        <div className="font-bold text-[14.5px] mb-3.5">Saúde da carteira — mesma linguagem usada em FIDCs</div>
+        <div className="font-bold text-[14px] mb-3.5">Saúde da carteira — mesma linguagem usada em FIDCs</div>
         <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div>
             <div className="flex justify-between items-center text-[13px] mb-1.5">
@@ -347,7 +347,7 @@ export function HistoricoPage() {
           <div className="flex items-center justify-between gap-4 flex-wrap mb-1">
             <div>
               <div className="font-bold text-[15px] mb-1.5">Relatórios Institucionais</div>
-              <div className="text-onNavy text-[13.5px] leading-relaxed max-w-[600px]">
+              <div className="text-onNavy text-[13px] leading-relaxed max-w-[600px]">
                 Analytics de carteira acima do extrato por operação — concentração por rating, maiores exposições e desempenho mensal, com relatório em PDF pronto para o comitê. {institutional.priceFmt}/mês, a partir do plano {institutional.requiredPlan === 'pro' ? 'Pro' : institutional.requiredPlan}.
               </div>
             </div>
@@ -392,7 +392,7 @@ export function HistoricoPage() {
                 <div>
                   <div className="font-bold text-[12.5px] mb-2">Maiores exposições</div>
                   <div className="flex flex-col gap-1.5">
-                    {analytics.maioresExposicoes.length === 0 && <span className="text-onNavy text-[12px]">Nenhuma operação registrada ainda.</span>}
+                    {analytics.maioresExposicoes.length === 0 && <span className="text-onNavy text-[12.5px]">Nenhuma operação registrada ainda.</span>}
                     {analytics.maioresExposicoes.map((e) => (
                       <div key={e.sacado} className="flex items-center justify-between text-[12.5px] gap-2">
                         <span className="text-onNavy flex-1 min-w-0 truncate">{e.sacado}</span>

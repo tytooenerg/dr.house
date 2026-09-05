@@ -70,7 +70,7 @@ export function DashboardPage() {
           return (
             <div key={kpi.label} className={`rounded-card border border-border p-5 ${destaque ? 'bg-navy' : 'bg-white'}`}>
               <div className={`text-[13px] font-semibold ${destaque ? 'text-onNavy' : 'text-textSecondary'}`}>{kpi.label}</div>
-              <div className={`font-extrabold mt-2.5 tracking-tight ${destaque ? 'text-[30px] text-white' : 'text-[26px] text-navy'}`}>{kpi.value}</div>
+              <div className={`font-extrabold mt-2.5 tracking-tight ${destaque ? 'text-[26px] text-white' : 'text-[26px] text-navy'}`}>{kpi.value}</div>
               <div className="text-[12.5px] mt-2 font-semibold" style={{ color: destaque && kpi.trendColor === PALETTE.textSecondary ? PALETTE.onNavy : kpi.trendColor }}>
                 {kpi.trend}
               </div>
@@ -101,7 +101,7 @@ export function DashboardPage() {
           <div className="font-bold text-[15px] self-start mb-4">{data.donutTitle}</div>
           <Donut stops={data.riskDonutStops} size={150}>
             <div className="text-xl font-extrabold">{data.activeDuplicatas}</div>
-            <div className="text-[11px] text-textSecondary">{t('dashboard.operacoes', 'operações')}</div>
+            <div className="text-[11.5px] text-textSecondary">{t('dashboard.operacoes', 'operações')}</div>
           </Donut>
           {data.donutEmptyHint && <div className="text-[12.5px] text-textSecondary text-center mt-4">{data.donutEmptyHint}</div>}
           {!data.donutEmptyHint && (

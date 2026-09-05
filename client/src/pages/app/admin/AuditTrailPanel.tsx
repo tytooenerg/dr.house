@@ -50,7 +50,7 @@ export function AuditTrailPanel() {
             <b>{e.actor}</b> — {e.action}
             <span className="text-textMuted"> · {e.quando}</span>
           </div>
-          <span className="font-mono-num text-[11px] text-textTertiary">#{e.hash}</span>
+          <span className="font-mono-num text-[11.5px] text-textTertiary">#{e.hash}</span>
         </div>
       ))}
       {audit && audit.entries.length === 0 && <EmptyState title="Nenhum evento registrado ainda" hint="Ações sensíveis da plataforma vão aparecer aqui" />}

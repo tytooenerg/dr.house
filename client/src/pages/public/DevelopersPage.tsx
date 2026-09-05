@@ -117,12 +117,12 @@ export function DevelopersPage() {
                 <span style={{ width: 14, height: 14, border: `2px solid ${PALETTE.blue}`, borderRadius: 3 }} />
               </div>
               <div className="font-bold text-base mb-2">{p.title}</div>
-              <div className="text-textSecondary text-[13.5px] leading-relaxed">{p.desc}</div>
+              <div className="text-textSecondary text-[13px] leading-relaxed">{p.desc}</div>
             </div>
           ))}
           <div className="rounded-card p-6.5 bg-navy">
             <div className="font-bold text-base mb-2 text-white">Sua ideia aqui</div>
-            <div className="text-onNavy text-[13.5px] leading-relaxed mb-4">Fale com nosso time de parcerias para desenhar o fluxo do seu produto sobre a Lastro.</div>
+            <div className="text-onNavy text-[13px] leading-relaxed mb-4">Fale com nosso time de parcerias para desenhar o fluxo do seu produto sobre a Lastro.</div>
             <div className="text-[13px] font-bold text-onNavyBright">Ver documentação →</div>
           </div>
         </div>
@@ -160,8 +160,8 @@ export function DevelopersPage() {
         <div className="max-w-[1360px] mx-auto grid gap-6" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           {STATS.map((s) => (
             <div key={s.value}>
-              <div className="text-[38px] font-extrabold tracking-tight">{s.value}</div>
-              <div className="text-onNavy text-[13.5px] mt-2">{s.desc}</div>
+              <div className="text-[34px] font-extrabold tracking-tight">{s.value}</div>
+              <div className="text-onNavy text-[13px] mt-2">{s.desc}</div>
             </div>
           ))}
         </div>
@@ -171,7 +171,7 @@ export function DevelopersPage() {
         <div className="grid gap-10 items-center" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div>
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Regulação</div>
-            <div className="text-[30px] font-extrabold tracking-tight mb-4">Conector universal, não mais um silo.</div>
+            <div className="text-[26px] font-extrabold tracking-tight mb-4">Conector universal, não mais um silo.</div>
             <div className="text-textSecondary text-[15px] leading-relaxed">
               Grandes bancos já fecham parceria individual com uma escrituradora só para seus próprios clientes. A Lastro faz o caminho inverso: uma integração conecta você às
               registradoras autorizadas pelo Banco Central (CERC, B3, Núclea e demais em processo de homologação, incluindo a Grafeno/SPC), em conformidade com a Resolução BCB nº 339/2023 e nº 540/2025 — sem escolher um silo e ficar preso a ele.
@@ -199,10 +199,10 @@ export function DevelopersPage() {
         <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {PRICING.map((p) => (
             <div key={p.name} className="rounded-card p-7 relative" style={{ border: p.highlighted ? `2px solid ${PALETTE.blue}` : `1px solid ${PALETTE.border}` }}>
-              {p.highlighted && <div className="absolute -top-3 left-6 bg-blue text-white text-[11px] font-bold px-2.5 py-1 rounded-md">MAIS USADO</div>}
+              {p.highlighted && <div className="absolute -top-3 left-6 bg-blue text-white text-[11.5px] font-bold px-2.5 py-1 rounded-md">MAIS USADO</div>}
               <div className="font-bold text-[15px] mb-1.5">{p.name}</div>
               <div className="text-textSecondary text-[13px] mb-5">{p.desc}</div>
-              <div className="text-[30px] font-extrabold mb-1">{p.price}</div>
+              <div className="text-[26px] font-extrabold mb-1">{p.price}</div>
               <div className="text-textTertiary text-[12.5px] mb-5">{p.priceHint}</div>
               <div className="text-textSecondary text-[13px] leading-loose">
                 {p.features.map((f) => (
@@ -218,7 +218,7 @@ export function DevelopersPage() {
         <div className="max-w-[1360px] mx-auto">
           <div className="max-w-[640px] mb-8">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Referência</div>
-            <div className="text-[30px] font-extrabold tracking-tight">Endpoints principais.</div>
+            <div className="text-[26px] font-extrabold tracking-tight">Endpoints principais.</div>
           </div>
           <div className="bg-white border border-border rounded-card overflow-hidden">
             <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-[11.5px] font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: '0.5fr 1.5fr 2fr' }}>
@@ -227,7 +227,7 @@ export function DevelopersPage() {
               <div>Descrição</div>
             </div>
             {ENDPOINTS.map((e) => (
-              <div key={e.path} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13.5px]" style={{ gridTemplateColumns: '0.5fr 1.5fr 2fr' }}>
+              <div key={e.path} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13px]" style={{ gridTemplateColumns: '0.5fr 1.5fr 2fr' }}>
                 <div className="font-mono-num font-bold" style={{ color: e.method === 'POST' ? PALETTE.green : PALETTE.blue }}>
                   {e.method}
                 </div>
@@ -242,7 +242,7 @@ export function DevelopersPage() {
       <div className="px-14 py-16 max-w-[1360px] mx-auto">
         <div className="max-w-[640px] mb-10">
           <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Sem virar cliente do marketplace</div>
-          <div className="text-[30px] font-extrabold tracking-tight">Só precisa do dado, não da esteira inteira.</div>
+          <div className="text-[26px] font-extrabold tracking-tight">Só precisa do dado, não da esteira inteira.</div>
           <div className="text-textSecondary text-[15px] mt-3 leading-relaxed">
             9 capacidades internas da Lastro são vendidas avulsas, por chamada — uma conta "só-API" gera a chave em minutos, sem passar pelo cadastro de cedente/investidor nem por KYB.
           </div>
@@ -251,56 +251,56 @@ export function DevelopersPage() {
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-green mb-2">GET</div>
             <div className="font-bold text-base mb-2">Score API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Score interno + sinais de rede entre CNPJs, na hora — R$ 1,50 por consulta.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">GET /v1/sacados/:cnpj/score</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Score interno + sinais de rede entre CNPJs, na hora — R$ 1,50 por consulta.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">GET /v1/sacados/:cnpj/score</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">PLD Screening API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Checagem contra listas de sanções, com segunda opinião de IA em casos ambíguos — R$ 2,00 por triagem.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/pld/triagem</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Checagem contra listas de sanções, com segunda opinião de IA em casos ambíguos — R$ 2,00 por triagem.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/pld/triagem</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">Registro API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">O mesmo roteamento inteligente entre CERC/B3/Núclea/Grafeno que a Lastro usa internamente, sem entrar no marketplace — R$ 3,50 por registro.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/registro</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">O mesmo roteamento inteligente entre CERC/B3/Núclea/Grafeno que a Lastro usa internamente, sem entrar no marketplace — R$ 3,50 por registro.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/registro</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">Judicial Records API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Execuções, falência/recuperação judicial e protestos por CNPJ — R$ 4,00 por consulta.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/judicial/consulta</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Execuções, falência/recuperação judicial e protestos por CNPJ — R$ 4,00 por consulta.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/judicial/consulta</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">Fraud Screening API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Autorrelacionamento e concentração anômala sobre a sua própria transação e histórico — R$ 2,50 por avaliação.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/fraude/avaliar</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Autorrelacionamento e concentração anômala sobre a sua própria transação e histórico — R$ 2,50 por avaliação.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/fraude/avaliar</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">Document Intelligence API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Extração de NF-e ou análise de cláusulas de contrato via IA, direto do PDF/imagem/XML — R$ 3,00 por documento.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/documentos/analisar</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Extração de NF-e ou análise de cláusulas de contrato via IA, direto do PDF/imagem/XML — R$ 3,00 por documento.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/documentos/analisar</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">Reconciliation API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Envie um extrato OFX e sua lista de lançamentos esperados, receba o que bateu e o que ficou pendente — R$ 1,50 por conciliação.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/conciliacao</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Envie um extrato OFX e sua lista de lançamentos esperados, receba o que bateu e o que ficou pendente — R$ 1,50 por conciliação.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/conciliacao</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">Suitability API</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Classificação conservador/moderado/arrojado, estilo CVM, para o cliente final da sua própria plataforma — R$ 1,00 por avaliação.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">POST /v1/suitability/avaliar</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Classificação conservador/moderado/arrojado, estilo CVM, para o cliente final da sua própria plataforma — R$ 1,00 por avaliação.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/suitability/avaliar</div>
           </div>
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-green mb-2">GET</div>
             <div className="font-bold text-base mb-2">Lastro Index</div>
-            <div className="text-textSecondary text-[13.5px] leading-relaxed mb-3">Deságio médio e taxa de inadimplência por rating, calculado ao vivo sobre o volume real da Lastro — R$ 5,00 por consulta.</div>
-            <div className="font-mono-num text-[12px] text-textTertiary">GET /v1/index</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">Deságio médio e taxa de inadimplência por rating, calculado ao vivo sobre o volume real da Lastro — R$ 5,00 por consulta.</div>
+            <div className="font-mono-num text-[12.5px] text-textTertiary">GET /v1/index</div>
           </div>
         </div>
         <div className="mt-6">
@@ -311,7 +311,7 @@ export function DevelopersPage() {
       </div>
 
       <div className="px-14 py-20 text-center bg-surface">
-        <div className="text-[32px] font-extrabold tracking-tight">Pronto para construir sobre a Lastro?</div>
+        <div className="text-[34px] font-extrabold tracking-tight">Pronto para construir sobre a Lastro?</div>
         <div className="text-textSecondary text-[15px] mt-2.5">Chaves de teste em minutos, sem burocracia.</div>
         <div className="flex gap-3 justify-center mt-6.5">
           <Link to="/login" className="px-6.5 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">

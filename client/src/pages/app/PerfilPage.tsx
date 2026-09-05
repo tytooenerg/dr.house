@@ -300,7 +300,7 @@ export function PerfilPage() {
             {(user?.role === 'admin' ? [...NOTIF_ROWS, DIGEST_ROW] : NOTIF_ROWS).map((row) => (
               <div key={row.key} className="flex items-center justify-between">
                 <div>
-                  <div className="font-semibold text-[13.5px]">{row.label}</div>
+                  <div className="font-semibold text-[13px]">{row.label}</div>
                   <div className="text-textTertiary text-xs mt-0.5">{row.hint}</div>
                 </div>
                 <Toggle on={data.notifPrefs[row.key]} onClick={() => toggleNotif(row.key)} />
@@ -308,7 +308,7 @@ export function PerfilPage() {
             ))}
             <div className="flex items-center justify-between pt-2 border-t border-hairline">
               <div>
-                <div className="font-semibold text-[13.5px]">Também via WhatsApp</div>
+                <div className="font-semibold text-[13px]">Também via WhatsApp</div>
                 <div className="text-textTertiary text-xs mt-0.5">
                   {data.whatsappEnabled ? 'Envia as mesmas notificações para o telefone cadastrado' : 'Modo simulado — nenhum TWILIO_* configurado no servidor'}
                 </div>
@@ -318,7 +318,7 @@ export function PerfilPage() {
             {pushConfig?.enabled && 'serviceWorker' in navigator && 'PushManager' in window && (
               <div className="flex items-center justify-between pt-2 border-t border-hairline">
                 <div>
-                  <div className="font-semibold text-[13.5px]">Notificações push no navegador</div>
+                  <div className="font-semibold text-[13px]">Notificações push no navegador</div>
                   <div className="text-textTertiary text-xs mt-0.5">Alertas reais direto no seu navegador ou desktop, mesmo com a aba fechada</div>
                   {pushError && <div className="text-red text-xs mt-1 font-semibold">{pushError}</div>}
                 </div>
@@ -339,7 +339,7 @@ export function PerfilPage() {
                 <div className="w-[26px] h-[26px] rounded-md bg-blue flex items-center justify-center font-extrabold text-white text-xs">L</div>
                 <div className="font-bold text-[13px]">Lastro</div>
               </div>
-              <div className="font-bold text-[13.5px] mb-1">Novo lance no leilão DUP-2026-0842</div>
+              <div className="font-bold text-[13px] mb-1">Novo lance no leilão DUP-2026-0842</div>
               <div className="text-textSecondary text-[12.5px] leading-snug">Um financiador ofereceu 1,7% a.m. pela sua duplicata do Grupo Atlas Varejo. Restam 2h para o encerramento.</div>
             </div>
           </div>
@@ -347,7 +347,7 @@ export function PerfilPage() {
             <div className="px-3.5 py-2.5 bg-bg text-[11.5px] font-bold text-textSecondary">PUSH</div>
             <div className="p-4">
               <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-[22px] h-[22px] rounded-md bg-navy flex items-center justify-center font-extrabold text-white text-[11px]">L</div>
+                <div className="w-[22px] h-[22px] rounded-md bg-navy flex items-center justify-center font-extrabold text-white text-[11.5px]">L</div>
                 <div className="font-bold text-[12.5px]">Lastro · agora</div>
               </div>
               <div className="text-[13px] font-semibold">Sacado confirmou a duplicata DUP-2026-0917 ✓</div>
@@ -392,7 +392,7 @@ export function PerfilPage() {
             <Button type="button" size="sm" variant="ghost" onClick={() => { setDisabling2fa(false); setDisable2faPassword(''); setDisable2faError(''); }}>
               Cancelar
             </Button>
-            {disable2faError && <div className="w-full text-red text-[12px] font-semibold">{disable2faError}</div>}
+            {disable2faError && <div className="w-full text-red text-[12.5px] font-semibold">{disable2faError}</div>}
           </form>
         )}
 
@@ -421,14 +421,14 @@ export function PerfilPage() {
                 Cancelar
               </Button>
             </div>
-            {twoFactorError && <div className="text-red text-[12px] font-semibold">{twoFactorError}</div>}
+            {twoFactorError && <div className="text-red text-[12.5px] font-semibold">{twoFactorError}</div>}
           </form>
         )}
 
         {recoveryCodes && (
           <div className="flex flex-col gap-2.5 p-4 rounded-lg bg-surface">
             <div className="font-bold text-[13px] text-navy">2FA ativada — guarde estes códigos de recuperação</div>
-            <div className="text-[12px] text-textSecondary">Cada um só pode ser usado uma vez, caso você perca acesso ao seu app autenticador. Eles não serão mostrados novamente.</div>
+            <div className="text-[12.5px] text-textSecondary">Cada um só pode ser usado uma vez, caso você perca acesso ao seu app autenticador. Eles não serão mostrados novamente.</div>
             <div className="grid gap-1.5 font-mono-num text-[13px] font-bold" style={{ gridTemplateColumns: '1fr 1fr' }}>
               {recoveryCodes.map((c) => (
                 <div key={c} className="bg-white border border-border rounded-md px-3 py-1.5 text-center">{c}</div>
@@ -480,7 +480,7 @@ export function PerfilPage() {
           return (
             <div key={m.id} className="flex items-center justify-between px-5 py-3.5 border-b border-hairline last:border-b-0">
               <div>
-                <div className="font-semibold text-[13.5px]">{m.nome}</div>
+                <div className="font-semibold text-[13px]">{m.nome}</div>
                 <div className="text-textTertiary text-xs mt-0.5">{m.email}</div>
               </div>
               <div className="flex items-center gap-2">
@@ -532,7 +532,7 @@ export function PerfilPage() {
               ))}
             </div>
           )}
-          {referral.indicados.length === 0 && <div className="text-textTertiary text-[12px]">Ninguém se cadastrou com seu link ainda.</div>}
+          {referral.indicados.length === 0 && <div className="text-textTertiary text-[12.5px]">Ninguém se cadastrou com seu link ainda.</div>}
         </Card>
       )}
 
@@ -558,7 +558,7 @@ export function PerfilPage() {
               mantidos de forma anonimizada, conforme obrigação legal. Confirme sua senha para continuar.
             </div>
             <Input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} placeholder="Sua senha" />
-            {deleteError && <div className="text-red text-[12px] font-semibold">{deleteError}</div>}
+            {deleteError && <div className="text-red text-[12.5px] font-semibold">{deleteError}</div>}
             <Button type="submit" variant="danger" disabled={deleting || !deletePassword} className="self-start">
               {deleting ? 'Excluindo…' : 'Confirmar exclusão definitiva'}
             </Button>

@@ -212,7 +212,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
           <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
             <div>
               <div className="font-mono-num font-bold text-[13px] text-textSecondary">{c.duplicataId}</div>
-              <div className="font-bold text-[16px] mt-1">
+              <div className="font-bold text-[15px] mt-1">
                 {c.cedente} → {c.sacado} — {c.valorFmt}
               </div>
               <div className="text-textSecondary text-[12.5px] mt-1">Vencimento {c.vencimento} · suspensa {c.quando}</div>
@@ -284,14 +284,14 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
           <div key={s.id} className="rounded-[10px] p-4 mb-3 last:mb-0" style={{ border: `1px solid ${s.severidade === 'critico' ? PALETTE.redBorder : PALETTE.border}` }}>
             <div className="flex items-start justify-between gap-2.5 mb-2">
               <div>
-                <div className="font-bold text-[13.5px]">
+                <div className="font-bold text-[13px]">
                   {s.empresa} <span className="font-normal text-textMuted">— {SAR_TIPO_LABELS[s.tipo] ?? s.tipo}</span>
                 </div>
                 <div className="text-textSecondary text-[12.5px] mt-1">{s.descricao}</div>
-                <div className="text-textTertiary text-[11px] mt-1">{s.quando}</div>
+                <div className="text-textTertiary text-[11.5px] mt-1">{s.quando}</div>
               </div>
               <span
-                className="text-[11px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap"
+                className="text-[11.5px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap"
                 style={s.severidade === 'critico' ? { background: PALETTE.redBg, color: PALETTE.red } : { background: PALETTE.amberBg, color: PALETTE.amber }}
               >
                 {s.severidade === 'critico' ? 'Crítico' : 'Atenção'}

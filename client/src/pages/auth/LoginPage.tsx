@@ -193,7 +193,7 @@ export function LoginPage() {
           </div>
           <form onSubmit={handleVerifyTwoFactor}>
             <div className="text-xl font-extrabold mb-1">Verificação em duas etapas</div>
-            <div className="text-textSecondary text-[13.5px] mb-6">Digite o código de 6 dígitos do seu app autenticador, ou um código de recuperação.</div>
+            <div className="text-textSecondary text-[13px] mb-6">Digite o código de 6 dígitos do seu app autenticador, ou um código de recuperação.</div>
             <div className="mb-5">
               <Field label="Código">
                 <Input
@@ -269,7 +269,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={continueWithGoogle}
-                className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-inputBorder bg-white text-[13.5px] font-bold cursor-pointer mb-3 hover:bg-bg"
+                className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-inputBorder bg-white text-[13px] font-bold cursor-pointer mb-3 hover:bg-bg"
               >
                 {/* Logo do Google: as 4 cores abaixo são da marca do Google, não da nossa
                     paleta (client/src/lib/palette.ts) — trocá-las por tokens nossos
@@ -287,7 +287,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={continueWithSaml}
-                className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-inputBorder bg-white text-[13.5px] font-bold cursor-pointer mb-4 hover:bg-bg"
+                className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-inputBorder bg-white text-[13px] font-bold cursor-pointer mb-4 hover:bg-bg"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <rect x="3" y="10" width="18" height="10" rx="1.5" stroke={PALETTE.blue} strokeWidth="2" />
@@ -307,7 +307,7 @@ export function LoginPage() {
         {mode === 'login' ? (
           <form onSubmit={handleLogin}>
             <div className="text-xl font-extrabold mb-1">Entrar na plataforma</div>
-            <div className="text-textSecondary text-[13.5px] mb-6">Use uma das contas de demonstração ou a sua conta cadastrada</div>
+            <div className="text-textSecondary text-[13px] mb-6">Use uma das contas de demonstração ou a sua conta cadastrada</div>
             <div className="flex flex-col gap-3.5 mb-5">
               <Field label="E-mail">
                 <Input type="email" required autoComplete="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="voce@empresa.com.br" />
@@ -320,7 +320,7 @@ export function LoginPage() {
             <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting}>
               {submitting ? 'Entrando…' : 'Entrar'}
             </Button>
-            <div className="mt-5 p-3.5 rounded-lg bg-bg text-[12px] text-textSecondary leading-relaxed">
+            <div className="mt-5 p-3.5 rounded-lg bg-bg text-[12.5px] text-textSecondary leading-relaxed">
               <b>Contas de demonstração</b> (senha <code>demo1234</code>):<br />
               investidor@lastro.demo · cedente@lastro.demo · sacado@lastro.demo · seguradora@lastro.demo
             </div>
@@ -328,7 +328,7 @@ export function LoginPage() {
         ) : (
           <form onSubmit={handleRegister}>
             <div className="text-xl font-extrabold mb-1">Criar conta</div>
-            <div className="text-textSecondary text-[13.5px] mb-6">Escolha como você quer acessar a plataforma</div>
+            <div className="text-textSecondary text-[13px] mb-6">Escolha como você quer acessar a plataforma</div>
 
             <div className="flex flex-col gap-2.5 mb-4">
               {ROLES.map((r) => {
@@ -365,7 +365,7 @@ export function LoginPage() {
                       key={ins.key}
                       type="button"
                       onClick={() => setInsurerKey(ins.key)}
-                      className="px-3.5 py-2.5 rounded-lg border text-[13.5px] font-semibold text-left cursor-pointer"
+                      className="px-3.5 py-2.5 rounded-lg border text-[13px] font-semibold text-left cursor-pointer"
                       style={{ borderColor: insurerKey === ins.key ? PALETTE.blue : PALETTE.border, background: insurerKey === ins.key ? PALETTE.chip : '#fff' }}
                     >
                       {ins.name}

@@ -51,7 +51,7 @@ export function KybModal() {
   return (
     <ModalOverlay maxWidth={520}>
       <div className="text-[12.5px] font-bold text-blue uppercase tracking-wide mb-1.5">Credenciamento institucional</div>
-      <div className="text-[21px] font-extrabold mb-5">Antes de participar do leilão</div>
+      <div className="text-[20px] font-extrabold mb-5">Antes de participar do leilão</div>
 
         {step === 0 && (
           <div className="flex flex-col gap-3.5 mb-2">
@@ -64,7 +64,7 @@ export function KybModal() {
                 className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
                 style={{ border: `2px solid ${naoResidente ? PALETTE.blue : PALETTE.borderStrong}`, background: naoResidente ? PALETTE.blue : '#fff' }}
               >
-                {naoResidente && <span className="text-white text-[11px] leading-none">✓</span>}
+                {naoResidente && <span className="text-white text-[11.5px] leading-none">✓</span>}
               </span>
               Somos um investidor não residente (instituição estrangeira)
             </button>
@@ -100,7 +100,7 @@ export function KybModal() {
                       key={t}
                       type="button"
                       onClick={() => setTipo(t)}
-                      className="px-3.5 py-2.5 rounded-lg border border-inputBorder text-[13.5px] font-semibold cursor-pointer text-left"
+                      className="px-3.5 py-2.5 rounded-lg border border-inputBorder text-[13px] font-semibold cursor-pointer text-left"
                       style={{ background: selected ? PALETTE.blue : '#fff', color: selected ? '#fff' : PALETTE.navy }}
                     >
                       {t}
@@ -132,7 +132,7 @@ export function KybModal() {
               onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-borderStrong rounded-xl p-[22px] text-center cursor-pointer bg-transparent"
             >
-              <div className="font-bold text-[13.5px]">{docUploaded ? 'Documento enviado ✓' : uploading ? 'Enviando…' : 'Envie sua autorização regulatória'}</div>
+              <div className="font-bold text-[13px]">{docUploaded ? 'Documento enviado ✓' : uploading ? 'Enviando…' : 'Envie sua autorização regulatória'}</div>
               <div className="text-textSecondary text-[12.5px] mt-1">Ato de autorização BCB/CVM ou contrato social + procuração</div>
             </button>
           </div>
@@ -141,10 +141,10 @@ export function KybModal() {
         {step === 2 && (
           <div className="flex flex-col gap-3 mb-2">
             <div className="p-4 rounded-[10px] bg-navy text-white">
-              <div className="text-[22px] font-extrabold">R$ 128,4M</div>
+              <div className="text-[20px] font-extrabold">R$ 128,4M</div>
               <div className="text-onNavy text-[12.5px] mt-1">já em oferta ativa no marketplace este mês — sua instituição pode começar a dar lances assim que aprovada</div>
             </div>
-            <div className="p-4 rounded-[10px] bg-bg text-[13.5px] text-slate leading-relaxed">
+            <div className="p-4 rounded-[10px] bg-bg text-[13px] text-slate leading-relaxed">
               Sua instituição será verificada junto ao Banco Central antes da liberação total para leilão — enquanto isso, você já pode explorar o marketplace em modo consulta.
             </div>
             <div className="flex items-center gap-2.5">

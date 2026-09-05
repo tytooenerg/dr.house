@@ -97,11 +97,11 @@ export function RiscoPage() {
               color={selected.scoreColor}
               size={150}
               innerLabel={
-                <div className="text-[30px] font-extrabold" style={{ color: selected.scoreColor }}>
+                <div className="text-[26px] font-extrabold" style={{ color: selected.scoreColor }}>
                   {selected.score}
                 </div>
               }
-              innerSub={<div className="text-[11px] text-textSecondary">score de 0–100</div>}
+              innerSub={<div className="text-[11.5px] text-textSecondary">score de 0–100</div>}
             />
             <div className="font-bold text-base mt-[18px]">{selected.name}</div>
             <span className="text-[12.5px] font-bold px-2.5 py-1 rounded-md mt-2" style={{ background: selected.ratingBg, color: selected.ratingColor }}>
@@ -134,7 +134,7 @@ export function RiscoPage() {
             <div className="flex flex-col gap-4">
               {selected.factors.map((f) => (
                 <div key={f.label}>
-                  <div className="flex justify-between text-[13.5px] mb-1.5">
+                  <div className="flex justify-between text-[13px] mb-1.5">
                     <span className="font-semibold">{f.label}</span>
                     <span className="text-textSecondary">{f.value}</span>
                   </div>

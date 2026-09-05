@@ -140,7 +140,7 @@ export function CompliancePage() {
             <div key={r.name} className="p-4 rounded-[10px] bg-bg">
               <div className="flex items-center gap-2 mb-2">
                 <span className="rounded-full bg-green" style={{ width: 8, height: 8 }} />
-                <span className="font-bold text-[13.5px]">{r.name}</span>
+                <span className="font-bold text-[13px]">{r.name}</span>
               </div>
               <div className="text-textSecondary text-xs leading-snug">Roteamento inteligente ativo · última operação: {r.lastCheck}</div>
             </div>
@@ -182,7 +182,7 @@ export function CompliancePage() {
                 <span className="rounded-[2px]" style={{ width: 8, height: 8, background: req.color }} />
               </span>
               <div>
-                <div className="font-semibold text-[13.5px]">{req.label}</div>
+                <div className="font-semibold text-[13px]">{req.label}</div>
                 <div className="text-textSecondary text-[12.5px] mt-0.5 leading-snug">{req.desc}</div>
               </div>
             </div>
@@ -197,7 +197,7 @@ export function CompliancePage() {
             <div key={c.label} className="flex items-center gap-3.5">
               <span className="rounded-full flex-shrink-0" style={{ width: 10, height: 10, background: c.dotColor }} />
               <div className="flex-1">
-                <div className="font-semibold text-[13.5px]">{c.label}</div>
+                <div className="font-semibold text-[13px]">{c.label}</div>
                 <div className="text-textSecondary text-[12.5px]">{c.periodo}</div>
               </div>
               <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: c.statusBg, color: c.statusColor }}>
@@ -219,7 +219,7 @@ export function CompliancePage() {
         </div>
         {dupResult && dupResult.matches.length === 0 && (
           <div className="mt-4 p-4 rounded-[10px] bg-greenBg" style={{ border: `1px solid ${PALETTE.greenBorder}` }}>
-            <div className="font-bold text-[13.5px] text-green">Nenhum registro encontrado para esta consulta</div>
+            <div className="font-bold text-[13px] text-green">Nenhum registro encontrado para esta consulta</div>
           </div>
         )}
         {dupResult && dupResult.matches.length > 0 && (
@@ -230,11 +230,11 @@ export function CompliancePage() {
                 className="p-4 rounded-[10px]"
                 style={m.duplicidadeSuspeita ? { background: PALETTE.redBg, border: `1px solid ${PALETTE.redBorder}` } : { background: PALETTE.surface }}
               >
-                <div className="font-bold text-[13.5px]" style={{ color: m.duplicidadeSuspeita ? PALETTE.red : undefined }}>
+                <div className="font-bold text-[13px]" style={{ color: m.duplicidadeSuspeita ? PALETTE.red : undefined }}>
                   {m.duplicidadeSuspeita ? 'Possível duplicidade — ' : ''}
                   {m.valorFmt} · vencimento {m.vencimento} · {m.ocorrencias.length} registro{m.ocorrencias.length > 1 ? 's' : ''}
                 </div>
-                <div className="text-[11px] font-semibold mt-1 text-textSecondary">
+                <div className="text-[11.5px] font-semibold mt-1 text-textSecondary">
                   {m.confirmadoNaRegistradora === null
                     ? 'Verificado apenas na base da Lastro — registradora não configurada para checagem direta'
                     : m.confirmadoNaRegistradora
@@ -257,7 +257,7 @@ export function CompliancePage() {
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <Card>
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="font-bold text-[14.5px]">Detecção de fraude</div>
+            <div className="font-bold text-[14px]">Detecção de fraude</div>
           </div>
           <div className="text-textSecondary text-[12.5px] mb-3.5">Calculado em tempo real a partir das duplicatas emitidas: valores fora do padrão histórico do sacado e tentativas de reuso de NF-e</div>
           <div className="flex flex-col gap-2">
@@ -272,7 +272,7 @@ export function CompliancePage() {
         <Card>
           <div className="flex items-center gap-2 mb-1.5">
             {!data.contractFlagsReal && <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-chip text-blue">Simulado</span>}
-            <div className="font-bold text-[14.5px]">Leitura de contratos</div>
+            <div className="font-bold text-[14px]">Leitura de contratos</div>
           </div>
           <div className="text-textSecondary text-[12.5px] mb-3.5">
             {data.contractFlagsReal

@@ -105,7 +105,7 @@ export function SeguradoraPage() {
             <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
               <div>
                 <div className="font-mono-num font-bold text-[13px] text-textSecondary">{s.id}</div>
-                <div className="font-bold text-[16px] mt-1">
+                <div className="font-bold text-[15px] mt-1">
                   {s.sacado} não pagou {s.cedente} — {s.valorFmt}
                 </div>
                 <div className="text-textSecondary text-[12.5px] mt-1">Venceu em {s.vencimento} e nunca foi vendida no marketplace</div>

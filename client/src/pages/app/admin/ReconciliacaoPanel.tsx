@@ -150,7 +150,7 @@ export function ReconciliacaoPanel() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-[16px] font-bold text-navy">Reconciliação de pagamentos</h2>
+          <h2 className="text-[15px] font-bold text-navy">Reconciliação de pagamentos</h2>
           <p className="text-[13px] text-navy/60 mt-1 max-w-2xl">
             Compara confirmações reais de Pix/boleto/TED contra o extrato de cada conta e sinaliza qualquer confirmação sem lançamento
             correspondente — ver server/src/lib/reconciliation.ts. Pagamentos simulados não entram nesta checagem.
@@ -184,7 +184,7 @@ export function ReconciliacaoPanel() {
                     <span className="text-[13px] font-bold text-navy">{f.company_name}</span>
                   </div>
                   <p className="text-[12.5px] text-navy/70 mt-1 max-w-2xl">{f.descricao}</p>
-                  <div className="text-[11px] text-navy/40 mt-1">Aberto em {f.created_at}</div>
+                  <div className="text-[11.5px] text-navy/40 mt-1">Aberto em {f.created_at}</div>
                 </div>
                 <Button size="sm" disabled={resolvingId === f.id} onClick={() => resolve(f.id)}>
                   {resolvingId === f.id ? 'Resolvendo…' : 'Marcar resolvido'}
@@ -200,7 +200,7 @@ export function ReconciliacaoPanel() {
           <div className="text-[13px] font-bold text-navy mb-2">Resolvidos ({resolved.length})</div>
           <div className="flex flex-col gap-1.5">
             {resolved.map((f) => (
-              <div key={f.id} className="text-[12px] text-navy/50 flex items-center gap-2">
+              <div key={f.id} className="text-[12.5px] text-navy/50 flex items-center gap-2">
                 <span className="font-bold">{TIPO_LABEL[f.tipo]}</span>
                 <span>{f.company_name}</span>
                 <span>— resolvido em {f.resolved_at}</span>
