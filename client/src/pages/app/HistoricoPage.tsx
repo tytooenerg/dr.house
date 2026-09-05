@@ -252,7 +252,7 @@ export function HistoricoPage() {
           retenção automática (a Lastro ainda não retém imposto nas liquidações).
         </div>
         <div className="flex items-center gap-2.5">
-          <input
+          <input aria-label="Ano-calendário do informe"
             type="number"
             min={2020}
             max={new Date().getFullYear()}
@@ -277,7 +277,7 @@ export function HistoricoPage() {
           </div>
           <div className="flex items-center gap-2.5 mb-3.5">
             <span className="text-textSecondary text-[12.5px]">Taxa livre de risco (% a.a.)</span>
-            <input
+            <input aria-label="Taxa livre de risco (% a.a.)"
               type="number"
               step="0.1"
               className="w-24 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
@@ -411,23 +411,23 @@ export function HistoricoPage() {
         </NavyCard>
       )}
 
-      <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
-          <div>Data</div>
-          <div>Empresa</div>
-          <div>Investido</div>
-          <div>Retorno</div>
-          <div>Status</div>
-          <div>Coobrigação</div>
-        </div>
+      <div role="table" aria-label="Operações concluídas" className="bg-white border border-border rounded-card overflow-hidden">
+        <div role="rowgroup"><div role="row" className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
+          <div role="columnheader">Data</div>
+          <div role="columnheader">Empresa</div>
+          <div role="columnheader">Investido</div>
+          <div role="columnheader">Retorno</div>
+          <div role="columnheader">Status</div>
+          <div role="columnheader">Coobrigação</div>
+        </div></div>
         {historico.map((h, i) => (
-          <div key={i} className="grid gap-3 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" style={{ gridTemplateColumns: COLS }}>
-            <div className="text-textSecondary font-mono-num text-[13px]">{h.data}</div>
-            <div className="font-semibold">{h.empresa}</div>
-            <div className="font-mono-num">{h.investidoFmt}</div>
-            <div className="font-mono-num text-green font-bold">{h.retornoFmt}</div>
-            <Badge variant="success" className="inline-block">{h.status}</Badge>
-            <span
+          <div role="row" key={i} className="grid gap-3 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" style={{ gridTemplateColumns: COLS }}>
+            <div role="cell" className="text-textSecondary font-mono-num text-[13px]">{h.data}</div>
+            <div role="cell" className="font-semibold">{h.empresa}</div>
+            <div role="cell" className="font-mono-num">{h.investidoFmt}</div>
+            <div role="cell" className="font-mono-num text-green font-bold">{h.retornoFmt}</div>
+            <Badge role="cell" variant="success" className="inline-block">{h.status}</Badge>
+            <span role="cell"
               className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md w-fit"
               style={h.comRegresso ? { background: PALETTE.chip, color: PALETTE.blue } : { background: PALETTE.hairline, color: PALETTE.textSecondary }}
               title="Res. BCB 540/2025 — aquisição com regresso: o cedente permanece coobrigado pela duplicata"

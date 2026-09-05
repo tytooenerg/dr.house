@@ -142,7 +142,7 @@ export function AddonRevenuePanel() {
       <div className="px-5 py-3.5 border-b border-bg">
         <div className="text-[12.5px] font-bold text-textMuted uppercase mb-2">Franquia mensal da API (chamadas incluídas antes do excedente)</div>
         <div className="flex items-center gap-2">
-          <input
+          <input aria-label="Chamadas incluídas no plano"
             value={includedCallsInput}
             onChange={(e) => setIncludedCallsInput(e.target.value)}
             className="w-32 px-2.5 py-1.5 rounded-md border border-inputBorder font-mono-num text-[12.5px]"
@@ -163,7 +163,7 @@ export function AddonRevenuePanel() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <input
+              <input aria-label="Preço do add-on"
                 value={addonPriceInputs[p.kind] ?? ''}
                 onChange={(e) => setAddonPriceInputs((prev) => ({ ...prev, [p.kind]: e.target.value }))}
                 className="w-24 px-2.5 py-1.5 rounded-md border border-inputBorder font-mono-num text-[12.5px]"

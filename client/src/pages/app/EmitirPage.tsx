@@ -371,7 +371,7 @@ export function EmitirPage() {
             <div className="text-textSecondary text-xs mb-2.5">Emita várias notas do mesmo sacado de uma vez — economize tempo com emissão em lote</div>
             {batchRows.map((row) => (
               <div key={row.id} className="flex items-center gap-2 mb-2">
-                <input
+                <input aria-label="Valor (R$)"
                   placeholder="Valor (R$)"
                   value={row.valor}
                   onChange={(e) => updateBatchRow(row.id, e.target.value)}

@@ -119,7 +119,7 @@ function FundoCard() {
             </div>
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <input
+            <input aria-label="Valor em R$"
               type="text"
               inputMode="decimal"
               placeholder="Valor em R$"
@@ -405,7 +405,7 @@ export function ConfirmingPage() {
                         <span className="text-[11.5px] font-bold text-green">Matriculado</span>
                       ) : (
                         <div className="flex items-center gap-1.5">
-                          <input
+                          <input aria-label="Sublimite do cedente"
                             placeholder={`Sublimite (sugestão: ${c.sublimiteSugeridoFmt})`}
                             value={sublimiteById[c.cedenteUserId] ?? ''}
                             onChange={(e) => setSublimiteById((s) => ({ ...s, [c.cedenteUserId]: e.target.value }))}

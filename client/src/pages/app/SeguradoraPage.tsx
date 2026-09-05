@@ -128,7 +128,7 @@ export function SeguradoraPage() {
               <div className="text-[12.5px] text-textSecondary mb-3">Triagem indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>
             )}
             <div className="flex items-center gap-2.5 flex-wrap">
-              <input
+              <input aria-label="Nota da decisão"
                 className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[13px]"
                 placeholder="Nota da decisão"
                 value={noteById[s.id] ?? ''}
@@ -151,26 +151,26 @@ export function SeguradoraPage() {
       </div>
 
       <div className="font-bold text-[15px] mb-3">Apólices</div>
-      <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div
+      <div role="table" aria-label="Apólices e sinistros" className="bg-white border border-border rounded-card overflow-hidden">
+        <div role="rowgroup"><div role="row"
           className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
           style={{ gridTemplateColumns: '1.2fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr' }}
         >
-          <div>Cedente</div>
-          <div>Sacado</div>
-          <div>Valor</div>
-          <div>Vencimento</div>
-          <div>Prêmio</div>
-          <div>Status</div>
-        </div>
+          <div role="columnheader">Cedente</div>
+          <div role="columnheader">Sacado</div>
+          <div role="columnheader">Valor</div>
+          <div role="columnheader">Vencimento</div>
+          <div role="columnheader">Prêmio</div>
+          <div role="columnheader">Status</div>
+        </div></div>
         {data.apolices.map((a) => (
-          <div key={a.id} className="grid gap-3 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" style={{ gridTemplateColumns: '1.2fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr' }}>
-            <div className="font-semibold">{a.cedente}</div>
-            <div className="text-textSecondary">{a.sacado}</div>
-            <div className="font-mono-num">{a.valorFmt}</div>
-            <div className="text-textSecondary">{a.vencimento}</div>
-            <div className="font-mono-num text-green font-bold">{a.premioFmt}</div>
-            <div className="text-[11.5px] font-bold">
+          <div role="row" key={a.id} className="grid gap-3 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" style={{ gridTemplateColumns: '1.2fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr' }}>
+            <div role="cell" className="font-semibold">{a.cedente}</div>
+            <div role="cell" className="text-textSecondary">{a.sacado}</div>
+            <div role="cell" className="font-mono-num">{a.valorFmt}</div>
+            <div role="cell" className="text-textSecondary">{a.vencimento}</div>
+            <div role="cell" className="font-mono-num text-green font-bold">{a.premioFmt}</div>
+            <div role="cell" className="text-[11.5px] font-bold">
               {a.sinistroStatus === 'none' ? 'Sem sinistro' : a.sinistroStatus === 'aprovado' ? 'Indenizada' : 'Negada'}
             </div>
           </div>

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { PALETTE } from '../../lib/palette';
 
 // As pílulas de status estavam montadas à mão em 26 arquivos — 46 delas, em 11 formas
@@ -34,6 +34,7 @@ export function Badge({
   bg,
   color,
   className = '',
+  ...rest
 }: {
   label?: string;
   children?: ReactNode;
@@ -42,10 +43,12 @@ export function Badge({
   bg?: string;
   color?: string;
   className?: string;
-}) {
+  // Repassa atributos de <span> — o Badge às vezes É a célula de uma tabela e precisa
+  // carregar role="cell", ou um aria-label quando o texto sozinho não basta.
+} & Omit<HTMLAttributes<HTMLSpanElement>, 'color'>) {
   const v = variant ? VARIANT[variant] : { bg: bg ?? PALETTE.hairline, color: color ?? PALETTE.textSecondary };
   return (
-    <span className={`inline-flex items-center font-bold w-fit ${SIZE[size]} ${className}`} style={{ background: v.bg, color: v.color }}>
+    <span className={`inline-flex items-center font-bold w-fit ${SIZE[size]} ${className}`} style={{ background: v.bg, color: v.color }} {...rest}>
       {children ?? label}
     </span>
   );

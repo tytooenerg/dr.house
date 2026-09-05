@@ -68,7 +68,7 @@ function BankStatementUploadCard({ onReconciled }: { onReconciled: () => void })
         reconciliação interna (Pix/boleto/TED) nunca alcança, porque essa nunca lê o banco de verdade.
       </p>
       <div className="flex items-center gap-2.5 flex-wrap mb-2.5">
-        <input
+        <input aria-label="E-mail da conta"
           placeholder="E-mail da conta"
           value={email}
           onChange={(e) => setEmail(e.target.value)}

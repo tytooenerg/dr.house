@@ -250,8 +250,8 @@ export function MarketplacePage() {
       />
 
       <div className="flex gap-2.5 mb-2.5 flex-wrap">
-        <Input placeholder={t('marketplace.searchPlaceholder', 'Buscar por sacado ou cedente')} value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[340px]" />
-        <Select value={sort} onChange={(e) => setSort(e.target.value)}>
+        <Input aria-label="Buscar por sacado ou cedente" placeholder={t('marketplace.searchPlaceholder', 'Buscar por sacado ou cedente')} value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[340px]" />
+        <Select aria-label="Ordenar ofertas" value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="taxa">{t('marketplace.sortRate', 'Ordenar: melhor deságio')}</option>
           <option value="score">{t('marketplace.sortScore', 'Ordenar: maior score')}</option>
           <option value="valor">{t('marketplace.sortValue', 'Ordenar: maior valor')}</option>
@@ -260,7 +260,7 @@ export function MarketplacePage() {
       </div>
 
       <div className="flex gap-2.5 mb-4 flex-wrap items-center">
-        <Select value={setorFilter} onChange={(e) => setSetorFilter(e.target.value)}>
+        <Select aria-label="Filtrar por setor" value={setorFilter} onChange={(e) => setSetorFilter(e.target.value)}>
           <option value="">{t('marketplace.filterSector', 'Setor: todos')}</option>
           {SETOR_OPTIONS.map((s) => (
             <option key={s.value} value={s.value}>
@@ -268,7 +268,7 @@ export function MarketplacePage() {
             </option>
           ))}
         </Select>
-        <Select value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
+        <Select aria-label="Filtrar por rating" value={ratingFilter} onChange={(e) => setRatingFilter(e.target.value)}>
           <option value="">{t('marketplace.filterRating', 'Rating: todos')}</option>
           {RATING_OPTIONS.map((r) => (
             <option key={r} value={r}>
@@ -277,14 +277,14 @@ export function MarketplacePage() {
           ))}
         </Select>
         <div className="flex items-center gap-1.5">
-          <Input type="number" placeholder={t('marketplace.valueMin', 'Valor mín.')} value={valorMin} onChange={(e) => setValorMin(e.target.value)} className="w-[120px]" />
+          <Input aria-label="Valor mínimo" type="number" placeholder={t('marketplace.valueMin', 'Valor mín.')} value={valorMin} onChange={(e) => setValorMin(e.target.value)} className="w-[120px]" />
           <span className="text-textTertiary text-xs">–</span>
-          <Input type="number" placeholder={t('marketplace.valueMax', 'Valor máx.')} value={valorMax} onChange={(e) => setValorMax(e.target.value)} className="w-[120px]" />
+          <Input aria-label="Valor máximo" type="number" placeholder={t('marketplace.valueMax', 'Valor máx.')} value={valorMax} onChange={(e) => setValorMax(e.target.value)} className="w-[120px]" />
         </div>
         <div className="flex items-center gap-1.5">
-          <Input type="number" placeholder={t('marketplace.prazoMin', 'Prazo mín. (dias)')} value={prazoMin} onChange={(e) => setPrazoMin(e.target.value)} className="w-[140px]" />
+          <Input aria-label="Prazo mínimo em dias" type="number" placeholder={t('marketplace.prazoMin', 'Prazo mín. (dias)')} value={prazoMin} onChange={(e) => setPrazoMin(e.target.value)} className="w-[140px]" />
           <span className="text-textTertiary text-xs">–</span>
-          <Input type="number" placeholder={t('marketplace.prazoMax', 'Prazo máx. (dias)')} value={prazoMax} onChange={(e) => setPrazoMax(e.target.value)} className="w-[140px]" />
+          <Input aria-label="Prazo máximo em dias" type="number" placeholder={t('marketplace.prazoMax', 'Prazo máx. (dias)')} value={prazoMax} onChange={(e) => setPrazoMax(e.target.value)} className="w-[140px]" />
         </div>
         {hasActiveFilters && (
           <Button size="sm" variant="secondary" onClick={clearFilters}>
@@ -293,25 +293,25 @@ export function MarketplacePage() {
         )}
       </div>
 
-      <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div
+      <div role="table" aria-label="Ofertas do marketplace" className="bg-white border border-border rounded-card overflow-hidden">
+        <div role="rowgroup"><div role="row"
           className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
           style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}
         >
-          <div>{t('marketplace.colSacado', 'Sacado')}</div>
-          <div>{t('marketplace.colCedente', 'Cedente')}</div>
-          <div>{t('marketplace.colValor', 'Valor')}</div>
-          <div>{t('marketplace.colDesagio', 'Deságio')}</div>
-          <div>{t('marketplace.colVencimento', 'Vencimento')}</div>
-          <div>{t('marketplace.colAction', 'Score / Aceite / Ação')}</div>
-        </div>
+          <div role="columnheader">{t('marketplace.colSacado', 'Sacado')}</div>
+          <div role="columnheader">{t('marketplace.colCedente', 'Cedente')}</div>
+          <div role="columnheader">{t('marketplace.colValor', 'Valor')}</div>
+          <div role="columnheader">{t('marketplace.colDesagio', 'Deságio')}</div>
+          <div role="columnheader">{t('marketplace.colVencimento', 'Vencimento')}</div>
+          <div role="columnheader">{t('marketplace.colAction', 'Score / Aceite / Ação')}</div>
+        </div></div>
 
         {offers.map((offer) => {
           const isExpanded = expanded.has(offer.id);
           return (
             <div key={offer.id} className="border-b border-border last:border-b-0">
-              <div className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}>
-                <div>
+              <div role="row" className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}>
+                <div role="cell">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-semibold">{offer.sacado}</span>
                     {offer.setor && offer.setorLabel && (
@@ -320,16 +320,16 @@ export function MarketplacePage() {
                   </div>
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
                 </div>
-                <div className="text-textSecondary">{offer.cedente}</div>
-                <div>
+                <div role="cell" className="text-textSecondary">{offer.cedente}</div>
+                <div role="cell">
                   <div className="font-bold font-mono-num">{offer.valorFmt}</div>
                   <div className="text-[11.5px] text-textTertiary font-mono-num" title="Preço com deságio — o que você paga agora; recebe o valor de face de volta no vencimento">
                     Você paga {offer.precoCompraFmt}
                   </div>
                 </div>
-                <div className="text-green font-bold">{offer.desagio}</div>
-                <div className="text-textSecondary">{offer.vencimento}</div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div role="cell" className="text-green font-bold">{offer.desagio}</div>
+                <div role="cell" className="text-textSecondary">{offer.vencimento}</div>
+                <div role="cell" className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11.5px] font-bold px-2 py-1 rounded-md" style={{ background: offer.scoreBg, color: offer.scoreColor }}>
                     {offer.score}
                   </span>
@@ -441,7 +441,7 @@ export function MarketplacePage() {
                           <div className="text-[12.5px] font-bold text-green">{t('marketplace.fullyAllocated', 'Totalmente alocada.')}</div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <Input
+                            <Input aria-label="Quantidade de tokens a comprar"
                               placeholder={`até ${fractionalOffering.tokensRestantes} tokens`}
                               value={fractionalTokensInput}
                               onChange={(e) => setFractionalTokensInput(e.target.value)}
@@ -455,7 +455,7 @@ export function MarketplacePage() {
                       </>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Input placeholder={t('marketplace.tokenQtyPlaceholder', 'quantidade de tokens')} value={fractionalTokensInput} onChange={(e) => setFractionalTokensInput(e.target.value)} className="flex-1" />
+                        <Input aria-label="Quantidade de tokens" placeholder={t('marketplace.tokenQtyPlaceholder', 'quantidade de tokens')} value={fractionalTokensInput} onChange={(e) => setFractionalTokensInput(e.target.value)} className="flex-1" />
                         <Button size="sm" disabled={fractionalBusy} onClick={() => buyFractionalTokens(offer.id)}>
                           {fractionalBusy ? t('marketplace.buying', 'Comprando…') : t('marketplace.buyTokens', 'Comprar tokens')}
                         </Button>

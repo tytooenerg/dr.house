@@ -77,7 +77,7 @@ export function RiscoPage() {
       <PageHeader title="Análise de Risco do Sacado" subtitle="Consulte o score de crédito antes de comprar uma duplicata" />
 
       <div className="relative max-w-[440px] mb-5">
-        <Input placeholder="Buscar empresa sacada (ex: Grupo Atlas)" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <Input aria-label="Buscar empresa sacada (ex: Grupo Atlas)" placeholder="Buscar empresa sacada (ex: Grupo Atlas)" value={query} onChange={(e) => setQuery(e.target.value)} />
         {suggestions.length > 0 && (
           <div className="absolute top-[calc(100%+6px)] left-0 right-0 bg-white border border-border rounded-[10px] shadow-dropdown overflow-hidden z-10">
             {suggestions.map((s) => (

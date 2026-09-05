@@ -361,7 +361,7 @@ export function ContaPage() {
           <div className="p-3.5 rounded-[10px] bg-surface text-[13px] font-semibold mb-4">{data.bankAccountDisplay}</div>
           {!data.pixChave && (
             <div className="flex gap-2 mb-4">
-              <input
+              <input aria-label="Chave Pix para liquidação"
                 value={pixKeyInput}
                 onChange={(e) => setPixKeyInput(e.target.value)}
                 placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
@@ -396,7 +396,7 @@ export function ContaPage() {
             </div>
           )}
           <div className="flex gap-2 mb-4">
-            <input
+            <input aria-label="Valor do depósito via Pix"
               value={depositValor}
               onChange={(e) => setDepositValor(e.target.value)}
               placeholder="Valor (R$)"
@@ -433,7 +433,7 @@ export function ContaPage() {
             <>
               <div className="text-[12.5px] text-textSecondary mb-3">Enviado para {data.pixChave}{!data.pixEnabled && ' (simulado)'}</div>
               <div className="flex gap-2">
-                <input
+                <input aria-label="Valor do saque via Pix"
                   value={withdrawValor}
                   onChange={(e) => setWithdrawValor(e.target.value)}
                   placeholder="Valor (R$)"
@@ -460,7 +460,7 @@ export function ContaPage() {
           </div>
         )}
         <div className="flex gap-2 mb-4">
-          <input
+          <input aria-label="Valor do depósito via boleto"
             value={boletoValor}
             onChange={(e) => setBoletoValor(e.target.value)}
             placeholder="Valor (R$)"
@@ -510,7 +510,7 @@ export function ContaPage() {
               : 'Modo simulado — nenhum provedor de TED real configurado (TED_PSP_* ou LASTRO_TED_*). Dados bancários abaixo são fictícios.'}
           </div>
           <div className="flex gap-2 mb-4">
-            <input
+            <input aria-label="Valor do depósito via TED"
               value={tedDepositValor}
               onChange={(e) => setTedDepositValor(e.target.value)}
               placeholder="Valor (R$)"
@@ -538,26 +538,26 @@ export function ContaPage() {
           <div className="font-bold text-[15px] mb-4">Sacar via TED</div>
           {!data.tedContaBancaria ? (
             <div className="flex flex-col gap-2">
-              <input
+              <input aria-label="Banco (nome ou código)"
                 value={tedContaForm.banco}
                 onChange={(e) => setTedContaForm({ ...tedContaForm, banco: e.target.value })}
                 placeholder="Banco (nome ou código)"
                 className="border border-border rounded-md px-3 py-2 text-[13px]"
               />
               <div className="flex gap-2">
-                <input
+                <input aria-label="Agência"
                   value={tedContaForm.agencia}
                   onChange={(e) => setTedContaForm({ ...tedContaForm, agencia: e.target.value })}
                   placeholder="Agência"
                   className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
                 />
-                <input
+                <input aria-label="Conta"
                   value={tedContaForm.conta}
                   onChange={(e) => setTedContaForm({ ...tedContaForm, conta: e.target.value })}
                   placeholder="Conta"
                   className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
                 />
-                <select
+                <select aria-label="Tipo de conta"
                   value={tedContaForm.tipoConta}
                   onChange={(e) => setTedContaForm({ ...tedContaForm, tipoConta: e.target.value as 'corrente' | 'poupanca' })}
                   className="border border-border rounded-md px-2 py-2 text-[13px]"
@@ -566,13 +566,13 @@ export function ContaPage() {
                   <option value="poupanca">Poupança</option>
                 </select>
               </div>
-              <input
+              <input aria-label="Nome do titular"
                 value={tedContaForm.titularNome}
                 onChange={(e) => setTedContaForm({ ...tedContaForm, titularNome: e.target.value })}
                 placeholder="Nome do titular"
                 className="border border-border rounded-md px-3 py-2 text-[13px]"
               />
-              <input
+              <input aria-label="CNPJ do titular"
                 value={tedContaForm.titularCnpj}
                 onChange={(e) => setTedContaForm({ ...tedContaForm, titularCnpj: e.target.value })}
                 placeholder="CNPJ do titular"
@@ -593,7 +593,7 @@ export function ContaPage() {
                 {!data.tedEnabled && ' (simulado)'}
               </div>
               <div className="flex gap-2">
-                <input
+                <input aria-label="Valor do saque via TED"
                   value={tedWithdrawValor}
                   onChange={(e) => setTedWithdrawValor(e.target.value)}
                   placeholder="Valor (R$)"
@@ -623,7 +623,7 @@ export function ContaPage() {
               : `Modo simulado — nenhum provedor real configurado (STABLECOIN_PSP_* ou LASTRO_STABLECOIN_WALLET_ADDRESS). Endereço abaixo é fictício.`}
           </div>
           <div className="flex gap-2 mb-4">
-            <input
+            <input aria-label="Valor do depósito via USDC"
               value={stablecoinDepositValor}
               onChange={(e) => setStablecoinDepositValor(e.target.value)}
               placeholder="Valor (R$)"
@@ -651,7 +651,7 @@ export function ContaPage() {
           <div className="font-bold text-[15px] mb-4">Sacar via {data.stablecoinAsset}</div>
           {!data.stablecoinWalletEndereco ? (
             <div className="flex gap-2">
-              <input
+              <input aria-label="Endereço da carteira USDC"
                 value={stablecoinWalletInput}
                 onChange={(e) => setStablecoinWalletInput(e.target.value)}
                 placeholder={`Endereço da carteira (rede ${data.stablecoinNetwork})`}
@@ -668,7 +668,7 @@ export function ContaPage() {
                 {!data.stablecoinEnabled && ' (simulado)'}
               </div>
               <div className="flex gap-2">
-                <input
+                <input aria-label="Valor do saque via USDC"
                   value={stablecoinWithdrawValor}
                   onChange={(e) => setStablecoinWithdrawValor(e.target.value)}
                   placeholder="Valor (R$)"

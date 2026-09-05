@@ -59,7 +59,7 @@ export function ComparadorPage() {
         <div className="grid gap-3.5 mb-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div>
             <div className="text-xs font-bold text-onNavy mb-1.5">Valor (R$)</div>
-            <input
+            <input aria-label="Valor a antecipar"
               value={input.valor}
               onChange={(e) => setField('valor', e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-lg text-white outline-none text-sm"
@@ -68,7 +68,7 @@ export function ComparadorPage() {
           </div>
           <div>
             <div className="text-xs font-bold text-onNavy mb-1.5">Prazo (dias)</div>
-            <input
+            <input aria-label="Prazo em dias"
               value={input.prazo}
               onChange={(e) => setField('prazo', e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-lg text-white outline-none text-sm"

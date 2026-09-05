@@ -83,7 +83,7 @@ export function ComplianceCalendarCard() {
 
       {editing ? (
         <div className="flex gap-2.5 max-w-[560px] flex-wrap items-center">
-          <Select value={selected} onChange={(e) => setSelected(e.target.value as FaturamentoBracket)} className="flex-1 min-w-[220px]">
+          <Select aria-label="Obrigação do cronograma" value={selected} onChange={(e) => setSelected(e.target.value as FaturamentoBracket)} className="flex-1 min-w-[220px]">
             {BRACKET_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}

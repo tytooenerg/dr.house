@@ -156,11 +156,11 @@ export function AutomacaoPage() {
             </div>
             <div>
               <div className="text-xs font-bold text-textSecondary mb-1.5">Exposição máxima por sacado (R$)</div>
-              <Input mono value={data.autoBidRules.exposicaoSacado} onChange={(e) => setRule('exposicaoSacado', e.target.value)} />
+              <Input aria-label="Exposição máxima por sacado (R$)" mono value={data.autoBidRules.exposicaoSacado} onChange={(e) => setRule('exposicaoSacado', e.target.value)} />
             </div>
             <div>
               <div className="text-xs font-bold text-textSecondary mb-1.5">Limite de exposição mensal (R$)</div>
-              <Input mono value={data.autoBidRules.exposicaoMensal} onChange={(e) => setRule('exposicaoMensal', e.target.value)} />
+              <Input aria-label="Limite de exposição mensal (R$)" mono value={data.autoBidRules.exposicaoMensal} onChange={(e) => setRule('exposicaoMensal', e.target.value)} />
             </div>
           </div>
         </Card>
@@ -211,7 +211,7 @@ export function AutomacaoPage() {
                 <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                   <div>
                     <div className="text-xs font-bold text-textSecondary mb-1.5">Taxa inicial (% a.m.)</div>
-                    <Input
+                    <Input aria-label="Taxa inicial (% a.m.)"
                       mono
                       placeholder={l.bandaAoVivo.maxFmt}
                       value={ladderInputValue(rating, 'taxaInicial')}
@@ -221,7 +221,7 @@ export function AutomacaoPage() {
                   </div>
                   <div>
                     <div className="text-xs font-bold text-textSecondary mb-1.5">Taxa alvo / piso (% a.m.)</div>
-                    <Input
+                    <Input aria-label="Taxa alvo (% a.m.)"
                       mono
                       placeholder={l.bandaAoVivo.minFmt}
                       value={ladderInputValue(rating, 'taxaAlvo')}
@@ -231,7 +231,7 @@ export function AutomacaoPage() {
                   </div>
                   <div>
                     <div className="text-xs font-bold text-textSecondary mb-1.5">Decremento por etapa (p.p.)</div>
-                    <Input
+                    <Input aria-label="Decremento por etapa (p.p.)"
                       mono
                       value={ladderInputValue(rating, 'decrementoPorEtapa')}
                       onChange={(e) => editLadder(rating, 'decrementoPorEtapa', e.target.value)}
@@ -240,7 +240,7 @@ export function AutomacaoPage() {
                   </div>
                   <div>
                     <div className="text-xs font-bold text-textSecondary mb-1.5">Intervalo entre etapas (h)</div>
-                    <Input
+                    <Input aria-label="Intervalo entre etapas (h)"
                       mono
                       value={ladderInputValue(rating, 'intervaloHoras')}
                       onChange={(e) => editLadder(rating, 'intervaloHoras', e.target.value)}
@@ -278,11 +278,11 @@ export function AutomacaoPage() {
         <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div>
             <div className="text-xs font-bold text-textSecondary mb-1.5">Score mínimo do sacado para dar liquidez</div>
-            <Input mono value={data.marketMakerMinScore} onChange={(e) => setMarketMakerRule('marketMakerMinScore', e.target.value)} />
+            <Input aria-label="Score mínimo do sacado para dar liquidez" mono value={data.marketMakerMinScore} onChange={(e) => setMarketMakerRule('marketMakerMinScore', e.target.value)} />
           </div>
           <div>
             <div className="text-xs font-bold text-textSecondary mb-1.5">Exposição máxima em lances de liquidez (R$)</div>
-            <Input mono value={data.marketMakerMaxExposicao} onChange={(e) => setMarketMakerRule('marketMakerMaxExposicao', e.target.value)} />
+            <Input aria-label="Exposição máxima como formador de mercado" mono value={data.marketMakerMaxExposicao} onChange={(e) => setMarketMakerRule('marketMakerMaxExposicao', e.target.value)} />
           </div>
         </div>
         {data.marketMakerEnabled && (

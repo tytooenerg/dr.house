@@ -241,15 +241,15 @@ export function DevPage() {
             {data.apiKeys.length === 0 && !newKey && <div className="text-textSecondary text-[12.5px]">Nenhuma chave ativa ainda.</div>}
           </div>
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <Select value={keyMode} onChange={(e) => setKeyMode(e.target.value as 'live' | 'test')} className="text-[12.5px]">
+            <Select aria-label="Modo da chave de API" value={keyMode} onChange={(e) => setKeyMode(e.target.value as 'live' | 'test')} className="text-[12.5px]">
               <option value="live">Produção</option>
               <option value="test">Sandbox (teste)</option>
             </Select>
-            <Select value={keyScope} onChange={(e) => setKeyScope(e.target.value as 'read_write' | 'read_only')} className="text-[12.5px]">
+            <Select aria-label="Escopo da chave de API" value={keyScope} onChange={(e) => setKeyScope(e.target.value as 'read_write' | 'read_only')} className="text-[12.5px]">
               <option value="read_write">Leitura e escrita</option>
               <option value="read_only">Somente leitura</option>
             </Select>
-            <Select value={keyProduct} onChange={(e) => setKeyProduct(e.target.value as typeof keyProduct)} className="text-[12.5px]">
+            <Select aria-label="Produto da chave de API" value={keyProduct} onChange={(e) => setKeyProduct(e.target.value as typeof keyProduct)} className="text-[12.5px]">
               {!isApiPartner && <option value="platform">API completa (plataforma)</option>}
               <option value="score_api">Score API — {data.scoreApiPriceFmt}/chamada</option>
               <option value="pld_screening_api">PLD Screening API — {data.pldScreeningApiPriceFmt}/chamada</option>
@@ -338,13 +338,13 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
             {data.webhooks.length === 0 && <div className="text-textSecondary text-[12.5px]">Nenhum webhook registrado ainda.</div>}
           </div>
           <div className="flex flex-col gap-2 mb-2.5">
-            <input
+            <input aria-label="URL do webhook"
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
               placeholder="https://sua-url.com/webhook"
               className="w-full px-3 py-2 rounded-md border border-inputBorder font-mono-num text-[12.5px] outline-none"
             />
-            <Select value={webhookEvent} onChange={(e) => setWebhookEvent(e.target.value)} className="font-mono-num text-[12.5px]">
+            <Select aria-label="Evento do webhook" value={webhookEvent} onChange={(e) => setWebhookEvent(e.target.value)} className="font-mono-num text-[12.5px]">
               {data.webhookEvents.map((ev) => (
                 <option key={ev} value={ev}>
                   {ev}
@@ -383,7 +383,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
             <div className="font-bold text-[15px]">Simulador de API</div>
             <div className="text-textSecondary text-[12.5px] mt-0.5">Monte uma requisição e veja a resposta simulada da Lastro em tempo real</div>
           </div>
-          <Select value={data.playgroundEndpoint} onChange={(e) => setEndpoint(e.target.value)} className="font-semibold">
+          <Select aria-label="Endpoint do playground" value={data.playgroundEndpoint} onChange={(e) => setEndpoint(e.target.value)} className="font-semibold">
             {data.playgroundEndpoints.map((ep) => (
               <option key={ep.key} value={ep.key}>
                 {ep.label}
@@ -400,7 +400,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
               {data.playgroundFields.map((f) => (
                 <div key={f.key}>
                   <div className="text-xs font-bold text-textSecondary mb-1.5">{f.label}</div>
-                  <input
+                  <input aria-label="Valor do parâmetro"
                     value={f.value}
                     onChange={(e) => setFieldValue(f.key, e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-inputBorder font-mono-num text-[13px] outline-none"

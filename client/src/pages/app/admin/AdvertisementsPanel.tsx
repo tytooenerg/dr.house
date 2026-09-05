@@ -105,7 +105,7 @@ export function AdvertisementsPanel({ onCount }: { onCount?: (n: number) => void
             <div className="text-[12.5px] text-textSecondary mb-3">Triagem indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>
           )}
           <div className="flex items-center gap-2 flex-wrap">
-            <input
+            <input aria-label="Motivo (obrigatório só para rejeitar)"
               className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[12.5px]"
               placeholder="Motivo (obrigatório só para rejeitar)"
               value={rejectReasonById[ad.id] ?? ''}

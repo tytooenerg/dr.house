@@ -1202,6 +1202,49 @@ refactor de estrutura e acessibilidade, não de cor.
 Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32,
 sdks/node 9, e2e 12/12.
 
+### Acessibilidade: tabelas com semântica e rótulo em todo campo de formulário
+
+Última frente da revisão de interface. Antes disto, um leitor de tela não anunciava cabeçalho
+de coluna nas tabelas nem dizia do que era cada campo de formulário.
+
+**Dois números do diagnóstico inicial estavam errados** e a medição real corrigiu:
+
+| | Diagnóstico inicial | Real |
+|---|---|---|
+| Tabelas | "95 grids de div" | **6 tabelas de dados** — os outros 89 grids são layout (cards de preço, KPIs, seções da landing) |
+| Campos sem rótulo | "~37 inputs" | **111 controles**, dos quais **79 não tinham nem rótulo nem placeholder** |
+
+Os 79 eram o caso grave: o leitor anunciava só "caixa de edição", sem dizer do quê. Entre eles,
+o `<select>` de categoria em Contas a Pagar, o campo de data de vencimento, as credenciais de
+SAP/TOTVS/Omie e o campo de senha que confirma a **exclusão da conta** em Perfil.
+
+**`components/ui/Table.tsx`** (novo): `Table`/`TableHead`/`TableRow` existiam dentro de
+`Modal.tsx` (colocação estranha) com **zero usos** — código morto desde sempre, enquanto as 6
+tabelas repetiam a mesma marcação à mão. Saíram do limbo, ganharam `TableBody`/`TableCell` e os
+papéis ARIA.
+
+*Decisão técnica que muda o que eu havia recomendado no diagnóstico*: eu tinha proposto
+"tabelas semânticas (`<table>`)". Pesquisando o terreno, isso sairia **pior**. As colunas são
+dimensionadas com `gridTemplateColumns` fracionário (`1.3fr 0.9fr 0.8fr…`), sem equivalente
+direto em layout de tabela; preservar o visual exigiria `display: grid` na `<table>` com
+`display: contents` nas linhas — e `display: contents` **remove** justamente a semântica de
+tabela em vários leitores de tela, anulando o ganho. A alternativa seria reconstruir o layout
+das 6, arriscando regressão. Os papéis ARIA (`table`/`rowgroup`/`row`/`columnheader`/`cell`)
+são a solução padrão quando o layout exige CSS Grid: o leitor anuncia "tabela", navega por
+células e lê o cabeçalho junto com o valor ("Vencimento: 22/09/2026"), com risco visual zero.
+
+**Rótulos**: os 32 controles que tinham placeholder ganharam `aria-label` com o mesmo texto
+(placeholder não é rótulo — some ao digitar e nem sempre é anunciado). Os 79 sem dica nenhuma
+receberam `aria-label` escrito caso a caso a partir do que o campo realmente faz
+("Valor do depósito via Pix", "Client Secret do TOTVS", "Senha para confirmar a exclusão da
+conta"), não do nome da variável. `Badge` passou a repassar atributos de `<span>`, porque em
+algumas tabelas ele **é** a célula e precisa carregar `role="cell"`.
+
+Verificação: script de contagem confirma **0 controles sem rótulo associado** (eram 111); as
+mesmas 11 telas antes e depois ficam **idênticas pixel a pixel**, como esperado — `aria-label` e
+papel ARIA não têm efeito visual. `npm run typecheck`/`test`/`build`/`test:e2e` verdes —
+server 750, client 32, sdks/node 9, e2e 12/12.
+
 ## Running locally
 
 ```bash

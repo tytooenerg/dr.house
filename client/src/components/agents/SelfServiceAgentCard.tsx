@@ -117,7 +117,7 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
         </div>
       )}
 
-      <textarea
+      <textarea aria-label="Pergunta para a IA"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         rows={2}

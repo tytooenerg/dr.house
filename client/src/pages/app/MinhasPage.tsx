@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/ui/Card';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
+import { Table, TableHead, TableBody, TableRow, TableCell } from '../../components/ui/Table';
 
 interface Duplicata {
   id: string;
@@ -67,25 +68,29 @@ export function MinhasPage() {
       {loadError && <ErrorState message={loadError} onRetry={load} />}
 
       {!loadError && (
-      <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
-          <div>{t('minhas.colSacado', 'Sacado')}</div>
-          <div>{t('minhas.colValor', 'Valor')}</div>
-          <div>{t('minhas.colEmissao', 'Emissão')}</div>
-          <div>{t('minhas.colVencimento', 'Vencimento')}</div>
-          <div>{t('minhas.colLastro', 'Lastro')}</div>
-          <div>{t('minhas.colStatus', 'Status / Ação')}</div>
-        </div>
+      <Table label={t('minhas.title', 'Minhas Duplicatas')}>
+        <TableHead
+          columns={COLS}
+          labels={[
+            t('minhas.colSacado', 'Sacado'),
+            t('minhas.colValor', 'Valor'),
+            t('minhas.colEmissao', 'Emissão'),
+            t('minhas.colVencimento', 'Vencimento'),
+            t('minhas.colLastro', 'Lastro'),
+            t('minhas.colStatus', 'Status / Ação'),
+          ]}
+        />
+        <TableBody>
         {duplicatas.map((d) => (
-          <div key={d.id} className="grid gap-3 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" style={{ gridTemplateColumns: COLS }}>
-            <div className="font-semibold">{d.sacado}</div>
-            <div className="font-mono-num font-bold">{d.valorFmt}</div>
-            <div className="text-textSecondary">{d.emissao}</div>
-            <div className="text-textSecondary">{d.vencimento}</div>
-            <div className="font-bold text-[13px]" style={{ color: d.lastroColor }}>
-              {d.lastroFmt}
-            </div>
-            <div className="flex items-center gap-2">
+          <TableRow key={d.id} columns={COLS}>
+            <TableCell className="font-semibold">{d.sacado}</TableCell>
+            <TableCell className="font-mono-num font-bold">{d.valorFmt}</TableCell>
+            <TableCell className="text-textSecondary">{d.emissao}</TableCell>
+            <TableCell className="text-textSecondary">{d.vencimento}</TableCell>
+            <TableCell className="font-bold text-[13px]">
+              <span style={{ color: d.lastroColor }}>{d.lastroFmt}</span>
+            </TableCell>
+            <TableCell className="flex items-center gap-2">
               <span className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: d.statusBg, color: d.statusColor }}>
                 {d.status}
               </span>
@@ -94,10 +99,11 @@ export function MinhasPage() {
                   {t('minhas.disparar', 'Disparar leilão')}
                 </button>
               )}
-            </div>
-          </div>
+            </TableCell>
+          </TableRow>
         ))}
-      </div>
+        </TableBody>
+      </Table>
       )}
     </div>
   );

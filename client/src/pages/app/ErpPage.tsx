@@ -340,8 +340,8 @@ export function ErpPage() {
               </div>
             ) : c.key === 'omie' && omieForm ? (
               <div className="flex flex-col gap-2">
-                <input value={appKey} onChange={(e) => setAppKey(e.target.value)} placeholder="app_key" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder="app_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="App Key do Omie" value={appKey} onChange={(e) => setAppKey(e.target.value)} placeholder="app_key" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="App Secret do Omie" value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder="app_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 {omieError && (
                   <>
                     <div className="text-[11.5px] text-red-600">{omieError}</div>
@@ -369,10 +369,10 @@ export function ErpPage() {
               </div>
             ) : c.key === 'sap' && sapForm ? (
               <div className="flex flex-col gap-2">
-                <input value={sapBaseUrl} onChange={(e) => setSapBaseUrl(e.target.value)} placeholder="https://seu-servidor:50000" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                <input value={sapCompanyDb} onChange={(e) => setSapCompanyDb(e.target.value)} placeholder="CompanyDB" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                <input value={sapUsername} onChange={(e) => setSapUsername(e.target.value)} placeholder="Usuário" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                <input value={sapPassword} onChange={(e) => setSapPassword(e.target.value)} placeholder="Senha" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="URL base do SAP" value={sapBaseUrl} onChange={(e) => setSapBaseUrl(e.target.value)} placeholder="https://seu-servidor:50000" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="Company DB do SAP" value={sapCompanyDb} onChange={(e) => setSapCompanyDb(e.target.value)} placeholder="CompanyDB" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="Usuário do SAP" value={sapUsername} onChange={(e) => setSapUsername(e.target.value)} placeholder="Usuário" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="Senha do SAP" value={sapPassword} onChange={(e) => setSapPassword(e.target.value)} placeholder="Senha" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 {sapError && (
                   <>
                     <div className="text-[11.5px] text-red-600">{sapError}</div>
@@ -400,9 +400,9 @@ export function ErpPage() {
               </div>
             ) : c.key === 'totvs' && totvsForm ? (
               <div className="flex flex-col gap-2">
-                <input value={totvsBaseUrl} onChange={(e) => setTotvsBaseUrl(e.target.value)} placeholder="https://api.totvs.seudominio.com.br" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                <input value={totvsClientId} onChange={(e) => setTotvsClientId(e.target.value)} placeholder="client_id" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
-                <input value={totvsClientSecret} onChange={(e) => setTotvsClientSecret(e.target.value)} placeholder="client_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="URL base do TOTVS" value={totvsBaseUrl} onChange={(e) => setTotvsBaseUrl(e.target.value)} placeholder="https://api.totvs.seudominio.com.br" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="Client ID do TOTVS" value={totvsClientId} onChange={(e) => setTotvsClientId(e.target.value)} placeholder="client_id" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
+                <input aria-label="Client Secret do TOTVS" value={totvsClientSecret} onChange={(e) => setTotvsClientSecret(e.target.value)} placeholder="client_secret" type="password" className="border border-border rounded-md px-2.5 py-2 text-[12.5px]" />
                 {totvsError && (
                   <>
                     <div className="text-[11.5px] text-red-600">{totvsError}</div>
@@ -484,7 +484,7 @@ export function ErpPage() {
         </div>
         <div className="flex items-center gap-2.5">
           <span className="text-[12.5px] text-textSecondary">Limite por emissão:</span>
-          <input
+          <input aria-label="Limite por emissão automática"
             className="w-40 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
             value={autoEmitMaxInput}
             onChange={(e) => setAutoEmitMaxInput(e.target.value)}
@@ -502,7 +502,7 @@ export function ErpPage() {
           Usado só pelo AI CFO (plano Empresarial) pra consultar seu saldo bancário real via Open Finance — não é o CNPJ do sacado.
         </div>
         <div className="flex items-center gap-2.5">
-          <input
+          <input aria-label="00.000.000/0000-00"
             className="w-64 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
             placeholder="00.000.000/0000-00"
             value={companyCnpjInput}
@@ -542,9 +542,9 @@ export function ErpPage() {
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <input value={brandNome} onChange={(e) => setBrandNome(e.target.value)} placeholder="Nome da marca" className="flex-1 min-w-[160px] border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
-              <input value={brandCor} onChange={(e) => setBrandCor(e.target.value)} placeholder={PALETTE.blue} className="w-28 border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
-              <input value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} placeholder="URL do logo" className="flex-1 min-w-[160px] border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input aria-label="Nome da marca white-label" value={brandNome} onChange={(e) => setBrandNome(e.target.value)} placeholder="Nome da marca" className="flex-1 min-w-[160px] border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input aria-label="Cor primária da marca" value={brandCor} onChange={(e) => setBrandCor(e.target.value)} placeholder={PALETTE.blue} className="w-28 border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input aria-label="URL do logo da marca" value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} placeholder="URL do logo" className="flex-1 min-w-[160px] border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
             </div>
             {brandError && <div className="text-[11.5px]" style={{ color: PALETTE.redOnNavy }}>{brandError}</div>}
             <div className="flex items-center gap-2">

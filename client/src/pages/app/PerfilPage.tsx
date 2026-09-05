@@ -557,7 +557,7 @@ export function PerfilPage() {
               Isso apaga seus dados pessoais (nome, e-mail, telefone) e revoga todas as sessões, chaves de API e webhooks. Registros financeiros são
               mantidos de forma anonimizada, conforme obrigação legal. Confirme sua senha para continuar.
             </div>
-            <Input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} placeholder="Sua senha" />
+            <Input aria-label="Senha para confirmar a exclusão da conta" type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} placeholder="Sua senha" />
             {deleteError && <div className="text-red text-[12.5px] font-semibold">{deleteError}</div>}
             <Button type="submit" variant="danger" disabled={deleting || !deletePassword} className="self-start">
               {deleting ? 'Excluindo…' : 'Confirmar exclusão definitiva'}

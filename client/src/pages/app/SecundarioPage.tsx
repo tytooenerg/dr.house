@@ -204,7 +204,7 @@ export function SecundarioPage() {
                 </div>
                 <div className="text-textSecondary text-[12.5px] mb-2.5">Pago: {p.valorPagoFmt} · vence {p.vencimento}</div>
                 <div className="flex items-center gap-2">
-                  <Input
+                  <Input aria-label="Preço de venda"
                     placeholder="Preço de venda"
                     value={prices[p.purchaseId] ?? ''}
                     onChange={(e) => setPrices((v) => ({ ...v, [p.purchaseId]: e.target.value }))}
@@ -306,8 +306,8 @@ export function SecundarioPage() {
         <Card>
           <div className="font-bold text-[15px] mb-3.5">Anúncios de outros investidores</div>
           <div className="flex gap-2 mb-3">
-            <Input placeholder="Buscar por sacado ou cedente" value={marketQuery} onChange={(e) => setMarketQuery(e.target.value)} className="flex-1" />
-            <Select value={marketSort} onChange={(e) => setMarketSort(e.target.value as typeof marketSort)}>
+            <Input aria-label="Buscar por sacado ou cedente" placeholder="Buscar por sacado ou cedente" value={marketQuery} onChange={(e) => setMarketQuery(e.target.value)} className="flex-1" />
+            <Select aria-label="Ordenar anúncios" value={marketSort} onChange={(e) => setMarketSort(e.target.value as typeof marketSort)}>
               <option value="variacao">Ordenar: melhor deságio</option>
               <option value="valor">Ordenar: maior valor</option>
               <option value="prazo">Ordenar: vencendo antes</option>
@@ -330,7 +330,7 @@ export function SecundarioPage() {
                   <Button size="sm" disabled={busyKey === `comprar:${l.id}`} onClick={() => buy(l.id)}>
                     {busyKey === `comprar:${l.id}` ? 'Comprando…' : `Comprar por ${l.precoFmt}`}
                   </Button>
-                  <Input
+                  <Input aria-label="Seu lance"
                     placeholder="Seu lance"
                     value={bidValues[l.id] ?? ''}
                     onChange={(e) => setBidValues((v) => ({ ...v, [l.id]: e.target.value }))}
@@ -360,15 +360,15 @@ export function SecundarioPage() {
         <div className="flex items-end gap-2.5 flex-wrap mb-3">
           <div className="flex-1 min-w-[160px]">
             <div className="text-[11.5px] font-bold text-textSecondary mb-1">Orçamento máximo</div>
-            <Input placeholder="Ex: 1.000.000" value={blockValorMaximo} onChange={(e) => setBlockValorMaximo(e.target.value)} />
+            <Input aria-label="Ex: 1.000.000" placeholder="Ex: 1.000.000" value={blockValorMaximo} onChange={(e) => setBlockValorMaximo(e.target.value)} />
           </div>
           <div className="w-[130px]">
             <div className="text-[11.5px] font-bold text-textSecondary mb-1">Score mínimo</div>
-            <Input placeholder="Opcional" value={blockScoreMin} onChange={(e) => setBlockScoreMin(e.target.value)} inputMode="numeric" />
+            <Input aria-label="Opcional" placeholder="Opcional" value={blockScoreMin} onChange={(e) => setBlockScoreMin(e.target.value)} inputMode="numeric" />
           </div>
           <div className="w-[150px]">
             <div className="text-[11.5px] font-bold text-textSecondary mb-1">Máx. de anúncios</div>
-            <Input placeholder="Opcional" value={blockQuantidadeMax} onChange={(e) => setBlockQuantidadeMax(e.target.value)} inputMode="numeric" />
+            <Input aria-label="Opcional" placeholder="Opcional" value={blockQuantidadeMax} onChange={(e) => setBlockQuantidadeMax(e.target.value)} inputMode="numeric" />
           </div>
           <Button onClick={runBlockTrade} disabled={blockSubmitting || !blockValorMaximo.trim()}>
             {blockSubmitting ? 'Executando…' : 'Executar block trade'}

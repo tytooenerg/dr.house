@@ -89,7 +89,7 @@ export function FeatureFlagsPanel() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[12.5px] text-navy/60">Rollout:</span>
-              <input
+              <input aria-label="Percentual de rollout"
                 type="number"
                 min={0}
                 max={100}
