@@ -39,7 +39,7 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
 
   return (
     <div className="px-14 py-10 max-w-[1360px] mx-auto">
-      <div className="text-[11px] font-bold text-textTertiary uppercase tracking-wide mb-3 text-center">Publicidade</div>
+      <div className="text-[11.5px] font-bold text-textTertiary uppercase tracking-wide mb-3 text-center">Publicidade</div>
       <a
         href={`/api/public/advertisements/${ad.id}/click`}
         target="_blank"
@@ -48,8 +48,8 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
       >
         <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-surface flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-[16px]">{ad.titulo}</div>
-          <div className="text-textSecondary text-[13.5px] mt-1">{ad.texto}</div>
+          <div className="font-bold text-[15px]">{ad.titulo}</div>
+          <div className="text-textSecondary text-[13px] mt-1">{ad.texto}</div>
         </div>
         <div className="text-blue font-bold text-[13px] whitespace-nowrap">Saiba mais →</div>
       </a>
@@ -144,7 +144,7 @@ export function LandingPage() {
         </div>
 
         <div className="bg-navy rounded-2xl p-7" style={{ boxShadow: '0 24px 60px rgba(11,31,58,0.18)' }}>
-          <div className="text-onNavy text-[12px] font-bold uppercase tracking-wide mb-5">Como a Lastro conecta o mercado</div>
+          <div className="text-onNavy text-[12.5px] font-bold uppercase tracking-wide mb-5">Como a Lastro conecta o mercado</div>
           <div className="flex flex-col gap-2.5">
             {[
               ['Empresa (cedente)', 'Emite e antecipa a duplicata'],
@@ -153,7 +153,7 @@ export function LandingPage() {
               ['Sacado & seguradora', 'Aceite e proteção de crédito'],
             ].map(([label, desc], i) => (
               <div key={label} className="rounded-xl p-4" style={{ background: i === 2 ? PALETTE.blue : 'rgba(255,255,255,0.06)' }}>
-                <div className="font-bold text-[13.5px] text-white">{label}</div>
+                <div className="font-bold text-[13px] text-white">{label}</div>
                 <div className="text-[11.5px] mt-0.5" style={{ color: i === 2 ? 'rgba(255,255,255,0.85)' : PALETTE.onNavy }}>
                   {desc}
                 </div>
@@ -188,7 +188,7 @@ export function LandingPage() {
                 <span style={{ width: 14, height: 14, border: `2px solid ${PALETTE.blue}`, borderRadius: 3 }} />
               </div>
               <div className="font-bold text-base mb-2">{p.t}</div>
-              <div className="text-textSecondary text-[13.5px] leading-relaxed">{p.d}</div>
+              <div className="text-textSecondary text-[13px] leading-relaxed">{p.d}</div>
             </div>
           ))}
         </div>
@@ -206,7 +206,7 @@ export function LandingPage() {
               <div key={p.t} className="relative">
                 <div className="bg-white border border-border rounded-card p-5.5 h-full">
                   <div className="w-9 h-9 rounded-full bg-navy text-white flex items-center justify-center font-bold text-[14px] mb-4">{p.n}</div>
-                  <div className="font-bold text-[14.5px] mb-1.5">{p.t}</div>
+                  <div className="font-bold text-[14px] mb-1.5">{p.t}</div>
                   <div className="text-textSecondary text-[12.5px] leading-relaxed">{p.d}</div>
                 </div>
                 {i < PASSOS.length - 1 && (
@@ -277,20 +277,20 @@ export function LandingPage() {
           </div>
           <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <div>
-              <div className="text-[38px] font-extrabold tracking-tight">{stats?.volumeEmitidoFmt ?? '—'}</div>
-              <div className="text-onNavy text-[13.5px] mt-2">em duplicatas registradas na plataforma</div>
+              <div className="text-[34px] font-extrabold tracking-tight">{stats?.volumeEmitidoFmt ?? '—'}</div>
+              <div className="text-onNavy text-[13px] mt-2">em duplicatas registradas na plataforma</div>
             </div>
             <div>
-              <div className="text-[38px] font-extrabold tracking-tight">{stats ? stats.totalDuplicatas : '—'}</div>
-              <div className="text-onNavy text-[13.5px] mt-2">duplicatas emitidas</div>
+              <div className="text-[34px] font-extrabold tracking-tight">{stats ? stats.totalDuplicatas : '—'}</div>
+              <div className="text-onNavy text-[13px] mt-2">duplicatas emitidas</div>
             </div>
             <div>
-              <div className="text-[38px] font-extrabold tracking-tight">{stats ? stats.totalCedentes : '—'}</div>
-              <div className="text-onNavy text-[13.5px] mt-2">empresas cedentes</div>
+              <div className="text-[34px] font-extrabold tracking-tight">{stats ? stats.totalCedentes : '—'}</div>
+              <div className="text-onNavy text-[13px] mt-2">empresas cedentes</div>
             </div>
             <div>
-              <div className="text-[38px] font-extrabold tracking-tight">{stats ? `${stats.taxaInadimplenciaPct}%` : '—'}</div>
-              <div className="text-onNavy text-[13.5px] mt-2">taxa de inadimplência</div>
+              <div className="text-[34px] font-extrabold tracking-tight">{stats ? `${stats.taxaInadimplenciaPct}%` : '—'}</div>
+              <div className="text-onNavy text-[13px] mt-2">taxa de inadimplência</div>
             </div>
           </div>
         </div>
@@ -300,7 +300,7 @@ export function LandingPage() {
 
       {/* CTA FINAL */}
       <div className="px-14 py-20 text-center bg-surface">
-        <div className="text-[32px] font-extrabold tracking-tight">Quer saber mais sobre a Lastro?</div>
+        <div className="text-[34px] font-extrabold tracking-tight">Quer saber mais sobre a Lastro?</div>
         <div className="text-textSecondary text-[15px] mt-2.5">Fale com nosso time — parcerias, imprensa ou dúvidas gerais sobre a plataforma.</div>
         <div className="flex gap-3 justify-center mt-6.5">
           <Link to="/legal#contato" className="px-6.5 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">

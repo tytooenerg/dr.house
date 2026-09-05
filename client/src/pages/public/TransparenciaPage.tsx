@@ -18,7 +18,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
   return (
     <div className="border border-border rounded-card p-6">
       <div className="text-textTertiary text-[12.5px] font-bold uppercase tracking-wide mb-2">{label}</div>
-      <div className="text-[32px] font-extrabold tracking-tight">{value}</div>
+      <div className="text-[34px] font-extrabold tracking-tight">{value}</div>
       {hint && <div className="text-textSecondary text-[12.5px] mt-1.5">{hint}</div>}
     </div>
   );
@@ -38,8 +38,8 @@ export function TransparenciaPage() {
     <div className="w-full text-navy min-h-screen">
       <PublicNav active="transparencia" />
       <div className="max-w-[880px] mx-auto px-6 py-16">
-        <div className="text-[38px] font-extrabold tracking-tight mb-2">Transparência</div>
-        <div className="text-[16px] text-textSecondary mb-10 max-w-[560px]">
+        <div className="text-[34px] font-extrabold tracking-tight mb-2">Transparência</div>
+        <div className="text-[15px] text-textSecondary mb-10 max-w-[560px]">
           Números reais, calculados ao vivo a partir da nossa base — não são metas nem projeções de marketing.
         </div>
 
@@ -70,8 +70,8 @@ export function TransparenciaPage() {
                 <div className="flex gap-2.5 flex-wrap">
                   {stats.registradoras.map((r) => (
                     <div key={r.key} className="border border-border rounded-lg px-3.5 py-2.5">
-                      <div className="font-bold text-[13.5px]">{r.nome}</div>
-                      <div className="text-textSecondary text-[12px]">{r.totalDuplicatas} duplicata(s)</div>
+                      <div className="font-bold text-[13px]">{r.nome}</div>
+                      <div className="text-textSecondary text-[12.5px]">{r.totalDuplicatas} duplicata(s)</div>
                     </div>
                   ))}
                 </div>

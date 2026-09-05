@@ -28,8 +28,8 @@ export function OnboardingModal() {
           <div key={i} className="h-1 flex-1 rounded-full" style={{ background: i === step ? PALETTE.blue : PALETTE.border }} />
         ))}
       </div>
-      <div className="text-[21px] font-extrabold mb-2.5">{current.title}</div>
-      <div className="text-[14.5px] text-textSecondary leading-relaxed mb-7">{current.body}</div>
+      <div className="text-[20px] font-extrabold mb-2.5">{current.title}</div>
+      <div className="text-[14px] text-textSecondary leading-relaxed mb-7">{current.body}</div>
       <div className="flex justify-between items-center">
         <button type="button" className="bg-transparent border-none text-textSecondary text-[13px] font-bold cursor-pointer" onClick={completeOnboarding}>
           Pular

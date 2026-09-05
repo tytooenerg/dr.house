@@ -99,7 +99,7 @@ export function DisputaPage() {
             <div className="flex justify-between items-start mb-4 flex-wrap gap-2.5">
               <div>
                 <div className="font-mono-num font-bold text-[13px] text-textSecondary">{d.duplicataId}</div>
-                <div className="font-bold text-[17px] mt-1">
+                <div className="font-bold text-[15px] mt-1">
                   {d.sacado} — {d.valorFmt}
                 </div>
               </div>

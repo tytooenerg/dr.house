@@ -90,7 +90,7 @@ export function MinhasPage() {
                 {d.status}
               </span>
               {d.canDisparar && (
-                <button type="button" onClick={() => disparar(d.id)} className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11px] font-bold cursor-pointer">
+                <button type="button" onClick={() => disparar(d.id)} className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">
                   {t('minhas.disparar', 'Disparar leilão')}
                 </button>
               )}

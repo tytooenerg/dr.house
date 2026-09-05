@@ -28,7 +28,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <Card className="max-w-[560px]">
           <div className="font-extrabold text-lg mb-2">Algo deu errado nesta tela</div>
-          <div className="text-textSecondary text-[13.5px] mb-1">{this.state.error.message || 'Erro inesperado.'}</div>
+          <div className="text-textSecondary text-[13px] mb-1">{this.state.error.message || 'Erro inesperado.'}</div>
           <div className="text-textSecondary text-[13px] mb-5">Tente novamente — se o problema persistir, atualize a página.</div>
           <Button onClick={this.reset}>Tentar novamente</Button>
         </Card>

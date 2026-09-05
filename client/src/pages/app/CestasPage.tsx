@@ -80,12 +80,12 @@ export function CestasPage() {
             <div className="text-textSecondary text-[12.5px] mb-3">{c.desc}</div>
             <div className="flex gap-1.5 flex-wrap mb-3">
               {c.ratings.map((r) => (
-                <span key={r} className="text-[11px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
+                <span key={r} className="text-[11.5px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
                   {r}
                 </span>
               ))}
             </div>
-            <div className="text-[12px] font-semibold" style={{ color: c.faixa.real ? PALETTE.green : PALETTE.textTertiary }}>
+            <div className="text-[12.5px] font-semibold" style={{ color: c.faixa.real ? PALETTE.green : PALETTE.textTertiary }}>
               {c.faixa.real ? 'Faixa hoje' : 'Faixa teórica (sem oferta aberta agora)'}:{' '}
               <span className="font-mono-num">
                 {c.faixa.minFmt}–{c.faixa.maxFmt}
@@ -131,11 +131,11 @@ export function CestasPage() {
           <div className="font-bold text-[15px] mb-3.5">Alocação realizada</div>
           <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div>
-              <div className="text-textTertiary text-[11px] font-bold uppercase">Total investido</div>
+              <div className="text-textTertiary text-[11.5px] font-bold uppercase">Total investido</div>
               <div className="text-[20px] font-extrabold">{result.totalInvestidoFmt}</div>
             </div>
             <div>
-              <div className="text-textTertiary text-[11px] font-bold uppercase">Não alocado</div>
+              <div className="text-textTertiary text-[11.5px] font-bold uppercase">Não alocado</div>
               <div className="text-[20px] font-extrabold">{result.restanteFmt}</div>
             </div>
           </div>
@@ -143,7 +143,7 @@ export function CestasPage() {
             {result.comprados.map((c) => (
               <div key={c.duplicataId} className="flex items-center justify-between text-[13px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
                 <span className="font-semibold">{c.sacado}</span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">{c.rating}</span>
+                <span className="text-[11.5px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">{c.rating}</span>
                 <span className="text-textSecondary">{c.desagio}</span>
                 <span className="font-mono-num font-bold">{c.valorFmt}</span>
               </div>

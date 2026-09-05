@@ -87,7 +87,7 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
   return (
     <Card className="p-6 flex flex-col gap-3.5">
       <div>
-        <div className="font-bold text-[14.5px] flex items-center gap-2">
+        <div className="font-bold text-[14px] flex items-center gap-2">
           {title}
           <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-chip text-blue">IA agêntica</span>
         </div>
@@ -101,7 +101,7 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
             <div key={p.id} className="p-3 rounded-lg bg-amberBg flex items-start justify-between gap-3">
               <div>
                 <div className="font-bold text-[12.5px]">Aguardando sua confirmação — {p.tool_name}</div>
-                <pre className="text-[11px] text-textSecondary whitespace-pre-wrap mt-1">{renderPayloadShort(p.input)}</pre>
+                <pre className="text-[11.5px] text-textSecondary whitespace-pre-wrap mt-1">{renderPayloadShort(p.input)}</pre>
               </div>
               <div className="flex gap-1.5 shrink-0">
                 <Button size="sm" variant="secondary" disabled={decidingId === p.id} onClick={() => decide(p.id, 'reject')}>
@@ -126,7 +126,7 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
       <Button onClick={run} disabled={running || !input.trim()} variant="secondary">
         {running ? 'Investigando…' : 'Pedir para a IA investigar'}
       </Button>
-      {error && <div className="text-red text-[12px]">{error}</div>}
+      {error && <div className="text-red text-[12.5px]">{error}</div>}
 
       {lastRun && (
         <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
@@ -136,10 +136,10 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
                 {STEP_LABELS[s.type] ?? s.type}
                 {s.toolName ? ` — ${s.toolName}` : ''}
               </div>
-              <div className="text-[12px] whitespace-pre-wrap mt-0.5">{stepSummary(s)}</div>
+              <div className="text-[12.5px] whitespace-pre-wrap mt-0.5">{stepSummary(s)}</div>
             </div>
           ))}
-          {lastRun.steps.length === 0 && <div className="text-textSecondary text-[12px]">{lastRun.summary}</div>}
+          {lastRun.steps.length === 0 && <div className="text-textSecondary text-[12.5px]">{lastRun.summary}</div>}
         </div>
       )}
     </Card>

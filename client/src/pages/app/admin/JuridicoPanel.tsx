@@ -293,7 +293,7 @@ export function JuridicoPanel() {
               <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
                 <div>
                   <div className="font-mono-num font-bold text-[13px] text-textSecondary">{o.duplicataId}</div>
-                  <div className="font-bold text-[16px] mt-1">
+                  <div className="font-bold text-[15px] mt-1">
                     {o.cedente} → {o.sacado} — {o.valorFmt}
                   </div>
                   <div className="text-textSecondary text-[12.5px] mt-1">
@@ -330,7 +330,7 @@ export function JuridicoPanel() {
               {Object.entries(collectionError)
                 .filter(([k, msg]) => k.startsWith(`${o.duplicataId}:`) && msg)
                 .map(([k, msg]) => (
-                  <div key={k} className="text-red text-[12px] font-semibold mb-2">
+                  <div key={k} className="text-red text-[12.5px] font-semibold mb-2">
                     {msg}
                   </div>
                 ))}
@@ -343,7 +343,7 @@ export function JuridicoPanel() {
                           {COLLECTION_DOC_LABELS[doc.type] ?? doc.type} · {doc.quando}
                         </span>
                         <span
-                          className="text-[11px] font-bold px-2 py-0.5 rounded-md ml-2"
+                          className="text-[11.5px] font-bold px-2 py-0.5 rounded-md ml-2"
                           style={doc.reviewed ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.amberBg, color: PALETTE.amber }}
                         >
                           {doc.reviewed ? 'Revisado' : 'Aguardando revisão'}
@@ -378,7 +378,7 @@ export function JuridicoPanel() {
                       {recoveringId === o.duplicataId ? 'Registrando…' : `Registrar recuperação (fee ${feeConfig?.feePct ?? 5}%)`}
                     </Button>
                   </div>
-                  {recoveryError[o.duplicataId] && <div className="text-red text-[12px] font-semibold mt-1.5">{recoveryError[o.duplicataId]}</div>}
+                  {recoveryError[o.duplicataId] && <div className="text-red text-[12.5px] font-semibold mt-1.5">{recoveryError[o.duplicataId]}</div>}
                 </div>
               )}
             </div>
@@ -395,7 +395,7 @@ export function JuridicoPanel() {
               <div key={r.duplicataId} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
                 <div>
                   <div className="font-mono-num font-bold text-textSecondary">{r.duplicataId}</div>
-                  <div className="text-textSecondary text-[12px]">
+                  <div className="text-textSecondary text-[12.5px]">
                     {r.cedente} → {r.sacado} · recuperado {r.recoveredValorFmt} · {r.quando}
                   </div>
                 </div>
@@ -437,7 +437,7 @@ export function JuridicoPanel() {
             <Button type="submit" size="sm" className="self-start" disabled={generatingMinuta || !minutaContext.trim()}>
               {generatingMinuta ? 'Gerando…' : 'Gerar minuta'}
             </Button>
-            {minutaError && <div className="text-red text-[12px] font-semibold">{minutaError}</div>}
+            {minutaError && <div className="text-red text-[12.5px] font-semibold">{minutaError}</div>}
           </form>
 
           {minutas.map((doc) => (
@@ -447,7 +447,7 @@ export function JuridicoPanel() {
                   {MINUTA_TYPE_LABELS[doc.type] ?? doc.type} · {doc.quando}
                 </span>
                 <span
-                  className="text-[11px] font-bold px-2 py-0.5 rounded-md ml-2"
+                  className="text-[11.5px] font-bold px-2 py-0.5 rounded-md ml-2"
                   style={doc.reviewed ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.amberBg, color: PALETTE.amber }}
                 >
                   {doc.reviewed ? 'Revisado' : 'Aguardando revisão'}
@@ -484,7 +484,7 @@ export function JuridicoPanel() {
               )}
               {doc.signatureStatus === 'enviado' && (
                 <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amberBg text-amber">
+                  <span className="text-[11.5px] font-bold px-2 py-0.5 rounded-md bg-amberBg text-amber">
                     Aguardando assinatura de {doc.signerName} ({doc.signerEmail})
                   </span>
                   <Button size="sm" variant="secondary" disabled={signingId === doc.id} onClick={() => checkMinutaSignature(doc.id)}>
@@ -493,7 +493,7 @@ export function JuridicoPanel() {
                 </div>
               )}
               {doc.signatureStatus === 'assinado' && (
-                <span className="mt-2.5 inline-block text-[11px] font-bold px-2 py-0.5 rounded-md bg-greenBg text-green">
+                <span className="mt-2.5 inline-block text-[11.5px] font-bold px-2 py-0.5 rounded-md bg-greenBg text-green">
                   Assinado por {doc.signerName}
                 </span>
               )}
@@ -529,7 +529,7 @@ export function JuridicoPanel() {
             <Button type="submit" size="sm" className="self-start" disabled={analyzingReg || !regTitle.trim() || !regText.trim()}>
               {analyzingReg ? 'Analisando…' : 'Analisar'}
             </Button>
-            {regError && <div className="text-red text-[12px] font-semibold">{regError}</div>}
+            {regError && <div className="text-red text-[12.5px] font-semibold">{regError}</div>}
           </form>
 
           {regulatoryNotes.map((n) => (
@@ -547,7 +547,7 @@ export function JuridicoPanel() {
               {n.impactAreas.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {n.impactAreas.map((a, i) => (
-                    <span key={i} className="text-[11px] font-bold px-2 py-1 rounded-md bg-chip text-blue">
+                    <span key={i} className="text-[11.5px] font-bold px-2 py-1 rounded-md bg-chip text-blue">
                       {a}
                     </span>
                   ))}

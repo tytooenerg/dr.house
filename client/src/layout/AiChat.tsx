@@ -50,7 +50,7 @@ export function AiChat() {
         <div role="dialog" aria-label="Assistente Lastro" className="w-80 bg-white border border-border rounded-2xl shadow-modal overflow-hidden mb-3">
           <div className="bg-navy px-4 py-3.5 flex items-center gap-2">
             <AiTag />
-            <div className="text-white font-bold text-[13.5px]">Assistente Lastro</div>
+            <div className="text-white font-bold text-[13px]">Assistente Lastro</div>
           </div>
           <div className="p-4 flex flex-col gap-3 max-h-72 overflow-y-auto" aria-live="polite">
             {messages.map((m, i) => (
@@ -62,7 +62,7 @@ export function AiChat() {
                 {m.text}
               </div>
             ))}
-            {asking && <div className="text-textMuted text-[12px]">Digitando…</div>}
+            {asking && <div className="text-textMuted text-[12.5px]">Digitando…</div>}
             {!asking &&
               suggestions.map((q) => (
                 <button

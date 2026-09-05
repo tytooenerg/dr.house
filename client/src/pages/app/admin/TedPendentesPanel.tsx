@@ -47,7 +47,7 @@ export function TedPendentesPanel() {
     <div className="bg-white border border-border rounded-card overflow-hidden mt-5">
       <div className="px-5 py-3.5 border-b border-border">
         <div className="font-bold text-[14px]">Depósitos via TED pendentes de confirmação</div>
-        <div className="text-[12px] text-textMuted mt-0.5">Sem webhook automático (ver lib/tedRail.ts) — confira o extrato bancário real antes de confirmar</div>
+        <div className="text-[12.5px] text-textMuted mt-0.5">Sem webhook automático (ver lib/tedRail.ts) — confira o extrato bancário real antes de confirmar</div>
       </div>
       {tedPendentes.map((t) => (
         <div key={t.referencia} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">

@@ -5,7 +5,7 @@
 export function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="py-12 px-5 text-center">
-      <div className="font-bold text-[14.5px] text-red">Não foi possível carregar</div>
+      <div className="font-bold text-[14px] text-red">Não foi possível carregar</div>
       <div className="text-textSecondary text-[13px] mt-1">{message}</div>
       <button type="button" onClick={onRetry} className="mt-3 text-[12.5px] font-bold text-blue bg-transparent border-none cursor-pointer">
         Tentar de novo

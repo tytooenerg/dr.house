@@ -94,7 +94,7 @@ export function SuitabilityPage() {
               <span className="text-[12.5px] text-textSecondary">
                 {current.expired ? 'Expirado em' : 'Válido até'} {current.expiresAt ? new Date(current.expiresAt).toLocaleDateString('pt-BR') : '—'}
               </span>
-              {current.expired && <span className="text-[12px] font-bold text-red">Refaça o questionário — seu perfil expirou.</span>}
+              {current.expired && <span className="text-[12.5px] font-bold text-red">Refaça o questionário — seu perfil expirou.</span>}
             </div>
           ) : (
             <p className="text-[12.5px] text-textSecondary">

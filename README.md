@@ -1122,6 +1122,48 @@ dinâmico.
 Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32,
 sdks/node 9, e2e 12/12.
 
+### Tipografia: 28 tamanhos arbitrários colapsados em 11
+
+Terceira frente da revisão de interface, segunda parte (a primeira foi a unificação de cores).
+O client tinha **1.237 usos de `text-[Npx]` em 28 tamanhos distintos** — e **1.164 deles
+espremidos entre 10px e 16px**, em 13 tamanhos com passos de meio pixel que ninguém consegue
+distinguir: `12px` e `12.5px` conviviam (74 e 288 usos), assim como `13px`/`13.5px` (242 e 109)
+e `11px`/`11.5px` (74 e 157). Não era hierarquia, era deriva.
+
+Abordagem **conservadora** (escolhida pelo usuário entre as duas opções): cada faixa colapsa no
+tamanho que **já era dominante** nela, em vez de impor uma régua tipográfica nova. Muda 344 dos
+1.237 usos; os outros 893 já estavam na escala.
+
+| Faixa | Colapsa em | Usos movidos |
+|---|---|---|
+| 10 | 10,5 | 3 |
+| 11 | 11,5 | 74 |
+| 12 | 12,5 | 74 |
+| 13,5 | 13 | 109 |
+| 14,5 | 14 | 21 |
+| 15,5 · 16 · 17 · 18 | 15 | 18 |
+| 19 · 21 · 22 | 20 | 17 |
+| 28 · 30 | 26 | 16 |
+| 32 · 38 · 40 | 34 | 12 |
+
+Escala final: 6 degraus de interface (10,5 · 11,5 · 12,5 · 13 · 14 · 15) e 5 de destaque para
+números grandes (20 · 26 · 34 · 52 · 64).
+
+Verificação visual: as mesmas 11 telas capturadas antes e depois. Como esperado numa mudança
+conservadora, elas ficam **visualmente iguais** — as diferenças são de fração de pixel, e é
+exatamente esse o ponto: some a duplicação invisível sem redesenhar a interface.
+
+**Item deixado em aberto de propósito**: 218 usos das classes nomeadas do Tailwind
+(`text-xs`/`sm`/`base`/`lg`/`xl`/`2xl` = 12/14/16/18/20/24px) convivem com os valores
+arbitrários acima, então `12px` e `12,5px` ainda coexistem no app por caminhos diferentes.
+Unificar os dois sistemas exige ou redefinir o que `text-xs` significa (muda o sentido de um
+nome conhecido, e mexe em 218 telas de uma vez) ou converter tudo para classes nomeadas — a
+"escala real" que ficou de fora desta escolha. Fica registrado como decisão pendente, não como
+esquecimento.
+
+Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32,
+sdks/node 9, e2e 12/12.
+
 ## Running locally
 
 ```bash

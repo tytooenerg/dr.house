@@ -167,7 +167,7 @@ export function AutomacaoPage() {
 
         <Card>
           <div className="font-bold text-[15px] mb-1.5">Como funciona</div>
-          <div className="text-textSecondary text-[13.5px] leading-relaxed mb-4.5">
+          <div className="text-textSecondary text-[13px] leading-relaxed mb-4.5">
             Toda vez que uma duplicata entra em leilão, a Lastro verifica o score do sacado e sua exposição atual contra os critérios acima e o piso atual da escada de lances
             (abaixo) pra essa classe de rating. Se estiver dentro do parâmetro, a compra acontece automaticamente — sem precisar de intervenção manual.
           </div>
@@ -203,8 +203,8 @@ export function AutomacaoPage() {
             return (
               <div key={rating} className="border border-border rounded-lg p-3.5">
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                  <div className="font-bold text-[13.5px]">Rating {rating}</div>
-                  <div className="text-[12px] text-textSecondary">
+                  <div className="font-bold text-[13px]">Rating {rating}</div>
+                  <div className="text-[12.5px] text-textSecondary">
                     Banda de mercado hoje: <span className="font-mono-num">{l.bandaAoVivo.minFmt}–{l.bandaAoVivo.maxFmt}</span>
                   </div>
                 </div>
@@ -350,7 +350,7 @@ export function AutomacaoPage() {
         {data.autoBidActivity.map((act, i) => (
           <div key={i} className="flex items-start gap-2.5 px-5 py-3.5 border-b border-hairline last:border-b-0">
             <span className="rounded-full mt-1.5 flex-shrink-0" style={{ width: 7, height: 7, background: act.color }} />
-            <div className="flex-1 text-[13.5px] leading-snug">{act.text}</div>
+            <div className="flex-1 text-[13px] leading-snug">{act.text}</div>
             <div className="text-xs text-textTertiary flex-shrink-0">{act.time}</div>
           </div>
         ))}

@@ -71,15 +71,15 @@ export function ReceitaPage() {
             <div className="text-textSecondary text-[12.5px] mt-0.5">Descontada automaticamente na liquidação de cada compra (marketplace, cestas ou mercado secundário)</div>
           </div>
           <div className="text-right">
-            <div className="text-[22px] font-extrabold">{data.realFees.totalColetadoFmt}</div>
+            <div className="text-[20px] font-extrabold">{data.realFees.totalColetadoFmt}</div>
             <div className="text-textTertiary text-[11.5px]">{data.realFees.totalLiquidacoes} liquidações até agora</div>
           </div>
         </div>
         <div className="flex gap-2.5 flex-wrap">
           {data.realFees.faixasFmt.map((f) => (
             <div key={f.ateFmt} className="flex-1 min-w-[160px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
-              <div className="text-textTertiary text-[11px] font-bold">{f.ateFmt}</div>
-              <div className="text-[16px] font-extrabold mt-0.5">{f.pctFmt}</div>
+              <div className="text-textTertiary text-[11.5px] font-bold">{f.ateFmt}</div>
+              <div className="text-[15px] font-extrabold mt-0.5">{f.pctFmt}</div>
             </div>
           ))}
         </div>
@@ -97,7 +97,7 @@ export function ReceitaPage() {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[22px] font-extrabold">{data.realInsuranceCommission.totalComissaoFmt}</div>
+            <div className="text-[20px] font-extrabold">{data.realInsuranceCommission.totalComissaoFmt}</div>
             <div className="text-textTertiary text-[11.5px]">
               {data.realInsuranceCommission.totalApolices} apólice(s) · {data.realInsuranceCommission.totalPremiosFmt} em prêmios
             </div>
@@ -115,7 +115,7 @@ export function ReceitaPage() {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[22px] font-extrabold">{data.realLegalCollectionFees.totalFeeFmt}</div>
+            <div className="text-[20px] font-extrabold">{data.realLegalCollectionFees.totalFeeFmt}</div>
             <div className="text-textTertiary text-[11.5px]">
               {data.realLegalCollectionFees.totalCasos} caso(s) · {data.realLegalCollectionFees.totalRecoveredFmt} recuperados
             </div>
@@ -126,7 +126,7 @@ export function ReceitaPage() {
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1.6fr' }}>
         <NavyCard className="flex flex-col items-center py-6.5">
           <Donut stops={data.streams.map((s) => ({ color: s.color, from: s.gradFrom, to: s.gradTo }))} size={150} innerBg={PALETTE.navy}>
-            <div className="text-[11px] text-onNavy">total</div>
+            <div className="text-[11.5px] text-onNavy">total</div>
             <div className="text-[15px] font-extrabold">{data.totalFmt}</div>
           </Donut>
           <div className="text-[12.5px] text-onNavy text-center mt-4">12 fontes de receita ativas — mix diversificado entre take rate, spread, API, dados e serviços agregados</div>
@@ -139,7 +139,7 @@ export function ReceitaPage() {
             {data.streams.map((r) => (
               <div key={r.label} className="flex items-center gap-2.5">
                 <span className="rounded-[2px] flex-shrink-0" style={{ width: 9, height: 9, background: r.color }} />
-                <span className="flex-1 text-[13.5px] font-semibold">{r.label}</span>
+                <span className="flex-1 text-[13px] font-semibold">{r.label}</span>
                 <span className="text-[13px] text-textSecondary font-mono-num">{r.valorFmt}</span>
                 <span className="text-[12.5px] font-bold w-12 text-right">{r.pctFmt}</span>
               </div>
@@ -153,7 +153,7 @@ export function ReceitaPage() {
           <Card key={r.label} className="px-5 py-5">
             <div className="flex items-center gap-2 mb-2">
               <span className="rounded-[2px]" style={{ width: 8, height: 8, background: r.color }} />
-              <div className="font-bold text-[14.5px]">{r.label}</div>
+              <div className="font-bold text-[14px]">{r.label}</div>
             </div>
             <div className="text-textSecondary text-[13px] leading-snug">{r.desc}</div>
           </Card>

@@ -315,7 +315,7 @@ export function MarketplacePage() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-semibold">{offer.sacado}</span>
                     {offer.setor && offer.setorLabel && (
-                      <Badge label={offer.setorLabel} bg={SETOR_STYLE[offer.setor]?.bg ?? PALETTE.hairline} color={SETOR_STYLE[offer.setor]?.color ?? PALETTE.textSecondary} className="text-[10px] px-2 py-0.5" />
+                      <Badge label={offer.setorLabel} bg={SETOR_STYLE[offer.setor]?.bg ?? PALETTE.hairline} color={SETOR_STYLE[offer.setor]?.color ?? PALETTE.textSecondary} className="text-[10.5px] px-2 py-0.5" />
                     )}
                   </div>
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
@@ -323,7 +323,7 @@ export function MarketplacePage() {
                 <div className="text-textSecondary">{offer.cedente}</div>
                 <div>
                   <div className="font-bold font-mono-num">{offer.valorFmt}</div>
-                  <div className="text-[11px] text-textTertiary font-mono-num" title="Preço com deságio — o que você paga agora; recebe o valor de face de volta no vencimento">
+                  <div className="text-[11.5px] text-textTertiary font-mono-num" title="Preço com deságio — o que você paga agora; recebe o valor de face de volta no vencimento">
                     Você paga {offer.precoCompraFmt}
                   </div>
                 </div>
@@ -406,7 +406,7 @@ export function MarketplacePage() {
                           <div className="font-bold text-[13px] text-navy flex items-center gap-1.5">
                             {ins.name}
                             {ins.recommended && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-greenBg text-green">{t('marketplace.bestQuote', 'Melhor cotação')}</span>
+                              <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-greenBg text-green">{t('marketplace.bestQuote', 'Melhor cotação')}</span>
                             )}
                           </div>
                           <div className="text-textTertiary text-[11.5px] mt-0.5">{ins.selo}</div>
@@ -461,7 +461,7 @@ export function MarketplacePage() {
                         </Button>
                       </div>
                     )}
-                    {fractionalError && <div className="mt-2 text-red text-[12px] font-semibold">{fractionalError}</div>}
+                    {fractionalError && <div className="mt-2 text-red text-[12.5px] font-semibold">{fractionalError}</div>}
                   </div>
                 )}
               </div>
@@ -511,15 +511,15 @@ export function MarketplacePage() {
                   <div className="flex flex-col gap-2">
                     {offer.bids.map((bid, i) => (
                       <div key={i} className="flex items-center gap-3.5 bg-white rounded-lg px-3.5 py-2.5" style={{ border: `1px solid ${bid.borderColor}` }}>
-                        <div className="w-[26px] h-[26px] rounded-full text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: bid.avatarBg }}>
+                        <div className="w-[26px] h-[26px] rounded-full text-white flex items-center justify-center text-[11.5px] font-bold flex-shrink-0" style={{ background: bid.avatarBg }}>
                           {bid.initials}
                         </div>
-                        <div className="flex-1 text-[13.5px] font-semibold">{bid.name}</div>
+                        <div className="flex-1 text-[13px] font-semibold">{bid.name}</div>
                         <div className="text-[13px] text-textSecondary">{bid.tipo}</div>
                         <div className="text-sm font-extrabold font-mono-num" style={{ color: bid.rateColor }}>
                           {bid.taxa}
                         </div>
-                        <div className="text-[11px] font-bold px-2 py-1 rounded-md min-w-[84px] text-center" style={{ background: bid.tagBg, color: bid.tagColor }}>
+                        <div className="text-[11.5px] font-bold px-2 py-1 rounded-md min-w-[84px] text-center" style={{ background: bid.tagBg, color: bid.tagColor }}>
                           {bid.tag}
                         </div>
                       </div>

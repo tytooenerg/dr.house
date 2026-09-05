@@ -54,7 +54,7 @@ export function ConformidadeEscrituralPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-[16px] font-bold text-navy">Conformidade — Duplicata Escritural</h2>
+        <h2 className="text-[15px] font-bold text-navy">Conformidade — Duplicata Escritural</h2>
         <p className="text-[13px] text-navy/60 mt-1 max-w-2xl">
           Quantos cedentes/sacados já informaram sua faixa de faturamento anual e em que status de obrigatoriedade cada um está, conforme o
           cronograma do Banco Central.

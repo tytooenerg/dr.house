@@ -137,10 +137,10 @@ export function AddonRevenuePanel() {
     <div className="bg-white border border-border rounded-card overflow-hidden mt-5">
       <div className="px-5 py-3.5 border-b border-border">
         <div className="font-bold text-[14px]">Receita de add-ons</div>
-        <div className="text-[12px] text-textMuted mt-0.5">Preços por produto e cobranças reais lançadas (lib/addOnBilling.ts)</div>
+        <div className="text-[12.5px] text-textMuted mt-0.5">Preços por produto e cobranças reais lançadas (lib/addOnBilling.ts)</div>
       </div>
       <div className="px-5 py-3.5 border-b border-bg">
-        <div className="text-[12px] font-bold text-textMuted uppercase mb-2">Franquia mensal da API (chamadas incluídas antes do excedente)</div>
+        <div className="text-[12.5px] font-bold text-textMuted uppercase mb-2">Franquia mensal da API (chamadas incluídas antes do excedente)</div>
         <div className="flex items-center gap-2">
           <input
             value={includedCallsInput}
@@ -181,7 +181,7 @@ export function AddonRevenuePanel() {
         );
       })}
       <div className="px-5 py-3.5 border-b border-bg flex items-center gap-2 flex-wrap">
-        <span className="text-[12px] text-textMuted mr-1">Rodar cobrança mensal agora (mês anterior completo):</span>
+        <span className="text-[12.5px] text-textMuted mr-1">Rodar cobrança mensal agora (mês anterior completo):</span>
         <Button size="sm" variant="secondary" disabled={runningAddonJob === 'api-overage'} onClick={() => runAddonBillingJob('api-overage')}>
           {runningAddonJob === 'api-overage' ? 'Cobrando…' : 'Excedente de API'}
         </Button>

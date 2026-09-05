@@ -163,7 +163,7 @@ export function AiCfoPage() {
           <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Recebíveis externos (ERP)</div>
           <div className="font-mono-num font-bold text-lg">{forecast.recebiveisExternosFmt}</div>
           {forecast.recebiveisExternos === 0 && (
-            <div className="text-[11px] text-textTertiary mt-1">
+            <div className="text-[11.5px] text-textTertiary mt-1">
               Conecte um ERP em <Link to="/app/erp" className="text-blue">Integrações ERP</Link> pra somar aqui o que você recebe fora da Lastro.
             </div>
           )}
@@ -231,7 +231,7 @@ export function AiCfoPage() {
                 <span>Resultado</span>
                 <span className="font-mono-num" style={{ color: forecast.dre.resultado >= 0 ? PALETTE.green : PALETTE.red }}>{forecast.dre.resultadoFmt}</span>
               </div>
-              <div className="text-[11px] text-textTertiary mt-1">Valor bruto, sem descontar taxa/deságio da Lastro — visão simplificada, não substitui sua contabilidade.</div>
+              <div className="text-[11.5px] text-textTertiary mt-1">Valor bruto, sem descontar taxa/deságio da Lastro — visão simplificada, não substitui sua contabilidade.</div>
             </div>
           ) : (
             <EmpresarialUpsell isEmpresarial={isEmpresarial} />
@@ -254,7 +254,7 @@ export function AiCfoPage() {
                 <span className="text-textSecondary">Volatilidade</span>
                 <span className="font-mono-num font-bold">{forecast.saldoBancarioReal.volatilidadePct}%</span>
               </div>
-              <div className="text-[11px] text-textTertiary mt-1">Via Open Finance ({forecast.saldoBancarioReal.fonte}), com seu consentimento.</div>
+              <div className="text-[11.5px] text-textTertiary mt-1">Via Open Finance ({forecast.saldoBancarioReal.fonte}), com seu consentimento.</div>
             </div>
           ) : isEmpresarial ? (
             <div className="text-[13px] text-textSecondary">
@@ -283,7 +283,7 @@ export function AiCfoPage() {
               </div>
               {forecast.benchmark.comparacao && (
                 <div
-                  className="text-[12px] font-bold mt-1"
+                  className="text-[12.5px] font-bold mt-1"
                   style={{ color: forecast.benchmark.comparacao === 'melhor' ? PALETTE.green : forecast.benchmark.comparacao === 'pior' ? PALETTE.red : PALETTE.textSecondary }}
                 >
                   Você está {forecast.benchmark.comparacao === 'melhor' ? 'melhor' : forecast.benchmark.comparacao === 'pior' ? 'pior' : 'igual'} que a média do mercado (Lastro Index)

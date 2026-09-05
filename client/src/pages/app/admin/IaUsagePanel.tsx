@@ -124,7 +124,7 @@ export function IaUsagePanel() {
               jurídica) na base.
             </div>
           )}
-          {mlRetrainMessage && <div className="text-[12px] font-bold text-blue mt-2">{mlRetrainMessage}</div>}
+          {mlRetrainMessage && <div className="text-[12.5px] font-bold text-blue mt-2">{mlRetrainMessage}</div>}
         </div>
       )}
       {aiUsage && (
@@ -132,20 +132,20 @@ export function IaUsagePanel() {
           <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <div className="bg-white border border-border rounded-card p-4">
               <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Chamadas totais</div>
-              <div className="text-[22px] font-bold">{aiUsage.totalCalls}</div>
+              <div className="text-[20px] font-bold">{aiUsage.totalCalls}</div>
               {aiUsage.failedCalls > 0 && <div className="text-[11.5px] text-red mt-0.5">{aiUsage.failedCalls} com falha</div>}
             </div>
             <div className="bg-white border border-border rounded-card p-4">
               <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Tokens de entrada</div>
-              <div className="text-[22px] font-bold">{aiUsage.totalInputTokens.toLocaleString('pt-BR')}</div>
+              <div className="text-[20px] font-bold">{aiUsage.totalInputTokens.toLocaleString('pt-BR')}</div>
             </div>
             <div className="bg-white border border-border rounded-card p-4">
               <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Tokens de saída</div>
-              <div className="text-[22px] font-bold">{aiUsage.totalOutputTokens.toLocaleString('pt-BR')}</div>
+              <div className="text-[20px] font-bold">{aiUsage.totalOutputTokens.toLocaleString('pt-BR')}</div>
             </div>
             <div className="bg-white border border-border rounded-card p-4">
               <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Custo estimado</div>
-              <div className="text-[22px] font-bold">US$ {aiUsage.totalEstimatedCostUsd.toFixed(2)}</div>
+              <div className="text-[20px] font-bold">US$ {aiUsage.totalEstimatedCostUsd.toFixed(2)}</div>
             </div>
           </div>
 

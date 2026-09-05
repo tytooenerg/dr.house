@@ -131,15 +131,15 @@ function FundCard() {
         <>
           <div className="grid grid-cols-3 gap-4 mb-3">
             <div>
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Sua posição (com rendimento)</div>
+              <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Sua posição (com rendimento)</div>
               <div className="font-mono-num font-bold text-[15px]">{fund.yourPositionFmt}</div>
             </div>
             <div>
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Principal aportado</div>
+              <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Principal aportado</div>
               <div className="font-mono-num font-bold text-[15px] text-textSecondary">{fund.yourPrincipalAportadoFmt}</div>
             </div>
             <div>
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Disponível para resgate</div>
+              <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Disponível para resgate</div>
               <div className="font-mono-num font-bold text-[15px] text-blue">{fund.yourAvailableToRedeemFmt}</div>
             </div>
           </div>
@@ -306,7 +306,7 @@ export function CreditLinePage() {
                     <span className="font-mono-num">{d.valorOriginalFmt}</span>
                     <span className="font-mono-num font-bold">{d.saldoDevedorFmt}</span>
                     <span className="text-textSecondary">{d.taxaAmFmt}</span>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${d.status === 'quitado' ? 'bg-greenBg text-green' : 'bg-amberBg text-amber'}`}>
+                    <span className={`text-[11.5px] font-bold px-2 py-0.5 rounded-md ${d.status === 'quitado' ? 'bg-greenBg text-green' : 'bg-amberBg text-amber'}`}>
                       {d.status === 'quitado' ? 'Quitado' : 'Em aberto'}
                     </span>
                   </div>

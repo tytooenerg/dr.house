@@ -104,15 +104,15 @@ function FundoCard() {
         <>
           <div className="grid grid-cols-3 gap-4 mb-3">
             <div>
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Sua posição (com rendimento)</div>
+              <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Sua posição (com rendimento)</div>
               <div className="font-mono-num font-bold text-[15px]">{fundo.yourPositionFmt}</div>
             </div>
             <div>
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Principal aportado</div>
+              <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Principal aportado</div>
               <div className="font-mono-num font-bold text-[15px] text-textSecondary">{fundo.yourPrincipalAportadoFmt}</div>
             </div>
             <div>
-              <div className="text-[11px] font-bold text-textSecondary uppercase mb-1">Disponível para resgate</div>
+              <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1">Disponível para resgate</div>
               <div className="font-mono-num font-bold text-[15px] text-blue">{fundo.yourAvailableToRedeemFmt}</div>
             </div>
           </div>
@@ -356,7 +356,7 @@ export function ConfirmingPage() {
 
           <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <Card>
-              <div className="font-bold text-[14.5px] mb-1">Fornecedores matriculados</div>
+              <div className="font-bold text-[14px] mb-1">Fornecedores matriculados</div>
               <div className="text-textSecondary text-[12.5px] mb-3.5">Cedentes que já podem ser financiados dentro do seu programa</div>
               {programa.membros.filter((m) => m.status === 'ativo').length === 0 ? (
                 <div className="text-textSecondary text-[12.5px]">Nenhum fornecedor matriculado ainda.</div>
@@ -380,7 +380,7 @@ export function ConfirmingPage() {
             </Card>
 
             <Card>
-              <div className="font-bold text-[14.5px] mb-1">Fornecedores elegíveis</div>
+              <div className="font-bold text-[14px] mb-1">Fornecedores elegíveis</div>
               <div className="text-textSecondary text-[12.5px] mb-3.5">Cedentes com histórico real de duplicatas contra sua empresa</div>
               {elegiveis.length === 0 ? (
                 <div className="text-textSecondary text-[12.5px]">Nenhum cedente com histórico contra sua empresa ainda.</div>
@@ -407,7 +407,7 @@ export function ConfirmingPage() {
                             placeholder={`Sublimite (sugestão: ${c.sublimiteSugeridoFmt})`}
                             value={sublimiteById[c.cedenteUserId] ?? ''}
                             onChange={(e) => setSublimiteById((s) => ({ ...s, [c.cedenteUserId]: e.target.value }))}
-                            className="w-[180px] px-2.5 py-1.5 rounded-md border border-inputBorder text-[12px] outline-none"
+                            className="w-[180px] px-2.5 py-1.5 rounded-md border border-inputBorder text-[12.5px] outline-none"
                           />
                           <Button size="sm" onClick={() => matricular(c.cedenteUserId)} disabled={busyKey === `matricular:${c.cedenteUserId}`}>
                             {busyKey === `matricular:${c.cedenteUserId}` ? 'Matriculando…' : 'Matricular'}

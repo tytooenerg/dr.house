@@ -102,7 +102,7 @@ export function AdvertisementsPanel({ onCount }: { onCount?: (n: number) => void
               <div>{screeningById[ad.id]!.reasoning}</div>
             </div>
           ) : (
-            <div className="text-[12px] text-textSecondary mb-3">Triagem indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>
+            <div className="text-[12.5px] text-textSecondary mb-3">Triagem indisponível (ANTHROPIC_API_KEY não configurada no servidor).</div>
           )}
           <div className="flex items-center gap-2 flex-wrap">
             <input

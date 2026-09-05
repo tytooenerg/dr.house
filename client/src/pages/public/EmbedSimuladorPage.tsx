@@ -42,7 +42,7 @@ export function EmbedSimuladorPage() {
 
   return (
     <div className="w-full min-h-screen bg-white text-navy p-5" style={{ fontFamily: 'inherit' }}>
-      <div className="font-extrabold text-[16px] mb-1">Simule sua antecipação</div>
+      <div className="font-extrabold text-[15px] mb-1">Simule sua antecipação</div>
       <div className="text-textSecondary text-[12.5px] mb-4">Taxa estimada com o mesmo modelo de risco da Lastro — sem compromisso.</div>
       <form onSubmit={simular} className="flex flex-col gap-3">
         <Field label="Empresa sacada (opcional)">
@@ -65,15 +65,15 @@ export function EmbedSimuladorPage() {
         <div className="mt-4 p-4 rounded-[10px] bg-surface border border-border">
           <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div>
-              <div className="text-textTertiary text-[11px] font-bold">TAXA ESTIMADA</div>
-              <div className="font-extrabold text-[18px] mt-0.5">{result.taxaEstimadaFmt}</div>
+              <div className="text-textTertiary text-[11.5px] font-bold">TAXA ESTIMADA</div>
+              <div className="font-extrabold text-[15px] mt-0.5">{result.taxaEstimadaFmt}</div>
             </div>
             <div>
-              <div className="text-textTertiary text-[11px] font-bold">TAXA DA PLATAFORMA</div>
-              <div className="font-extrabold text-[18px] mt-0.5">{result.plataformaFeeFmt}</div>
+              <div className="text-textTertiary text-[11.5px] font-bold">TAXA DA PLATAFORMA</div>
+              <div className="font-extrabold text-[15px] mt-0.5">{result.plataformaFeeFmt}</div>
             </div>
           </div>
-          {result.sacadoRecognizedText && <div className="mt-3 text-[12px] text-textSecondary">{result.sacadoRecognizedText}</div>}
+          {result.sacadoRecognizedText && <div className="mt-3 text-[12.5px] text-textSecondary">{result.sacadoRecognizedText}</div>}
           <a href="/login" target="_blank" rel="noreferrer" className="inline-block mt-3 text-[12.5px] font-bold text-blue">
             Antecipar com a Lastro →
           </a>

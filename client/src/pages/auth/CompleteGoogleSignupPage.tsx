@@ -38,7 +38,7 @@ export function CompleteGoogleSignupPage() {
       <div className="w-full min-h-screen flex items-center justify-center bg-bg p-6">
         <div className="w-full max-w-[420px] bg-white border border-border rounded-2xl p-9 text-center">
           <div className="text-xl font-extrabold mb-2">Link inválido</div>
-          <div className="text-textSecondary text-[13.5px]">Volte e tente entrar com Google novamente.</div>
+          <div className="text-textSecondary text-[13px]">Volte e tente entrar com Google novamente.</div>
         </div>
       </div>
     );
@@ -65,7 +65,7 @@ export function CompleteGoogleSignupPage() {
           <Logo />
         </div>
         <div className="text-xl font-extrabold mb-1">Quase lá, {nome.split(' ')[0] || 'bem-vindo(a)'}</div>
-        <div className="text-textSecondary text-[13.5px] mb-6">
+        <div className="text-textSecondary text-[13px] mb-6">
           Confirmamos sua conta Google (<b>{email}</b>). Só falta escolher como você vai acessar a plataforma.
         </div>
 
@@ -105,7 +105,7 @@ export function CompleteGoogleSignupPage() {
                     key={ins.key}
                     type="button"
                     onClick={() => setInsurerKey(ins.key)}
-                    className="px-3.5 py-2.5 rounded-lg border text-[13.5px] font-semibold text-left cursor-pointer"
+                    className="px-3.5 py-2.5 rounded-lg border text-[13px] font-semibold text-left cursor-pointer"
                     style={{ borderColor: insurerKey === ins.key ? PALETTE.blue : PALETTE.border, background: insurerKey === ins.key ? PALETTE.chip : '#fff' }}
                   >
                     {ins.name}

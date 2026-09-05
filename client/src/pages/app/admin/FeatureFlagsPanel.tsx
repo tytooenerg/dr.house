@@ -58,7 +58,7 @@ export function FeatureFlagsPanel() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-[16px] font-bold text-navy">Feature flags</h2>
+        <h2 className="text-[15px] font-bold text-navy">Feature flags</h2>
         <p className="text-[13px] text-navy/60 mt-1">
           Kill switches operacionais que qualquer admin pode acionar sem depender de um novo deploy. Cada flag abaixo controla um ponto real do
           sistema — veja server/src/lib/featureFlags.ts para a lista completa de onde cada uma é checada.
@@ -71,7 +71,7 @@ export function FeatureFlagsPanel() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[13.5px] font-bold text-navy">{f.label}</span>
+                  <span className="text-[13px] font-bold text-navy">{f.label}</span>
                   <code className="text-[10.5px] text-navy/50 bg-bg px-1.5 py-0.5 rounded">{f.key}</code>
                   {!f.isOverridden && (
                     <span className="text-[10.5px] font-bold text-navy/40 uppercase tracking-wide">padrão</span>
@@ -88,7 +88,7 @@ export function FeatureFlagsPanel() {
               </Button>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[12px] text-navy/60">Rollout:</span>
+              <span className="text-[12.5px] text-navy/60">Rollout:</span>
               <input
                 type="number"
                 min={0}
@@ -97,11 +97,11 @@ export function FeatureFlagsPanel() {
                 onChange={(e) => setRolloutInputs((prev) => ({ ...prev, [f.key]: e.target.value }))}
                 className="w-16 border border-border rounded-md px-2 py-1 text-[12.5px]"
               />
-              <span className="text-[12px] text-navy/60">%</span>
+              <span className="text-[12.5px] text-navy/60">%</span>
               <Button variant="ghost" disabled={savingKey === f.key} onClick={() => save(f, f.enabled)}>
                 Salvar %
               </Button>
-              {f.updatedAt && <span className="text-[11px] text-navy/40 ml-auto">Alterada em {f.updatedAt}</span>}
+              {f.updatedAt && <span className="text-[11.5px] text-navy/40 ml-auto">Alterada em {f.updatedAt}</span>}
             </div>
           </div>
         ))}

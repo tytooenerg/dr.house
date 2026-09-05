@@ -183,7 +183,7 @@ function LoteImportCard({ onImported }: { onImported: () => void }) {
             {outcome.resultados
               .filter((r) => !r.ok)
               .map((r) => (
-                <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md bg-redBg">
+                <div key={r.index} className="flex items-center justify-between text-[12.5px] px-2.5 py-1.5 rounded-md bg-redBg">
                   <span className="font-semibold">{r.descricao || `linha ${r.index + 1}`}</span>
                   <span className="text-red">{r.error}</span>
                 </div>
@@ -375,7 +375,7 @@ export function ContasPagarPage() {
                   </div>
                   <div className="text-textSecondary">{p.vencimento}</div>
                   <div className="font-mono-num font-bold">{p.valorFmt}</div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md" style={{ background: st.bg, color: st.color }}>
+                  <span className="text-[11.5px] font-bold px-2 py-0.5 rounded-md" style={{ background: st.bg, color: st.color }}>
                     {p.atrasado ? 'Atrasado' : st.label}
                   </span>
                   {p.status === 'pendente' && (
