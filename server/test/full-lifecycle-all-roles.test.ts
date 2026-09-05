@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { applyTacitAcceptance } from '../src/lib/aceiteCore.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // Simulação de uma operação real de duplicata escritural jogando o papel de TODOS os 6
 // papéis da plataforma (cedente, investidor, sacado, seguradora, admin, auditor) numa
@@ -119,7 +120,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
 
     // 5. INVESTIDOR A compra — extrato de ambos os lados confere o movimento real.
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
+    const buy = (await arrematar(investidorA.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
     expect(getDuplicata(duplicataId)!.status).toBe('vendida');
 
@@ -208,7 +209,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
 
     // O investidor compra — status vira 'vendida'.
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidor.token}`);
+    const buy = (await arrematar(investidor.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
     expect(getDuplicata(duplicataId)!.status).toBe('vendida');
 
@@ -255,7 +256,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
     const duplicataId = emit.body.duplicataId as string;
     aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
+    const buy = (await arrematar(investidorA.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const insure = await request(app).post(`/api/market/${duplicataId}/insure`).set('Authorization', `Bearer ${investidorB.token}`).send({ key: 'pottencial' });
@@ -356,7 +357,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
     const duplicataId = emit.body.duplicataId as string;
     aceitarDuplicata(duplicataId);
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedente.token}`);
-    await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorA.token}`);
+    (await arrematar(investidorA.token, duplicataId)).lance;
 
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${investidorA.token}`);
     const posicao = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId);

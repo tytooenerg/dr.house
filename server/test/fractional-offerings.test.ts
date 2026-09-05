@@ -7,6 +7,7 @@ import { createDuplicata, getDuplicata } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { FRACTIONAL_MIN_VALOR, FRACTIONAL_TOTAL_TOKENS } from '../src/lib/fractionalOfferings.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -123,7 +124,7 @@ describe('Fractional offerings — real multi-investor allocation', () => {
     expect(full.body.offering.status).toBe('concluida');
     expect(full.body.offering.pctVendido).toBe(100);
 
-    const wholeBuy = await request(app).post(`/api/market/${d.id}/buy`).set('Authorization', `Bearer ${wholeHunter.token}`);
+    const wholeBuy = (await arrematar(wholeHunter.token, d.id)).lance;
     expect(wholeBuy.status).toBe(409);
     expect(wholeBuy.body.error).toBe('already_purchased');
   });
@@ -131,7 +132,7 @@ describe('Fractional offerings — real multi-investor allocation', () => {
   it('a duplicata already bought whole cannot then be fractionalized', async () => {
     const d = makeLargeDuplicata(200000);
     const wholeBuyer = await registerInvestidor();
-    const wholeBuy = await request(app).post(`/api/market/${d.id}/buy`).set('Authorization', `Bearer ${wholeBuyer.token}`);
+    const wholeBuy = (await arrematar(wholeBuyer.token, d.id)).lance;
     expect(wholeBuy.status).toBe(200);
 
     const fractionalHopeful = await registerInvestidor();

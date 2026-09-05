@@ -8,6 +8,7 @@ import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { fmtBRLSigned } from '../src/lib/format.js';
+import { fecharLeiloes } from './helpers/auction.js';
 
 // lib/cestasCore.ts's investInBasket reusa computePurchasePrice/settlePurchase/
 // createPurchase exatamente como routes/market.ts faz — nenhum bug financeiro achado
@@ -92,7 +93,9 @@ describe('POST /cestas/investir — ledger e retorno reais', () => {
       .set('Authorization', `Bearer ${investor.token}`)
       .send({ cesta: 'diversificada', valor: '999.999.999' });
     expect(invest.status).toBe(200);
-    expect(invest.body.comprados.some((c: { duplicataId: string }) => c.duplicataId === duplicataId)).toBe(true);
+    expect(invest.body.lances.some((c: { duplicataId: string }) => c.duplicataId === duplicataId)).toBe(true);
+    // A cesta propõe; o dinheiro só se move quando o leilão fecha e o lance vence.
+    fecharLeiloes(duplicataId);
 
     const extratoInvestor = await request(app).get('/api/account').set('Authorization', `Bearer ${investor.token}`);
     const debit = extratoInvestor.body.extrato.find((e: { descricao: string }) => e.descricao.includes(duplicataId));
@@ -120,6 +123,7 @@ describe('POST /cestas/investir — ledger e retorno reais', () => {
       .set('Authorization', `Bearer ${investor.token}`)
       .send({ cesta: 'diversificada', valor: '999.999.999' });
     expect(invest.status).toBe(200);
+    fecharLeiloes(duplicataId);
 
     const historico = await request(app).get('/api/historico?pageSize=200').set('Authorization', `Bearer ${investor.token}`);
     const row = historico.body.historico.find((h: { empresa: string }) => h.empresa === sacadoCompany);
@@ -140,7 +144,8 @@ describe('POST /cestas/investir — ledger e retorno reais', () => {
       .set('Authorization', `Bearer ${seller.token}`)
       .send({ cesta: 'diversificada', valor: '999.999.999' });
     expect(invest.status).toBe(200);
-    expect(invest.body.comprados.some((c: { duplicataId: string }) => c.duplicataId === duplicataId)).toBe(true);
+    expect(invest.body.lances.some((c: { duplicataId: string }) => c.duplicataId === duplicataId)).toBe(true);
+    fecharLeiloes(duplicataId);
 
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
     const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId);
@@ -184,14 +189,14 @@ describe('POST /cestas/investir — ledger e retorno reais', () => {
       .set('Authorization', `Bearer ${investor.token}`)
       .send({ cesta: 'diversificada', valor: String(budget) });
     expect(invest.status).toBe(200);
-    expect(invest.body.comprados.length).toBeGreaterThan(0);
+    expect(invest.body.lances.length).toBeGreaterThan(0);
 
-    const somaPrecoCompraReal = invest.body.comprados.reduce((sum: number, c: { duplicataId: string }) => {
+    const somaPrecoCompraReal = invest.body.lances.reduce((sum: number, c: { duplicataId: string }) => {
       const d = getDuplicata(c.duplicataId)!;
       return sum + computePurchasePrice(d).precoCompra;
     }, 0);
 
-    const totalInvestido = parseBRL(invest.body.totalInvestidoFmt);
+    const totalInvestido = parseBRL(invest.body.totalEmLancesFmt);
     const restante = parseBRL(invest.body.restanteFmt);
     expect(Math.round(totalInvestido)).toBe(Math.round(somaPrecoCompraReal));
     expect(Math.round(budget - restante)).toBe(Math.round(totalInvestido));

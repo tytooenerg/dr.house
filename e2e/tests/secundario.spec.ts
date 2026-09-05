@@ -1,21 +1,16 @@
 import { test, expect, dismissOnboardingIfPresent } from './fixtures';
 
-test('demo investidor can buy an offer, then list it for resale on the mercado secundário', async ({ page }) => {
+// A conta demo já tem uma posição em aberto vinda de um leilão que fechou (server/src/db/seed.ts
+// adjudica uma duplicata ao investidor demo). Comprar na hora deixou de existir — o vencedor
+// do leilão primário só é conhecido no fechamento — então o anúncio de revenda parte da
+// posição que a conta já tem, que é o mesmo ponto de partida de um investidor real.
+test('demo investidor can list an owned position for resale on the mercado secundário', async ({ page }) => {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await page.getByPlaceholder('voce@empresa.com.br').fill('investidor@lastro.demo');
   await page.getByPlaceholder('••••••••').fill('demo1234');
   await page.locator('form').getByRole('button', { name: 'Entrar' }).click();
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await dismissOnboardingIfPresent(page);
-
-  await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });
-  await dismissOnboardingIfPresent(page);
-  await expect(page.getByText('Atualizações ao vivo')).toBeVisible({ timeout: 15_000 });
-  const buyButton = page.getByRole('button', { name: 'Comprar' }).first();
-  if (await buyButton.isVisible().catch(() => false)) {
-    await buyButton.click();
-    await expect(page.getByRole('button', { name: 'Comprada' }).first()).toBeVisible({ timeout: 10_000 });
-  }
 
   await page.goto('/app/secundario', { waitUntil: 'domcontentloaded' });
   await expect(page.getByText('Revenda posições antes do vencimento')).toBeVisible();

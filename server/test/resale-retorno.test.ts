@@ -8,6 +8,7 @@ import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { fmtBRLSigned } from '../src/lib/format.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // Achado ao simular o mercado secundário de ponta a ponta: revender uma posição antes do
 // vencimento nunca atualizava purchases.retorno da linha original do vendedor — ela
@@ -59,7 +60,7 @@ async function emitirEComprar(valor: string, buyer: { token: string }) {
 
   const precoCompra = computePurchasePrice(getDuplicata(duplicataId)!).precoCompra;
   setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
-  const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${buyer.token}`);
+  const buy = (await arrematar(buyer.token, duplicataId)).lance;
   expect(buy.status).toBe(200);
 
   return { duplicataId, precoCompra };

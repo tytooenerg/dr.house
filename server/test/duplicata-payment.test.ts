@@ -10,6 +10,7 @@ import { getProgramaBySacado } from '../src/db/confirming.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // Nenhuma parte da plataforma modelava "sacado pagou no vencimento, caminho feliz" antes
 // desta feature — nem o marketplace normal, nem a linha de crédito, nem o Confirming. Self-
@@ -93,7 +94,7 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
     expect(accept.status).toBe(200);
 
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investidorToken}`);
+    const buy = (await arrematar(investidorToken, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const aceite = await findAceite(sacadoToken, duplicataId);
@@ -166,8 +167,10 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
     const programa = getProgramaBySacado(sacadoUserId)!;
     setDesagio(duplicataId, programa.taxa_am - 0.3);
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(1);
+    // O fundo dá lance como qualquer investidor; a compra sai do fechamento do leilão.
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(1);
+    expect(fecharLeiloes(duplicataId)).toMatchObject({ vendidos: 1 });
 
     // Caixa cai só o preço com deságio (lib/marketCompute.ts's computePurchasePrice); NAV
     // (caixa + posições em aberto, valorizadas ao valor de face) SOBE pelo valor do deságio

@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { db, resetDbForTests } from '../src/db/index.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // resetDbForTests() itself isn't called by any other test today (each test file already
 // gets its own fresh :memory: database from Vitest's per-file isolation) — this is the
@@ -31,7 +32,7 @@ describe('resetDbForTests', () => {
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
     expect(buyable).toBeTruthy();
-    await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${token}`);
+    (await arrematar(token, buyable.id)).lance;
 
     const before = new Map(allTableNames().map((t) => [t, (db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n]));
     expect(before.get('users')).toBeGreaterThan(0);

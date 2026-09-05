@@ -8,6 +8,7 @@ import { platformFee } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 function parseBRL(s: string): number {
   return Number(s.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
@@ -66,7 +67,7 @@ async function sellerWithListing(askingValor: string, faceValor = '20.000') {
   if (leilao.status !== 200) throw new Error(`leilão falhou: ${JSON.stringify(leilao.body)}`);
 
   const precoCompra = computePurchasePrice(getDuplicata(duplicataId)!).precoCompra;
-  await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${seller.token}`);
+  (await arrematar(seller.token, duplicataId)).lance;
   const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
   const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId);
   const listRes = await request(app)

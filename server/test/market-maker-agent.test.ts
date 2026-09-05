@@ -6,6 +6,7 @@ import { approveKyb, updateSettings, updateSubscription } from '../src/db/users.
 import { marketMakerAgent } from '../src/lib/agents/marketMaker.js';
 import { runMarketMakerAgentScan } from '../src/lib/marketMakerAgentJob.js';
 import type { AgentRunContext } from '../src/lib/agentRuntime.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -33,7 +34,7 @@ async function sellerWithListing(askingValor: string) {
   const seller = await registerInvestidor();
   const market = await request(app).get('/api/market').set('Authorization', `Bearer ${seller.token}`);
   const buyable = market.body.offers.find((o: { canBuy: boolean; vencimento: string }) => o.canBuy && parseDataBr(o.vencimento).getTime() > Date.now());
-  await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${seller.token}`);
+  (await arrematar(seller.token, buyable.id)).lance;
   const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
   const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === buyable.id);
   const listRes = await request(app)

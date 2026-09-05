@@ -1,14 +1,13 @@
-import { getDuplicata, isPurchased, createPurchase, listPurchasesByInvestor } from '../../db/duplicatas.js';
+import { getDuplicata, isPurchased, listPurchasesByInvestor } from '../../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../../db/aceites.js';
 import { aceiteConfirmado } from '../aceiteCore.js';
 import { getUserById, getSettings } from '../../db/users.js';
-import { settlePurchase } from '../settlement.js';
 import { computePurchasePrice } from '../marketCompute.js';
-import { deliverWebhookEvent } from '../webhookDelivery.js';
 import { addAutomationActivity } from '../../db/misc.js';
 import { ratingFromScore } from '../riscoCore.js';
 import { fmtBRL } from '../format.js';
 import type { AgentDefinition } from '../agentRuntime.js';
+import { placeAuctionBid, fmtTaxa } from '../auctionCore.js';
 
 // The rule-based auto-bid engine (routes/automation.ts) always applies the same fixed
 // checks in the same order to every offer. This agent version investigates a specific
@@ -70,7 +69,7 @@ export const autoBidAgent: AgentDefinition = {
     {
       name: 'comprar_oferta',
       description:
-        'Executa a compra da oferta (mesma operação de um clique manual em "Comprar") em nome do investidor. Ação sensível — compromete capital real (o próprio investidor pode aprovar a sua, é o mesmo efeito de comprar manualmente).',
+        'Registra um lance no leilão da oferta em nome do investidor, na taxa de reserva. Ação sensível — compromete capital real se o lance vencer no fechamento.',
       sensitive: true,
       selfApprovable: true,
       extractValueBRL: async (input: { duplicataId: string }) => getDuplicata(input.duplicataId)?.valor ?? null,
@@ -83,15 +82,19 @@ export const autoBidAgent: AgentDefinition = {
         // 'contestada' — uma duplicata só pode ser negociada depois que o sacado aceita
         // (explícito ou tácito). Mesmo padrão de erro do fluxo manual (routes/market.ts).
         if (!aceiteConfirmado(offer.id)) throw new Error('Aguardando aceite do sacado (ou o prazo tácito vencer) antes de poder comprar esta duplicata.');
-        const { precoCompra } = computePurchasePrice(offer);
-        createPurchase(offer.id, input.userId, offer.valor, offer.desagio ?? '', Math.round(offer.valor - precoCompra));
-        settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: input.userId, cedenteId: offer.cedente_id, valor: offer.valor, precoCompra });
-        if (offer.cedente_id) {
-          void deliverWebhookEvent(offer.cedente_id, 'pagamento.confirmado', { duplicataId: offer.id, valor: offer.valor, investorId: input.userId });
+        // Com leilão real, o agente propõe um lance na taxa de reserva em vez de comprar
+        // na hora — o vencedor sai do fechamento (lib/auctionClose.ts). A tool continua
+        // sensitive: propor um lance compromete dinheiro se vencer.
+        const { taxaAmPct } = computePurchasePrice(offer);
+        const bidder = getUserById(input.userId);
+        if (!bidder) return { ok: false, message: 'Conta não encontrada.' };
+        const outcome = placeAuctionBid(bidder, offer.id, taxaAmPct);
+        if (outcome.status !== 200) {
+          return { ok: false, message: (outcome.body as { message?: string }).message ?? 'Não foi possível registrar o lance.' };
         }
         addAutomationActivity(
           input.userId,
-          `Agente de auto-bid (IA) comprou ${fmtBRL(offer.valor)} em ${offer.sacado_nome} a ${offer.desagio}, aprovado por humano.`,
+          `Agente de auto-bid (IA) deu lance de ${fmtTaxa(taxaAmPct)} a.m. em ${offer.sacado_nome} (${fmtBRL(offer.valor)}), aprovado por humano.`,
           '#0A5C36'
         );
         return { ok: true, valorFmt: fmtBRL(offer.valor) };

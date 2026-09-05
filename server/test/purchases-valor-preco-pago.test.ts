@@ -7,6 +7,7 @@ import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { platformFee } from '../src/lib/settlement.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // Achado corrigido: "Investido"/totalInvestido em routes/historico.ts,
 // lib/institutionalReporting.ts, lib/portfolioRebalance.ts e lib/investorPerformance.ts
@@ -62,7 +63,7 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     const duplicataId = await emitirELeiloar('50.000');
     const precoCompra = computePurchasePrice(getDuplicata(duplicataId)!).precoCompra;
 
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    const buy = (await arrematar(investor.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const analytics = await request(app).get('/api/historico/institutional/analytics').set('Authorization', `Bearer ${investor.token}`);
@@ -82,7 +83,7 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     const duplicataId = await emitirELeiloar('40.000');
     const precoCompra = computePurchasePrice(getDuplicata(duplicataId)!).precoCompra;
 
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    const buy = (await arrematar(investor.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const rebalance = await request(app).get('/api/historico/rebalanceamento').set('Authorization', `Bearer ${investor.token}`);
@@ -103,7 +104,7 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     // não Math.round(precoCompra) direto — um arredondamento de até R$1 é esperado.
     const investidoEsperado = 60000 - retornoReal;
 
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    const buy = (await arrematar(investor.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const perf = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${investor.token}`);
@@ -123,7 +124,7 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     const duplicataId = await emitirELeiloar('30.000');
     const precoCompra = computePurchasePrice(getDuplicata(duplicataId)!).precoCompra;
 
-    await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${seller.token}`);
+    (await arrematar(seller.token, duplicataId)).lance;
 
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
     const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId);
@@ -160,7 +161,7 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     // revenda (bem menor que 500.000) — se discountRatio usasse essa coluna, a ordenação
     // ficaria errada.
     const duplicataId = await emitirELeiloar('500.000');
-    await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${originalBuyer.token}`);
+    (await arrematar(originalBuyer.token, duplicataId)).lance;
     const secundario1 = await request(app).get('/api/secundario').set('Authorization', `Bearer ${originalBuyer.token}`);
     const pos1 = secundario1.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId);
     const list1 = await request(app)
@@ -186,7 +187,7 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     // Segundo anúncio concorrente com desconto real menor (só pra garantir que o sweep
     // tenha mais de um candidato disputando ordem, e orçamento suficiente pros dois).
     const duplicataId2 = await emitirELeiloar('300.000');
-    await request(app).post(`/api/market/${duplicataId2}/buy`).set('Authorization', `Bearer ${originalBuyer.token}`);
+    (await arrematar(originalBuyer.token, duplicataId2)).lance;
     const secundario3 = await request(app).get('/api/secundario').set('Authorization', `Bearer ${originalBuyer.token}`);
     const pos3 = secundario3.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === duplicataId2);
     const list3 = await request(app)

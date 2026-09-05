@@ -8,35 +8,42 @@ import { logger } from './lib/logger.js';
 
 const CHANNEL = 'lastro:market';
 let wss: WebSocketServer | null = null;
-const clients = new Set<WebSocket>();
+// Quem está vendo importa: com leilão real, a oferta carrega "Seu lance"/"Alterar lance",
+// que só existem em relação a um investidor. Por isso cada conexão guarda o userId e recebe
+// a sua própria renderização, em vez de um payload único compartilhado.
+const clients = new Map<WebSocket, number>();
 
-function broadcastLocal(payload: string) {
-  for (const ws of clients) {
-    if (ws.readyState === WebSocket.OPEN) ws.send(payload);
+function offersFor(userId: number): string {
+  return JSON.stringify({ type: 'offers', offers: listMarketplace().map((d) => buildOfferView(d, userId)) });
+}
+
+function broadcastLocal() {
+  for (const [ws, userId] of clients) {
+    if (ws.readyState === WebSocket.OPEN) ws.send(offersFor(userId));
   }
 }
 
 // Redis is optional: with a single API process (the default for this app) the
 // in-memory interval below is all that's needed. REDIS_URL only matters if this
-// process is scaled horizontally — each instance still computes its own view of
-// the marketplace and publishes it, and every instance (including the publisher)
-// relays whatever it receives on the channel to its own locally-connected clients.
-function setupRedisRelay(): ((payload: string) => void) | null {
+// process is scaled horizontally. O que trafega no canal é só um aviso de "mudou" — não
+// mais o payload pronto: como cada cliente vê o leilão pelos próprios lances, quem tem a
+// conexão é quem tem que montar o que mandar pra ela.
+function setupRedisRelay(): (() => void) | null {
   const url = process.env.REDIS_URL;
   if (!url) return null;
 
   const publisher = new Redis(url);
   const subscriber = new Redis(url);
   subscriber.subscribe(CHANNEL).catch((err: Error) => logger.error({ err }, '[ws] failed to subscribe to Redis channel'));
-  subscriber.on('message', (channel: string, message: string) => {
-    if (channel === CHANNEL) broadcastLocal(message);
+  subscriber.on('message', (channel: string) => {
+    if (channel === CHANNEL) broadcastLocal();
   });
   publisher.on('error', (err: Error) => logger.error({ err }, '[ws] redis publisher error'));
   subscriber.on('error', (err: Error) => logger.error({ err }, '[ws] redis subscriber error'));
   logger.info('[ws] Redis pub/sub relay enabled for the marketplace feed');
 
-  return (payload: string) => {
-    publisher.publish(CHANNEL, payload).catch((err: Error) => logger.error({ err }, '[ws] failed to publish market update'));
+  return () => {
+    publisher.publish(CHANNEL, 'refresh').catch((err: Error) => logger.error({ err }, '[ws] failed to publish market update'));
   };
 }
 
@@ -52,8 +59,8 @@ export function attachWebSocketServer(server: HttpServer) {
       ws.close(4001, 'unauthorized');
       return;
     }
-    clients.add(ws);
-    ws.send(JSON.stringify({ type: 'offers', offers: listMarketplace().map(buildOfferView) }));
+    clients.set(ws, payload.sub);
+    ws.send(offersFor(payload.sub));
     ws.on('close', () => clients.delete(ws));
   });
 
@@ -61,9 +68,8 @@ export function attachWebSocketServer(server: HttpServer) {
   // client sees the live auction tick without polling.
   setInterval(() => {
     if (clients.size === 0 && !publish) return;
-    const payload = JSON.stringify({ type: 'offers', offers: listMarketplace().map(buildOfferView) });
-    broadcastLocal(payload);
-    publish?.(payload);
+    broadcastLocal();
+    publish?.();
   }, 2000);
 
   return wss;

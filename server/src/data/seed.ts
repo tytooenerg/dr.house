@@ -118,20 +118,6 @@ export const ACEITE_MAP: Record<number, 'aceita' | 'aguardando' | 'contestada'> 
   1: 'aceita', 2: 'aguardando', 3: 'aceita', 4: 'contestada', 5: 'aceita', 6: 'aguardando',
 };
 
-export const BID_TEMPLATES = [
-  { name: 'Itaú BBA Recebíveis', initials: 'IB', tipo: 'Banco', avatarBg: COLORS.NAVY },
-  { name: 'FIDC Multisetorial Prisma', initials: 'FP', tipo: 'FIDC', avatarBg: COLORS.BLUE },
-  { name: 'Vórtice Crédito', initials: 'VC', tipo: 'Fintech', avatarBg: '#5B6472' },
-  { name: 'Nortis Investimentos', initials: 'NI', tipo: 'Family Office', avatarBg: COLORS.GREEN },
-];
-
-export const EXTRA_BIDDERS = [
-  { name: 'BTG Pactual Crédito', initials: 'BP', tipo: 'Banco', avatarBg: COLORS.NAVY },
-  { name: 'Kayrós FIDC', initials: 'KF', tipo: 'FIDC', avatarBg: COLORS.BLUE },
-  { name: 'Zenit Capital', initials: 'ZC', tipo: 'Fintech', avatarBg: '#5B6472' },
-  { name: 'Bradesco Corporate', initials: 'BC', tipo: 'Banco', avatarBg: COLORS.NAVY },
-];
-
 // Same vencimentoDiasOffset reasoning as OFFERS_RAW above, and for the same reason: 'No
 // mercado' items are just as marketplace-visible (listMarketplace() matches on status, not
 // on which raw array a duplicata originally came from) and so just as exposed to the same

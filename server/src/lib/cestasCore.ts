@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { listMarketplace, isPurchased, createPurchase } from '../db/duplicatas.js';
+import { listMarketplace, isPurchased } from '../db/duplicatas.js';
+import { placeAuctionBid, fmtTaxa } from './auctionCore.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
@@ -81,8 +82,8 @@ export type InvestOutcome =
   | {
       status: 200;
       body: {
-        comprados: { duplicataId: string; sacado: string; rating: Rating; valorFmt: string; desagio: string }[];
-        totalInvestidoFmt: string;
+        lances: { duplicataId: string; sacado: string; rating: Rating; valorFmt: string; desagio: string }[];
+        totalEmLancesFmt: string;
         restanteFmt: string;
         ofertasDisponiveis: number;
       };
@@ -125,38 +126,40 @@ export function investInBasket(user: UserRow, cestaKey: CestaKey, valorRaw: stri
   }
 
   let remaining = budget;
-  const comprados: { duplicataId: string; sacado: string; rating: Rating; valorFmt: string; desagio: string }[] = [];
+  // 'lances', não 'comprados': a cesta propõe e o leilão decide.
+  const lances: { duplicataId: string; sacado: string; rating: Rating; valorFmt: string; desagio: string }[] = [];
   for (const d of candidates) {
     // Affordability and the running budget are checked against precoCompra — what the
     // investor's ledger actually gets debited (lib/settlement.ts's settlePurchase) — not
     // the duplicata's face value, which is only what comes back at maturity.
-    const { precoCompra } = computePurchasePrice(d);
+    const { precoCompra, taxaAmPct } = computePurchasePrice(d);
     if (precoCompra > remaining) continue;
-    createPurchase(d.id, user.id, d.valor, d.desagio ?? '', Math.round(d.valor - precoCompra));
-    settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: user.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
-    // Res. BCB nº 540/2025 — ver comentário de informarNegociacao (lib/registradoras.ts).
-    void informarNegociacao({ registradoraKey: d.registradora as RegistradoraKey | null, duplicataId: d.id, evento: 'compra', valor: precoCompra });
-    if (d.cedente_id) {
-      void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: user.id });
-    }
-    comprados.push({ duplicataId: d.id, sacado: d.sacado_nome, rating: ratingForOffer(d), valorFmt: fmtBRL(d.valor), desagio: d.desagio ?? '—' });
+    // A cesta é um alocador passivo: ela aceita a taxa de reserva (o pior deságio que o
+    // cedente aceita) e deixa o leilão decidir. Não compra na hora — se outro investidor
+    // lançar melhor, ele leva, que é como um leilão de verdade funciona.
+    const outcome = placeAuctionBid(user, d.id, taxaAmPct);
+    if (outcome.status !== 200) continue;
+    // Sem informarNegociacao nem webhook de pagamento aqui: nada foi negociado ainda, só
+    // proposto. Os dois acontecem na adjudicação (lib/auctionClose.ts), pro vencedor real.
+    lances.push({ duplicataId: d.id, sacado: d.sacado_nome, rating: ratingForOffer(d), valorFmt: fmtBRL(d.valor), desagio: fmtTaxa(taxaAmPct) });
     remaining -= precoCompra;
   }
 
-  recordAuditEvent(user.id, user.company_name, 'cesta.investido', { cesta: cestaKey, budget, comprados: comprados.length });
+  recordAuditEvent(user.id, user.company_name, 'cesta.investido', { cesta: cestaKey, budget, lances: lances.length });
 
   const investido = Math.round(budget - remaining);
 
   return {
     status: 200,
     body: {
-      comprados,
-      // Arredonda UMA vez e deriva o outro do valor já arredondado: `fmtBRL` usa
+      lances,
+      // 'em lances' e não 'investido': o dinheiro só sai da conta se o lance vencer o
+      // leilão. Arredonda UMA vez e deriva o outro do valor já arredondado: `fmtBRL` usa
       // maximumFractionDigits: 0, então formatar `budget - remaining` e `remaining`
       // independentemente pode arredondar os dois pra cima e exibir um par que soma R$ 1 a
-      // mais que o orçamento ("investido R$ 15.782 + restante R$ 999.984.218" pra um
-      // orçamento de R$ 999.999.999). Derivando, investido + restante fecha sempre.
-      totalInvestidoFmt: fmtBRL(investido),
+      // mais que o orçamento ("R$ 15.782 + restante R$ 999.984.218" pra um orçamento de
+      // R$ 999.999.999). Derivando, comprometido + restante fecha sempre.
+      totalEmLancesFmt: fmtBRL(investido),
       restanteFmt: fmtBRL(budget - investido),
       ofertasDisponiveis: candidates.length,
     },

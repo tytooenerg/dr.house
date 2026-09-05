@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { fmtBRL } from '../src/lib/format.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -37,7 +38,7 @@ async function sellerWithListing(askingValor: string) {
   const seller = await registerInvestidor();
   const market = await request(app).get('/api/market').set('Authorization', `Bearer ${seller.token}`);
   const buyable = market.body.offers.find((o: { canBuy: boolean; vencimento: string }) => o.canBuy && parseDataBr(o.vencimento).getTime() > Date.now());
-  await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${seller.token}`);
+  (await arrematar(seller.token, buyable.id)).lance;
   const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
   const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === buyable.id);
   const listRes = await request(app)

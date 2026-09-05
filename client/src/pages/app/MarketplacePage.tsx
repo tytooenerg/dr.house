@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
+import { useApi } from '../../lib/useApi';
 import { useMarketSocket } from '../../lib/useMarketSocket';
 import { PageHeader } from '../../components/ui/Card';
 import { Input, Select } from '../../components/ui/Input';
@@ -17,6 +18,7 @@ interface Insurer {
   recommended?: boolean;
 }
 interface Bid {
+  id: number;
   name: string;
   initials: string;
   tipo: string;
@@ -27,6 +29,24 @@ interface Bid {
   tag: string;
   tagBg: string;
   tagColor: string;
+  isMine: boolean;
+}
+interface LanceDoInvestidor {
+  id: number;
+  duplicataId: string;
+  sacado: string;
+  valorFmt: string;
+  taxaFmt: string;
+  precoFmt: string;
+  status: 'ativo' | 'vencedor' | 'perdedor' | 'cancelado';
+  closeAt: string | null;
+}
+interface MeuLance {
+  id: number;
+  taxaAm: number;
+  taxaFmt: string;
+  precoFmt: string;
+  liderando: boolean;
 }
 interface ExplanationFactor {
   label: string;
@@ -51,6 +71,23 @@ interface FractionalOffering {
   status: 'aberta' | 'concluida';
   holdersCount: number;
 }
+// O prazo do leilão decide de verdade quem leva a duplicata, então ele anda na tela: o
+// servidor manda o instante do fechamento (closeAtIso) e quem conta é o cliente. Antes o
+// "encerra em" vinha como string pronta do servidor e ficava parada até o próximo frame do
+// WebSocket, num leilão que não existia.
+function formatarPrazo(closeAtIso: string | null, agora: number): string {
+  if (!closeAtIso) return '—';
+  const restante = new Date(closeAtIso).getTime() - agora;
+  if (restante <= 0) return 'prazo encerrado';
+  const seg = Math.floor(restante / 1000);
+  const h = Math.floor(seg / 3600);
+  const min = Math.floor((seg % 3600) / 60);
+  const s = seg % 60;
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${String(min).padStart(2, '0')}min`;
+  return `${min}min ${String(s).padStart(2, '0')}s`;
+}
+
 // Mirrors server FRACTIONAL_MIN_VALOR (lib/fractionalOfferings.ts) — only offers at or
 // above this face value are eligible for tokenização.
 const FRACTIONAL_MIN_VALOR = 150000;
@@ -89,9 +126,16 @@ interface Offer {
   isBought: boolean;
   btnLabel: string;
   canBuy: boolean;
+  leilaoAberto: boolean;
+  leilaoMotivo: string | null;
+  closeAtIso: string | null;
+  reservaTaxaAm: number;
+  reservaTaxaFmt: string;
+  reservaPrecoFmt: string;
+  melhorTaxaFmt: string | null;
+  meuLance: MeuLance | null;
   bidCount: number;
   bids: Bid[];
-  countdown: string;
   countdownSec: number;
   aceiteBadgeLabel: string;
   aceiteBadgeBg: string;
@@ -100,7 +144,6 @@ interface Offer {
   insurerOptions: Insurer[];
   aiMatch: boolean;
   aiMatchPct: string;
-  aiSuggestedRate: string;
 }
 
 export function MarketplacePage() {
@@ -122,9 +165,22 @@ export function MarketplacePage() {
   const [fractionalTokensInput, setFractionalTokensInput] = useState('');
   const [fractionalBusy, setFractionalBusy] = useState(false);
   const [fractionalError, setFractionalError] = useState('');
+  const [bidTaxa, setBidTaxa] = useState<Record<string, string>>({});
+  const [bidError, setBidError] = useState<Record<string, string>>({});
   const [explainFor, setExplainFor] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<FundingExplanation | null>(null);
   const [explainLoading, setExplainLoading] = useState(false);
+
+  // "Meus lances" precisa existir porque o lance deixou de resolver na hora: entre propor e
+  // saber o resultado passa o prazo do leilão, e sem essa lista o investidor não teria onde
+  // ver o que ainda está de pé, o que venceu e o que perdeu.
+  const meusLances = useApi<{ lances: LanceDoInvestidor[] }>('/market/meus-lances');
+  const [verMeusLances, setVerMeusLances] = useState(false);
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!insurerPickerFor) return;
@@ -177,10 +233,38 @@ export function MarketplacePage() {
     });
   };
 
-  const buy = async (id: string) => {
+  // Comprar deixou de existir: o investidor propõe uma TAXA de deságio e o vencedor sai no
+  // fechamento do leilão, no close_at. Menor deságio ganha; a taxa de reserva do cedente é
+  // o teto — lance pior que ela o servidor recusa com 409 above_reserve.
+  const abrirLance = (offer: Offer) => {
+    setExpanded((prev) => new Set(prev).add(offer.id));
+    setBidError((prev) => ({ ...prev, [offer.id]: '' }));
+    setBidTaxa((prev) => ({
+      ...prev,
+      [offer.id]: prev[offer.id] ?? (offer.meuLance ? offer.meuLance.taxaAm : offer.reservaTaxaAm).toFixed(2).replace('.', ','),
+    }));
+  };
+
+  const darLance = async (id: string) => {
     setBusyId(id);
+    setBidError((prev) => ({ ...prev, [id]: '' }));
     try {
-      await api.post(`/market/${id}/buy`);
+      await api.post(`/market/${id}/lance`, { taxaAm: bidTaxa[id] ?? '' });
+      void meusLances.reload();
+    } catch (err) {
+      setBidError((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível registrar o lance.' }));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const cancelarLance = async (offerId: string, bidId: number) => {
+    setBusyId(offerId);
+    try {
+      await api.post(`/market/lances/${bidId}/cancelar`, {});
+      void meusLances.reload();
+    } catch (err) {
+      setBidError((prev) => ({ ...prev, [offerId]: err instanceof ApiError ? err.message : 'Não foi possível cancelar o lance.' }));
     } finally {
       setBusyId(null);
     }
@@ -248,6 +332,40 @@ export function MarketplacePage() {
           </span>
         }
       />
+
+      {(meusLances.data?.lances.length ?? 0) > 0 && (
+        <div className="bg-white border border-border rounded-card mb-2.5 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setVerMeusLances((v) => !v)}
+            aria-expanded={verMeusLances}
+            className="w-full flex items-center justify-between gap-3 px-5 py-3 bg-transparent border-none cursor-pointer text-left"
+          >
+            <span className="text-[12.5px] font-bold text-navy">
+              Meus lances ({meusLances.data!.lances.filter((l) => l.status === 'ativo').length} ativo(s) de {meusLances.data!.lances.length})
+            </span>
+            <span className="text-[11.5px] font-bold text-textSecondary">{verMeusLances ? 'Ocultar' : 'Ver'}</span>
+          </button>
+          {verMeusLances && (
+            <div className="border-t border-border">
+              {meusLances.data!.lances.map((l) => (
+                <div key={l.id} className="flex items-center gap-3 px-5 py-2.5 border-b border-hairline last:border-b-0 text-[12.5px] flex-wrap">
+                  <span className="font-semibold flex-1 min-w-[160px]">{l.sacado}</span>
+                  <span className="text-textSecondary font-mono-num">{l.valorFmt}</span>
+                  <span className="font-mono-num font-bold">{l.taxaFmt} a.m.</span>
+                  <span className="text-textSecondary font-mono-num">{l.precoFmt}</span>
+                  <Badge
+                    variant={l.status === 'vencedor' ? 'success' : l.status === 'perdedor' ? 'danger' : l.status === 'cancelado' ? 'neutral' : 'info'}
+                    size="sm"
+                  >
+                    {l.status === 'ativo' ? `aguardando o prazo (${formatarPrazo(l.closeAt, agora)})` : l.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2.5 mb-2.5 flex-wrap">
         <Input aria-label="Buscar por sacado ou cedente" placeholder={t('marketplace.searchPlaceholder', 'Buscar por sacado ou cedente')} value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-[340px]" />
@@ -323,8 +441,11 @@ export function MarketplacePage() {
                 <div role="cell" className="text-textSecondary">{offer.cedente}</div>
                 <div role="cell">
                   <div className="font-bold font-mono-num">{offer.valorFmt}</div>
-                  <div className="text-[11.5px] text-textTertiary font-mono-num" title="Preço com deságio — o que você paga agora; recebe o valor de face de volta no vencimento">
-                    Você paga {offer.precoCompraFmt}
+                  <div
+                    className="text-[11.5px] text-textTertiary font-mono-num"
+                    title="Preço de reserva: o menor preço que o cedente aceita, equivalente ao maior deságio. Um lance com deságio menor paga mais que isso — e é o que ganha o leilão."
+                  >
+                    Reserva {offer.reservaPrecoFmt}
                   </div>
                 </div>
                 <div role="cell" className="text-green font-bold">{offer.desagio}</div>
@@ -350,8 +471,8 @@ export function MarketplacePage() {
                   >
                     {explainFor === offer.id ? 'Fechar explicação' : 'Por que essa oferta?'}
                   </button>
-                  <Button size="sm" disabled={!offer.canBuy || busyId === offer.id} onClick={() => buy(offer.id)}>
-                    {busyId === offer.id ? t('marketplace.buying', 'Comprando…') : offer.btnLabel}
+                  <Button size="sm" disabled={!offer.canBuy || busyId === offer.id} onClick={() => abrirLance(offer)}>
+                    {offer.btnLabel}
                   </Button>
                 </div>
               </div>
@@ -498,19 +619,52 @@ export function MarketplacePage() {
 
               {isExpanded && (
                 <div className="px-5 pb-4 pt-2.5 bg-surface">
-                  <div className="flex items-center justify-between pt-2.5 mb-2.5">
-                    <div className="text-[11.5px] font-bold text-textSecondary uppercase tracking-wide">Leilão ao vivo — {offer.bidCount} financiadores disputando</div>
-                    <div className="text-[11.5px] font-bold text-red font-mono-num">encerra em {offer.countdown}</div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-chip mb-2.5">
-                    <AiTag />
-                    <div className="text-xs text-navy">
-                      Sugestão de abertura: <b>{offer.aiSuggestedRate}</b> a.m., com base em operações similares (mesmo setor, prazo e score)
+                  <div className="flex items-center justify-between pt-2.5 mb-2.5 gap-3 flex-wrap">
+                    <div className="text-[11.5px] font-bold text-textSecondary uppercase tracking-wide">
+                      {offer.bidCount === 0 ? 'Leilão aberto — nenhum lance ainda' : `Leilão aberto — ${offer.bidCount} ${offer.bidCount === 1 ? 'lance' : 'lances'}`}
+                    </div>
+                    <div className="text-[11.5px] font-bold font-mono-num" style={{ color: offer.leilaoAberto ? PALETTE.red : PALETTE.textTertiary }}>
+                      {offer.leilaoAberto ? `encerra em ${formatarPrazo(offer.closeAtIso, agora)}` : offer.isBought ? 'arrematada' : 'encerrado'}
                     </div>
                   </div>
+
+                  <div className="text-xs text-navy bg-chip rounded-lg px-3 py-2 mb-2.5">
+                    Reserva do cedente: <b>{offer.reservaTaxaFmt}</b> a.m. ({offer.reservaPrecoFmt}). Vence o menor deságio proposto até o prazo — lance acima
+                    da reserva é recusado, e sem nenhum lance a duplicata não é vendida.
+                  </div>
+
+                  {offer.leilaoAberto && (
+                    <div className="flex items-end gap-2 flex-wrap mb-2.5">
+                      {/* A largura vai no wrapper: Input já traz `w-full`, e uma classe de
+                          largura no próprio elemento perde pro utilitário do componente. */}
+                      <div className="w-[150px]">
+                        <Input
+                          aria-label="Taxa de deságio mensal do seu lance, em %"
+                          value={bidTaxa[offer.id] ?? ''}
+                          onChange={(e) => setBidTaxa((prev) => ({ ...prev, [offer.id]: e.target.value }))}
+                          placeholder={`até ${offer.reservaTaxaFmt}`}
+                        />
+                      </div>
+                      <span className="text-[12.5px] text-textSecondary pb-3">% a.m.</span>
+                      <Button size="sm" disabled={busyId === offer.id} onClick={() => darLance(offer.id)}>
+                        {busyId === offer.id ? 'Enviando…' : offer.meuLance ? 'Atualizar lance' : 'Enviar lance'}
+                      </Button>
+                      {offer.meuLance && (
+                        <button
+                          type="button"
+                          className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer underline pb-2"
+                          onClick={() => cancelarLance(offer.id, offer.meuLance!.id)}
+                        >
+                          Cancelar meu lance
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {bidError[offer.id] && <div className="text-red text-[12.5px] font-semibold mb-2.5">{bidError[offer.id]}</div>}
+
                   <div className="flex flex-col gap-2">
-                    {offer.bids.map((bid, i) => (
-                      <div key={i} className="flex items-center gap-3.5 bg-white rounded-lg px-3.5 py-2.5" style={{ border: `1px solid ${bid.borderColor}` }}>
+                    {offer.bids.map((bid) => (
+                      <div key={bid.id} className="flex items-center gap-3.5 bg-white rounded-lg px-3.5 py-2.5" style={{ border: `1px solid ${bid.borderColor}` }}>
                         <div className="w-[26px] h-[26px] rounded-full text-white flex items-center justify-center text-[11.5px] font-bold flex-shrink-0" style={{ background: bid.avatarBg }}>
                           {bid.initials}
                         </div>
@@ -524,6 +678,11 @@ export function MarketplacePage() {
                         </div>
                       </div>
                     ))}
+                    {offer.bids.length === 0 && (
+                      <div className="text-[12.5px] text-textSecondary bg-white border border-border rounded-lg px-3.5 py-2.5">
+                        Nenhum investidor lançou nesta duplicata ainda.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

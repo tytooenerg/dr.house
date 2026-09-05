@@ -1296,6 +1296,58 @@ converter no automático seria chute.
 Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client **39**
 (eram 32), sdks/node 9, e2e 12/12. As 11 telas antes/depois ficam idênticas.
 
+### Leilão real no marketplace primário — lance, prazo e reserva
+
+O "leilão" do marketplace primário era encenação, e dá pra apontar exatamente onde: não existia
+tabela de lances; `POST /market/:id/buy` não aceitava preço nenhum (o valor era sempre
+`computePurchasePrice` no servidor); e os concorrentes exibidos vinham de
+`BID_TEMPLATES`/`EXTRA_BIDDERS` (`server/src/data/seed.ts`) — oito nomes inventados, incluindo
+instituições reais ("Itaú BBA Recebíveis", "BTG Pactual Crédito"), revelados por um cronômetro,
+com taxas geradas por fórmula. Na prática era **quem clica primeiro leva, a preço fixo**, com um
+teatro de disputa desenhado por cima.
+
+Agora é leilão:
+
+- **O investidor propõe uma taxa** (`POST /market/:id/lance`). Menor deságio = cedente recebe
+  mais = lance melhor. Um investidor tem no máximo um lance ativo por duplicata; lançar de novo
+  substitui o anterior, e `POST /market/lances/:id/cancelar` retira.
+- **O prazo decide.** No `close_at`, `closeDueAuctions` (`lib/auctionClose.ts`, rodando de 30 em
+  30s a partir de `src/index.ts`) adjudica ao menor deságio; empate desempata por quem lançou
+  antes. O vencedor paga o preço **congelado no próprio lance**, não uma reprecificação.
+- **`computePurchasePrice` virou preço de reserva**, não preço de venda: é o pior deságio que o
+  cedente aceita. Lance acima dela é recusado com `409 above_reserve`. E **sem nenhum lance
+  dentro da reserva a duplicata não vende** — fecha, o cedente é notificado e pode reofertar, em
+  vez de ser vendida a um preço que ninguém propôs.
+- **Os cinco caminhos que compravam na hora agora dão lance**: a rota manual, a Automação de
+  Lances (o piso da escada por rating virou a estratégia de lance — conforme a escada relaxa, o
+  lance fica competitivo sozinho), as cestas, o Fundo de Fomento do Confirming e o agente de IA
+  de auto-bid. O Fundo lança na taxa de mercado, com `programa.taxa_am` como teto, e o pool só é
+  debitado se ele **vencer** (`settleFundoWin`, chamado pela adjudicação) — propor não move
+  dinheiro. A resposta das cestas passou de `comprados`/`totalInvestidoFmt` para
+  `lances`/`totalEmLancesFmt` pelo mesmo motivo.
+
+Na tela: o painel do leilão mostra os lances **reais** (lista vazia quando não há nenhum, em vez
+de oito concorrentes fabricados), o formulário de lance vem preenchido com a taxa de reserva, o
+erro de lance acima da reserva diz qual é ela em reais, o cronômetro passou a andar de verdade
+(o servidor manda o instante do fechamento, o cliente conta) e existe um painel **"Meus lances"**
+— que precisa existir porque agora passa um prazo entre propor e saber o resultado. Saiu também
+a linha "Sugestão de abertura … com base em operações similares", que era `taxa − 0,30` disfarçada
+de recomendação de IA.
+
+O feed WebSocket passou a ser **por espectador**: "Seu lance"/"Alterar lance" só fazem sentido em
+relação a um investidor, então cada conexão recebe a própria renderização e o canal Redis carrega
+só o aviso de "mudou", não o payload pronto.
+
+Migração `0067_auction_bids.sql` (+ espelho Postgres) cria `auction_bids` — espelhando
+`resale_bids`, que já era a mecânica de lance real do secundário — e `duplicatas.leilao_fechado_em`,
+além de dar prazo a duplicata legada que estava em mercado sem `close_at` (sem prazo, ela nunca
+seria fechada).
+
+Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server **763** (eram 750; 13
+novos em `test/auction.test.ts` cobrindo menor deságio vence, desempate por ordem de chegada,
+recusa acima da reserva, fechamento sem lance, substituição/cancelamento de lance e fechar duas
+vezes sem readjudicar), client 39, sdks/node 9.
+
 ## Running locally
 
 ```bash

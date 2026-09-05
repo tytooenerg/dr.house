@@ -1,8 +1,10 @@
 import type { DuplicataRow } from '../db/types.js';
-import { BID_TEMPLATES, COLORS, EXTRA_BIDDERS, INSURERS } from '../data/seed.js';
+import { COLORS, INSURERS } from '../data/seed.js';
+import { listActiveAuctionBids } from '../db/auctionBids.js';
 import { fmtBRL, scoreColorFor, parseFlexibleDate } from './format.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
 import { isPurchased } from '../db/duplicatas.js';
+import { auctionIsOpen } from './auctionGate.js';
 import { ratingFromScore, SETOR_LABELS } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { listInsuranceQuotes } from './insuranceQuotes.js';
@@ -14,19 +16,6 @@ const ACEITE_BADGE = {
   contestada: { label: 'Aceite contestado', bg: '#F7E9E7', color: COLORS.RED },
 };
 
-function getLiveExtraBids(startedAt: string | null, baseRate: number) {
-  if (!startedAt) return [];
-  const elapsed = (Date.now() - new Date(startedAt).getTime()) / 1000;
-  const REVEAL_AT = [4, 30, 90, 240];
-  const bids: { name: string; initials: string; tipo: string; avatarBg: string; rate: number }[] = [];
-  EXTRA_BIDDERS.forEach((b, i) => {
-    if (elapsed >= REVEAL_AT[i]) {
-      const drop = (i + 1) * 0.15 + 0.05 + (i % 2 === 0 ? 0.08 : 0.14);
-      bids.push({ ...b, rate: +(baseRate - drop).toFixed(2) });
-    }
-  });
-  return bids;
-}
 
 // Real monthly deságio rate for a specific duplicata — either the rate actually agreed
 // when it entered the book (d.desagio) or, for an offer still open on the marketplace,
@@ -62,7 +51,7 @@ export function computePurchasePrice(
   return { precoCompra: d.valor - descontoValor, descontoValor, descontoPct, taxaAmPct };
 }
 
-export function buildOfferView(d: DuplicataRow) {
+export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) {
   const score = d.score ?? 60;
   const sc = scoreColorFor(score);
   const baseRate = effectiveMonthlyRatePct(d);
@@ -73,26 +62,35 @@ export function buildOfferView(d: DuplicataRow) {
   const aceiteBadge = ACEITE_BADGE[aceiteStatus];
   const bought = isPurchased(d.id);
 
-  const extra = getLiveExtraBids(d.leilao_started_at, baseRate);
-  const bidsRaw = BID_TEMPLATES.map((b, i) => ({ ...b, rate: +(baseRate + i * 0.35).toFixed(2) }))
-    .concat(extra)
-    .sort((a, b) => a.rate - b.rate);
-  const bids = bidsRaw.map((b, i) => ({
-    name: b.name,
-    initials: b.initials,
-    tipo: b.tipo,
-    avatarBg: b.avatarBg,
-    taxa: b.rate.toFixed(2).replace('.', ',') + '%',
+  // Lances REAIS. Antes daqui saíam concorrentes fabricados: BID_TEMPLATES/EXTRA_BIDDERS
+  // (data/seed.ts) davam oito nomes inventados — incluindo instituições reais como "Itaú
+  // BBA Recebíveis" e "BTG Pactual Crédito" — revelados num cronômetro, com taxas geradas
+  // por fórmula, num leilão que nem sequer existia. Agora é o que está na tabela
+  // auction_bids, e uma lista vazia é uma lista vazia.
+  const bidRows = listActiveAuctionBids(d.id);
+  const bids = bidRows.map((b, i) => ({
+    id: b.id,
+    name: b.bidder_company_name,
+    initials: b.bidder_company_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase(),
+    tipo: b.bidder_id === viewerId ? 'Seu lance' : 'Investidor',
+    avatarBg: b.bidder_id === viewerId ? COLORS.BLUE : COLORS.NAVY,
+    taxa: b.taxa_am.toFixed(2).replace('.', ',') + '%',
     rateColor: i === 0 ? COLORS.GREEN : COLORS.NAVY,
     borderColor: i === 0 ? COLORS.GREEN : '#E4E8EE',
-    tag: i === 0 ? 'Melhor oferta' : 'Lance ativo',
+    tag: i === 0 ? 'Melhor lance' : 'Lance ativo',
     tagBg: i === 0 ? '#EAF3EE' : '#F0F2F5',
     tagColor: i === 0 ? COLORS.GREEN : '#5B6472',
+    isMine: b.bidder_id === viewerId,
   }));
 
   const closeAt = d.close_at ? new Date(d.close_at).getTime() : Date.now();
   const remainingSec = Math.max(0, Math.round((closeAt - Date.now()) / 1000));
   const countdown = `${Math.floor(remainingSec / 3600)}h ${String(Math.floor((remainingSec % 3600) / 60)).padStart(2, '0')}min`;
+  // O prazo agora decide de verdade quem leva a duplicata (lib/auctionClose.ts), então a
+  // oferta precisa carregar o estado real do leilão — antes `canBuy` só olhava o aceite e
+  // prometia "Comprar" em duplicata cujo leilão o backend já tinha encerrado.
+  const gate = auctionIsOpen(d.id);
+  const meuLanceRow = viewerId === null ? null : bidRows.find((b) => b.bidder_id === viewerId) ?? null;
 
   // insurerInfo shows the premium actually charged at insure-time (the recorded
   // settlement), never a freshly recomputed quote — a sacado's score moving afterward
@@ -138,8 +136,38 @@ export function buildOfferView(d: DuplicataRow) {
     // exige isso antes de sair de 'aprovada'), então 'aguardando' aqui só apareceria por
     // dado legado/seed inconsistente — mantido como defesa em profundidade e pra não
     // prometer "Comprar" num estado que o backend recusaria.
-    btnLabel: bought ? 'Comprada' : aceiteStatus === 'contestada' ? 'Bloqueada' : aceiteStatus !== 'aceita' ? 'Aguardando aceite' : 'Comprar',
-    canBuy: !bought && aceiteStatus === 'aceita',
+    btnLabel: bought
+      ? 'Comprada'
+      : aceiteStatus === 'contestada'
+        ? 'Bloqueada'
+        : aceiteStatus !== 'aceita'
+          ? 'Aguardando aceite'
+          : gate.ok
+            ? meuLanceRow
+              ? 'Alterar lance'
+              : 'Dar lance'
+            : 'Leilão encerrado',
+    // `canBuy` é o mesmo predicado que o backend aplica em placeAuctionBid (lib/auctionGate.ts),
+    // não uma segunda opinião do client — nome mantido pra não quebrar quem já lê o campo.
+    canBuy: gate.ok,
+    leilaoAberto: gate.ok,
+    leilaoMotivo: gate.ok ? null : gate.error,
+    closeAtIso: d.close_at,
+    leilaoFechadoEm: d.leilao_fechado_em,
+    // Reserva: o pior deságio que o cedente aceita. Lance acima disso é recusado com 409.
+    reservaTaxaAm: baseRate,
+    reservaTaxaFmt: desagio,
+    reservaPrecoFmt: fmtBRL(precoCompra),
+    melhorTaxaFmt: bidRows.length ? bidRows[0].taxa_am.toFixed(2).replace('.', ',') + '%' : null,
+    meuLance: meuLanceRow
+      ? {
+          id: meuLanceRow.id,
+          taxaAm: meuLanceRow.taxa_am,
+          taxaFmt: meuLanceRow.taxa_am.toFixed(2).replace('.', ',') + '%',
+          precoFmt: fmtBRL(meuLanceRow.preco),
+          liderando: bidRows[0]?.id === meuLanceRow.id,
+        }
+      : null,
     bidCount: bids.length,
     bids,
     countdown,
@@ -151,6 +179,5 @@ export function buildOfferView(d: DuplicataRow) {
     insurerOptions,
     aiMatch: score >= 76,
     aiMatchPct: score >= 84 ? '96%' : '89%',
-    aiSuggestedRate: (baseRate - 0.3).toFixed(1).replace('.', ',') + '%',
   };
 }

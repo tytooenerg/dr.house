@@ -7,6 +7,7 @@ import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
 import { getProgramaBySacado } from '../src/db/confirming.js';
 import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -122,7 +123,7 @@ describe('Fee de sucesso — cobrança jurídica', () => {
     const leilao = await request(app).post(`/api/minhas/${emitted.duplicataId}/leilao`).set('Authorization', `Bearer ${cedente}`);
     expect(leilao.status).toBe(200);
 
-    const buy = await request(app).post(`/api/market/${emitted.duplicataId}/buy`).set('Authorization', `Bearer ${investor}`);
+    const buy = (await arrematar(investor, emitted.duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
@@ -208,8 +209,10 @@ describe('Fee de sucesso — cobrança jurídica', () => {
     db.prepare('UPDATE duplicatas SET desagio = ? WHERE id = ?').run((programa.taxa_am - 0.3).toFixed(2).replace('.', ','), emitted.duplicataId);
     const leilao = await request(app).post(`/api/minhas/${emitted.duplicataId}/leilao`).set('Authorization', `Bearer ${cedente}`);
     expect(leilao.status).toBe(200);
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(1);
+    // O fundo dá lance como qualquer investidor; a compra sai do fechamento do leilão.
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(1);
+    expect(fecharLeiloes(emitted.duplicataId)).toMatchObject({ vendidos: 1 });
 
     const balanceBeforeRecovery = getFundoBalance();
     const recover = await request(app).post(`/api/admin/juridico/cobranca/${emitted.duplicataId}/recuperar`).set('Authorization', `Bearer ${admin}`);
