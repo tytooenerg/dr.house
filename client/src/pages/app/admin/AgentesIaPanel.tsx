@@ -14,6 +14,7 @@ import {
   stepSummary,
 } from '../../../lib/agentUi';
 import { PALETTE } from '../../../lib/palette';
+import { Badge } from '../../../components/ui/Badge';
 
 export function AgentesIaPanel() {
   const [agents, setAgents] = useState<AgentSummary[]>([]);
@@ -217,7 +218,7 @@ export function AgentesIaPanel() {
                 <div className="font-bold text-[13px] flex items-center gap-2">
                   {agents.find((a) => a.id === p.agent_id)?.label ?? p.agent_id} → <code>{p.tool_name}</code>
                   {p.approvals_required > 1 && (
-                    <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-amberBg text-amber">requer {p.approvals_required} aprovadores</span>
+                    <Badge variant="warning" size="sm">requer {p.approvals_required} aprovadores</Badge>
                   )}
                 </div>
                 <pre className="mt-1 text-[11.5px] text-textSecondary whitespace-pre-wrap font-mono-num">{renderPayload(JSON.parse(p.input))}</pre>

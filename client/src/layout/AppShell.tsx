@@ -8,6 +8,7 @@ import { useSession } from '../state/SessionContext';
 import { useIsMobile } from '../lib/useIsMobile';
 import { OnboardingModal } from '../pages/auth/OnboardingModal';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { Notice } from '../components/ui/Notice';
 
 export function AppShell() {
   const { user, loading } = useSession();
@@ -68,9 +69,9 @@ export function AppShell() {
         <TopBar onMenu={isMobile ? () => setMenuOpen(true) : undefined} />
         <main className="flex-1 w-full" style={{ padding: isMobile ? '20px 16px' : '28px 32px', maxWidth: 1280 }}>
           {user.kybPending && (
-            <div className="mb-4 px-4 py-3 rounded-lg bg-amberBg text-amber text-[13px] font-semibold">
+            <Notice variant="warning" className="mb-4">
               Seu credenciamento institucional está em análise (até 2 dias úteis) — você pode explorar o marketplace, mas ainda não pode dar lances.
-            </div>
+            </Notice>
           )}
           <ErrorBoundary>
             <Outlet />

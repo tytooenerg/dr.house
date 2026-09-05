@@ -8,6 +8,8 @@ import { ProgressBar } from '../../components/ui/ProgressBar';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
+import { Notice } from '../../components/ui/Notice';
 
 interface EmitForm {
   sacado: string;
@@ -170,7 +172,7 @@ function LoteEmissaoCard() {
           {busy ? 'Emitindo lote…' : `Emitir ${rows.length} duplicata(s)`}
         </Button>
       )}
-      {error && <div className="px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold mb-3">{error}</div>}
+      {error && <Notice variant="danger" className="text-sm mb-3">{error}</Notice>}
       {outcome && (
         <div>
           <div className="text-[12.5px] font-bold mb-2">
@@ -295,8 +297,8 @@ export function EmitirPage() {
             {`Registro escritural nº ${result.registro} confirmado na ${result.registradora}. Status: enviada ao Marketplace.`}
           </div>
           <div className="flex justify-center gap-2.5 mt-5.5">
-            <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-greenBg text-green">Registrada — {result.registradora}</span>
-            {result.seguro && <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-chip text-blue">Protegida por seguro</span>}
+            <Badge variant="success">Registrada — {result.registradora}</Badge>
+            {result.seguro && <Badge variant="info">Protegida por seguro</Badge>}
           </div>
           <Button className="mt-6" onClick={reset}>
             Emitir outra duplicata
@@ -311,7 +313,7 @@ export function EmitirPage() {
       <PageHeader
         title={t('emitir.title', 'Emitir Duplicata')}
         subtitle={t('emitir.subtitle', 'Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma')}
-        right={<span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-greenBg text-green">Aprovação em minutos · dinheiro em até 24h</span>}
+        right={<Badge variant="success" size="lg">Aprovação em minutos · dinheiro em até 24h</Badge>}
       />
 
       <div className="mb-4">
@@ -393,7 +395,7 @@ export function EmitirPage() {
           <Button disabled={submitting} onClick={submit} className="py-3.5">
             {submitting ? 'Registrando na registradora…' : 'Emitir e registrar duplicata escritural'}
           </Button>
-          {error && <div className="px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold">{error}</div>}
+          {error && <Notice variant="danger" className="text-sm">{error}</Notice>}
         </Card>
 
         <div className="flex flex-col gap-4">

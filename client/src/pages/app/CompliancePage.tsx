@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { ComplianceCalendarCard } from '../../components/ComplianceCalendarCard';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
 
 interface DupGroup {
   valorFmt: string;
@@ -271,7 +272,7 @@ export function CompliancePage() {
         </Card>
         <Card>
           <div className="flex items-center gap-2 mb-1.5">
-            {!data.contractFlagsReal && <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-chip text-blue">Simulado</span>}
+            {!data.contractFlagsReal && <Badge variant="info" size="sm">Simulado</Badge>}
             <div className="font-bold text-[14px]">Leitura de contratos</div>
           </div>
           <div className="text-textSecondary text-[12.5px] mb-3.5">

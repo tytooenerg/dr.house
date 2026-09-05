@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { PALETTE } from '../../../lib/palette';
+import { Badge } from '../../../components/ui/Badge';
 
 interface LegalDocRef {
   id: number;
@@ -484,18 +485,18 @@ export function JuridicoPanel() {
               )}
               {doc.signatureStatus === 'enviado' && (
                 <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-                  <span className="text-[11.5px] font-bold px-2 py-0.5 rounded-md bg-amberBg text-amber">
+                  <Badge variant="warning">
                     Aguardando assinatura de {doc.signerName} ({doc.signerEmail})
-                  </span>
+                  </Badge>
                   <Button size="sm" variant="secondary" disabled={signingId === doc.id} onClick={() => checkMinutaSignature(doc.id)}>
                     {signingId === doc.id ? 'Verificando…' : 'Verificar status'}
                   </Button>
                 </div>
               )}
               {doc.signatureStatus === 'assinado' && (
-                <span className="mt-2.5 inline-block text-[11.5px] font-bold px-2 py-0.5 rounded-md bg-greenBg text-green">
+                <Badge variant="success" className="mt-2.5 inline-block">
                   Assinado por {doc.signerName}
-                </span>
+                </Badge>
               )}
             </details>
           ))}

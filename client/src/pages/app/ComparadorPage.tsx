@@ -4,6 +4,7 @@ import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Segmented } from '../../components/ui/Segmented';
 import { RangeBar } from '../../components/ui/ProgressBar';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { Badge } from '../../components/ui/Badge';
 
 interface RateChannel {
   label: string;
@@ -102,7 +103,7 @@ export function ComparadorPage() {
               <div className="flex justify-between items-baseline mb-2">
                 <div className="flex items-center gap-2">
                   <div className="font-bold text-[14px]">{ch.label}</div>
-                  {ch.isLastro && <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-chip text-blue">LASTRO</span>}
+                  {ch.isLastro && <Badge variant="info" size="sm">LASTRO</Badge>}
                 </div>
                 <div className="font-mono-num font-bold text-sm">{ch.rangeLabel}</div>
               </div>

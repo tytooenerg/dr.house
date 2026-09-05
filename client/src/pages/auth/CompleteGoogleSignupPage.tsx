@@ -8,6 +8,7 @@ import { DEFAULT_TAB_BY_ROLE, NAV_ITEMS } from '../../data/navConfig';
 import type { Role } from '../../state/SessionContext';
 import { ROLES, INSURER_OPTIONS, RoleShape } from './LoginPage';
 import { PALETTE } from '../../lib/palette';
+import { Notice } from '../../components/ui/Notice';
 
 // Second step of "Continuar com Google" for a brand-new email — Google already verified
 // the identity (see server routes/auth.ts POST /auth/google/complete-signup), this page
@@ -121,7 +122,7 @@ export function CompleteGoogleSignupPage() {
             </Field>
           </div>
 
-          {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
+          {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
           <Button type="submit" className="w-full" disabled={!role || (role === 'seguradora' && !insurerKey) || !companyName.trim() || submitting}>
             {submitting ? 'Concluindo…' : 'Concluir cadastro'}
           </Button>

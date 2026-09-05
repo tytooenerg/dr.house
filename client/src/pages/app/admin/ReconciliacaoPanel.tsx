@@ -3,6 +3,7 @@ import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { Badge } from '../../../components/ui/Badge';
 
 interface ReconciliationFlag {
   id: number;
@@ -180,7 +181,7 @@ export function ReconciliacaoPanel() {
               <div key={f.id} className="border border-border rounded-xl p-4 flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-amberBg text-amber">{TIPO_LABEL[f.tipo]}</span>
+                    <Badge variant="warning" size="sm">{TIPO_LABEL[f.tipo]}</Badge>
                     <span className="text-[13px] font-bold text-navy">{f.company_name}</span>
                   </div>
                   <p className="text-[12.5px] text-navy/70 mt-1 max-w-2xl">{f.descricao}</p>

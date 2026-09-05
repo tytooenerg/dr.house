@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { PALETTE } from '../../../lib/palette';
+import { Badge } from '../../../components/ui/Badge';
 
 interface ComplianceQueueItem {
   duplicataId: string;
@@ -217,7 +218,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
               </div>
               <div className="text-textSecondary text-[12.5px] mt-1">Vencimento {c.vencimento} · suspensa {c.quando}</div>
             </div>
-            <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Nota de risco: {c.score}/100</span>
+            <Badge variant="warning" size="lg">Nota de risco: {c.score}/100</Badge>
           </div>
           <div className="flex flex-col gap-1.5 mb-3">
             {c.breakdown.map((b, i) => (

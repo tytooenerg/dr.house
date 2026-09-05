@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
 
 type ApiKeyProduct =
   | 'platform'
@@ -219,9 +220,9 @@ export function DevPage() {
                     >
                       {k.mode === 'test' ? 'Sandbox' : 'Produção'}
                     </span>
-                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-hairline text-textSecondary">
+                    <Badge variant="neutral" size="sm">
                       {k.scope === 'read_only' ? 'Somente leitura' : 'Leitura e escrita'}
-                    </span>
+                    </Badge>
                     {k.product !== 'platform' && (
                       <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: PALETTE.chip, color: PALETTE.blue }}>
                         {NARROW_PRODUCT_LABELS[k.product]}

@@ -8,6 +8,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
 
 interface Historico {
   data: string;
@@ -210,10 +211,10 @@ export function HistoricoPage() {
         <Card className="mb-4 px-6 py-5">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
             <div className="font-bold text-[14px]">Rebalanceamento sugerido</div>
-            <span className="text-[11.5px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
+            <Badge variant="neutral">
               Perfil {rebalance.profile === 'conservador' ? 'Conservador' : rebalance.profile === 'moderado' ? 'Moderado' : 'Arrojado'}
               {rebalance.usingDefaultProfile ? ' (padrão — responda o questionário de suitability)' : ''}
-            </span>
+            </Badge>
           </div>
           <div className="text-textSecondary text-[12.5px] mb-3.5">
             Comparação da sua alocação atual com a faixa alvo do seu perfil — não executa nada automaticamente, apenas sugere.
@@ -425,7 +426,7 @@ export function HistoricoPage() {
             <div className="font-semibold">{h.empresa}</div>
             <div className="font-mono-num">{h.investidoFmt}</div>
             <div className="font-mono-num text-green font-bold">{h.retornoFmt}</div>
-            <span className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-greenBg text-green w-fit">{h.status}</span>
+            <Badge variant="success" className="inline-block">{h.status}</Badge>
             <span
               className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md w-fit"
               style={h.comRegresso ? { background: PALETTE.chip, color: PALETTE.blue } : { background: PALETTE.hairline, color: PALETTE.textSecondary }}

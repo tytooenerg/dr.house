@@ -1164,6 +1164,44 @@ esquecimento.
 Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32,
 sdks/node 9, e2e 12/12.
 
+### Badge e Notice: dois padrões que se repetiam sem componente
+
+Terceira frente da revisão de interface, terceira parte (as anteriores foram cores e
+tipografia).
+
+**Correção de um número informado antes**: o levantamento inicial falava em "166 pílulas
+inline vs 2 usos do `Badge`". Esse valor veio de um grep grosseiro (`rounded-*` + `px-*`) que
+contava botões, abas, campos e caixas de alerta junto. Medindo com o JSX multilinha achatado, o
+número real é **46 pílulas de status** em 26 arquivos — e apareceu um **segundo padrão de 35
+caixas de aviso** usando exatamente os mesmos 5 pares de cores semânticos, que não tinha
+componente nenhum.
+
+- **`Badge` ganhou `variant` e `size`**: `variant` nomeia o par de cores
+  (`success`/`danger`/`warning`/`info`/`neutral`) para ninguém precisar lembrar que "aprovado" é
+  `greenBg`/`green`; `size` (`sm`/`md`/`lg`) reduz as **11 formas** diferentes em que as 46
+  pílulas apareciam. O par `bg`/`color` continua aceito como escape para o caso legítimo que
+  não é semântico: as cores categóricas de setor (`SECTOR_COLORS`).
+- **`Notice` (novo)**: a caixa de aviso colorida que explica um estado ("credenciamento em
+  análise", "modo simulado", "nenhum PSP configurado"). Usa o **mesmo vocabulário de `variant`**
+  do `Badge` de propósito — quem já sabe que uma pílula de erro é `variant="danger"` não precisa
+  aprender outro nome para a caixa de erro.
+
+Migrados nesta PR: **20 pílulas** e **16 caixas**. `rounded-full` foi deixado de fora do
+colapso de formas por ser uma escolha deliberada (chip totalmente arredondado), não deriva.
+
+Verificação visual: as mesmas 11 telas antes e depois — **todas as 11 idênticas pixel a
+pixel**, porque os componentes reproduzem exatamente as classes e cores que estavam inline.
+
+**Fica em aberto**: ~26 pílulas e ~19 caixas ainda inline, a maioria dentro de expressões
+condicionais de `style` (`style={cond ? {greenBg} : {hairline}}`). São o caso onde `variant`
+mais ajuda a leitura (`variant={cond ? 'success' : 'neutral'}`), mas cada uma exige julgamento
+do que a condição significa — reescrita automática ali seria chute. Ficam para uma passada
+manual, junto com `Table`/`Field` (os 95 grids de `div` e os ~37 inputs sem rótulo), que são
+refactor de estrutura e acessibilidade, não de cor.
+
+Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32,
+sdks/node 9, e2e 12/12.
+
 ## Running locally
 
 ```bash

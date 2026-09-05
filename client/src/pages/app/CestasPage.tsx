@@ -6,6 +6,7 @@ import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
 
 interface CestaDef {
   key: 'conservadora' | 'diversificada' | 'agressiva';
@@ -143,7 +144,7 @@ export function CestasPage() {
             {result.comprados.map((c) => (
               <div key={c.duplicataId} className="flex items-center justify-between text-[13px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
                 <span className="font-semibold">{c.sacado}</span>
-                <span className="text-[11.5px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">{c.rating}</span>
+                <Badge variant="neutral">{c.rating}</Badge>
                 <span className="text-textSecondary">{c.desagio}</span>
                 <span className="font-mono-num font-bold">{c.valorFmt}</span>
               </div>

@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
 
 interface Apolice {
   id: string;
@@ -110,7 +111,7 @@ export function SeguradoraPage() {
                 </div>
                 <div className="text-textSecondary text-[12.5px] mt-1">Venceu em {s.vencimento} e nunca foi vendida no marketplace</div>
               </div>
-              <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Sinistro aberto</span>
+              <Badge variant="warning" size="lg">Sinistro aberto</Badge>
             </div>
             {aiById[s.id] === undefined ? (
               <Button size="sm" variant="secondary" className="mb-3" disabled={loadingAiId === s.id} onClick={() => generateAiTriagem(s.id)}>

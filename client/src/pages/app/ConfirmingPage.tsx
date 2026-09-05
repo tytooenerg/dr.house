@@ -6,6 +6,8 @@ import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
+import { Notice } from '../../components/ui/Notice';
 
 interface FundoOverview {
   balanceFmt: string;
@@ -289,8 +291,8 @@ export function ConfirmingPage() {
 
       {isSacado && !loadError && (
         <>
-          {error && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold">{error}</div>}
-          {notice && <div className="mb-4 px-3.5 py-3 rounded-lg bg-greenBg text-green text-sm font-semibold">{notice}</div>}
+          {error && <Notice variant="danger" className="mb-4 text-sm">{error}</Notice>}
+          {notice && <Notice variant="success" className="mb-4 text-sm">{notice}</Notice>}
 
           {!programa ? (
         <Card className="mb-4 max-w-[560px]">
@@ -392,9 +394,9 @@ export function ConfirmingPage() {
                         <div className="flex items-center gap-1.5">
                           <span className="font-semibold text-[13px]">{c.cedenteNome}</span>
                           {c.disputasAbertas > 0 && (
-                            <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-redBg text-red">
+                            <Badge variant="danger" size="sm">
                               {c.disputasAbertas} disputa{c.disputasAbertas > 1 ? 's' : ''} em aberto
-                            </span>
+                            </Badge>
                           )}
                         </div>
                         <div className="text-textSecondary text-[11.5px]">Histórico: {c.volumeHistoricoFmt} · sugestão de sublimite: {c.sublimiteSugeridoFmt}</div>

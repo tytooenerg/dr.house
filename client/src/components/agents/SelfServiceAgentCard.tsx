@@ -4,6 +4,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { STEP_LABELS, STEP_COLOR, stepSummary, type AgentRunOutcome, type AgentSummary, type PendingActionRow } from '../../lib/agentUi';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
 
 // Embedded, single-agent version of the admin "Agentes IA" console — no agent picker, no
 // "run as another user" field, because self-service is always scoped to the caller's own
@@ -89,7 +90,7 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
       <div>
         <div className="font-bold text-[14px] flex items-center gap-2">
           {title}
-          <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-chip text-blue">IA agêntica</span>
+          <Badge variant="info" size="sm">IA agêntica</Badge>
         </div>
         <div className="text-textSecondary text-[12.5px] mt-1">{agent.description}</div>
         {!llmEnabled && <div className="text-[11.5px] font-bold text-amber mt-1.5">Modo simulado — peça ao admin para configurar a IA.</div>}
