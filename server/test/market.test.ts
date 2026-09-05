@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { db } from '../src/db/index.js';
 import { createDuplicata, backfillDuplicataSetor, getDuplicata } from '../src/db/duplicatas.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -117,30 +118,40 @@ describe('backfillDuplicataSetor', () => {
   });
 });
 
-describe('POST /api/market/:id/buy', () => {
+describe('POST /api/market/:id/lance', () => {
   it('is forbidden for non-investidor roles', async () => {
     const cedenteEmail = `ced-${Date.now()}@example.com`;
     const reg = await request(app).post('/api/auth/register').send({ nome: 'Carlos Teste', email: cedenteEmail, password: 'senha123', companyName: 'C Ltda', role: 'cedente' });
     const token = reg.body.token as string;
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
     const offerId = market.body.offers[0].id;
-    const res = await request(app).post(`/api/market/${offerId}/buy`).set('Authorization', `Bearer ${token}`);
+    const res = (await arrematar(token, offerId)).lance;
     expect(res.status).toBe(403);
   });
 
-  it('allows an investidor to buy an unpurchased, non-contested offer, and blocks a second purchase', async () => {
+  it('adjudica a duplicata ao único lance no fechamento, e depois disso não aceita mais lance', async () => {
     const token = await registerInvestidor();
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
     expect(buyable).toBeTruthy();
 
-    const first = await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${token}`);
+    const first = await darLance(token, buyable.id);
     expect(first.status).toBe(200);
-    const boughtOffer = first.body.offers.find((o: { id: string }) => o.id === buyable.id);
-    expect(boughtOffer.isBought).toBe(true);
-    expect(boughtOffer.canBuy).toBe(false);
+    // O lance não compra nada: enquanto o leilão está aberto a oferta segue disponível, só
+    // que agora com um lance ativo — quem leva sai do fechamento (lib/auctionClose.ts).
+    const emLeilao = first.body.offers.find((o: { id: string }) => o.id === buyable.id);
+    expect(emLeilao.isBought).toBe(false);
+    expect(emLeilao.bidCount).toBe(1);
+    expect(emLeilao.meuLance.liderando).toBe(true);
 
-    const second = await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${token}`);
+    expect(fecharLeiloes(buyable.id)).toMatchObject({ vendidos: 1 });
+
+    const depois = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
+    const arrematada = depois.body.offers.find((o: { id: string }) => o.id === buyable.id);
+    expect(arrematada.isBought).toBe(true);
+    expect(arrematada.canBuy).toBe(false);
+
+    const second = await darLance(token, buyable.id);
     expect(second.status).toBe(409);
   });
 
@@ -148,7 +159,7 @@ describe('POST /api/market/:id/buy', () => {
     const token = await registerInvestidor();
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
-    await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${token}`);
+    (await arrematar(token, buyable.id)).lance;
 
     const historico = await request(app).get('/api/historico').set('Authorization', `Bearer ${token}`);
     expect(historico.status).toBe(200);

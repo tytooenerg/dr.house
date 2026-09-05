@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -47,7 +48,7 @@ describe('KYB approval flow', () => {
 
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
-    const blocked = await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${token}`);
+    const blocked = (await arrematar(token, buyable.id)).lance;
     expect(blocked.status).toBe(403);
     expect(blocked.body.error).toBe('kyb_required');
 
@@ -58,7 +59,7 @@ describe('KYB approval flow', () => {
     const approve = await request(app).post(`/api/admin/kyb/${userId}/approve`).set('Authorization', `Bearer ${adminTok}`);
     expect(approve.status).toBe(200);
 
-    const allowed = await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${token}`);
+    const allowed = (await arrematar(token, buyable.id)).lance;
     expect(allowed.status).toBe(200);
   });
 

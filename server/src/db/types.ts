@@ -219,6 +219,9 @@ export interface DuplicataRow {
   // Derived once at emission time from the sacado's seeded risk profile (lib/riscoCore.ts's
   // sectorFor), same pattern as `score` — null when the sacado has no seeded profile at all.
   setor: string | null;
+  // Instante em que o job de fechamento adjudicou o leilão (lib/auctionClose.ts) — null
+  // enquanto aberto, e também quando fechou sem nenhum lance elegível.
+  leilao_fechado_em: string | null;
 }
 
 export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';
@@ -358,6 +361,22 @@ export interface ResaleBidRow {
   bidder_id: number;
   valor: number;
   status: ResaleBidStatus;
+  created_at: string;
+}
+
+export type AuctionBidStatus = 'ativo' | 'vencedor' | 'perdedor' | 'cancelado';
+
+// Lance no leilão primário. `taxa_am` é o deságio mensal proposto pelo investidor: MENOR
+// taxa = cedente recebe mais = lance melhor. `preco` congela o que essa taxa vale em reais
+// no instante do lance, pro vencedor não ser reprecificado por variação de liquidez entre
+// o lance e o fechamento.
+export interface AuctionBidRow {
+  id: number;
+  duplicata_id: string;
+  bidder_id: number;
+  taxa_am: number;
+  preco: number;
+  status: AuctionBidStatus;
   created_at: string;
 }
 

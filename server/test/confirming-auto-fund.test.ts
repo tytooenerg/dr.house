@@ -9,6 +9,7 @@ import { getProgramaBySacado } from '../src/db/confirming.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // Achado corrigido (mudança de modelo de negócio): o financiamento automático do Programa
 // Confirming costumava pular o leilão inteiramente na emissão (a suíte antiga cobria esse
@@ -109,8 +110,14 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
     const balanceBefore = getFundoBalance();
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(1);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(1);
+    // Propor um lance não move dinheiro: o pool só é debitado quando o lance vence o leilão
+    // (lib/auctionClose.ts chama settleFundoWin). Até o fechamento, saldo intacto.
+    expect(getFundoBalance()).toBe(balanceBefore);
+    expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
+
+    expect(fecharLeiloes(duplicataId)).toMatchObject({ vendidos: 1 });
 
     // O fundo pagou pela compra de verdade — saldo do pool caiu no preço com deságio da
     // taxa DINÂMICA de mercado (sem override), não a taxa negociada do programa.
@@ -140,8 +147,8 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     setDesagio(duplicataId, 1.0); // taxa baixa — não é o motivo do bloqueio aqui
 
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(0);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(0);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
@@ -159,8 +166,8 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     setDesagio(duplicataId, 1.0);
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(0);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(0);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
@@ -183,8 +190,8 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     setDesagio(duplicataId, 1.0); // taxa baixa — não é o motivo do bloqueio aqui
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(0);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(0);
     expect(getFundoBalance()).toBe(balanceBefore);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
 
@@ -208,8 +215,8 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     setDesagio(duplicataId, 1.0);
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(0);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(0);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
@@ -227,8 +234,8 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     setDesagio(duplicataId, 1.0);
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(0);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(0);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
@@ -247,8 +254,8 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     setDesagio(duplicataId, programa.taxa_am + 1.0); // acima do teto negociado
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(0);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(0);
     expect(getDuplicata(duplicataId)!.status).toBe('no_mercado');
   });
 
@@ -269,12 +276,12 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
 
     const { token: outroInvestidorToken, userId: outroInvestidorId } = await register('investidor', unique('Investidor Rápido'));
     approveKyb(outroInvestidorId);
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${outroInvestidorToken}`);
+    const buy = (await arrematar(outroInvestidorToken, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const balanceBefore = getFundoBalance();
-    const { compradas } = await runFundoAutoBuyTick();
-    expect(compradas).toBe(0);
+    const { lances } = await runFundoAutoBuyTick();
+    expect(lances).toBe(0);
     expect(getFundoBalance()).toBe(balanceBefore); // fundo não gastou nada — não era mais dele pra comprar
 
     const purchase = db.prepare('SELECT investor_id FROM purchases WHERE duplicata_id = ?').get(duplicataId) as { investor_id: number };

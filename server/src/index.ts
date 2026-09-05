@@ -15,6 +15,7 @@ import { startHealthMonitor } from './lib/healthMonitor.js';
 import { startAceiteReminderJob } from './lib/aceiteReminder.js';
 import { startAceiteTacitoJob } from './lib/aceiteTacito.js';
 import { startFundoAutoBuyJob } from './lib/confirmingFundoAutoBuy.js';
+import { startAuctionCloseJob } from './lib/auctionClose.js';
 import { startAutoEmitJob } from './lib/autoEmitJob.js';
 import { startBackupJob } from './lib/backup.js';
 import { startSuspiciousActivityJob } from './lib/suspiciousActivityMonitor.js';
@@ -45,6 +46,7 @@ async function main() {
   startAceiteReminderJob();
   startAceiteTacitoJob();
   startFundoAutoBuyJob();
+  startAuctionCloseJob();
   startAutoEmitJob();
   startBackupJob();
   startSuspiciousActivityJob();

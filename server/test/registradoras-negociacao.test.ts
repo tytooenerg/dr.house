@@ -6,6 +6,7 @@ import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { approveKyb } from '../src/db/users.js';
 import * as registradoras from '../src/lib/registradoras.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // Achado corrigido (auditoria de conformidade — Resolução BCB nº 540/2025): o sacador
 // deve informar a registradora sobre atos de negociação da duplicata, não só registrar a
@@ -58,7 +59,7 @@ describe('informarNegociacao é chamada nos pontos reais de negociação, não s
     setAceiteStatus(getAceiteByDuplicata(duplicataId)!.id, 'aceita');
 
     spy.mockClear(); // limpa qualquer chamada residual (não há nenhuma na emissão, mas por segurança)
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investorToken}`);
+    const buy = (await arrematar(investorToken, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ duplicataId, evento: 'compra', registradoraKey }));

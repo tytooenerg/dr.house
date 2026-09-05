@@ -13,6 +13,7 @@ import { checkFractionalEligibility, buyFractionalTokens, buyTokensSchema, build
 import { INSURERS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { explainFundingOffer } from '../lib/fundingExplainability.js';
+import { placeAuctionBid, cancelAuctionBid, viewMyAuctionBids } from '../lib/auctionCore.js';
 
 export const marketRouter = Router();
 marketRouter.use(requireAuth);
@@ -58,50 +59,34 @@ marketRouter.get('/', (req, res) => {
   res.json({ offers: paged, page, pageSize, total });
 });
 
-marketRouter.post('/:id/buy', (req, res) => {
-  if (req.user!.role !== 'investidor') {
-    res.status(403).json({ error: 'forbidden', message: 'Apenas contas de investidor podem comprar duplicatas.' });
+const lanceSchema = z.object({ taxaAm: z.union([z.number(), z.string()]) });
+
+// Substitui POST /:id/buy. Comprar deixou de ser "clicar primeiro a um preço fixo do
+// servidor": o investidor propõe uma taxa de deságio e o vencedor é decidido no
+// fechamento do leilão (lib/auctionClose.ts). Ver lib/auctionCore.ts pras regras.
+marketRouter.post('/:id/lance', (req, res) => {
+  const parsed = lanceSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
     return;
   }
-  if (req.user!.kyb_status !== 'approved') {
-    res.status(403).json({ error: 'kyb_required', message: 'Seu credenciamento institucional ainda está em análise — assim que for aprovado você poderá dar lances.' });
+  const raw = parsed.data.taxaAm;
+  const taxaAm = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(',', '.'));
+  const outcome = placeAuctionBid(req.user!, req.params.id, taxaAm);
+  if (outcome.status !== 200) {
+    res.status(outcome.status).json(outcome.body);
     return;
   }
-  const d = getDuplicata(req.params.id);
-  if (!d) {
-    res.status(404).json({ error: 'not_found' });
-    return;
-  }
-  const aceite = getAceiteByDuplicata(d.id);
-  if (aceite?.status === 'contestada') {
-    res.status(409).json({ error: 'contested', message: 'Esta duplicata está contestada e não pode ser comprada.' });
-    return;
-  }
-  // Achado corrigido: uma duplicata só pode ser negociada depois que o sacado aceita
-  // (explícito ou tácito) — antes só se bloqueava 'contestada', 'aguardando' passava
-  // normalmente. Defesa em profundidade além do bloqueio em dispararLeilao
-  // (routes/minhas.ts), já que dispararLeilao é o único jeito de uma duplicata chegar
-  // aqui hoje, mas nada impede um caminho futuro de reabastecer 'no_mercado' sem passar
-  // por ele.
-  if (aceite?.status !== 'aceita') {
-    res.status(409).json({ error: 'aceite_pendente', message: 'Aguardando aceite do sacado (ou o prazo tácito vencer) antes de poder comprar esta duplicata.' });
-    return;
-  }
-  if (isPurchased(d.id)) {
-    res.status(409).json({ error: 'already_purchased', message: 'Esta duplicata já foi comprada.' });
-    return;
-  }
-  const { precoCompra } = computePurchasePrice(d);
-  createPurchase(d.id, req.user!.id, d.valor, d.desagio ?? '', Math.round(d.valor - precoCompra));
-  settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: req.user!.id, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
-  // Res. BCB nº 540/2025: o sacador deve informar a registradora sobre a negociação, não
-  // só a emissão original. Nunca bloqueia a compra (já liquidada acima) — ver comentário
-  // de informarNegociacao.
-  void informarNegociacao({ registradoraKey: d.registradora as RegistradoraKey | null, duplicataId: d.id, evento: 'compra', valor: precoCompra });
-  if (d.cedente_id) {
-    void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: d.id, valor: d.valor, investorId: req.user!.id });
-  }
-  res.json({ offers: listMarketplace().map(buildOfferView) });
+  res.json({ ...(outcome.body as object), offers: listMarketplace().map((d) => buildOfferView(d, req.user!.id)) });
+});
+
+marketRouter.post('/lances/:bidId/cancelar', (req, res) => {
+  const outcome = cancelAuctionBid(req.user!, Number(req.params.bidId));
+  res.status(outcome.status).json(outcome.status === 200 ? { ok: true, offers: listMarketplace().map((d) => buildOfferView(d, req.user!.id)) } : outcome.body);
+});
+
+marketRouter.get('/meus-lances', (req, res) => {
+  res.json({ lances: viewMyAuctionBids(req.user!.id) });
 });
 
 const insureSchema = z.object({ key: z.enum(['too', 'pottencial', 'junto']).nullable() });

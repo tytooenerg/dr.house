@@ -5,6 +5,9 @@ import { ensureAceite, setAceiteStatus } from './aceites.js';
 import { addLedgerEntry, addNotification, inviteTeamMember } from './misc.js';
 import { hashPassword } from '../auth/password.js';
 import { logger } from '../lib/logger.js';
+import { reserveRate, priceForRate } from '../lib/auctionCore.js';
+import { createAuctionBid } from './auctionBids.js';
+import { closeDueAuctions } from '../lib/auctionClose.js';
 import { OFFERS_RAW, MINHAS_RAW, ACEITES_RAW, HISTORICO_RAW, EXTRATO_RAW, TEAM_MEMBERS, NOTIFICATIONS } from '../data/seed.js';
 
 const STATUS_MAP: Record<string, string> = {
@@ -165,6 +168,35 @@ export async function seedIfEmpty() {
       seguro: false,
     });
     ensureAceite(d.id, e.prazo);
+  }
+
+  // Um leilão que JÁ fechou, arrematado pelo investidor demo. Enquanto comprar era
+  // instantâneo, qualquer clique em "Comprar" virava posição na hora; agora o vencedor sai
+  // do fechamento no prazo (lib/auctionClose.ts), então a conta demo precisa de pelo menos
+  // uma posição em aberto vinda de um leilão real — é ela que a tela de mercado secundário
+  // tem pra revender. O caminho aqui é o de produção inteiro: lance na tabela auction_bids
+  // e adjudicação por closeDueAuctions, nada inserido à mão em purchases.
+  const arrematada = createDuplicata({
+    cedenteId: cedente.id,
+    cedenteNome: cedente.company_name,
+    sacadoNome: 'Grupo Atlas Varejo',
+    sacadoCnpj: '',
+    valor: 42000,
+    vencimento: daysFromNow(45),
+    emissao: daysFromNow(-20),
+    status: 'aprovada',
+    lastroPct: 100,
+    seguro: false,
+  });
+  setAceiteStatus(ensureAceite(arrematada.id, 'Aceite confirmado na emissão').id, 'aceita');
+  dispararLeilao(arrematada.id, new Date(Date.now() - 2 * 3600 * 1000).toISOString());
+  const reserva = reserveRate(arrematada.id);
+  if (reserva) {
+    // Lance 0,25 p.p. melhor (mais barato pro cedente) que a reserva — um leilão em que o
+    // investidor de fato disputou, não um em que ele aceitou o preço de tabela.
+    const taxaVencedora = Math.max(0.01, reserva.taxaAm - 0.25);
+    createAuctionBid(arrematada.id, investidor.id, taxaVencedora, priceForRate(arrematada.id, taxaVencedora) ?? reserva.preco);
+    closeDueAuctions(new Date().toISOString(), arrematada.id);
   }
 
   // Historical (settled) purchases for the demo investor, so Carteira & Histórico isn't empty.

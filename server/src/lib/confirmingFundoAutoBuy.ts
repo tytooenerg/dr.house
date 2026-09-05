@@ -1,7 +1,9 @@
 import { getSacadoAccountByCompanyName } from '../db/users.js';
 import type { RegistradoraKey } from './registradoras.js';
 import { getMembro, getProgramaBySacado, setMembroUtilizado, setProgramaUtilizado } from '../db/confirming.js';
-import { createPurchase, isPurchased, listMarketplace } from '../db/duplicatas.js';
+import { getDuplicata, isPurchased, listMarketplace } from '../db/duplicatas.js';
+import { getUserById } from '../db/users.js';
+import { placeAuctionBid } from './auctionCore.js';
 import { getFundoBalance } from '../db/confirmingFundo.js';
 import { fundoFinanciarCompra, getOrCreateFundoSistemaUserId } from './confirmingFundo.js';
 import { settlePurchase } from './settlement.js';
@@ -36,12 +38,12 @@ import { recordAuditEvent } from '../db/audit.js';
 // investidor Pro com Automação de Lances (routes/automation.ts) já tem hoje (poll a cada
 // 4s). Sem vantagem estrutural: se um humano ou outro bot for mais rápido, ganha ele.
 export interface FundoAutoBuyResultado {
-  compradas: number;
+  lances: number;
 }
 
 export async function runFundoAutoBuyTick(): Promise<FundoAutoBuyResultado> {
   const fundoUserId = await getOrCreateFundoSistemaUserId();
-  let compradas = 0;
+  let lances = 0;
 
   for (const d of listMarketplace()) {
     if (d.status !== 'no_mercado' || isPurchased(d.id)) continue;
@@ -65,21 +67,21 @@ export async function runFundoAutoBuyTick(): Promise<FundoAutoBuyResultado> {
     if (taxaAmPct > programa.taxa_am) continue;
     if (getFundoBalance() < precoCompra) continue;
 
-    // Mesma sequência síncrona de routes/market.ts's POST /:id/buy — sem nenhum `await`
-    // entre a última checagem (getFundoBalance) e a escrita, pra não abrir uma janela de
-    // race dentro do event loop do Node (better-sqlite3 é síncrono).
-    createPurchase(d.id, fundoUserId, d.valor, fmtTaxaAm(programa.taxa_am), Math.round(d.valor - precoCompra));
-    settlePurchase({ duplicataId: d.id, sacadoNome: d.sacado_nome, investorId: fundoUserId, cedenteId: d.cedente_id, valor: d.valor, precoCompra });
-    // Res. BCB nº 540/2025 — ver comentário de informarNegociacao (lib/registradoras.ts).
-    void informarNegociacao({ registradoraKey: d.registradora as RegistradoraKey | null, duplicataId: d.id, evento: 'compra', valor: precoCompra });
-    fundoFinanciarCompra(d.id, precoCompra);
-    setProgramaUtilizado(programa.id, programa.utilizado + d.valor);
-    setMembroUtilizado(membro.id, membro.utilizado + d.valor);
-    recordAuditEvent(null, 'Fundo Confirming', 'confirming.duplicata_financiada_via_leilao', { duplicataId: d.id });
-    compradas++;
+    // O fundo DÁ LANCE como qualquer investidor, na taxa de mercado (que é a reserva do
+    // leilão) — nunca em programa.taxa_am, que é TETO e não preço: lançar no teto seria um
+    // deságio pior que a reserva e o próprio leilão recusaria (409 above_reserve). Quem
+    // leva é decidido no fechamento — o fundo não tem, e não deve ter, atalho nenhum. A
+    // contabilidade do fundo (débito no pool + consumo de limite) só acontece se ele
+    // VENCER: ver settleFundoWin, chamado por lib/auctionClose.ts.
+    const fundoUser = getUserById(fundoUserId);
+    if (!fundoUser) continue;
+    const outcome = placeAuctionBid(fundoUser, d.id, taxaAmPct);
+    if (outcome.status !== 200) continue;
+    recordAuditEvent(null, 'Fundo Confirming', 'confirming.lance_no_leilao', { duplicataId: d.id, taxaAm: taxaAmPct });
+    lances++;
   }
 
-  return { compradas };
+  return { lances };
 }
 
 // Só é chamado de src/index.ts (processo real do server) — nunca de app.ts, mesmo padrão
@@ -88,4 +90,23 @@ export async function runFundoAutoBuyTick(): Promise<FundoAutoBuyResultado> {
 export function startFundoAutoBuyJob(intervalMs = 30_000): NodeJS.Timeout {
   void runFundoAutoBuyTick();
   return setInterval(runFundoAutoBuyTick, intervalMs);
+}
+
+
+// Chamada por lib/auctionClose.ts quando o vencedor do leilão é a conta de sistema do
+// Fundo de Fomento: só aí o dinheiro do pool sai e o limite do programa é consumido.
+// Antes isso acontecia junto da compra instantânea; com leilão real, propor um lance não
+// pode debitar nada — só vencer pode.
+export function settleFundoWin(duplicataId: string, preco: number) {
+  const d = getDuplicata(duplicataId);
+  if (!d || !d.cedente_id) return;
+  fundoFinanciarCompra(duplicataId, preco);
+  const sacadoAccount = getSacadoAccountByCompanyName(d.sacado_nome);
+  if (!sacadoAccount) return;
+  const programa = getProgramaBySacado(sacadoAccount.id);
+  if (!programa) return;
+  const membro = getMembro(programa.id, d.cedente_id);
+  setProgramaUtilizado(programa.id, programa.utilizado + d.valor);
+  if (membro) setMembroUtilizado(membro.id, membro.utilizado + d.valor);
+  recordAuditEvent(null, 'Fundo Confirming', 'confirming.duplicata_financiada_via_leilao', { duplicataId, preco });
 }

@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -36,7 +37,7 @@ describe('secondary market', () => {
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${seller.token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
     expect(buyable).toBeTruthy();
-    await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${seller.token}`);
+    (await arrematar(seller.token, buyable.id)).lance;
 
     const sellerSecundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
     const position = sellerSecundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === buyable.id);
@@ -67,7 +68,7 @@ describe('secondary market', () => {
     const investor = await registerInvestidor();
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${investor.token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
-    await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    (await arrematar(investor.token, buyable.id)).lance;
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${investor.token}`);
     const position = secundario.body.minhasPosicoes[0];
     const listRes = await request(app)
@@ -90,8 +91,8 @@ describe('cestas de investimento', () => {
       .set('Authorization', `Bearer ${investor.token}`)
       .send({ cesta: 'conservadora', valor: '999.999.999' });
     expect(res.status).toBe(200);
-    expect(res.body.comprados.length).toBeGreaterThan(0);
-    for (const c of res.body.comprados) {
+    expect(res.body.lances.length).toBeGreaterThan(0);
+    for (const c of res.body.lances) {
       expect(['AA', 'A']).toContain(c.rating);
     }
   });

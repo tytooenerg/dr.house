@@ -6,7 +6,7 @@ import { addAutomationActivity, listAutomationActivity } from '../db/misc.js';
 import { fmtRelative, fmtBRL, parseBRLNumber } from '../lib/format.js';
 import { listMarketplace, isPurchased, createPurchase, listPurchasesByInvestor } from '../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
-import { settlePurchase } from '../lib/settlement.js';
+import { placeAuctionBid } from '../lib/auctionCore.js';
 import { computePurchasePrice } from '../lib/marketCompute.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { ratingFromScore, sectorFor } from '../lib/riscoCore.js';
@@ -110,17 +110,22 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   const passes = passesScore && passesTaxa && passesDiversificacao && passesSetor && passesExposicaoSacado && passesExposicaoMensal;
 
   if (passes) {
-    const { precoCompra } = computePurchasePrice(offer);
-    createPurchase(offer.id, user.id, offer.valor, offer.desagio ?? '', Math.round(offer.valor - precoCompra));
-    settlePurchase({ duplicataId: offer.id, sacadoNome: offer.sacado_nome, investorId: user.id, cedenteId: offer.cedente_id, valor: offer.valor, precoCompra });
-    if (offer.cedente_id) {
-      void deliverWebhookEvent(offer.cedente_id, 'pagamento.confirmado', { duplicataId: offer.id, valor: offer.valor, investorId: user.id });
+    // Agora que o leilão é real, a automação DÁ UM LANCE em vez de comprar na hora. O piso
+    // atual da escada (PR da escada por classe de rating) é exatamente o retorno mínimo que
+    // este investidor aceita, então é a taxa que ele propõe: conforme a escada relaxa com o
+    // tempo, o lance fica mais competitivo sozinho. Quem leva a duplicata é decidido no
+    // fechamento (lib/auctionClose.ts), não por quem clicou primeiro.
+    const piso = currentFloor(ladderCfg, rating);
+    const outcome = placeAuctionBid(user, offer.id, piso);
+    if (outcome.status !== 200) {
+      addAutomationActivity(user.id, `Lance recusado em ${offer.sacado_nome}: ${(outcome.body as { message?: string }).message ?? 'leilão indisponível'}`, '#B8790A');
+      return;
     }
     // Fechou um ciclo nesta classe — rearma a escada pra voltar a ser exigente na próxima.
     updateSettings(user.id, { autoBidLadder: { ...settings.autoBidLadder, [rating]: { ...ladderCfg, ...armLadder() } } });
     addAutomationActivity(
       user.id,
-      `Automação aplicada — compra de ${fmtBRL(offer.valor)} em ${offer.sacado_nome} a ${offer.desagio} (rating ${rating}), dentro de todos os parâmetros configurados`,
+      `Automação aplicada — lance de ${fmtPct(piso)} a.m. em ${offer.sacado_nome} (${fmtBRL(offer.valor)}, rating ${rating}), dentro de todos os parâmetros configurados`,
       '#0A5C36'
     );
     return;

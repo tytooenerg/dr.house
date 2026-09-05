@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb, updateKybForm } from '../src/db/users.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { platformFee } from '../src/lib/settlement.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 // lib/revenue.ts's getRealPlatformFees usava recomputar platformFee(purchases.valor) do
 // zero pra cada linha de `purchases` — o que não tinha como saber que a taxa de uma
@@ -78,7 +79,7 @@ describe('GET /revenue — taxa de plataforma real (platform_fee_events)', () =>
     const beforeCount = before.totalLiquidacoes;
 
     const duplicataId = await emitirELeiloar(cedenteToken, '50.000');
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    const buy = (await arrematar(investor.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const after = await getRevenue(investor.token);
@@ -96,7 +97,7 @@ describe('GET /revenue — taxa de plataforma real (platform_fee_events)', () =>
     const buyer = await registerInvestidor();
 
     const duplicataId = await emitirELeiloar(cedenteToken, '40.000');
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${seller.token}`);
+    const buy = (await arrematar(seller.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const beforeResale = await getRevenue(seller.token);
@@ -131,7 +132,7 @@ describe('GET /revenue — taxa de plataforma real (platform_fee_events)', () =>
       const market = await request(app).get('/api/market').set('Authorization', `Bearer ${seller.token}`);
       const parseDataBr = (v: string) => { const [d, m, y] = v.split('/'); return new Date(`${y}-${m}-${d}`); };
       const buyable = market.body.offers.find((o: { canBuy: boolean; vencimento: string }) => o.canBuy && parseDataBr(o.vencimento).getTime() > Date.now());
-      await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${seller.token}`);
+      (await arrematar(seller.token, buyable.id)).lance;
       const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
       const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === buyable.id);
       const listRes = await request(app)

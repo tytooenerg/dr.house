@@ -32,7 +32,11 @@ async function loginSeguradoraToo() {
 // offer so tests don't collide with that seed data or with each other's mutations.
 async function pickUninsuredOffer(token: string) {
   const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
-  const offer = market.body.offers.find((o: { insurerInfo: unknown }) => !o.insurerInfo);
+  // Precisa estar sem seguro E ainda em leilão: listMarketplace também devolve ofertas já
+  // arrematadas (pra elas ainda renderem como "Comprada"), e contratar seguro numa duplicata
+  // já negociada é bloqueado com 409 antes de qualquer cobrança — mesmo cuidado de
+  // market.test.ts e settlement.test.ts.
+  const offer = market.body.offers.find((o: { insurerInfo: unknown; canBuy: boolean }) => !o.insurerInfo && o.canBuy);
   if (!offer) throw new Error('no uninsured offer available for test');
   return offer as { id: string; valor: number; score: number; vencimento: string };
 }

@@ -7,6 +7,7 @@ import { platformFee, platformFeePct } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
+import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -51,7 +52,7 @@ describe('real settlement on a marketplace purchase', () => {
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
     expect(buyable).toBeTruthy();
 
-    await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    (await arrematar(investor.token, buyable.id)).lance;
 
     const investorExtrato = await request(app).get('/api/account').set('Authorization', `Bearer ${investor.token}`);
     const debit = investorExtrato.body.extrato.find((e: { descricao: string }) => e.descricao.includes(buyable.id));
@@ -89,7 +90,7 @@ describe('real settlement on a marketplace purchase', () => {
     const { precoCompra } = computePurchasePrice(getDuplicata(duplicataId)!);
     expect(precoCompra).toBeLessThanOrEqual(10_000);
 
-    const buyRes = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    const buyRes = (await arrematar(investor.token, duplicataId)).lance;
     expect(buyRes.status).toBe(200);
 
     const fee = platformFee(10_000);
@@ -132,7 +133,7 @@ describe('real settlement on a marketplace purchase', () => {
     const retornoEsperado = Math.round(20000 - precoCompra);
 
     const investor = await registerInvestidor();
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    const buy = (await arrematar(investor.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     // "Investido" é o preço realmente pago (achado corrigido: usava valor de face, 20000,
@@ -155,7 +156,7 @@ describe('real settlement on a marketplace purchase', () => {
     }
     aceitarDuplicata(duplicataId2);
     await request(app).post(`/api/minhas/${duplicataId2}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
-    const buy2 = await request(app).post(`/api/market/${duplicataId2}/buy`).set('Authorization', `Bearer ${investor.token}`);
+    const buy2 = (await arrematar(investor.token, duplicataId2)).lance;
     expect(buy2.status).toBe(200);
 
     // Mesmo preço de compra determinístico pras duas (mesmo prazo/rating) — daí o mesmo
@@ -173,7 +174,7 @@ describe('real settlement on a mercado secundário resale', () => {
     const seller = await registerInvestidor();
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${seller.token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);
-    await request(app).post(`/api/market/${buyable.id}/buy`).set('Authorization', `Bearer ${seller.token}`);
+    (await arrematar(seller.token, buyable.id)).lance;
 
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${seller.token}`);
     const position = secundario.body.minhasPosicoes.find((p: { duplicataId: string }) => p.duplicataId === buyable.id);
@@ -229,7 +230,7 @@ describe('real settlement on a mercado secundário resale', () => {
     await request(app).post(`/api/minhas/${duplicataId}/leilao`).set('Authorization', `Bearer ${cedenteToken}`);
 
     const originalBuyer = await registerInvestidor();
-    const buy = await request(app).post(`/api/market/${duplicataId}/buy`).set('Authorization', `Bearer ${originalBuyer.token}`);
+    const buy = (await arrematar(originalBuyer.token, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
     const secundario = await request(app).get('/api/secundario').set('Authorization', `Bearer ${originalBuyer.token}`);

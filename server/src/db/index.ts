@@ -30,6 +30,7 @@ runMigrations(db);
 // re-apply every migration on the same already-migrated database next time it runs.
 export function resetDbForTests() {
   db.exec(`
+    DELETE FROM auction_bids;
     DELETE FROM dispute_events;
     DELETE FROM disputes;
     DELETE FROM aceites;

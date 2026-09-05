@@ -3,6 +3,8 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
+import { listActiveAuctionBids } from '../src/db/auctionBids.js';
+import { fecharLeiloes } from './helpers/auction.js';
 import { approveKyb, updateSubscription, getSettings, getUserById } from '../src/db/users.js';
 import { createDuplicata, dispararLeilao, getDuplicata } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
@@ -188,6 +190,11 @@ describe('Automação de Lances — compra na classe rearma a escada', () => {
     const res = await request(app).get('/api/automacao').set('Authorization', `Bearer ${inv.token}`);
     expect(res.status).toBe(200);
 
+    // A automação dá um lance no piso da escada; quem arremata sai do fechamento do leilão.
+    const lances = listActiveAuctionBids(d.id);
+    expect(lances).toHaveLength(1);
+    expect(lances[0].bidder_id).toBe(inv.userId);
+    fecharLeiloes(d.id);
     expect(getDuplicata(d.id)!.status).toBe('vendida');
 
     // Rating 'B' (score null → 60 via ratingFromScore) — a classe comprada foi rearmada.
