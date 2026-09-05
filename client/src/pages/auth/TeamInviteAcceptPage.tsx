@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Field, Input } from '../../components/ui/Input';
 import { useSession } from '../../state/SessionContext';
 import { DEFAULT_TAB_BY_ROLE, NAV_ITEMS } from '../../data/navConfig';
+import { Notice } from '../../components/ui/Notice';
 
 export function TeamInviteAcceptPage() {
   const { user, acceptTeamInvite, authError } = useSession();
@@ -64,7 +65,7 @@ export function TeamInviteAcceptPage() {
               <Input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
             </Field>
           </div>
-          {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
+          {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
           <Button type="submit" className="w-full" disabled={submitting || password.length < 6}>
             {submitting ? 'Entrando…' : 'Aceitar convite e entrar'}
           </Button>

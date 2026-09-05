@@ -406,7 +406,7 @@ export function MarketplacePage() {
                           <div className="font-bold text-[13px] text-navy flex items-center gap-1.5">
                             {ins.name}
                             {ins.recommended && (
-                              <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-greenBg text-green">{t('marketplace.bestQuote', 'Melhor cotação')}</span>
+                              <Badge variant="success" size="sm">{t('marketplace.bestQuote', 'Melhor cotação')}</Badge>
                             )}
                           </div>
                           <div className="text-textTertiary text-[11.5px] mt-0.5">{ins.selo}</div>

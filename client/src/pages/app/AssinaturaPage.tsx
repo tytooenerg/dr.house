@@ -6,6 +6,7 @@ import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import type { Plan } from '../../state/SessionContext';
+import { Notice } from '../../components/ui/Notice';
 
 interface PlanDef {
   key: Plan;
@@ -72,11 +73,11 @@ export function AssinaturaPage() {
       <PageHeader title="Assinatura" subtitle="Escolha o plano ideal para o volume da sua operação" />
 
       {!data.billingEnabled && (
-        <div className="mb-4 px-4 py-3 rounded-lg bg-chip text-blue text-[13px] font-semibold">
+        <Notice variant="info" className="mb-4">
           Modo demo — Stripe não configurado neste ambiente. Trocar de plano aqui é instantâneo e não gera cobrança real.
-        </div>
+        </Notice>
       )}
-      {notice && <div className="mb-4 px-4 py-3 rounded-lg bg-greenBg text-green text-[13px] font-semibold">{notice}</div>}
+      {notice && <Notice variant="success" className="mb-4">{notice}</Notice>}
 
       <div className="grid gap-4 mb-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         {data.plans.map((p) => {

@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
+import { Notice } from '../../components/ui/Notice';
 
 interface PayableView {
   id: number;
@@ -173,7 +174,7 @@ function LoteImportCard({ onImported }: { onImported: () => void }) {
           {busy ? 'Importando…' : `Importar ${rows.length} conta(s)`}
         </Button>
       )}
-      {error && <div className="px-3.5 py-3 rounded-lg bg-redBg text-red text-sm font-semibold mb-3">{error}</div>}
+      {error && <Notice variant="danger" className="text-sm mb-3">{error}</Notice>}
       {outcome && (
         <div>
           <div className="text-[12.5px] font-bold mb-2">

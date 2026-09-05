@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
+import { Badge } from '../../components/ui/Badge';
 
 interface Dispute {
   id: number;
@@ -103,7 +104,7 @@ export function DisputaPage() {
                   {d.sacado} — {d.valorFmt}
                 </div>
               </div>
-              <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-redBg text-red">Contestada</span>
+              <Badge variant="danger" size="lg">Contestada</Badge>
             </div>
 
             <div className="rounded-[10px] px-4 py-3.5 mb-4 bg-amberBg">

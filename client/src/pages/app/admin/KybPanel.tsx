@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { PALETTE } from '../../../lib/palette';
+import { Badge } from '../../../components/ui/Badge';
 
 interface PendingKyb {
   id: number;
@@ -124,7 +125,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
                   Investidor não residente
                 </span>
               )}
-              <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md bg-amberBg text-amber">Aguardando análise — {p.submittedAt}</span>
+              <Badge variant="warning" size="lg">Aguardando análise — {p.submittedAt}</Badge>
             </div>
           </div>
           {p.pldStatus === 'flagged' && (

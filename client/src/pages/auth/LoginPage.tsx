@@ -9,6 +9,7 @@ import type { Role } from '../../state/SessionContext';
 import { KybModal } from './KybModal';
 import { api } from '../../lib/api';
 import { PALETTE } from '../../lib/palette';
+import { Notice } from '../../components/ui/Notice';
 
 const GOOGLE_ERROR_LABELS: Record<string, string> = {
   nao_configurado: 'Login com Google não está configurado neste ambiente.',
@@ -207,7 +208,7 @@ export function LoginPage() {
                 />
               </Field>
             </div>
-            {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
+            {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
             <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting || !twoFactorCode.trim()}>
               {submitting ? 'Verificando…' : 'Confirmar'}
             </Button>
@@ -260,8 +261,8 @@ export function LoginPage() {
           </button>
         </div>
 
-        {googleError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{googleError}</div>}
-        {samlError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{samlError}</div>}
+        {googleError && <Notice variant="danger" className="mb-4">{googleError}</Notice>}
+        {samlError && <Notice variant="danger" className="mb-4">{samlError}</Notice>}
 
         {(googleEnabled || samlEnabled) && (
           <>
@@ -316,7 +317,7 @@ export function LoginPage() {
                 <Input type="password" required autoComplete="current-password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="••••••••" />
               </Field>
             </div>
-            {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
+            {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
             <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting}>
               {submitting ? 'Entrando…' : 'Entrar'}
             </Button>
@@ -390,7 +391,7 @@ export function LoginPage() {
               </Field>
             </div>
 
-            {authError && <div className="mb-4 px-3.5 py-3 rounded-lg bg-redBg text-red text-[13px] font-semibold">{authError}</div>}
+            {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
             <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={!role || (role === 'seguradora' && !insurerKey) || submitting}>
               {submitting ? 'Criando conta…' : 'Criar conta e entrar'}
             </Button>
