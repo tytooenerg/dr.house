@@ -53,11 +53,16 @@ export function listSettledByCedenteSince(cedenteId: number, sinceIso: string): 
     .all(cedenteId, sinceIso) as { valor: number; settledAt: string }[];
 }
 
+// Toda duplicata real (não-sandbox), qualquer que seja o status.
+export function listAllDuplicatas(): DuplicataRow[] {
+  return db.prepare('SELECT * FROM duplicatas WHERE sandbox = 0').all() as DuplicataRow[];
+}
+
 // Training set for lib/mlScoring.ts — every real (non-sandbox) duplicata, regardless of
 // status, so the trainer can derive whatever label it needs from real state transitions
 // (sinistro_status, status='paga' via legal recovery) rather than a curated subset.
 export function listAllDuplicatasForTraining(): DuplicataRow[] {
-  return db.prepare('SELECT * FROM duplicatas WHERE sandbox = 0').all() as DuplicataRow[];
+  return listAllDuplicatas();
 }
 
 export function countByCedenteThisMonth(cedenteId: number): number {
