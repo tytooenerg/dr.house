@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
 import { Notice } from '../../components/ui/Notice';
+import { useApi } from '../../lib/useApi';
 
 interface PayableView {
   id: number;
@@ -198,7 +199,6 @@ function LoteImportCard({ onImported }: { onImported: () => void }) {
 
 export function ContasPagarPage() {
   const { t } = useLang();
-  const [overview, setOverview] = useState<PayablesOverview | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -206,19 +206,8 @@ export function ContasPagarPage() {
   const [form, setForm] = useState({ descricao: '', fornecedor: '', categoria: 'outros', valor: '', vencimento: '', recorrente: false });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<PayablesOverview>('/payables')
-      .then(setOverview)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar contas a pagar.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data: overview, error: loadError, reload: load, setData: setOverview } = useApi<PayablesOverview>('/payables', { fallbackMessage: 'Falha ao carregar contas a pagar.' });
 
   const resetForm = () => setForm({ descricao: '', fornecedor: '', categoria: 'outros', valor: '', vencimento: '', recorrente: false });
 

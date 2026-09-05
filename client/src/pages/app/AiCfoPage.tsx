@@ -9,6 +9,7 @@ import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCa
 import { useLang } from '../../lib/i18n';
 import { useSession } from '../../state/SessionContext';
 import { PALETTE } from '../../lib/palette';
+import { useApi } from '../../lib/useApi';
 
 interface HorizonPoint {
   days: number;
@@ -115,21 +116,9 @@ export function AiCfoPage() {
   const { t } = useLang();
   const { user } = useSession();
   const isEmpresarial = user?.plan === 'empresarial';
-  const [forecast, setForecast] = useState<CashflowForecast | null>(null);
   const [scenario, setScenario] = useState<ScenarioResult['scenario']>('base');
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    api
-      .get<CashflowForecast>('/cashflow/forecast')
-      .then(setForecast)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar a projeção de caixa.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data: forecast, error: loadError, reload: load, setData: setForecast } = useApi<CashflowForecast>('/cashflow/forecast', { fallbackMessage: 'Falha ao carregar a projeção de caixa.' });
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!forecast) return null;

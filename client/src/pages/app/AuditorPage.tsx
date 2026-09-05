@@ -6,6 +6,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
+import { useApi } from '../../lib/useApi';
 
 interface AuditorOverview {
   auditLog: {
@@ -21,20 +22,7 @@ interface AuditorOverview {
 // same data admin sees in Compliance/Reconciliação/PLD, just without any write control.
 export function AuditorPage() {
   const { t } = useLang();
-  const [data, setData] = useState<AuditorOverview | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const load = () => {
-    setLoadError(null);
-    api
-      .get<AuditorOverview>('/auditor/overview')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o painel de auditoria.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<AuditorOverview>('/auditor/overview', { fallbackMessage: 'Falha ao carregar o painel de auditoria.' });
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;

@@ -3,6 +3,7 @@ import { api, ApiError } from '../../../lib/api';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { PALETTE } from '../../../lib/palette';
+import { useApi } from '../../../lib/useApi';
 
 type Status = 'nao_informado' | 'assistida_disponivel' | 'obrigatorio_pleno';
 
@@ -33,20 +34,8 @@ const STATUS_STYLE: Record<Status, { bg: string; color: string; label: string }>
 // somente leitura: quem informa a própria faixa de faturamento é o cedente/sacado
 // (ComplianceCalendarCard, em CompliancePage/SacadoPage), não o admin.
 export function ConformidadeEscrituralPanel() {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    api
-      .get<Summary>('/admin/conformidade-escritural')
-      .then(setSummary)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar a conformidade escritural.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data: summary, error: loadError, reload: load, setData: setSummary } = useApi<Summary>('/admin/conformidade-escritural', { fallbackMessage: 'Falha ao carregar a conformidade escritural.' });
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!summary) return <p className="text-[13px] text-navy/60">Carregando…</p>;

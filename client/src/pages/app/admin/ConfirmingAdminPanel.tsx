@@ -3,6 +3,7 @@ import { api, ApiError } from '../../../lib/api';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { PALETTE } from '../../../lib/palette';
+import { useApi } from '../../../lib/useApi';
 
 interface ProgramaAdminView {
   id: number;
@@ -46,20 +47,7 @@ const STATUS_STYLE: Record<'ativo' | 'pausado', { bg: string; color: string; lab
 // financia. Somente leitura: quem cria/gerencia um programa é o sacado, quem
 // aporta/resgata no fundo é o investidor.
 export function ConfirmingAdminPanel() {
-  const [data, setData] = useState<ConfirmingAdminData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const load = () => {
-    setLoadError(null);
-    api
-      .get<ConfirmingAdminData>('/admin/confirming')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o Programa Confirming.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<ConfirmingAdminData>('/admin/confirming', { fallbackMessage: 'Falha ao carregar o Programa Confirming.' });
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <p className="text-[13px] text-navy/60">Carregando…</p>;

@@ -5,6 +5,7 @@ import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Donut } from '../../components/ui/Gauge';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
+import { useApi } from '../../lib/useApi';
 
 interface RevenueStream {
   label: string;
@@ -42,20 +43,7 @@ interface RevenueData {
 }
 
 export function ReceitaPage() {
-  const [data, setData] = useState<RevenueData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const load = () => {
-    setLoadError(null);
-    api
-      .get<RevenueData>('/revenue')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o modelo de receita.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<RevenueData>('/revenue', { fallbackMessage: 'Falha ao carregar o modelo de receita.' });
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;
