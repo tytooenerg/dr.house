@@ -6,6 +6,7 @@ import { Donut } from '../../components/ui/Gauge';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
+import { useApi } from '../../lib/useApi';
 
 interface Kpi {
   label: string;
@@ -37,21 +38,9 @@ interface DashboardData {
 }
 
 export function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { data, error: loadError, reload: load, setData } = useApi<DashboardData>('/dashboard', { fallbackMessage: 'Falha ao carregar o dashboard.' });
   const { t } = useLang();
 
-  const load = () => {
-    setLoadError(null);
-    api
-      .get<DashboardData>('/dashboard')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o dashboard.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;

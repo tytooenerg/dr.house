@@ -1245,6 +1245,57 @@ mesmas 11 telas antes e depois ficam **idênticas pixel a pixel**, como esperado
 papel ARIA não têm efeito visual. `npm run typecheck`/`test`/`build`/`test:e2e` verdes —
 server 750, client 32, sdks/node 9, e2e 12/12.
 
+### `useApi`: o bloco de carga duplicado — e a corrida que ele escondia
+
+Última frente do roteiro de revisão de interface. O diagnóstico apontava "o mesmo bloco fetch
+copiado em 36 arquivos, sem cache". Medindo: são **44 arquivos** com o par `load()` +
+`setLoadError`. Mas a duplicação não era o pior — ela escondia **dois defeitos reais**:
+
+**1. Corrida em Automação de Lances (visível pro usuário).** A tela faz poll a cada 4s
+(`setInterval(load, 4000)`) enquanto a automação está ligada, e cada mutação faz
+`api.post(...).then(setData)`. Se o GET do poll já estava em voo quando o investidor editava um
+campo, a resposta **antiga** do GET chegava depois da resposta do POST e sobrescrevia o valor
+recém-salvo — o campo revertia sozinho na tela. O `clearInterval` do cleanup só impede novos
+agendamentos; não cancela o que já saiu.
+
+**2. Escrita após o desmonte** em 27 dos 44: `useEffect(() => { load(); }, [])` sem nenhuma
+flag de cancelamento.
+
+**`client/src/lib/useApi.ts`** (novo) corrige os dois com a mesma ideia: numerar as cargas e
+deixar só a **mais recente** escrever estado. `setData` (usado pelas mutações) também conta como
+carga mais recente, então um GET em voo não desfaz um POST que já respondeu.
+
+```ts
+const { data, error, loading, reload, setData } = useApi<T>('/rota', { fallbackMessage, keepDataOnError });
+```
+
+`keepDataOnError` existe pra quem faz poll: falha isolada de um ciclo não derruba uma tela que
+já estava funcionando.
+
+**Sem cache, de propósito.** A plataforma mostra oferta de marketplace, saldo e posição em
+aberto — servir dado guardado por padrão faria o investidor decidir sobre número velho. Cache é
+decisão de produto por rota, não efeito colateral de refatoração.
+
+**O teste é a parte que importa**: `useApi.test.tsx` dispara duas cargas e resolve a **primeira
+depois** da segunda. Verificado que ele **falha** sem o sequenciamento (`expected { valor:
+'antigo' } to deeply equal { valor: 'novo' }`) — é a prova de que a correção é real, não
+hipotética.
+
+**Migrados: 17 arquivos**, incluindo o `AutomacaoPage.tsx` que tinha o bug. Nas telas que
+extraíam um sub-campo (`.then(d => setAceites(d.aceites))`), o nome local é preservado por uma
+linha (`const aceites = data?.aceites ?? []`), então nenhuma referência espalhada pelo arquivo
+precisou mudar.
+
+**Fica em aberto, com motivo**: 27 arquivos seguem com o padrão antigo. Não é esquecimento —
+eles não são "um GET numa variável". `PerfilPage.tsx` dispara **quatro** GETs no mesmo `load()`;
+`ConfirmingPage.tsx` e `CreditLinePage.tsx` têm **dois carregamentos distintos** (visão do
+investidor e do cedente) compartilhando um único `loadError`, que precisa virar dois hooks; e 12
+não têm `const load` nenhum (fetch inline no efeito). Cada um exige decisão própria, e
+converter no automático seria chute.
+
+Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client **39**
+(eram 32), sdks/node 9, e2e 12/12. As 11 telas antes/depois ficam idênticas.
+
 ## Running locally
 
 ```bash

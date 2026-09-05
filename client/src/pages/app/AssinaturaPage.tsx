@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import type { Plan } from '../../state/SessionContext';
 import { Notice } from '../../components/ui/Notice';
+import { useApi } from '../../lib/useApi';
 
 interface PlanDef {
   key: Plan;
@@ -26,22 +27,10 @@ const PLAN_RANK: Record<Plan, number> = { basico: 0, pro: 1, empresarial: 2 };
 
 export function AssinaturaPage() {
   const { refresh } = useSession();
-  const [data, setData] = useState<BillingData | null>(null);
   const [busyPlan, setBusyPlan] = useState<Plan | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<BillingData>('/billing')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar sua assinatura.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<BillingData>('/billing', { fallbackMessage: 'Falha ao carregar sua assinatura.' });
 
   const choosePlan = async (plan: Plan) => {
     setBusyPlan(plan);

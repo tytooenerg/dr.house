@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
+import { useApi } from '../../lib/useApi';
 
 interface ListingView {
   id: number;
@@ -78,7 +79,6 @@ const BID_STATUS_LABEL: Record<MyBidView['status'], string> = {
 };
 
 export function SecundarioPage() {
-  const [data, setData] = useState<SecundarioData | null>(null);
   const [prices, setPrices] = useState<Record<number, string>>({});
   const [bidValues, setBidValues] = useState<Record<number, string>>({});
   const [error, setError] = useState('');
@@ -95,19 +95,8 @@ export function SecundarioPage() {
   const [blockResult, setBlockResult] = useState<{ quantidade: number; valorTotalFmt: string; descontoPct: number } | null>(null);
   const [blockSubmitting, setBlockSubmitting] = useState(false);
 
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<SecundarioData>('/secundario')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o mercado secundário.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<SecundarioData>('/secundario', { fallbackMessage: 'Falha ao carregar o mercado secundário.' });
 
   const sortedMarket = useMemo(() => {
     const q = marketQuery.trim().toLowerCase();

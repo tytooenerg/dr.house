@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PALETTE } from '../../lib/palette';
 import { Badge } from '../../components/ui/Badge';
+import { useApi } from '../../lib/useApi';
 
 interface Apolice {
   id: string;
@@ -36,24 +37,12 @@ interface SeguradoraData {
 }
 
 export function SeguradoraPage() {
-  const [data, setData] = useState<SeguradoraData | null>(null);
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [aiById, setAiById] = useState<Record<string, { assessment: string; reasoning: string } | null>>({});
   const [loadingAiId, setLoadingAiId] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<SeguradoraData>('/seguradora')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o painel da seguradora.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<SeguradoraData>('/seguradora', { fallbackMessage: 'Falha ao carregar o painel da seguradora.' });
 
   const decide = async (id: string, decision: 'aprovado' | 'negado') => {
     const note = noteById[id]?.trim();

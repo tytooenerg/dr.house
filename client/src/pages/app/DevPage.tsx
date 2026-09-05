@@ -8,6 +8,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
 import { PALETTE } from '../../lib/palette';
 import { Badge } from '../../components/ui/Badge';
+import { useApi } from '../../lib/useApi';
 
 type ApiKeyProduct =
   | 'platform'
@@ -96,7 +97,6 @@ export function DevPage() {
   // A conta "só-API" (api_partner) nunca alcança o plano Empresarial (não tem aba
   // Assinatura) — a chave de "API completa" existe só pra quem participa do marketplace.
   const isApiPartner = user?.role === 'api_partner';
-  const [data, setData] = useState<DevData | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState('https://webhook.seusistema.com.br/lastro');
@@ -110,19 +110,8 @@ export function DevPage() {
   const [keyError, setKeyError] = useState('');
   const [webhookError, setWebhookError] = useState('');
 
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<DevData>('/dev')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar o Ambiente de Desenvolvedores.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<DevData>('/dev', { fallbackMessage: 'Falha ao carregar o Ambiente de Desenvolvedores.' });
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;

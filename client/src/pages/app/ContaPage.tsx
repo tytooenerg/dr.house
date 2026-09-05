@@ -5,6 +5,7 @@ import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
+import { useApi } from '../../lib/useApi';
 
 interface KycItem {
   label: string;
@@ -86,7 +87,6 @@ interface AccountData {
 }
 
 export function ContaPage() {
-  const [data, setData] = useState<AccountData | null>(null);
   const [pixKeyInput, setPixKeyInput] = useState('');
   const [depositValor, setDepositValor] = useState('');
   const [boletoValor, setBoletoValor] = useState('');
@@ -99,19 +99,8 @@ export function ContaPage() {
   const [stablecoinWalletInput, setStablecoinWalletInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<AccountData>('/account')
-      .then(setData)
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar sua conta.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load, setData } = useApi<AccountData>('/account', { fallbackMessage: 'Falha ao carregar sua conta.' });
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!data) return <PageSkeleton />;

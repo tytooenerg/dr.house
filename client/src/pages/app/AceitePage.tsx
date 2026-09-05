@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
+import { useApi } from '../../lib/useApi';
 
 interface Aceite {
   id: number;
@@ -22,22 +23,11 @@ interface Aceite {
 const COLS = '1.1fr 1.3fr 0.9fr 1.2fr 1.3fr';
 
 export function AceitePage() {
-  const [aceites, setAceites] = useState<Aceite[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [respondingId, setRespondingId] = useState<number | null>(null);
   const [errorById, setErrorById] = useState<Record<number, string>>({});
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<{ aceites: Aceite[] }>('/aceites')
-      .then((d) => setAceites(d.aceites))
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar os aceites.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load } = useApi<{ aceites: Aceite[] }>('/aceites', { fallbackMessage: 'Falha ao carregar os aceites.' });
+  const aceites = data?.aceites ?? [];
 
   // Uma proposta do cedente (routes/disputas.ts's POST /:id/propor) nunca resolve a
   // disputa sozinha — só o próprio sacado confirmando de verdade restaura o aceite.

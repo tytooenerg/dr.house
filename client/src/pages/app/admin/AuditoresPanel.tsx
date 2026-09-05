@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { useApi } from '../../../lib/useApi';
 
 interface AuditorRow {
   id: number;
@@ -14,24 +15,13 @@ interface AuditorRow {
 // Creates a real read-only login for the 'auditor' role (lib/createAuditorAccount.ts) —
 // the only way to get one, since it's deliberately absent from public self-registration.
 export function AuditoresPanel() {
-  const [auditores, setAuditores] = useState<AuditorRow[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ nome: '', email: '', password: '', companyName: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<{ auditores: AuditorRow[] }>('/admin/auditores')
-      .then((d) => setAuditores(d.auditores))
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar contas de auditoria.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load } = useApi<{ auditores: AuditorRow[] }>('/admin/auditores', { fallbackMessage: 'Falha ao carregar contas de auditoria.' });
+  const auditores = data?.auditores ?? [];
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 

@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
 import { Badge } from '../../components/ui/Badge';
+import { useApi } from '../../lib/useApi';
 
 interface CestaDef {
   key: 'conservadora' | 'diversificada' | 'agressiva';
@@ -23,26 +24,15 @@ interface InvestResult {
 }
 
 export function CestasPage() {
-  const [cestas, setCestas] = useState<CestaDef[]>([]);
   const [selected, setSelected] = useState<CestaDef['key'] | null>(null);
   const [valor, setValor] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<InvestResult | null>(null);
   const [error, setError] = useState('');
   const [needsSuitability, setNeedsSuitability] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = () => {
-    setLoadError(null);
-    return api
-      .get<{ cestas: CestaDef[] }>('/cestas')
-      .then((d) => setCestas(d.cestas))
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar as cestas de investimento.'));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const { data, error: loadError, reload: load } = useApi<{ cestas: CestaDef[] }>('/cestas', { fallbackMessage: 'Falha ao carregar as cestas de investimento.' });
+  const cestas = data?.cestas ?? [];
 
   const investir = async () => {
     if (!selected) return;

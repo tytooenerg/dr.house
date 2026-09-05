@@ -8,6 +8,7 @@ import { Segmented } from '../../components/ui/Segmented';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { PALETTE } from '../../lib/palette';
+import { useApi } from '../../lib/useApi';
 
 type Rating = 'AA' | 'A' | 'B' | 'C';
 type LadderField = 'taxaInicial' | 'taxaAlvo' | 'decrementoPorEtapa' | 'intervaloHoras';
@@ -46,10 +47,16 @@ function fmtHoursUntil(iso: string): string {
 }
 
 export function AutomacaoPage() {
-  const [data, setData] = useState<AutomationData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // keepDataOnError: esta tela faz polling a cada 4s quando a automação está ligada, e uma
+  // falha isolada de um ciclo não deve derrubar uma tela que já estava funcionando.
+  // O useApi também é o que corrige a corrida que existia aqui: a resposta de um GET do poll
+  // que já estava em voo chegava depois do POST de uma edição e sobrescrevia o valor
+  // recém-salvo — o campo revertia sozinho. Agora só a carga mais recente escreve.
+  const { data, error: loadError, reload: load, setData } = useApi<AutomationData>('/automacao', {
+    fallbackMessage: 'Falha ao carregar Automação de Lances.',
+    keepDataOnError: true,
+  });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hasLoadedOnce = useRef(false);
   // Rascunho local dos campos da escada, desacoplado de `data` — a tela faz polling a cada
   // 4s enquanto a automação está ligada, e um input controlado direto por `data` perderia o
   // que o usuário está digitando a cada resposta do poll. Só sincroniza com o servidor
@@ -59,22 +66,6 @@ export function AutomacaoPage() {
   // Erro de carga só bloqueia a tela na primeira carga — depois disso a página faz polling
   // (autoBidEnabled) a cada 4s, e uma falha isolada nesse polling não deve derrubar uma
   // tela que já estava funcionando; ela só tenta de novo no próximo ciclo.
-  const load = () =>
-    api
-      .get<AutomationData>('/automacao')
-      .then((d) => {
-        setData(d);
-        setLoadError(null);
-        hasLoadedOnce.current = true;
-      })
-      .catch((err) => {
-        if (!hasLoadedOnce.current) setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar Automação de Lances.');
-      });
-
-  useEffect(() => {
-    load();
-  }, []);
-
   useEffect(() => {
     if (data?.autoBidEnabled) {
       pollRef.current = setInterval(load, 4000);
