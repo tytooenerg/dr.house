@@ -194,7 +194,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
           {threshold?.default ?? 80}.
         </div>
         <div className="flex items-center gap-2.5">
-          <input
+          <input aria-label="Limite de alerta de compliance"
             type="number"
             min={1}
             max={100}
@@ -235,7 +235,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
             <div className="text-textSecondary">{c.reasoning}</div>
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <input
+            <input aria-label="Nota da decisão de revisão"
               className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[13px]"
               placeholder="Nota da decisão de revisão"
               value={complianceNoteById[c.duplicataId] ?? ''}
@@ -269,7 +269,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
         </div>
         <div className="flex items-center gap-2.5 mb-4">
           <span className="text-[12.5px] font-semibold text-textSecondary">Limite de fracionamento (24h):</span>
-          <input
+          <input aria-label="Limite para comunicação SAR"
             type="number"
             min={1000}
             className="w-32 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
@@ -299,7 +299,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
               </span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <input
+              <input aria-label="Protocolo COAF (após reportar externamente)"
                 className="flex-1 min-w-[200px] px-3 py-2 rounded-md border border-inputBorder text-[12.5px]"
                 placeholder="Protocolo COAF (após reportar externamente)"
                 value={sarExternalRefById[s.id] ?? ''}
@@ -327,7 +327,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
           junto à CVM.
         </div>
         <div className="flex items-center gap-2.5">
-          <input
+          <input aria-label="Período do relatório CVM"
             type="month"
             className="px-3 py-2 rounded-md border border-inputBorder text-[13px]"
             value={cvmPeriod}
@@ -346,7 +346,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
           recolhimento, não uma guia protocolada. Lastro não retém IR automaticamente hoje.
         </div>
         <div className="flex items-center gap-2.5">
-          <input
+          <input aria-label="Período do DARF"
             type="month"
             className="px-3 py-2 rounded-md border border-inputBorder text-[13px]"
             value={darfPeriod}

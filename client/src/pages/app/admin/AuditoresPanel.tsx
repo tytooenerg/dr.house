@@ -68,16 +68,16 @@ export function AuditoresPanel() {
 
       {showForm && (
         <div className="px-5 py-3.5 border-b border-bg grid grid-cols-1 md:grid-cols-4 gap-2.5">
-          <input placeholder="Nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="border border-border rounded-md px-3 py-2 text-sm" />
-          <input placeholder="E-mail" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="border border-border rounded-md px-3 py-2 text-sm" />
-          <input
+          <input aria-label="Nome" placeholder="Nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="border border-border rounded-md px-3 py-2 text-sm" />
+          <input aria-label="E-mail" placeholder="E-mail" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="border border-border rounded-md px-3 py-2 text-sm" />
+          <input aria-label="Senha (mín. 8 caracteres)"
             type="password"
             placeholder="Senha (mín. 8 caracteres)"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             className="border border-border rounded-md px-3 py-2 text-sm"
           />
-          <input
+          <input aria-label="Empresa/escritório (opcional)"
             placeholder="Empresa/escritório (opcional)"
             value={form.companyName}
             onChange={(e) => setForm({ ...form, companyName: e.target.value })}

@@ -41,28 +41,3 @@ export function ModalOverlay({ children, maxWidth = 440, onClose }: { children: 
     </div>
   );
 }
-
-export function Table({ children }: { children: React.ReactNode }) {
-  return <div className="bg-white border border-border rounded-card overflow-hidden">{children}</div>;
-}
-
-export function TableHead({ columns, labels }: { columns: string; labels: string[] }) {
-  return (
-    <div
-      className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-[12.5px] font-bold text-textSecondary uppercase tracking-wide"
-      style={{ gridTemplateColumns: columns }}
-    >
-      {labels.map((l) => (
-        <div key={l}>{l}</div>
-      ))}
-    </div>
-  );
-}
-
-export function TableRow({ columns, className = '', children }: { columns: string; className?: string; children: React.ReactNode }) {
-  return (
-    <div className={`grid gap-3 px-5 py-4 items-center text-sm border-b border-border last:border-b-0 ${className}`} style={{ gridTemplateColumns: columns }}>
-      {children}
-    </div>
-  );
-}

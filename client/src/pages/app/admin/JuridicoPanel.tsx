@@ -273,7 +273,7 @@ export function JuridicoPanel() {
               Padrão: {feeConfig?.default ?? 5}%.
             </div>
             <div className="flex items-center gap-2.5">
-              <input
+              <input aria-label="Percentual de honorários"
                 type="number"
                 min={0}
                 max={50}
@@ -365,6 +365,7 @@ export function JuridicoPanel() {
                   <div className="text-[12.5px] font-bold mb-1.5">Registrar recuperação (sacado pagou fora da plataforma)</div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <input
+                      aria-label="Valor recuperado pelo sacado"
                       className="w-40 px-3 py-2 rounded-md border border-inputBorder text-[13px]"
                       placeholder={o.valorFmt}
                       value={recoveredValorInput[o.duplicataId] ?? ''}
@@ -420,7 +421,7 @@ export function JuridicoPanel() {
           </div>
           <form onSubmit={submitMinuta} className="bg-white border border-border rounded-card p-5 flex flex-col gap-2.5">
             <div className="font-bold text-[14px] mb-1">Gerar nova minuta</div>
-            <select
+            <select aria-label="Tipo de minuta"
               className="px-3 py-2 rounded-md border border-inputBorder text-[13px] self-start"
               value={minutaType}
               onChange={(e) => setMinutaType(e.target.value as typeof minutaType)}
@@ -429,7 +430,7 @@ export function JuridicoPanel() {
               <option value="termos_atualizacao">Atualização de termos</option>
               <option value="notificacao_padrao">Notificação padrão</option>
             </select>
-            <textarea
+            <textarea aria-label="Descreva o contexto (ex.: solicitação do titular, resumo da mudança, motivo da notificação)"
               className="px-3 py-2 rounded-md border border-inputBorder text-[13px] min-h-[90px]"
               placeholder="Descreva o contexto (ex.: solicitação do titular, resumo da mudança, motivo da notificação)"
               value={minutaContext}
@@ -462,13 +463,13 @@ export function JuridicoPanel() {
               )}
               {doc.reviewed && (!doc.signatureStatus || doc.signatureStatus === 'none') && (
                 <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-                  <input
+                  <input aria-label="Nome do signatário"
                     placeholder="Nome do signatário"
                     value={signerNameById[doc.id] ?? ''}
                     onChange={(e) => setSignerNameById((prev) => ({ ...prev, [doc.id]: e.target.value }))}
                     className="px-2.5 py-1.5 rounded-md border border-inputBorder text-[12.5px] w-44"
                   />
-                  <input
+                  <input aria-label="Email do signatário"
                     placeholder="Email do signatário"
                     value={signerEmailById[doc.id] ?? ''}
                     onChange={(e) => setSignerEmailById((prev) => ({ ...prev, [doc.id]: e.target.value }))}
@@ -515,13 +516,13 @@ export function JuridicoPanel() {
             automático, apenas análise do texto que você fornecer.
           </div>
           <form onSubmit={submitRegulatory} className="bg-white border border-border rounded-card p-5 flex flex-col gap-2.5">
-            <input
+            <input aria-label="Título/referência (ex.: Resolução BCB 540/2025)"
               className="px-3 py-2 rounded-md border border-inputBorder text-[13px]"
               placeholder="Título/referência (ex.: Resolução BCB 540/2025)"
               value={regTitle}
               onChange={(e) => setRegTitle(e.target.value)}
             />
-            <textarea
+            <textarea aria-label="Cole o texto do normativo aqui"
               className="px-3 py-2 rounded-md border border-inputBorder text-[13px] min-h-[120px]"
               placeholder="Cole o texto do normativo aqui"
               value={regText}

@@ -64,22 +64,22 @@ export function AceitePage() {
       {loadError && <ErrorState message={loadError} onRetry={load} />}
 
       {!loadError && (
-      <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
-          <div>Duplicata</div>
-          <div>Sacado</div>
-          <div>Valor</div>
-          <div>Prazo de manifestação</div>
-          <div>Status</div>
-        </div>
+      <div role="table" aria-label="Duplicatas aguardando aceite" className="bg-white border border-border rounded-card overflow-hidden">
+        <div role="rowgroup"><div role="row" className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
+          <div role="columnheader">Duplicata</div>
+          <div role="columnheader">Sacado</div>
+          <div role="columnheader">Valor</div>
+          <div role="columnheader">Prazo de manifestação</div>
+          <div role="columnheader">Status</div>
+        </div></div>
         {aceites.map((a) => (
           <div key={a.id} className="border-b border-border last:border-b-0">
-            <div className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: COLS }}>
-              <div className="font-mono-num font-bold text-[13px]">{a.duplicataId}</div>
-              <div className="font-semibold">{a.sacado}</div>
-              <div className="font-mono-num">{a.valorFmt}</div>
-              <div className="text-textSecondary text-[13px]">{a.prazo}</div>
-              <div className="flex flex-col gap-1 items-start">
+            <div role="row" className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: COLS }}>
+              <div role="cell" className="font-mono-num font-bold text-[13px]">{a.duplicataId}</div>
+              <div role="cell" className="font-semibold">{a.sacado}</div>
+              <div role="cell" className="font-mono-num">{a.valorFmt}</div>
+              <div role="cell" className="text-textSecondary text-[13px]">{a.prazo}</div>
+              <div role="cell" className="flex flex-col gap-1 items-start">
                 <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md w-fit" style={{ background: a.statusBg, color: a.statusColor }}>
                   {a.statusLabel}
                 </span>

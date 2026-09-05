@@ -158,7 +158,7 @@ export function CompliancePage() {
         <div className="grid gap-5 items-center" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div>
             <div className="text-xs font-bold text-textSecondary mb-2">Patrimônio líquido disponível para alocação (R$)</div>
-            <Input mono value={fidcPL} onChange={(e) => updateFidc(e.target.value)} />
+            <Input aria-label="Patrimônio líquido do FIDC" mono value={fidcPL} onChange={(e) => updateFidc(e.target.value)} />
           </div>
           <div className="flex gap-6">
             <div>
@@ -215,7 +215,7 @@ export function CompliancePage() {
         <div className="font-bold text-[15px] mb-1">Verificação de duplicidade</div>
         <div className="text-textSecondary text-[12.5px] mb-3.5">Consulta real contra a base de duplicatas da própria Lastro (CNPJ do sacado, chave de NF-e ou nº da duplicata)</div>
         <div className="flex gap-2.5 max-w-[520px]">
-          <Input placeholder="CNPJ do sacado, chave de NF-e ou nº da duplicata" value={dupQuery} onChange={(e) => setDupQuery(e.target.value)} />
+          <Input aria-label="CNPJ do sacado, chave de NF-e ou nº da duplicata" placeholder="CNPJ do sacado, chave de NF-e ou nº da duplicata" value={dupQuery} onChange={(e) => setDupQuery(e.target.value)} />
           <Button onClick={runDupCheck}>Consultar</Button>
         </div>
         {dupResult && dupResult.matches.length === 0 && (

@@ -305,19 +305,19 @@ export function ContasPagarPage() {
         <Card className="mb-6">
           <div className="font-bold text-[15px] mb-3">Nova conta a pagar</div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-            <input
+            <input aria-label="Descrição"
               placeholder="Descrição"
               value={form.descricao}
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
               className="border border-border rounded-md px-3 py-2 text-sm md:col-span-1"
             />
-            <input
+            <input aria-label="Fornecedor (opcional)"
               placeholder="Fornecedor (opcional)"
               value={form.fornecedor}
               onChange={(e) => setForm({ ...form, fornecedor: e.target.value })}
               className="border border-border rounded-md px-3 py-2 text-sm"
             />
-            <select
+            <select aria-label="Categoria da conta"
               value={form.categoria}
               onChange={(e) => setForm({ ...form, categoria: e.target.value })}
               className="border border-border rounded-md px-3 py-2 text-sm"
@@ -328,7 +328,7 @@ export function ContasPagarPage() {
                 </option>
               ))}
             </select>
-            <input
+            <input aria-label="Valor em R$"
               type="text"
               inputMode="decimal"
               placeholder="Valor em R$"
@@ -336,7 +336,7 @@ export function ContasPagarPage() {
               onChange={(e) => setForm({ ...form, valor: e.target.value })}
               className="border border-border rounded-md px-3 py-2 text-sm"
             />
-            <input
+            <input aria-label="Vencimento da conta"
               type="date"
               value={form.vencimento}
               onChange={(e) => setForm({ ...form, vencimento: e.target.value })}

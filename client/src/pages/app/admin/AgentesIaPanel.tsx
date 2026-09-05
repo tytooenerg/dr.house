@@ -164,7 +164,7 @@ export function AgentesIaPanel() {
           <div className="bg-white border border-border rounded-card mt-2.5 overflow-hidden">
             <div className="px-5 py-3.5 border-b border-border flex items-center gap-2.5 flex-wrap">
               <span className="font-bold text-[13px]">Valor mínimo para exigir 2 aprovadores (BRL)</span>
-              <input value={thresholdInput} onChange={(e) => setThresholdInput(e.target.value)} className="w-32 px-2.5 py-1.5 rounded-md border border-border text-[12.5px]" />
+              <input aria-label="Limite de aprovação automática" value={thresholdInput} onChange={(e) => setThresholdInput(e.target.value)} className="w-32 px-2.5 py-1.5 rounded-md border border-border text-[12.5px]" />
               <Button size="sm" variant="secondary" disabled={savingGov === '__threshold'} onClick={saveThreshold}>
                 Salvar
               </Button>
@@ -186,7 +186,7 @@ export function AgentesIaPanel() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[11.5px] text-textSecondary">Orçamento diário (US$, vazio = ilimitado)</span>
-                  <input
+                  <input aria-label="Orçamento do agente"
                     value={budgetInputs[g.id] ?? ''}
                     onChange={(e) => setBudgetInputs((prev) => ({ ...prev, [g.id]: e.target.value }))}
                     placeholder="ilimitado"
@@ -286,7 +286,7 @@ export function AgentesIaPanel() {
                 </div>
 
                 <label className="block text-[11.5px] font-bold text-textTertiary uppercase mb-1.5">Instrução para o agente</label>
-                <textarea
+                <textarea aria-label="Pergunta para o agente"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   rows={3}
@@ -296,7 +296,7 @@ export function AgentesIaPanel() {
                 <label className="block text-[11.5px] font-bold text-textTertiary uppercase mb-1.5">
                   Executar em nome de (userId, opcional — padrão: sua própria conta admin)
                 </label>
-                <input
+                <input aria-label="Usuário em nome de quem agir"
                   value={actingUserId}
                   onChange={(e) => setActingUserId(e.target.value)}
                   placeholder="Ex: 4"

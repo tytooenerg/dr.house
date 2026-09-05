@@ -144,7 +144,7 @@ function FundCard() {
             </div>
           </div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <input
+            <input aria-label="Valor em R$"
               type="text"
               inputMode="decimal"
               placeholder="Valor em R$"
@@ -272,7 +272,7 @@ export function CreditLinePage() {
           <Card className="mb-6">
             <div className="font-bold text-[15px] mb-3">Sacar ou pagar</div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <input
+              <input aria-label="Valor em R$"
                 type="text"
                 inputMode="decimal"
                 placeholder="Valor em R$"

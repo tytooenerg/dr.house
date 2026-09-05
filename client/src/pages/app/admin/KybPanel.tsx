@@ -245,7 +245,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
 
           {rejectingId === p.id ? (
             <div className="flex items-center gap-2.5 flex-wrap">
-              <input
+              <input aria-label="Motivo da rejeição"
                 className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[13px]"
                 placeholder="Motivo da rejeição"
                 value={rejectReason}
