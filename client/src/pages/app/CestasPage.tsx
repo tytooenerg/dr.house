@@ -5,6 +5,7 @@ import { PageHeader, Card } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface CestaDef {
   key: 'conservadora' | 'diversificada' | 'agressiva';
@@ -72,19 +73,19 @@ export function CestasPage() {
           <Card
             key={c.key}
             className="cursor-pointer"
-            style={selected === c.key ? { outline: '2px solid #1E5EFF' } : undefined}
+            style={selected === c.key ? { outline: `2px solid ${PALETTE.blue}` } : undefined}
             onClick={() => setSelected(c.key)}
           >
             <div className="font-bold text-[15px] mb-1.5">{c.label}</div>
             <div className="text-textSecondary text-[12.5px] mb-3">{c.desc}</div>
             <div className="flex gap-1.5 flex-wrap mb-3">
               {c.ratings.map((r) => (
-                <span key={r} className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">
+                <span key={r} className="text-[11px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
                   {r}
                 </span>
               ))}
             </div>
-            <div className="text-[12px] font-semibold" style={{ color: c.faixa.real ? '#0A5C36' : '#8B97AC' }}>
+            <div className="text-[12px] font-semibold" style={{ color: c.faixa.real ? PALETTE.green : PALETTE.textTertiary }}>
               {c.faixa.real ? 'Faixa hoje' : 'Faixa teórica (sem oferta aberta agora)'}:{' '}
               <span className="font-mono-num">
                 {c.faixa.minFmt}–{c.faixa.maxFmt}
@@ -140,9 +141,9 @@ export function CestasPage() {
           </div>
           <div className="flex flex-col gap-2">
             {result.comprados.map((c) => (
-              <div key={c.duplicataId} className="flex items-center justify-between text-[13px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+              <div key={c.duplicataId} className="flex items-center justify-between text-[13px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
                 <span className="font-semibold">{c.sacado}</span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">{c.rating}</span>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">{c.rating}</span>
                 <span className="text-textSecondary">{c.desagio}</span>
                 <span className="font-mono-num font-bold">{c.valorFmt}</span>
               </div>

@@ -89,7 +89,7 @@ export function AssinaturaPage() {
               <div className="text-2xl font-extrabold mb-4">{p.priceFmt}</div>
               <ul className="flex flex-col gap-2 mb-5 flex-1">
                 {p.features.map((f) => (
-                  <li key={f} className={`text-[13px] flex items-start gap-2 ${p.key === 'pro' ? 'text-[#D6DCE5]' : 'text-textSecondary'}`}>
+                  <li key={f} className={`text-[13px] flex items-start gap-2 ${p.key === 'pro' ? 'text-inputBorder' : 'text-textSecondary'}`}>
                     <span className="mt-1 w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
                     {f}
                   </li>

@@ -4,6 +4,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface KycItem {
   label: string;
@@ -357,7 +358,7 @@ export function ContaPage() {
 
         <Card>
           <div className="font-bold text-[15px] mb-4">Conta Pix para liquidação</div>
-          <div className="p-3.5 rounded-[10px] bg-[#F7F8FA] text-[13.5px] font-semibold mb-4">{data.bankAccountDisplay}</div>
+          <div className="p-3.5 rounded-[10px] bg-surface text-[13.5px] font-semibold mb-4">{data.bankAccountDisplay}</div>
           {!data.pixChave && (
             <div className="flex gap-2 mb-4">
               <input
@@ -410,7 +411,7 @@ export function ContaPage() {
           {data.pixCharges
             .filter((c) => c.status === 'ativa')
             .map((c) => (
-              <div key={c.txid} className="flex items-center justify-between gap-2 p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+              <div key={c.txid} className="flex items-center justify-between gap-2 p-2.5 rounded-md bg-surface mb-2 text-[12.5px]">
                 <div>
                   <div className="font-semibold">{c.valorFmt}</div>
                   {c.brcode ? <div className="break-all text-[10.5px] text-textSecondary">{c.brcode}</div> : <div className="text-textSecondary">Aguardando pagamento (simulado)</div>}
@@ -473,7 +474,7 @@ export function ContaPage() {
         {data.boletos
           .filter((b) => b.status === 'ativo')
           .map((b) => (
-            <div key={b.nossoNumero} className="flex items-center justify-between gap-2 p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+            <div key={b.nossoNumero} className="flex items-center justify-between gap-2 p-2.5 rounded-md bg-surface mb-2 text-[12.5px]">
               <div>
                 <div className="font-semibold">{b.valorFmt}</div>
                 {b.linhaDigitavel ? (
@@ -523,7 +524,7 @@ export function ContaPage() {
           {data.tedDeposits
             .filter((t) => t.status === 'ativo')
             .map((t) => (
-              <div key={t.referencia} className="p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+              <div key={t.referencia} className="p-2.5 rounded-md bg-surface mb-2 text-[12.5px]">
                 <div className="font-semibold">{t.valorFmt}</div>
                 <div className="text-textSecondary">
                   {t.banco} · ag. {t.agencia} · cc {t.conta} — {t.favorecidoNome}
@@ -636,7 +637,7 @@ export function ContaPage() {
           {data.stablecoinDeposits
             .filter((s) => s.status === 'ativo')
             .map((s) => (
-              <div key={s.referencia} className="p-2.5 rounded-md bg-[#F7F8FA] mb-2 text-[12.5px]">
+              <div key={s.referencia} className="p-2.5 rounded-md bg-surface mb-2 text-[12.5px]">
                 <div className="font-semibold">{s.valorFmt}</div>
                 <div className="break-all text-textSecondary">
                   {s.asset} ({s.network}): {s.endereco}
@@ -689,7 +690,7 @@ export function ContaPage() {
           <div key={i} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13.5px]" style={{ gridTemplateColumns: '1fr 1.6fr 0.9fr 0.9fr' }}>
             <div className="text-textSecondary font-mono-num text-[12.5px]">{e.data}</div>
             <div>{e.descricao}</div>
-            <div className="font-mono-num font-bold" style={{ color: e.isPositive ? '#0A5C36' : '#0B1F3A' }}>
+            <div className="font-mono-num font-bold" style={{ color: e.isPositive ? PALETTE.green : PALETTE.navy }}>
               {e.valorFmt}
             </div>
             <div className="font-mono-num text-textSecondary">{e.saldoFmt}</div>
@@ -699,21 +700,21 @@ export function ContaPage() {
 
       <NavyCard className="p-6.5">
         <div className="font-bold text-[15px] mb-2.5">Como a Lastro monetiza</div>
-        <div className="text-[#9FB3D6] text-[13.5px] leading-relaxed mb-4.5 max-w-[640px]">
+        <div className="text-onNavy text-[13.5px] leading-relaxed mb-4.5 max-w-[640px]">
           Cobramos uma taxa de plataforma de 0,35% sobre o valor de cada operação, descontada automaticamente na liquidação — sem mensalidade e sem taxa de adesão.
         </div>
         <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <div className="text-[#9FB3D6] text-xs font-semibold">Valor da operação</div>
+            <div className="text-onNavy text-xs font-semibold">Valor da operação</div>
             <div className="text-[19px] font-extrabold mt-1.5">R$ 84.500</div>
           </div>
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <div className="text-[#9FB3D6] text-xs font-semibold">Taxa da plataforma (0,35%)</div>
+            <div className="text-onNavy text-xs font-semibold">Taxa da plataforma (0,35%)</div>
             <div className="text-[19px] font-extrabold mt-1.5">R$ 295,75</div>
           </div>
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            <div className="text-[#9FB3D6] text-xs font-semibold">Líquido repassado</div>
-            <div className="text-[19px] font-extrabold mt-1.5 text-[#6FCF97]">R$ 84.204,25</div>
+            <div className="text-onNavy text-xs font-semibold">Líquido repassado</div>
+            <div className="text-[19px] font-extrabold mt-1.5 text-greenOnNavy">R$ 84.204,25</div>
           </div>
         </div>
       </NavyCard>

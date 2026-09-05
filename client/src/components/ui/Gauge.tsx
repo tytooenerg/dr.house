@@ -1,9 +1,10 @@
+import { PALETTE } from '../../lib/palette';
 export function Gauge({ pct, color, size = 150, innerLabel, innerSub }: { pct: number; color: string; size?: number; innerLabel: React.ReactNode; innerSub?: React.ReactNode }) {
   const inner = size * 0.73;
   return (
     <div
       className="rounded-full flex items-center justify-center"
-      style={{ width: size, height: size, background: `conic-gradient(${color} 0% ${pct}%, #E4E8EE ${pct}% 100%)` }}
+      style={{ width: size, height: size, background: `conic-gradient(${color} 0% ${pct}%, ${PALETTE.border} ${pct}% 100%)` }}
     >
       <div className="rounded-full bg-white flex flex-col items-center justify-center" style={{ width: inner, height: inner }}>
         {innerLabel}

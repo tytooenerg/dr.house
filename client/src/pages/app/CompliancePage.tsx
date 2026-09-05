@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { ComplianceCalendarCard } from '../../components/ComplianceCalendarCard';
+import { PALETTE } from '../../lib/palette';
 
 interface DupGroup {
   valorFmt: string;
@@ -96,12 +97,12 @@ export function CompliancePage() {
         setContractError('Não foi possível analisar o contrato agora (ANTHROPIC_API_KEY não configurada ou análise indisponível).');
         return;
       }
-      const SEVERITY_COLOR: Record<string, string> = { ok: '#0A5C36', atencao: '#B8790A', critico: '#B03A2E' };
+      const SEVERITY_COLOR: Record<string, string> = { ok: PALETTE.green, atencao: PALETTE.amber, critico: PALETTE.red };
       setData((s) =>
         s
           ? {
               ...s,
-              contractFlags: res.analysis!.map((f) => ({ text: f.text, color: SEVERITY_COLOR[f.severity] || '#5B6472' })),
+              contractFlags: res.analysis!.map((f) => ({ text: f.text, color: SEVERITY_COLOR[f.severity] || PALETTE.textSecondary })),
               contractFlagsReal: true,
               contractAnalyzedFilename: file.name,
             }
@@ -120,12 +121,12 @@ export function CompliancePage() {
 
       <NavyCard className="mb-4">
         <div className="font-bold text-[15px] mb-1">A ponte de confiança — o que cada parte enxerga</div>
-        <div className="text-[#9FB3D6] text-[12.5px] mb-4.5">Mesma duplicata, uma visão de segurança diferente para cada interessado</div>
+        <div className="text-onNavy text-[12.5px] mb-4.5">Mesma duplicata, uma visão de segurança diferente para cada interessado</div>
         <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           {data.trustBridge.map((t) => (
             <div key={t.parte} className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
               <div className="font-bold text-[13px] mb-1.5">{t.parte}</div>
-              <div className="text-[#9FB3D6] text-xs leading-snug">{t.veSobreo}</div>
+              <div className="text-onNavy text-xs leading-snug">{t.veSobreo}</div>
             </div>
           ))}
         </div>
@@ -145,7 +146,7 @@ export function CompliancePage() {
             </div>
           ))}
         </div>
-        <div className="mt-3.5 px-3.5 py-3 rounded-lg text-[12.5px]" style={{ background: '#FBF1E0', color: '#8A5A00' }}>
+        <div className="mt-3.5 px-3.5 py-3 rounded-lg text-[12.5px]" style={{ background: PALETTE.amberBg, color: PALETTE.amber }}>
           O roteamento entre registradoras é real; a consulta cruzada de duplicidade contra as APIs oficiais da CERC/B3/Núclea ainda depende de integração comercial — hoje a verificação abaixo cobre apenas a base da própria Lastro.
         </div>
       </Card>
@@ -217,7 +218,7 @@ export function CompliancePage() {
           <Button onClick={runDupCheck}>Consultar</Button>
         </div>
         {dupResult && dupResult.matches.length === 0 && (
-          <div className="mt-4 p-4 rounded-[10px] bg-greenBg" style={{ border: '1px solid #CFE6D9' }}>
+          <div className="mt-4 p-4 rounded-[10px] bg-greenBg" style={{ border: `1px solid ${PALETTE.greenBorder}` }}>
             <div className="font-bold text-[13.5px] text-green">Nenhum registro encontrado para esta consulta</div>
           </div>
         )}
@@ -227,9 +228,9 @@ export function CompliancePage() {
               <div
                 key={i}
                 className="p-4 rounded-[10px]"
-                style={m.duplicidadeSuspeita ? { background: '#F7E9E7', border: '1px solid #E7C6C1' } : { background: '#F7F8FA' }}
+                style={m.duplicidadeSuspeita ? { background: PALETTE.redBg, border: `1px solid ${PALETTE.redBorder}` } : { background: PALETTE.surface }}
               >
-                <div className="font-bold text-[13.5px]" style={{ color: m.duplicidadeSuspeita ? '#B3261E' : undefined }}>
+                <div className="font-bold text-[13.5px]" style={{ color: m.duplicidadeSuspeita ? PALETTE.red : undefined }}>
                   {m.duplicidadeSuspeita ? 'Possível duplicidade — ' : ''}
                   {m.valorFmt} · vencimento {m.vencimento} · {m.ocorrencias.length} registro{m.ocorrencias.length > 1 ? 's' : ''}
                 </div>
@@ -240,7 +241,7 @@ export function CompliancePage() {
                       ? 'Duplicidade confirmada diretamente na registradora'
                       : 'Confirmado como não-duplicado diretamente na registradora'}
                 </div>
-                <div className="text-[12.5px] mt-1.5 flex flex-col gap-0.5" style={{ color: m.duplicidadeSuspeita ? '#8A3A32' : undefined }}>
+                <div className="text-[12.5px] mt-1.5 flex flex-col gap-0.5" style={{ color: m.duplicidadeSuspeita ? PALETTE.red : undefined }}>
                   {m.ocorrencias.map((o) => (
                     <div key={o.id}>
                       {o.id} — {o.cedenteNome} {o.registradora ? `(${o.registradora})` : ''}
@@ -310,9 +311,9 @@ export function CompliancePage() {
           <div className="text-textSecondary text-[12.5px] mb-4">Suas posições compradas e ainda ativas, classificadas por dias de atraso desde o vencimento</div>
           <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             {([
-              ['estagio_1', 'Estágio 1 — em dia (até 30d)', '#0A5C36'],
-              ['estagio_2', 'Estágio 2 — atraso 31–90d', '#B8790A'],
-              ['estagio_3', 'Estágio 3 — atraso > 90d', '#B03A2E'],
+              ['estagio_1', 'Estágio 1 — em dia (até 30d)', PALETTE.green],
+              ['estagio_2', 'Estágio 2 — atraso 31–90d', PALETTE.amber],
+              ['estagio_3', 'Estágio 3 — atraso > 90d', PALETTE.red],
             ] as [string, string, string][]).map(([key, label, color]) => (
               <div key={key} className="p-4 rounded-[10px] bg-bg">
                 <div className="text-textSecondary text-xs mb-1">{label}</div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { PALETTE } from '../../../lib/palette';
 
 interface AuditEntry {
   id: number;
@@ -37,14 +38,14 @@ export function AuditTrailPanel() {
         {audit && (
           <span
             className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
-            style={audit.chain.valid ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#F7E9E7', color: '#B3261E' }}
+            style={audit.chain.valid ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.redBg, color: PALETTE.red }}
           >
             {audit.chain.valid ? 'Cadeia íntegra ✓' : `Violação detectada no evento #${audit.chain.brokenAt}`}
           </span>
         )}
       </div>
       {(audit?.entries ?? []).map((e) => (
-        <div key={e.id} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+        <div key={e.id} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
           <div>
             <b>{e.actor}</b> — {e.action}
             <span className="text-textMuted"> · {e.quando}</span>

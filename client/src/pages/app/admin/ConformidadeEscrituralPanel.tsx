@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { PALETTE } from '../../../lib/palette';
 
 type Status = 'nao_informado' | 'assistida_disponivel' | 'obrigatorio_pleno';
 
@@ -23,9 +24,9 @@ interface Summary {
 }
 
 const STATUS_STYLE: Record<Status, { bg: string; color: string; label: string }> = {
-  nao_informado: { bg: '#F0F2F5', color: '#5B6472', label: 'Não informado' },
-  assistida_disponivel: { bg: '#FBF1E0', color: '#8A5A00', label: 'Produção assistida' },
-  obrigatorio_pleno: { bg: '#EAF3EE', color: '#0A5C36', label: 'Regime pleno' },
+  nao_informado: { bg: PALETTE.hairline, color: PALETTE.textSecondary, label: 'Não informado' },
+  assistida_disponivel: { bg: PALETTE.amberBg, color: PALETTE.amber, label: 'Produção assistida' },
+  obrigatorio_pleno: { bg: PALETTE.greenBg, color: PALETTE.green, label: 'Regime pleno' },
 };
 
 // Visão de oversight do cronograma de obrigatoriedade da duplicata escritural (BCB) —

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { PublicNav, PublicFooter } from './PublicChrome';
+import { PALETTE } from '../../lib/palette';
 
 const PILLARS = [
   { title: 'Emissão & Registro', desc: 'Emita duplicatas escriturais direto do seu sistema, com registro automático em CERC, B3 e Núclea.' },
@@ -74,10 +75,10 @@ export function DevelopersPage() {
         <div className="bg-navy rounded-2xl p-6.5" style={{ boxShadow: '0 24px 60px rgba(11,31,58,0.18)' }}>
           <div className="flex gap-1.5 mb-4">
             {[0, 1, 2].map((i) => (
-              <span key={i} className="rounded-full" style={{ width: 10, height: 10, background: '#3D4658' }} />
+              <span key={i} className="rounded-full" style={{ width: 10, height: 10, background: PALETTE.slate }} />
             ))}
           </div>
-          <pre className="font-mono-num text-[13px] leading-loose text-[#C7D6FF] whitespace-pre">{`curl https://api.lastro.com.br/v1/duplicatas \\
+          <pre className="font-mono-num text-[13px] leading-loose text-blueSoft whitespace-pre">{`curl https://api.lastro.com.br/v1/duplicatas \\
   -H "Authorization: Bearer sk_live_..." \\
   -d sacado_cnpj="12.345.678/0001-90" \\
   -d valor="84500.00" \\
@@ -85,17 +86,17 @@ export function DevelopersPage() {
   -d seguro="true"`}</pre>
           <div className="h-px my-4.5" style={{ background: 'rgba(255,255,255,0.1)' }} />
           <div className="font-mono-num text-[12.5px]">
-            <span style={{ color: '#6FCF97' }}>200 OK</span>
+            <span style={{ color: PALETTE.greenOnNavy }}>200 OK</span>
             <span className="text-textTertiary"> · registrado na CERC</span>
           </div>
           <div className="font-mono-num text-[12.5px] text-textTertiary">{'{ "id": "dup_9f2a", "status": "registrada", "leilao": "aberto" }'}</div>
         </div>
       </div>
 
-      <div className="px-14 py-7 bg-[#F7F8FA] border-t border-b border-hairline">
+      <div className="px-14 py-7 bg-surface border-t border-b border-hairline">
         <div className="max-w-[1360px] mx-auto flex items-center justify-between flex-wrap gap-5">
           <div className="text-[12.5px] font-bold text-textTertiary uppercase tracking-wide">Feito para quem não tem escala para negociar direto com uma registradora</div>
-          <div className="flex gap-8 font-mono-num text-[13px] font-semibold text-[#B8C2D4] flex-wrap">
+          <div className="flex gap-8 font-mono-num text-[13px] font-semibold text-onNavyDim flex-wrap">
             {['ERP Fluxo', 'PagaCerto', 'Banco Trilha', 'Girocap', 'Nortis Capital'].map((n) => (
               <div key={n}>{n}</div>
             ))}
@@ -113,7 +114,7 @@ export function DevelopersPage() {
           {PILLARS.map((p) => (
             <div key={p.title} className="border border-border rounded-card p-6.5">
               <div className="w-[38px] h-[38px] rounded-[9px] bg-chip flex items-center justify-center mb-4">
-                <span style={{ width: 14, height: 14, border: '2px solid #1E5EFF', borderRadius: 3 }} />
+                <span style={{ width: 14, height: 14, border: `2px solid ${PALETTE.blue}`, borderRadius: 3 }} />
               </div>
               <div className="font-bold text-base mb-2">{p.title}</div>
               <div className="text-textSecondary text-[13.5px] leading-relaxed">{p.desc}</div>
@@ -121,13 +122,13 @@ export function DevelopersPage() {
           ))}
           <div className="rounded-card p-6.5 bg-navy">
             <div className="font-bold text-base mb-2 text-white">Sua ideia aqui</div>
-            <div className="text-[#9FB3D6] text-[13.5px] leading-relaxed mb-4">Fale com nosso time de parcerias para desenhar o fluxo do seu produto sobre a Lastro.</div>
-            <div className="text-[13px] font-bold text-[#4C8CFF]">Ver documentação →</div>
+            <div className="text-onNavy text-[13.5px] leading-relaxed mb-4">Fale com nosso time de parcerias para desenhar o fluxo do seu produto sobre a Lastro.</div>
+            <div className="text-[13px] font-bold text-onNavyBright">Ver documentação →</div>
           </div>
         </div>
       </div>
 
-      <div className="px-14 py-20 bg-[#F7F8FA] border-t border-b border-hairline">
+      <div className="px-14 py-20 bg-surface border-t border-b border-hairline">
         <div className="max-w-[1360px] mx-auto">
           <div className="max-w-[640px] mb-12">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">A ponte</div>
@@ -138,7 +139,7 @@ export function DevelopersPage() {
             {TRUST.map((t) => (
               <div key={t.title} className="bg-white border border-border rounded-card p-6">
                 <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center mb-3.5">
-                  <span style={{ width: 12, height: 12, border: '2px solid #1E5EFF', borderRadius: 2 }} />
+                  <span style={{ width: 12, height: 12, border: `2px solid ${PALETTE.blue}`, borderRadius: 2 }} />
                 </div>
                 <div className="font-bold text-[15px] mb-2">{t.title}</div>
                 <div className="text-textSecondary text-[13px] leading-relaxed">{t.desc}</div>
@@ -146,10 +147,10 @@ export function DevelopersPage() {
             ))}
             <div className="rounded-card p-6 bg-navy">
               <div className="w-[34px] h-[34px] rounded-lg flex items-center justify-center mb-3.5" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                <span style={{ width: 12, height: 12, background: '#4C8CFF', transform: 'rotate(45deg)' }} />
+                <span style={{ width: 12, height: 12, background: PALETTE.onNavyBright, transform: 'rotate(45deg)' }} />
               </div>
               <div className="font-bold text-[15px] mb-2 text-white">Banco Central</div>
-              <div className="text-[#9FB3D6] text-[13px] leading-relaxed">Recebe trilha de auditoria completa e registro interoperável em CERC, B3 e Núclea — unicidade do título garantida, sem duplicidade.</div>
+              <div className="text-onNavy text-[13px] leading-relaxed">Recebe trilha de auditoria completa e registro interoperável em CERC, B3 e Núclea — unicidade do título garantida, sem duplicidade.</div>
             </div>
           </div>
         </div>
@@ -160,7 +161,7 @@ export function DevelopersPage() {
           {STATS.map((s) => (
             <div key={s.value}>
               <div className="text-[38px] font-extrabold tracking-tight">{s.value}</div>
-              <div className="text-[#9FB3D6] text-[13.5px] mt-2">{s.desc}</div>
+              <div className="text-onNavy text-[13.5px] mt-2">{s.desc}</div>
             </div>
           ))}
         </div>
@@ -197,7 +198,7 @@ export function DevelopersPage() {
         </div>
         <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {PRICING.map((p) => (
-            <div key={p.name} className="rounded-card p-7 relative" style={{ border: p.highlighted ? '2px solid #1E5EFF' : '1px solid #E4E8EE' }}>
+            <div key={p.name} className="rounded-card p-7 relative" style={{ border: p.highlighted ? `2px solid ${PALETTE.blue}` : `1px solid ${PALETTE.border}` }}>
               {p.highlighted && <div className="absolute -top-3 left-6 bg-blue text-white text-[11px] font-bold px-2.5 py-1 rounded-md">MAIS USADO</div>}
               <div className="font-bold text-[15px] mb-1.5">{p.name}</div>
               <div className="text-textSecondary text-[13px] mb-5">{p.desc}</div>
@@ -213,21 +214,21 @@ export function DevelopersPage() {
         </div>
       </div>
 
-      <div className="px-14 py-16 bg-[#F7F8FA] border-t border-b border-hairline">
+      <div className="px-14 py-16 bg-surface border-t border-b border-hairline">
         <div className="max-w-[1360px] mx-auto">
           <div className="max-w-[640px] mb-8">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Referência</div>
             <div className="text-[30px] font-extrabold tracking-tight">Endpoints principais.</div>
           </div>
           <div className="bg-white border border-border rounded-card overflow-hidden">
-            <div className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-[11.5px] font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: '0.5fr 1.5fr 2fr' }}>
+            <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-[11.5px] font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: '0.5fr 1.5fr 2fr' }}>
               <div>Método</div>
               <div>Endpoint</div>
               <div>Descrição</div>
             </div>
             {ENDPOINTS.map((e) => (
               <div key={e.path} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13.5px]" style={{ gridTemplateColumns: '0.5fr 1.5fr 2fr' }}>
-                <div className="font-mono-num font-bold" style={{ color: e.method === 'POST' ? '#0A5C36' : '#1E5EFF' }}>
+                <div className="font-mono-num font-bold" style={{ color: e.method === 'POST' ? PALETTE.green : PALETTE.blue }}>
                   {e.method}
                 </div>
                 <div className="font-mono-num">{e.path}</div>
@@ -309,7 +310,7 @@ export function DevelopersPage() {
         </div>
       </div>
 
-      <div className="px-14 py-20 text-center bg-[#F7F8FA]">
+      <div className="px-14 py-20 text-center bg-surface">
         <div className="text-[32px] font-extrabold tracking-tight">Pronto para construir sobre a Lastro?</div>
         <div className="text-textSecondary text-[15px] mt-2.5">Chaves de teste em minutos, sem burocracia.</div>
         <div className="flex gap-3 justify-center mt-6.5">

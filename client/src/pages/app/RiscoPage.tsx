@@ -124,7 +124,7 @@ export function RiscoPage() {
               </div>
               <div className="text-[11.5px] text-textSecondary mt-1 leading-snug">{selected.stageDesc}</div>
             </div>
-            <Button variant="secondary" size="sm" className="mt-5 bg-[#F0F2F5] text-textSecondary border-none" onClick={clear}>
+            <Button variant="secondary" size="sm" className="mt-5 bg-hairline text-textSecondary border-none" onClick={clear}>
               Nova busca
             </Button>
           </Card>
@@ -145,7 +145,7 @@ export function RiscoPage() {
               ))}
             </div>
 
-            <div className="h-px bg-[#EEF1F5] my-5" />
+            <div className="h-px bg-hairline my-5" />
 
             <div className="flex items-center gap-2 mb-3.5">
               <AiTag />
@@ -153,15 +153,15 @@ export function RiscoPage() {
             </div>
             {selected.hasAlerta && (
               <div className="flex gap-2 p-3 rounded-lg bg-amberBg mb-3.5">
-                <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-[#F0D9A8] text-[#8A5A00] h-fit">Preditivo</span>
-                <div className="text-[12.5px] text-[#5B4200] leading-snug">{selected.alerta}</div>
+                <span className="text-[10.5px] font-extrabold px-2 py-1 rounded-md bg-amberMid text-amber h-fit">Preditivo</span>
+                <div className="text-[12.5px] text-amber leading-snug">{selected.alerta}</div>
               </div>
             )}
             <div className="flex flex-col gap-2.5">
               {selected.aiSignals.map((s, i) => (
                 <div key={i} className="flex items-start gap-2 text-[12.5px]">
                   <span className="rounded-full mt-1.5 flex-shrink-0" style={{ width: 6, height: 6, background: s.color }} />
-                  <span className="text-[#3D4658]">{s.text}</span>
+                  <span className="text-slate">{s.text}</span>
                 </div>
               ))}
             </div>

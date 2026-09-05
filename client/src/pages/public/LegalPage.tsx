@@ -44,7 +44,7 @@ export function LegalPage() {
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Legal</div>
             <div className="text-[34px] font-extrabold tracking-tight mb-2">Termos de uso</div>
             <div className="text-textTertiary text-[13px] mb-7">Última atualização: 1 de julho de 2026</div>
-            <div className="flex flex-col gap-5 text-[15px] text-[#3D4658] leading-relaxed">
+            <div className="flex flex-col gap-5 text-[15px] text-slate leading-relaxed">
               {TERMOS.map((t) => (
                 <div key={t.title}>
                   <b>{t.title}</b> {t.text}
@@ -56,7 +56,7 @@ export function LegalPage() {
           <div id="privacidade" className="mb-16 scroll-mt-6">
             <div className="text-[34px] font-extrabold tracking-tight mb-2">Política de privacidade</div>
             <div className="text-textTertiary text-[13px] mb-7">Última atualização: 1 de julho de 2026</div>
-            <div className="flex flex-col gap-5 text-[15px] text-[#3D4658] leading-relaxed">
+            <div className="flex flex-col gap-5 text-[15px] text-slate leading-relaxed">
               {PRIVACIDADE.map((t) => (
                 <div key={t.title}>
                   <b>{t.title}</b> {t.text}
@@ -67,7 +67,7 @@ export function LegalPage() {
 
           <div id="status" className="mb-16 scroll-mt-6">
             <div className="text-[34px] font-extrabold tracking-tight mb-2">Status da plataforma</div>
-            <div className="text-[15px] text-[#3D4658] leading-relaxed">
+            <div className="text-[15px] text-slate leading-relaxed">
               Acompanhamos a disponibilidade da plataforma com verificações reais registradas a cada minuto —{' '}
               <Link to="/status" className="text-blue font-bold">
                 veja o status atual e o histórico de disponibilidade →

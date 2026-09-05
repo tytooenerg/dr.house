@@ -50,7 +50,7 @@ export function TedPendentesPanel() {
         <div className="text-[12px] text-textMuted mt-0.5">Sem webhook automático (ver lib/tedRail.ts) — confira o extrato bancário real antes de confirmar</div>
       </div>
       {tedPendentes.map((t) => (
-        <div key={t.referencia} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+        <div key={t.referencia} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
           <div>
             <b>{t.empresa}</b> — {t.valorFmt}
             <span className="text-textMuted">

@@ -1,3 +1,4 @@
+import { PALETTE } from '../../lib/palette';
 export function Segmented<T extends string>({ options, value, onChange, dark = false }: { options: T[]; value: T; onChange: (v: T) => void; dark?: boolean }) {
   return (
     <div className="flex gap-1.5">
@@ -12,8 +13,8 @@ export function Segmented<T extends string>({ options, value, onChange, dark = f
               dark ? 'border-white/20' : 'border-inputBorder'
             }`}
             style={{
-              background: active ? '#1E5EFF' : dark ? 'transparent' : '#fff',
-              color: active ? '#fff' : dark ? '#fff' : '#0B1F3A',
+              background: active ? PALETTE.blue : dark ? 'transparent' : '#fff',
+              color: active ? '#fff' : dark ? '#fff' : PALETTE.navy,
             }}
           >
             {opt}

@@ -8,6 +8,7 @@ import { DEFAULT_TAB_BY_ROLE, NAV_ITEMS } from '../../data/navConfig';
 import type { Role } from '../../state/SessionContext';
 import { KybModal } from './KybModal';
 import { api } from '../../lib/api';
+import { PALETTE } from '../../lib/palette';
 
 const GOOGLE_ERROR_LABELS: Record<string, string> = {
   nao_configurado: 'Login com Google não está configurado neste ambiente.',
@@ -44,7 +45,7 @@ export function RoleShape({ shape }: { shape: 'circle' | 'square' | 'diamond' | 
     return <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '11px solid #1E5EFF' }} />;
   }
   if (shape === 'hex') {
-    return <div style={{ width: 13, height: 13, background: '#1E5EFF', clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' }} />;
+    return <div style={{ width: 13, height: 13, background: PALETTE.blue, clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' }} />;
   }
   const style: React.CSSProperties = { width: 12, height: 12, border: '2px solid #1E5EFF' };
   if (shape === 'circle') style.borderRadius = '50%';
@@ -245,7 +246,7 @@ export function LoginPage() {
             type="button"
             onClick={() => setMode('login')}
             className="px-4 py-2 rounded-md text-[13px] font-bold cursor-pointer"
-            style={{ background: mode === 'login' ? '#fff' : 'transparent', color: mode === 'login' ? '#0B1F3A' : '#5B6472' }}
+            style={{ background: mode === 'login' ? '#fff' : 'transparent', color: mode === 'login' ? PALETTE.navy : PALETTE.textSecondary }}
           >
             Entrar
           </button>
@@ -253,7 +254,7 @@ export function LoginPage() {
             type="button"
             onClick={() => setMode('register')}
             className="px-4 py-2 rounded-md text-[13px] font-bold cursor-pointer"
-            style={{ background: mode === 'register' ? '#fff' : 'transparent', color: mode === 'register' ? '#0B1F3A' : '#5B6472' }}
+            style={{ background: mode === 'register' ? '#fff' : 'transparent', color: mode === 'register' ? PALETTE.navy : PALETTE.textSecondary }}
           >
             Criar conta
           </button>
@@ -270,6 +271,9 @@ export function LoginPage() {
                 onClick={continueWithGoogle}
                 className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-inputBorder bg-white text-[13.5px] font-bold cursor-pointer mb-3 hover:bg-bg"
               >
+                {/* Logo do Google: as 4 cores abaixo são da marca do Google, não da nossa
+                    paleta (client/src/lib/palette.ts) — trocá-las por tokens nossos
+                    descaracterizaria a marca de terceiro. Única exceção de hex no client. */}
                 <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
                   <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-4z" />
                   <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
@@ -286,8 +290,8 @@ export function LoginPage() {
                 className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-inputBorder bg-white text-[13.5px] font-bold cursor-pointer mb-4 hover:bg-bg"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <rect x="3" y="10" width="18" height="10" rx="1.5" stroke="#1E5EFF" strokeWidth="2" />
-                  <path d="M7 10V7a5 5 0 0 1 10 0v3" stroke="#1E5EFF" strokeWidth="2" strokeLinecap="round" />
+                  <rect x="3" y="10" width="18" height="10" rx="1.5" stroke={PALETTE.blue} strokeWidth="2" />
+                  <path d="M7 10V7a5 5 0 0 1 10 0v3" stroke={PALETTE.blue} strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 Entrar com SSO corporativo
               </button>
@@ -338,7 +342,7 @@ export function LoginPage() {
                       if (r.key !== 'seguradora') setInsurerKey(null);
                     }}
                     className="flex items-center gap-3 px-4 py-3.5 rounded-[10px] cursor-pointer text-left transition-colors"
-                    style={{ border: `2px solid ${selected ? '#1E5EFF' : '#E4E8EE'}`, background: selected ? '#EEF3FF' : '#fff' }}
+                    style={{ border: `2px solid ${selected ? PALETTE.blue : PALETTE.border}`, background: selected ? PALETTE.chip : '#fff' }}
                   >
                     <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center flex-shrink-0">
                       <RoleShape shape={r.shape} />
@@ -362,7 +366,7 @@ export function LoginPage() {
                       type="button"
                       onClick={() => setInsurerKey(ins.key)}
                       className="px-3.5 py-2.5 rounded-lg border text-[13.5px] font-semibold text-left cursor-pointer"
-                      style={{ borderColor: insurerKey === ins.key ? '#1E5EFF' : '#E4E8EE', background: insurerKey === ins.key ? '#EEF3FF' : '#fff' }}
+                      style={{ borderColor: insurerKey === ins.key ? PALETTE.blue : PALETTE.border, background: insurerKey === ins.key ? PALETTE.chip : '#fff' }}
                     >
                       {ins.name}
                     </button>

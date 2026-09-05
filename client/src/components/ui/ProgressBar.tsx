@@ -1,4 +1,5 @@
-export function ProgressBar({ pct, color, height = 6, bg = '#F0F2F5' }: { pct: number; color: string; height?: number; bg?: string }) {
+import { PALETTE } from '../../lib/palette';
+export function ProgressBar({ pct, color, height = 6, bg = PALETTE.hairline }: { pct: number; color: string; height?: number; bg?: string }) {
   return (
     <div className="rounded-full overflow-hidden" style={{ height, background: bg }}>
       <div className="h-full rounded-full transition-all duration-300" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />

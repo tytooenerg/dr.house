@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface Aceite {
   id: number;
@@ -64,7 +65,7 @@ export function AceitePage() {
 
       {!loadError && (
       <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
+        <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
           <div>Duplicata</div>
           <div>Sacado</div>
           <div>Valor</div>
@@ -83,7 +84,7 @@ export function AceitePage() {
                   {a.statusLabel}
                 </span>
                 {a.slaDiasRestantes !== null && (
-                  <span className="text-[11px] font-semibold" style={{ color: a.slaVencido ? '#B3261E' : '#8A5A00' }}>
+                  <span className="text-[11px] font-semibold" style={{ color: a.slaVencido ? PALETTE.red : PALETTE.amber }}>
                     {a.slaVencido ? 'Prazo legal vencido' : `${a.slaDiasRestantes}d restantes`}
                   </span>
                 )}
@@ -91,7 +92,7 @@ export function AceitePage() {
             </div>
             {a.disputeProposal && (
               <div className="mx-5 mb-4 rounded-[10px] px-4 py-3.5 bg-amberBg">
-                <div className="text-[12.5px] font-bold mb-1" style={{ color: '#8A5A00' }}>
+                <div className="text-[12.5px] font-bold mb-1" style={{ color: PALETTE.amber }}>
                   O cedente propôs uma resolução {a.disputeProposal.quando ? `— ${a.disputeProposal.quando}` : ''}
                 </div>
                 <div className="text-sm leading-snug mb-3">{a.disputeProposal.note}</div>
@@ -112,7 +113,7 @@ export function AceitePage() {
                     onClick={() => responder(a.disputeProposal!.disputeId, 'recusar')}
                     disabled={respondingId === a.disputeProposal.disputeId}
                     className="px-3.5 py-2 rounded-lg bg-white text-red text-[13px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default"
-                    style={{ border: '1px solid #E9CFCB' }}
+                    style={{ border: `1px solid ${PALETTE.redBorder}` }}
                   >
                     Recusar — pedir arbitragem
                   </button>

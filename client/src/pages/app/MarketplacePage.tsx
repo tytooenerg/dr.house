@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { AiTag, Badge } from '../../components/ui/Badge';
 import { useLang } from '../../lib/i18n';
+import { PALETTE, SECTOR_COLORS } from '../../lib/palette';
 
 interface Insurer {
   key: string;
@@ -66,14 +67,7 @@ const SETOR_OPTIONS: { value: string; label: string }[] = [
 ];
 // One color per class so the badge is scannable at a glance across a long list of offers —
 // distinct from the score/rating colors (green/amber/red), which mean risk, not business type.
-const SETOR_STYLE: Record<string, { bg: string; color: string }> = {
-  varejo: { bg: '#E8EEFB', color: '#2952A3' },
-  atacado: { bg: '#F0EAFB', color: '#6B3FA0' },
-  comercio: { bg: '#FCEAF5', color: '#A33578' },
-  industria: { bg: '#FBF1E0', color: '#8A5A00' },
-  construcao: { bg: '#F7E9E7', color: '#B3261E' },
-  servicos: { bg: '#EAF3EE', color: '#0A5C36' },
-};
+const SETOR_STYLE = SECTOR_COLORS;
 const RATING_OPTIONS = ['AA', 'A', 'B', 'C'];
 
 interface Offer {
@@ -249,7 +243,7 @@ export function MarketplacePage() {
         subtitle={t('marketplace.subtitle', 'Ofertas disponíveis para antecipação — compradores e cedentes')}
         right={
           <span className="flex items-center gap-1.5 text-xs font-semibold text-textTertiary">
-            <span className="rounded-full" style={{ width: 7, height: 7, background: connected ? '#0A5C36' : '#B8C2D4' }} />
+            <span className="rounded-full" style={{ width: 7, height: 7, background: connected ? PALETTE.green : PALETTE.onNavyDim }} />
             {connected ? t('marketplace.liveUpdates', 'Atualizações ao vivo') : t('marketplace.connecting', 'Conectando…')}
           </span>
         }
@@ -301,7 +295,7 @@ export function MarketplacePage() {
 
       <div className="bg-white border border-border rounded-card overflow-hidden">
         <div
-          className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
+          className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
           style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}
         >
           <div>{t('marketplace.colSacado', 'Sacado')}</div>
@@ -321,7 +315,7 @@ export function MarketplacePage() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-semibold">{offer.sacado}</span>
                     {offer.setor && offer.setorLabel && (
-                      <Badge label={offer.setorLabel} bg={SETOR_STYLE[offer.setor]?.bg ?? '#F0F2F5'} color={SETOR_STYLE[offer.setor]?.color ?? '#5B6472'} className="text-[10px] px-2 py-0.5" />
+                      <Badge label={offer.setorLabel} bg={SETOR_STYLE[offer.setor]?.bg ?? PALETTE.hairline} color={SETOR_STYLE[offer.setor]?.color ?? PALETTE.textSecondary} className="text-[10px] px-2 py-0.5" />
                     )}
                   </div>
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
@@ -365,7 +359,7 @@ export function MarketplacePage() {
               <div className="flex items-center gap-2.5 px-5 pb-3.5 relative flex-wrap">
                 {offer.insurerInfo ? (
                   <>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-blue bg-[#E9EEFB] text-xs font-bold text-blue">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-blue bg-chip text-xs font-bold text-blue">
                       <span className="rounded-full bg-current" style={{ width: 7, height: 7 }} />
                       Segurada por {offer.insurerInfo.name}
                     </div>
@@ -383,9 +377,9 @@ export function MarketplacePage() {
                   type="button"
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-bold"
                   style={{
-                    border: `1px solid ${offer.insurerInfo ? '#1E5EFF' : '#D6DCE5'}`,
-                    background: offer.insurerInfo ? '#E9EEFB' : 'transparent',
-                    color: offer.insurerInfo ? '#1E5EFF' : '#5B6472',
+                    border: `1px solid ${offer.insurerInfo ? PALETTE.blue : PALETTE.inputBorder}`,
+                    background: offer.insurerInfo ? PALETTE.chip : 'transparent',
+                    color: offer.insurerInfo ? PALETTE.blue : PALETTE.textSecondary,
                   }}
                   onClick={() => setInsurerPickerFor(insurerPickerFor === offer.id ? null : offer.id)}
                 >
@@ -406,7 +400,7 @@ export function MarketplacePage() {
                         key={ins.key}
                         type="button"
                         onClick={() => insure(offer.id, ins.key)}
-                        className="w-full flex items-center justify-between gap-2.5 px-4 py-3 border-none bg-transparent cursor-pointer text-left border-b border-[#F5F7FA] last:border-b-0"
+                        className="w-full flex items-center justify-between gap-2.5 px-4 py-3 border-none bg-transparent cursor-pointer text-left border-b border-bg last:border-b-0"
                       >
                         <div>
                           <div className="font-bold text-[13px] text-navy flex items-center gap-1.5">
@@ -473,7 +467,7 @@ export function MarketplacePage() {
               </div>
 
               {explainFor === offer.id && (
-                <div className="px-5 pb-4 pt-2.5 bg-[#F7F8FA]">
+                <div className="px-5 pb-4 pt-2.5 bg-surface">
                   <div className="flex items-center gap-2 mb-2.5">
                     <AiTag label="Explicabilidade" />
                     <div className="text-[11.5px] font-bold text-textSecondary uppercase tracking-wide">Por que essa oferta tem esse preço</div>
@@ -503,7 +497,7 @@ export function MarketplacePage() {
               )}
 
               {isExpanded && (
-                <div className="px-5 pb-4 pt-2.5 bg-[#F7F8FA]">
+                <div className="px-5 pb-4 pt-2.5 bg-surface">
                   <div className="flex items-center justify-between pt-2.5 mb-2.5">
                     <div className="text-[11.5px] font-bold text-textSecondary uppercase tracking-wide">Leilão ao vivo — {offer.bidCount} financiadores disputando</div>
                     <div className="text-[11.5px] font-bold text-red font-mono-num">encerra em {offer.countdown}</div>

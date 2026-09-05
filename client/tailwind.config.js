@@ -20,6 +20,7 @@ export default {
         textSecondary: '#5B6472',
         textTertiary: '#8B97AC',
         textMuted: '#9AA5B5',
+        slate: '#3D4658',
         green: '#0A5C36',
         greenBg: '#EAF3EE',
         amber: '#B8790A',
@@ -27,6 +28,20 @@ export default {
         red: '#B03A2E',
         redBg: '#F7E9E7',
         chip: '#EEF3FF',
+        // Ver client/src/lib/palette.ts — mesma cor, mesmo nome, pros dois modos de uso
+        // (token do Tailwind em className, PALETTE.x em valor de JS).
+        blueSoft: '#C7D6FF',
+        surface: '#F7F8FA',
+        onNavy: '#9FB3D6',
+        onNavyBright: '#4C8CFF',
+        navyBorder: '#2A3F5F',
+        redBorder: '#E9CFCB',
+        greenBorder: '#CFE6D9',
+        amberMid: '#F1C889',
+        greenOnNavy: '#6FCF97',
+        onNavyDim: '#B8C2D4',
+        onNavyFaint: '#7C8BA6',
+        borderStrong: '#C7D0DE',
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'sans-serif'],

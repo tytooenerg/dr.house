@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { useSession } from '../../state/SessionContext';
 import { ComplianceCalendarCard } from '../../components/ComplianceCalendarCard';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface Aceite {
   id: number;
@@ -99,7 +100,7 @@ export function SacadoPage() {
               {a.isPending && a.slaDiasRestantes !== null && (
                 <span
                   className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
-                  style={a.slaVencido ? { background: '#F7E9E7', color: '#B3261E' } : { background: '#FBF1E0', color: '#8A5A00' }}
+                  style={a.slaVencido ? { background: PALETTE.redBg, color: PALETTE.red } : { background: PALETTE.amberBg, color: PALETTE.amber }}
                 >
                   {a.slaVencido ? 'Prazo legal de aceite vencido' : `Vence em ${a.slaDiasRestantes} dia${a.slaDiasRestantes === 1 ? '' : 's'} (prazo legal)`}
                 </span>
@@ -115,7 +116,7 @@ export function SacadoPage() {
                     type="button"
                     onClick={() => setStatus(a.id, 'contestada')}
                     className="px-3.5 py-2 rounded-lg bg-white text-red text-[12.5px] font-bold cursor-pointer hover:opacity-85"
-                    style={{ border: '1px solid #E9CFCB' }}
+                    style={{ border: `1px solid ${PALETTE.redBorder}` }}
                   >
                     Contestar esta duplicata
                   </button>

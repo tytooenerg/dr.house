@@ -5,6 +5,7 @@ import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface Connector {
   key: string;
@@ -88,7 +89,7 @@ export function ErpPage() {
 
   const [brandForm, setBrandForm] = useState(false);
   const [brandNome, setBrandNome] = useState('');
-  const [brandCor, setBrandCor] = useState('#1E5EFF');
+  const [brandCor, setBrandCor] = useState<string>(PALETTE.blue);
   const [brandLogo, setBrandLogo] = useState('');
   const [brandError, setBrandError] = useState('');
   const [savingBrand, setSavingBrand] = useState(false);
@@ -324,7 +325,7 @@ export function ErpPage() {
 
             {c.key === 'omie' && c.connected ? (
               <div className="flex flex-col gap-2">
-                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: '#EAF3EE', color: '#0A5C36' }}>
+                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: PALETTE.greenBg, color: PALETTE.green }}>
                   Conectado ✓
                 </button>
                 <button type="button" onClick={() => buscarContas('omie', 'Omie')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
@@ -353,7 +354,7 @@ export function ErpPage() {
               </div>
             ) : c.key === 'sap' && c.connected ? (
               <div className="flex flex-col gap-2">
-                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: '#EAF3EE', color: '#0A5C36' }}>
+                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: PALETTE.greenBg, color: PALETTE.green }}>
                   Conectado ✓
                 </button>
                 <button type="button" onClick={() => buscarContas('sap', 'SAP Business One')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
@@ -384,7 +385,7 @@ export function ErpPage() {
               </div>
             ) : c.key === 'totvs' && c.connected ? (
               <div className="flex flex-col gap-2">
-                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: '#EAF3EE', color: '#0A5C36' }}>
+                <button type="button" disabled className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold" style={{ background: PALETTE.greenBg, color: PALETTE.green }}>
                   Conectado ✓
                 </button>
                 <button type="button" onClick={() => buscarContas('totvs', 'TOTVS')} disabled={busy} className="w-full py-2 rounded-lg border border-border bg-white text-[12px] font-bold cursor-pointer">
@@ -417,7 +418,7 @@ export function ErpPage() {
                 type="button"
                 onClick={() => (c.key === 'omie' ? setOmieForm(true) : c.key === 'sap' ? setSapForm(true) : c.key === 'totvs' ? setTotvsForm(true) : toggleConnector(c.key))}
                 className="w-full py-2.5 rounded-lg border-none text-[13px] font-bold cursor-pointer"
-                style={{ background: c.connected ? '#EAF3EE' : '#1E5EFF', color: c.connected ? '#0A5C36' : '#fff' }}
+                style={{ background: c.connected ? PALETTE.greenBg : PALETTE.blue, color: c.connected ? PALETTE.green : '#fff' }}
               >
                 {c.btnLabel}
               </button>
@@ -436,7 +437,7 @@ export function ErpPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {contas.map((c, i) => (
-                <div key={c.id ?? c.codigoLancamento ?? i} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-[#F7F8FA] text-[12.5px]">
+                <div key={c.id ?? c.codigoLancamento ?? i} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-surface text-[12.5px]">
                   <div>{c.cliente} — doc. {c.numeroDocumento}</div>
                   <div className="font-mono-num font-semibold">
                     R$ {c.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · vence {c.vencimento}
@@ -459,7 +460,7 @@ export function ErpPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {contasPagar.map((c, i) => (
-                <div key={c.id ?? c.codigoLancamento ?? i} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-[#F7F8FA] text-[12.5px]">
+                <div key={c.id ?? c.codigoLancamento ?? i} className="flex items-center justify-between gap-3 p-2.5 rounded-md bg-surface text-[12.5px]">
                   <div>{c.fornecedor} — doc. {c.numeroDocumento}</div>
                   <div className="font-mono-num font-semibold">
                     R$ {c.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · vence {c.vencimento}
@@ -517,14 +518,14 @@ export function ErpPage() {
         <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
           <div>
             <div className="font-bold text-[15px] mb-1.5">Programa white-label para sacados grandes</div>
-            <div className="text-[#9FB3D6] text-[13.5px] leading-relaxed max-w-[600px]">
+            <div className="text-onNavy text-[13.5px] leading-relaxed max-w-[600px]">
               Ofereça antecipação de recebíveis aos seus próprios fornecedores com sua marca, cores e logo — a Lastro cuida da infraestrutura por trás.
               Disponível no plano Empresarial.
             </div>
           </div>
         </div>
         {data.whitelabelBrand && !brandForm ? (
-          <div className="flex items-center justify-between gap-3 flex-wrap bg-[#0B1F3A] border border-[#2A3F5F] rounded-lg p-3.5">
+          <div className="flex items-center justify-between gap-3 flex-wrap bg-navy border border-navyBorder rounded-lg p-3.5">
             <div className="flex items-center gap-2.5">
               <span className="rounded-md" style={{ width: 20, height: 20, background: data.whitelabelBrand.corPrimaria }} />
               <span className="font-bold text-[13.5px]">{data.whitelabelBrand.nome}</span>
@@ -541,11 +542,11 @@ export function ErpPage() {
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <input value={brandNome} onChange={(e) => setBrandNome(e.target.value)} placeholder="Nome da marca" className="flex-1 min-w-[160px] border border-[#2A3F5F] bg-[#0B1F3A] rounded-md px-2.5 py-2 text-[12.5px] text-white" />
-              <input value={brandCor} onChange={(e) => setBrandCor(e.target.value)} placeholder="#1E5EFF" className="w-28 border border-[#2A3F5F] bg-[#0B1F3A] rounded-md px-2.5 py-2 text-[12.5px] text-white" />
-              <input value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} placeholder="URL do logo" className="flex-1 min-w-[160px] border border-[#2A3F5F] bg-[#0B1F3A] rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input value={brandNome} onChange={(e) => setBrandNome(e.target.value)} placeholder="Nome da marca" className="flex-1 min-w-[160px] border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input value={brandCor} onChange={(e) => setBrandCor(e.target.value)} placeholder={PALETTE.blue} className="w-28 border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
+              <input value={brandLogo} onChange={(e) => setBrandLogo(e.target.value)} placeholder="URL do logo" className="flex-1 min-w-[160px] border border-navyBorder bg-navy rounded-md px-2.5 py-2 text-[12.5px] text-white" />
             </div>
-            {brandError && <div className="text-[11.5px]" style={{ color: '#FF9E9E' }}>{brandError}</div>}
+            {brandError && <div className="text-[11.5px]" style={{ color: PALETTE.redOnNavy }}>{brandError}</div>}
             <div className="flex items-center gap-2">
               <Button size="sm" disabled={savingBrand || !brandNome || !brandLogo} onClick={saveBrand}>
                 {savingBrand ? 'Salvando…' : 'Salvar marca'}
@@ -560,17 +561,17 @@ export function ErpPage() {
         )}
 
         {data.whitelabelBrand && (
-          <div className="mt-3.5 pt-3.5 border-t border-[#2A3F5F] flex items-center justify-between gap-3 flex-wrap">
+          <div className="mt-3.5 pt-3.5 border-t border-navyBorder flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className="font-bold text-[13.5px]">White-label Plus</div>
-              <div className="text-[#9FB3D6] text-[12px] mt-0.5 max-w-[520px]">
+              <div className="text-onNavy text-[12px] mt-0.5 max-w-[520px]">
                 Estende sua marca à própria tela de aceite do sacado (hoje só o WhatsApp de lembrete é personalizado) — {data.whitelabelPlusPriceFmt}/mês.
               </div>
             </div>
             <Toggle on={data.whitelabelPlusEnabled} onClick={() => toggleWhitelabelPlus(!data.whitelabelPlusEnabled)} />
           </div>
         )}
-        {whitelabelPlusError && <div className="text-[11.5px] mt-2" style={{ color: '#FF9E9E' }}>{whitelabelPlusError}</div>}
+        {whitelabelPlusError && <div className="text-[11.5px] mt-2" style={{ color: PALETTE.redOnNavy }}>{whitelabelPlusError}</div>}
       </NavyCard>
 
       <Card>

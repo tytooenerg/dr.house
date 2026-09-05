@@ -5,6 +5,7 @@ import { Field, Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
+import { PALETTE } from '../../lib/palette';
 
 interface FundoOverview {
   balanceFmt: string;
@@ -317,7 +318,7 @@ export function ConfirmingPage() {
               <div className="font-bold text-[15px]">Meu programa — rating {programa.rating}</div>
               <span
                 className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
-                style={programa.status === 'ativo' ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#F0F2F5', color: '#5B6472' }}
+                style={programa.status === 'ativo' ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.hairline, color: PALETTE.textSecondary }}
               >
                 {programa.status === 'ativo' ? 'Ativo' : 'Pausado'}
               </span>

@@ -52,8 +52,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   className="flex items-center justify-between px-3 pb-1.5 border-none bg-transparent cursor-pointer w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
                   onClick={() => setCollapsed((c) => ({ ...c, [section.group]: !c[section.group] }))}
                 >
-                  <span className="text-[10.5px] font-bold text-[#7C8BA6] uppercase tracking-wider">{t(`group.${section.group}`, section.label)}</span>
-                  <ChevronDown size={12} className="text-[#7C8BA6] transition-transform" style={{ transform: isOpen ? 'none' : 'rotate(-90deg)' }} aria-hidden="true" />
+                  <span className="text-[10.5px] font-bold text-onNavyFaint uppercase tracking-wider">{t(`group.${section.group}`, section.label)}</span>
+                  <ChevronDown size={12} className="text-onNavyFaint transition-transform" style={{ transform: isOpen ? 'none' : 'rotate(-90deg)' }} aria-hidden="true" />
                 </button>
               )}
               {isOpen && (
@@ -65,7 +65,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                         onClick={onNavigate}
                         className={({ isActive }) =>
                           `flex items-center gap-3 px-3 py-[7px] rounded-lg text-[13px] font-semibold no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
-                            isActive ? 'bg-blue text-white' : 'text-[#B8C2D4] hover:bg-white/[0.06] hover:text-white'
+                            isActive ? 'bg-blue text-white' : 'text-onNavyDim hover:bg-white/[0.06] hover:text-white'
                           }`
                         }
                       >
@@ -83,8 +83,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Selo de conformidade: antes era um card grande logo abaixo da logo, empurrando o menu
           pra baixo em todo papel. Continua visível, mas como rodapé discreto. */}
-      <div className="mt-6 px-3 text-[10.5px] leading-snug text-[#7C8BA6]">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#4C8CFF] mr-1.5 align-middle" aria-hidden="true" />
+      <div className="mt-6 px-3 text-[10.5px] leading-snug text-onNavyFaint">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-onNavyBright mr-1.5 align-middle" aria-hidden="true" />
         Conforme Duplicata Escritural · Res. BCB nº 339/2023
       </div>
 
@@ -92,15 +92,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="w-[34px] h-[34px] rounded-full bg-blue text-white flex items-center justify-center font-bold text-[13px] flex-shrink-0">{initials}</div>
         <div className="flex-1 min-w-0">
           <div className="text-white text-[13px] font-semibold truncate">{user.nome}</div>
-          <div className="text-[#8B97AC] text-[11.5px] truncate">
+          <div className="text-textTertiary text-[11.5px] truncate">
             {user.sessionLabel}
             {user.isTeamMember ? ' · somente leitura' : ''}
           </div>
         </div>
-        <LanguageToggle className="text-[#8B97AC]" />
+        <LanguageToggle className="text-textTertiary" />
         <button
           type="button"
-          className="bg-transparent border-none text-[#8B97AC] text-[11.5px] font-bold cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
           onClick={handleLogout}
         >
           {t('app.sair', 'Sair')}

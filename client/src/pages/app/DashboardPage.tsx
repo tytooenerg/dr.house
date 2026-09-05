@@ -5,6 +5,7 @@ import { Card, PageHeader } from '../../components/ui/Card';
 import { Donut } from '../../components/ui/Gauge';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
+import { PALETTE } from '../../lib/palette';
 
 interface Kpi {
   label: string;
@@ -68,9 +69,9 @@ export function DashboardPage() {
           const destaque = i === 0;
           return (
             <div key={kpi.label} className={`rounded-card border border-border p-5 ${destaque ? 'bg-navy' : 'bg-white'}`}>
-              <div className={`text-[13px] font-semibold ${destaque ? 'text-[#9FB3D6]' : 'text-textSecondary'}`}>{kpi.label}</div>
+              <div className={`text-[13px] font-semibold ${destaque ? 'text-onNavy' : 'text-textSecondary'}`}>{kpi.label}</div>
               <div className={`font-extrabold mt-2.5 tracking-tight ${destaque ? 'text-[30px] text-white' : 'text-[26px] text-navy'}`}>{kpi.value}</div>
-              <div className="text-[12.5px] mt-2 font-semibold" style={{ color: destaque && kpi.trendColor === '#5B6472' ? '#9FB3D6' : kpi.trendColor }}>
+              <div className="text-[12.5px] mt-2 font-semibold" style={{ color: destaque && kpi.trendColor === PALETTE.textSecondary ? PALETTE.onNavy : kpi.trendColor }}>
                 {kpi.trend}
               </div>
             </div>

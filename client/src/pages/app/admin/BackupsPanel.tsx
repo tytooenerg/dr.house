@@ -62,7 +62,7 @@ export function BackupsPanel() {
       )}
       {backupsEnabled &&
         backups.map((b) => (
-          <div key={b.filename} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+          <div key={b.filename} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
             <div className="font-mono-num text-[12px]">{b.filename}</div>
             <div className="flex items-center gap-3 text-textMuted">
               <span>{(b.sizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
