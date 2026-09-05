@@ -36,7 +36,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
 
     // Sidebar group labels
     'group.operacoes': 'Operations',
-    'group.analise': 'Analysis',
+    'group.financeiro': 'Finance',
+    'group.risco': 'Risk & Compliance',
     'group.plataforma': 'Platform',
 
     // Sidebar nav item labels (keyed by NAV_ITEMS[].key)

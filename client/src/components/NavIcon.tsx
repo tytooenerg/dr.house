@@ -1,48 +1,72 @@
-const base = 'flex-shrink-0';
+import {
+  ArrowLeftRight,
+  Bot,
+  Building2,
+  ChartPie,
+  ClipboardCheck,
+  CodeXml,
+  CreditCard,
+  Eye,
+  FileClock,
+  FilePlus,
+  Files,
+  Gauge,
+  Gavel,
+  Handshake,
+  Landmark,
+  LayoutDashboard,
+  Megaphone,
+  Plug,
+  Receipt,
+  Repeat,
+  Settings,
+  ShieldCheck,
+  ShoppingBasket,
+  Sparkles,
+  Store,
+  Umbrella,
+  UserCheck,
+  Wallet,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
 
-export function NavIcon({ tab }: { tab: string }) {
-  switch (tab) {
-    case 'dashboard':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor' }} />;
-    case 'marketplace':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: '50%', background: 'currentColor' }} />;
-    case 'automacao':
-      return <div className={base} style={{ width: 9, height: 9, borderRadius: 2, border: '1.5px solid currentColor', transform: 'rotate(45deg)' }} />;
-    case 'erp':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, border: '1.5px solid currentColor' }} />;
-    case 'emitir':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, border: '1.5px solid currentColor' }} />;
-    case 'minhas':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, border: '1.5px solid currentColor' }} />;
-    case 'aceite':
-      return <div className={base} style={{ width: 9, height: 6, borderBottom: '1.5px solid currentColor', borderLeft: '1.5px solid currentColor', transform: 'rotate(-45deg)', marginTop: -2 }} />;
-    case 'sacado':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, border: '1.5px solid currentColor' }} />;
-    case 'disputa':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, border: '1.5px solid currentColor', transform: 'rotate(45deg)' }} />;
-    case 'risco':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid currentColor' }} />;
-    case 'historico':
-      return <div className={base} style={{ width: 8, height: 2, background: 'currentColor', marginTop: 3 }} />;
-    case 'comparador':
-      return <div className={base} style={{ width: 8, height: 8, border: '1.5px solid currentColor', transform: 'rotate(45deg)' }} />;
-    case 'compliance':
-      return <div className={base} style={{ width: 9, height: 9, borderRadius: '50% 50% 50% 0', border: '1.5px solid currentColor' }} />;
-    case 'dev':
-      return <div className={base} style={{ width: 9, height: 6, borderLeft: '1.5px solid currentColor', borderRight: '1.5px solid currentColor' }} />;
-    case 'conta':
-      return <div className={base} style={{ width: 9, height: 9, borderRadius: '50%', border: '1.5px solid currentColor' }} />;
-    case 'receita':
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor', transform: 'rotate(45deg)' }} />;
-    case 'perfil':
-      return <div className={base} style={{ width: 9, height: 9, borderRadius: '50%', border: '1.5px solid currentColor' }} />;
-    case 'secundario':
-      return <div className={base} style={{ width: 9, height: 9, borderRadius: '50%', border: '1.5px solid currentColor', borderStyle: 'dashed' }} />;
-    case 'cestas':
-      return <div className={base} style={{ width: 9, height: 7, borderRadius: '0 0 3px 3px', border: '1.5px solid currentColor', borderTop: 'none' }} />;
-    case 'seguradora':
-      return <div className={base} style={{ width: 9, height: 9, borderRadius: '50% 50% 50% 0', border: '1.5px solid currentColor', transform: 'rotate(-45deg)' }} />;
-    default:
-      return <div className={base} style={{ width: 8, height: 8, borderRadius: 2, background: 'currentColor' }} />;
-  }
+// Antes: 21 "ícones" feitos de <div> com border/rotate — 8 tabs eram o mesmo quadradinho e o
+// menu virava uma lista de texto indistinguível. Um glifo real por tab (lucide, tree-shaken:
+// só os ~30 usados entram no bundle), sempre 16px e `currentColor` pra herdar ativo/inativo.
+const ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  marketplace: Store,
+  secundario: Repeat,
+  cestas: ShoppingBasket,
+  automacao: Bot,
+  emitir: FilePlus,
+  minhas: Files,
+  aceite: ClipboardCheck,
+  erp: Plug,
+  sacado: Building2,
+  confirming: Handshake,
+  seguradora: Umbrella,
+  conta: Wallet,
+  historico: FileClock,
+  'linha-credito': Landmark,
+  'contas-pagar': Receipt,
+  'ai-cfo': Sparkles,
+  risco: Gauge,
+  suitability: UserCheck,
+  comparador: ArrowLeftRight,
+  compliance: ShieldCheck,
+  disputa: Gavel,
+  dev: CodeXml,
+  publicidade: Megaphone,
+  admin: Wrench,
+  auditor: Eye,
+  receita: ChartPie,
+  assinatura: CreditCard,
+  perfil: Settings,
+};
+
+export function NavIcon({ tab, size = 16 }: { tab: string; size?: number }) {
+  const Icon = ICONS[tab] ?? LayoutDashboard;
+  return <Icon size={size} strokeWidth={1.75} aria-hidden="true" className="flex-shrink-0" />;
 }
