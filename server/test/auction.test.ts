@@ -4,7 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { db } from '../src/db/index.js';
-import { createDuplicata, dispararLeilao, getDuplicata, isPurchased } from '../src/db/duplicatas.js';
+import { createDuplicata, dispararLeilao, getDuplicata, isPurchased, listMarketplace } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { listActiveAuctionBids } from '../src/db/auctionBids.js';
 import { reserveRate } from '../src/lib/auctionCore.js';
@@ -116,21 +116,46 @@ describe('leilão primário — a reserva', () => {
     expect(listActiveAuctionBids(id)).toHaveLength(0);
   });
 
-  it('sem nenhum lance dentro da reserva a duplicata NÃO vende — volta pro cedente reofertar', async () => {
+  it('sem nenhum lance dentro da reserva a duplicata NÃO vende — volta pro cedente em "aprovada"', async () => {
     const id = duplicataEmLeilao();
     expect(fecharLeiloes(id)).toMatchObject({ fechados: 1, vendidos: 0, semLance: 1 });
     expect(isPurchased(id)).toBe(false);
-    expect(getDuplicata(id)!.status).toBe('no_mercado');
-    expect(getDuplicata(id)!.leilao_fechado_em).toBeTruthy();
+    // Volta pro estado de onde saiu: é o único em que dispararLeilao aceita reabrir, e é o
+    // que faz a notificação "pode reofertar" ser verdade. Ficar em 'no_mercado' com o leilão
+    // carimbado deixava a duplicata encalhada exibindo "Leilão encerrado" pra sempre.
+    const d = getDuplicata(id)!;
+    expect(d.status).toBe('aprovada');
+    expect(d.leilao_fechado_em).toBeNull();
+    expect(d.close_at).toBeNull();
+    expect(listMarketplace().some((o) => o.id === id)).toBe(false);
   });
 
-  it('leilão já encerrado não aceita mais lance', async () => {
+  it('depois de encerrar sem lance, o cedente reoferta e o novo leilão aceita lance de verdade', async () => {
     const id = duplicataEmLeilao();
     fecharLeiloes(id);
+
+    // Mesmo caminho que a tela do cedente usa (routes/minhas.ts's POST /:id/leilao).
+    dispararLeilao(id, new Date(Date.now() + 3600_000).toISOString());
     const inv = await investidor();
     const res = await lance(inv.token, id, reserveRate(id)!.taxaAm);
+    expect(res.status).toBe(200);
+
+    fecharLeiloes(id);
+    expect(isPurchased(id)).toBe(true);
+    expect(getDuplicata(id)!.status).toBe('vendida');
+  });
+
+  it('leilão já adjudicado não aceita mais lance', async () => {
+    const id = duplicataEmLeilao();
+    const reserva = reserveRate(id)!;
+    const vencedor = await investidor('Vencedor');
+    await lance(vencedor.token, id, reserva.taxaAm);
+    fecharLeiloes(id);
+
+    const atrasado = await investidor('Atrasado');
+    const res = await lance(atrasado.token, id, reserva.taxaAm);
     expect(res.status).toBe(409);
-    expect(res.body.error).toBe('auction_closed');
+    expect(res.body.error).toBe('already_purchased');
   });
 
   it('leilão cujo prazo já passou não aceita lance nem antes do job rodar', async () => {

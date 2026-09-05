@@ -1348,6 +1348,36 @@ novos em `test/auction.test.ts` cobrindo menor deságio vence, desempate por ord
 recusa acima da reserva, fechamento sem lance, substituição/cancelamento de lance e fechar duas
 vezes sem readjudicar), client 39, sdks/node 9.
 
+### Leilão sem lance devolve a duplicata, e prazo legado deixa de matar o marketplace
+
+Dois defeitos da PR do leilão real, os dois encontrados rodando o projeto do zero num banco
+que já existia:
+
+**1. A duplicata ficava encalhada.** Quando o leilão fechava sem nenhum lance dentro da
+reserva, ela continuava em `no_mercado` com `leilao_fechado_em` carimbado, e o cedente
+recebia "você pode reofertar a duplicata" — só que `canDisparar` (`routes/minhas.ts`) exige
+`status = 'aprovada'` e nada devolvia a duplicata pra lá. Ela ficava no marketplace exibindo
+"Leilão encerrado" para sempre, e a notificação prometia algo que o sistema não permitia
+fazer. Agora o fechamento sem lance devolve a duplicata ao cedente em `'aprovada'`
+(`devolverDeLeilaoSemLance`), que é o estado de onde ela saiu e o único em que
+`dispararLeilao` reabre o leilão. `dispararLeilao` também limpa `leilao_fechado_em`, senão o
+carimbo do leilão anterior recusaria todo lance no leilão novo.
+
+**2. Instalação existente acordava com o marketplace morto.** Antes do leilão de verdade,
+`close_at` era decorativo — alimentava o cronômetro falso e não fechava nada. A migração
+0067 só deu prazo novo a quem tinha `close_at` NULL, mas a instalação típica tinha o campo
+preenchido com um prazo desses, quase sempre já vencido: no primeiro boot da versão nova,
+**toda** oferta virava "leilão encerrado" e nenhum investidor conseguia dar lance em nada.
+Verificado num banco semeado dois dias antes: `canBuy` falso em 100% das ofertas. A migração
+`0068` dá um prazo real de 24h a quem está em mercado com prazo vencido ou ausente, em vez
+de tirar a duplicata do mercado — o cedente pôs aquela duplicata à venda, e o upgrade não é
+hora de desfazer isso; se ninguém lançar nas 24h, aí sim ela volta pro cedente pelo caminho
+normal.
+
+Verificado: server **764** testes (dois novos em `test/auction.test.ts` — o fechamento sem
+lance devolve pra `'aprovada'` e some do marketplace; e o cedente reoferta, recebe lance e a
+duplicata é arrematada de verdade no segundo leilão).
+
 ## Running locally
 
 ```bash
