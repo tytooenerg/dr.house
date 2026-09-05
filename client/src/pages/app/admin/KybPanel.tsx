@@ -3,6 +3,7 @@ import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { PALETTE } from '../../../lib/palette';
 
 interface PendingKyb {
   id: number;
@@ -119,7 +120,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
               {p.naoResidente && (
-                <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md" style={{ background: '#E9EEFB', color: '#1E5EFF' }}>
+                <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md" style={{ background: PALETTE.chip, color: PALETTE.blue }}>
                   Investidor não residente
                 </span>
               )}
@@ -127,7 +128,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
             </div>
           </div>
           {p.pldStatus === 'flagged' && (
-            <div className="rounded-[10px] px-4 py-3 mb-3 text-[12.5px]" style={{ background: '#F7E9E7', color: '#B3261E' }}>
+            <div className="rounded-[10px] px-4 py-3 mb-3 text-[12.5px]" style={{ background: PALETTE.redBg, color: PALETTE.red }}>
               <b>PLD/FT — possível correspondência (lista de demonstração)</b>
               <div className="mt-0.5">{p.pldMatchNote}</div>
             </div>
@@ -165,7 +166,7 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
           )}
 
           {p.aiTriage && (
-            <div className="rounded-[10px] p-4 mb-4" style={{ background: '#EEF3FF' }}>
+            <div className="rounded-[10px] p-4 mb-4" style={{ background: PALETTE.chip }}>
               <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
                 <div className="font-bold text-[13px] flex items-center gap-2">
                   Pré-triagem do Agente de Onboarding (IA)
@@ -213,20 +214,20 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
                           <span
                             className="text-[11px] font-bold px-2.5 py-1 rounded-md"
                             style={
-                              s.classificacao === 'profissional' ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#F0F2F5', color: '#5B6472' }
+                              s.classificacao === 'profissional' ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.hairline, color: PALETTE.textSecondary }
                             }
                           >
                             {s.classificacao === 'profissional' ? 'Investidor profissional' : 'Não classificado'}
                           </span>
                           <span
                             className="text-[11px] font-bold px-2.5 py-1 rounded-md"
-                            style={s.jurisdicaoFavorecida ? { background: '#F7E9E7', color: '#B03A2E' } : { background: '#EAF3EE', color: '#0A5C36' }}
+                            style={s.jurisdicaoFavorecida ? { background: PALETTE.redBg, color: PALETTE.red } : { background: PALETTE.greenBg, color: PALETTE.green }}
                           >
                             {s.jurisdicaoFavorecida ? 'Jurisdição de tributação favorecida' : 'IRRF zero elegível (sujeito a confirmação jurídica)'}
                           </span>
                           <span
                             className="text-[11px] font-bold px-2.5 py-1 rounded-md"
-                            style={s.pldStatus === 'flagged' ? { background: '#F7E9E7', color: '#B03A2E' } : { background: '#EAF3EE', color: '#0A5C36' }}
+                            style={s.pldStatus === 'flagged' ? { background: PALETTE.redBg, color: PALETTE.red } : { background: PALETTE.greenBg, color: PALETTE.green }}
                           >
                             PLD: {s.pldStatus === 'flagged' ? 'correspondência encontrada' : 'sem correspondência'}
                           </span>

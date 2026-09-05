@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { AiTag } from '../components/ui/Badge';
+import { PALETTE } from '../lib/palette';
 
 interface Message {
   from: 'bot' | 'user';
@@ -56,7 +57,7 @@ export function AiChat() {
               <div
                 key={i}
                 className="rounded-[10px] px-3 py-2.5 text-[12.5px] leading-snug"
-                style={m.from === 'bot' ? { background: '#F7F8FA' } : { background: '#EEF3FF', alignSelf: 'flex-end' }}
+                style={m.from === 'bot' ? { background: PALETTE.surface } : { background: PALETTE.chip, alignSelf: 'flex-end' }}
               >
                 {m.text}
               </div>

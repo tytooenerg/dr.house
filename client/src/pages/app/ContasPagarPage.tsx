@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
+import { PALETTE } from '../../lib/palette';
 
 interface PayableView {
   id: number;
@@ -38,9 +39,9 @@ const CATEGORIA_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLE: Record<PayableView['status'], { label: string; bg: string; color: string }> = {
-  pendente: { label: 'Pendente', bg: '#FBF1E0', color: '#9A6B10' },
-  pago: { label: 'Pago', bg: '#EAF3EE', color: '#0A5C36' },
-  cancelado: { label: 'Cancelado', bg: '#F1F2F5', color: '#5B6472' },
+  pendente: { label: 'Pendente', bg: PALETTE.amberBg, color: PALETTE.amber },
+  pago: { label: 'Pago', bg: PALETTE.greenBg, color: PALETTE.green },
+  cancelado: { label: 'Cancelado', bg: PALETTE.hairline, color: PALETTE.textSecondary },
 };
 
 interface LoteRowResult {
@@ -163,7 +164,7 @@ function LoteImportCard({ onImported }: { onImported: () => void }) {
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className="w-full border-2 border-dashed border-[#C7D0DE] rounded-xl p-4 text-center cursor-pointer bg-transparent mb-3"
+        className="w-full border-2 border-dashed border-borderStrong rounded-xl p-4 text-center cursor-pointer bg-transparent mb-3"
       >
         <div className="font-bold text-[13px]">{fileName ? `${fileName} — ${rows.length} linha(s) reconhecida(s)` : 'Selecionar arquivo CSV'}</div>
       </button>
@@ -182,7 +183,7 @@ function LoteImportCard({ onImported }: { onImported: () => void }) {
             {outcome.resultados
               .filter((r) => !r.ok)
               .map((r) => (
-                <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md bg-[#F7E9E7]">
+                <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md bg-redBg">
                   <span className="font-semibold">{r.descricao || `linha ${r.index + 1}`}</span>
                   <span className="text-red">{r.error}</span>
                 </div>
@@ -290,7 +291,7 @@ export function ContasPagarPage() {
           </Card>
           <Card>
             <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Em atraso ({overview.countAtrasado})</div>
-            <div className="font-mono-num font-bold text-lg" style={{ color: overview.countAtrasado > 0 ? '#B3261E' : undefined }}>
+            <div className="font-mono-num font-bold text-lg" style={{ color: overview.countAtrasado > 0 ? PALETTE.red : undefined }}>
               {overview.totalAtrasadoFmt}
             </div>
           </Card>

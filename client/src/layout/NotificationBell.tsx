@@ -62,7 +62,7 @@ export function NotificationBell() {
         <div className="absolute top-[calc(100%+8px)] right-0 w-80 bg-white border border-border rounded-xl shadow-dropdown overflow-hidden">
           <div className="px-4 py-3.5 font-bold text-[13.5px] border-b border-hairline">Notificações</div>
           {notifications.map((n, i) => (
-            <div key={i} className="flex gap-2.5 px-4 py-3 border-b border-[#F7F8FA] last:border-b-0">
+            <div key={i} className="flex gap-2.5 px-4 py-3 border-b border-surface last:border-b-0">
               <Dot color={n.color} className="mt-1.5" />
               <div>
                 <div className="text-[12.5px] leading-snug">{n.text}</div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PublicNav, PublicFooter } from './PublicChrome';
+import { PALETTE } from '../../lib/palette';
 
 // A real, unauthenticated developer documentation page — distinct from DevelopersPage.tsx
 // (marketing landing, sells the API) and from the in-app DevPage.tsx (an authenticated
@@ -63,7 +64,7 @@ const WEBHOOK_EVENTS = [
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="bg-navy text-[#C7D6FF] rounded-lg p-4.5 text-[12.5px] leading-relaxed overflow-x-auto font-mono-num whitespace-pre">
+    <pre className="bg-navy text-blueSoft rounded-lg p-4.5 text-[12.5px] leading-relaxed overflow-x-auto font-mono-num whitespace-pre">
       {children}
     </pre>
   );
@@ -157,7 +158,7 @@ export function DocsPage() {
               type="button"
               onClick={() => setSample(k)}
               className="px-3.5 py-1.5 rounded-md text-[12.5px] font-bold cursor-pointer"
-              style={{ background: sample === k ? '#0B1F3A' : '#F0F2F5', color: sample === k ? '#fff' : '#5B6472' }}
+              style={{ background: sample === k ? PALETTE.navy : PALETTE.hairline, color: sample === k ? '#fff' : PALETTE.textSecondary }}
             >
               {k === 'curl' ? 'cURL' : k === 'node' ? 'Node.js' : 'Python'}
             </button>
@@ -222,7 +223,7 @@ export function DocsPage() {
         </div>
       </div>
 
-      <div className="px-14 py-12 bg-[#F7F8FA] border-t border-b border-hairline">
+      <div className="px-14 py-12 bg-surface border-t border-b border-hairline">
         <div className="max-w-[900px]">
           <div className="font-bold text-xl mb-1">Endpoints</div>
           <div className="text-textSecondary text-[13.5px] mb-6">
@@ -241,7 +242,7 @@ export function DocsPage() {
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <span
                           className="font-mono-num font-extrabold text-[12.5px] px-2 py-0.5 rounded"
-                          style={{ background: method === 'get' ? '#EEF3FF' : '#EAF3EE', color: method === 'get' ? '#1E5EFF' : '#0A5C36' }}
+                          style={{ background: method === 'get' ? PALETTE.chip : PALETTE.greenBg, color: method === 'get' ? PALETTE.blue : PALETTE.green }}
                         >
                           {method.toUpperCase()}
                         </span>
@@ -276,7 +277,7 @@ export function DocsPage() {
                           <div className="flex flex-col gap-1">
                             {Object.entries(op.responses).map(([status, r]) => (
                               <div key={status} className="text-[12.5px] flex gap-2">
-                                <span className="font-mono-num font-bold" style={{ color: status.startsWith('2') ? '#0A5C36' : '#B8790A' }}>
+                                <span className="font-mono-num font-bold" style={{ color: status.startsWith('2') ? PALETTE.green : PALETTE.amber }}>
                                   {status}
                                 </span>
                                 <span className="text-textSecondary">{r.description}</span>

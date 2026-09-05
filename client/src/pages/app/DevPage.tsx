@@ -6,6 +6,7 @@ import { Select } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
+import { PALETTE } from '../../lib/palette';
 
 type ApiKeyProduct =
   | 'platform'
@@ -194,13 +195,13 @@ export function DevPage() {
         <Card>
           <div className="font-bold text-[15px] mb-4">Chave de API</div>
           {newKey && (
-            <div className="mb-3.5 p-3.5 rounded-lg bg-amberBg text-[12.5px] text-[#8A5A00]">
+            <div className="mb-3.5 p-3.5 rounded-lg bg-amberBg text-[12.5px] text-amber">
               Guarde essa chave agora — por segurança, ela não será mostrada de novo.
             </div>
           )}
           <div className="flex flex-col gap-3 mb-4">
             {newKey && (
-              <div className="flex items-center gap-2.5 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px]">
+              <div className="flex items-center gap-2.5 bg-surface border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px]">
                 <div className="flex-1 break-all">{newKey}</div>
                 <button type="button" onClick={copyKey} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none flex-shrink-0">
                   {copied ? 'Copiado!' : 'Copiar'}
@@ -208,21 +209,21 @@ export function DevPage() {
               </div>
             )}
             {data.apiKeys.map((k) => (
-              <div key={k.id} className="flex items-center gap-2.5 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+              <div key={k.id} className="flex items-center gap-2.5 bg-surface border border-border rounded-lg px-3.5 py-2.5">
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-mono-num text-[13px]">{k.prefix}••••••••••••••••</span>
                     <span
                       className="text-[10.5px] font-bold px-1.5 py-0.5 rounded"
-                      style={k.mode === 'test' ? { background: '#FBF1E0', color: '#8A5A00' } : { background: '#EAF3EE', color: '#0A5C36' }}
+                      style={k.mode === 'test' ? { background: PALETTE.amberBg, color: PALETTE.amber } : { background: PALETTE.greenBg, color: PALETTE.green }}
                     >
                       {k.mode === 'test' ? 'Sandbox' : 'Produção'}
                     </span>
-                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">
+                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-hairline text-textSecondary">
                       {k.scope === 'read_only' ? 'Somente leitura' : 'Leitura e escrita'}
                     </span>
                     {k.product !== 'platform' && (
-                      <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: '#EAF0FB', color: '#1B4DB1' }}>
+                      <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: PALETTE.chip, color: PALETTE.blue }}>
                         {NARROW_PRODUCT_LABELS[k.product]}
                       </span>
                     )}
@@ -270,10 +271,10 @@ export function DevPage() {
             </div>
           )}
 
-          <div className="h-px bg-[#EEF1F5] my-5" />
+          <div className="h-px bg-hairline my-5" />
 
           <div className="font-bold text-[15px] mb-3.5">Endpoint de exemplo</div>
-          <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12.5px] leading-loose text-[#C7D6FF] overflow-x-auto whitespace-pre">{`POST /api/v1/duplicatas
+          <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12.5px] leading-loose text-blueSoft overflow-x-auto whitespace-pre">{`POST /api/v1/duplicatas
 Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '••••••••••••••••' : 'lastro_live_••••••••••••••••')}
 
 {
@@ -289,7 +290,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           <div className="font-bold text-[15px] mb-4">Webhooks</div>
           <div className="flex flex-col gap-2 mb-3.5">
             {data.webhooks.map((w) => (
-              <div key={w.id} className="rounded-[10px] bg-[#F7F8FA] overflow-hidden">
+              <div key={w.id} className="rounded-[10px] bg-surface overflow-hidden">
                 <div className="flex items-center justify-between px-3.5 py-3">
                   <div className="min-w-0">
                     <div className="font-semibold text-[13px] font-mono-num">{w.event}</div>
@@ -316,10 +317,10 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
                           className="font-bold px-1.5 py-0.5 rounded"
                           style={
                             d.status === 'success'
-                              ? { background: '#EAF3EE', color: '#0A5C36' }
+                              ? { background: PALETTE.greenBg, color: PALETTE.green }
                               : d.status === 'failed'
-                                ? { background: '#F7E9E7', color: '#B03A2E' }
-                                : { background: '#FBF1E0', color: '#8A5A00' }
+                                ? { background: PALETTE.redBg, color: PALETTE.red }
+                                : { background: PALETTE.amberBg, color: PALETTE.amber }
                           }
                         >
                           {d.status}
@@ -355,7 +356,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           </Button>
           {webhookError && <div className="mt-2 text-[12px] font-semibold text-red">{webhookError}</div>}
           {newWebhookSecret && (
-            <div className="mt-3 p-3 rounded-lg bg-amberBg text-[12px] text-[#8A5A00]">
+            <div className="mt-3 p-3 rounded-lg bg-amberBg text-[12px] text-amber">
               Assinatura para verificar as requisições (guarde agora, não será mostrada de novo):
               <div className="font-mono-num break-all mt-1">{newWebhookSecret}</div>
             </div>
@@ -368,7 +369,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
         <div className="text-textSecondary text-[12.5px] mb-3.5">
           Um simulador de antecipação que você pode embutir no seu site — usa o mesmo modelo de taxa da Lastro, sem precisar de chave de API.
         </div>
-        <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12px] leading-loose text-[#C7D6FF] overflow-x-auto whitespace-pre">{`<iframe
+        <pre className="bg-navy rounded-[10px] p-4.5 font-mono-num text-[12px] leading-loose text-blueSoft overflow-x-auto whitespace-pre">{`<iframe
   src="${window.location.origin}/embed/simulador"
   width="100%" height="420" style="border:0;border-radius:12px"
   title="Simulador de antecipação Lastro">
@@ -419,7 +420,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
                   <span className="font-mono-num text-xs font-extrabold px-2 py-0.5 rounded-md bg-greenBg text-green">{data.playgroundResult.status} OK</span>
                   <span className="font-mono-num text-[11.5px] text-textTertiary">{data.playgroundResult.latency} ms</span>
                 </div>
-                <pre className="font-mono-num text-xs leading-loose text-[#C7D6FF] whitespace-pre-wrap break-all">{data.playgroundResult.body}</pre>
+                <pre className="font-mono-num text-xs leading-loose text-blueSoft whitespace-pre-wrap break-all">{data.playgroundResult.body}</pre>
               </>
             )}
           </div>
@@ -432,28 +433,28 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           A franquia mensal é gratuita — chamadas de chaves de produção da API completa além dela são cobradas automaticamente no fechamento do mês.
         </div>
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+          <div className="bg-surface rounded-lg p-3.5">
             <div className="text-textTertiary text-[11px] font-bold uppercase">Franquia mensal</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.includedCallsPerMonth.toLocaleString('pt-BR')}</div>
           </div>
-          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+          <div className="bg-surface rounded-lg p-3.5">
             <div className="text-textTertiary text-[11px] font-bold uppercase">Chamadas este mês</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.callsThisMonth.toLocaleString('pt-BR')}</div>
           </div>
-          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+          <div className="bg-surface rounded-lg p-3.5">
             <div className="text-textTertiary text-[11px] font-bold uppercase">Excedente</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">
               {data.apiOverage.overageThisMonth.toLocaleString('pt-BR')} <span className="text-textTertiary text-[11px] font-semibold">({data.apiOverage.pricePerCallFmt}/chamada)</span>
             </div>
           </div>
-          <div className="bg-[#F7F8FA] rounded-lg p-3.5">
+          <div className="bg-surface rounded-lg p-3.5">
             <div className="text-textTertiary text-[11px] font-bold uppercase">Estimativa a cobrar</div>
             <div className="font-mono-num text-[15px] font-extrabold mt-1">{data.apiOverage.estimatedChargeFmt}</div>
           </div>
         </div>
         {data.addonCharges.length > 0 && (
           <>
-            <div className="h-px bg-[#EEF1F5] my-4" />
+            <div className="h-px bg-hairline my-4" />
             <div className="font-bold text-[13px] mb-2.5">Cobranças recentes</div>
             <div className="flex flex-col gap-1.5">
               {data.addonCharges.map((c) => (
@@ -474,7 +475,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
           <div key={i} className="grid gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0 items-center text-[13px]" style={{ gridTemplateColumns: '0.7fr 1fr 1.6fr 0.7fr' }}>
             <span
               className="text-[11px] font-bold px-2 py-1 rounded-md w-fit"
-              style={r.status.startsWith('2') ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#F7E9E7', color: '#B03A2E' }}
+              style={r.status.startsWith('2') ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.redBg, color: PALETTE.red }}
             >
               {r.status}
             </span>

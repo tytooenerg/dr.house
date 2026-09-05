@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PublicNav, PublicFooter } from './PublicChrome';
+import { PALETTE } from '../../lib/palette';
 
 interface StatusData {
   current: { status: 'ok' | 'degraded'; latencyMs: number; checkedAt: string } | null;
@@ -34,8 +35,8 @@ export function StatusPage() {
         {data && (
           <>
             <div className="flex items-center gap-2.5 mb-7">
-              <span className="rounded-full" style={{ width: 9, height: 9, background: ok ? '#0A5C36' : '#B03A2E' }} />
-              <span className="text-[14.5px] font-bold" style={{ color: ok ? '#0A5C36' : '#B03A2E' }}>
+              <span className="rounded-full" style={{ width: 9, height: 9, background: ok ? PALETTE.green : PALETTE.red }} />
+              <span className="text-[14.5px] font-bold" style={{ color: ok ? PALETTE.green : PALETTE.red }}>
                 {data.current ? (ok ? 'Operacional' : 'Degradado') : 'Sem dados ainda'}
               </span>
               {data.current && <span className="text-textTertiary text-[13px]">· última verificação {data.current.checkedAt}</span>}
@@ -57,8 +58,8 @@ export function StatusPage() {
               {data.history.length === 0 && <div className="px-5 py-4 text-textTertiary text-[13px]">Nenhuma verificação registrada ainda.</div>}
               {data.history.map((h, i) => (
                 <div key={i} className="flex justify-between items-center px-5 py-3 border-b border-hairline last:border-b-0 text-[13px]">
-                  <div className="flex items-center gap-2 font-semibold" style={{ color: h.status === 'ok' ? '#0A5C36' : '#B03A2E' }}>
-                    <span className="rounded-full" style={{ width: 7, height: 7, background: h.status === 'ok' ? '#0A5C36' : '#B03A2E' }} />
+                  <div className="flex items-center gap-2 font-semibold" style={{ color: h.status === 'ok' ? PALETTE.green : PALETTE.red }}>
+                    <span className="rounded-full" style={{ width: 7, height: 7, background: h.status === 'ok' ? PALETTE.green : PALETTE.red }} />
                     {h.status === 'ok' ? 'Operacional' : 'Degradado'}
                   </div>
                   <div className="text-textSecondary font-mono-num">{h.latencyMs}ms</div>

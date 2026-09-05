@@ -54,10 +54,10 @@ export function ComparadorPage() {
 
       <NavyCard className="p-7 mb-5">
         <div className="font-bold text-[15px] mb-1">Simule a sua operação</div>
-        <div className="text-[#9FB3D6] text-[12.5px] mb-5">Estimativa com base no score do sacado, valor e prazo — via leilão Lastro</div>
+        <div className="text-onNavy text-[12.5px] mb-5">Estimativa com base no score do sacado, valor e prazo — via leilão Lastro</div>
         <div className="grid gap-3.5 mb-5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div>
-            <div className="text-xs font-bold text-[#9FB3D6] mb-1.5">Valor (R$)</div>
+            <div className="text-xs font-bold text-onNavy mb-1.5">Valor (R$)</div>
             <input
               value={input.valor}
               onChange={(e) => setField('valor', e.target.value)}
@@ -66,7 +66,7 @@ export function ComparadorPage() {
             />
           </div>
           <div>
-            <div className="text-xs font-bold text-[#9FB3D6] mb-1.5">Prazo (dias)</div>
+            <div className="text-xs font-bold text-onNavy mb-1.5">Prazo (dias)</div>
             <input
               value={input.prazo}
               onChange={(e) => setField('prazo', e.target.value)}
@@ -75,22 +75,22 @@ export function ComparadorPage() {
             />
           </div>
           <div>
-            <div className="text-xs font-bold text-[#9FB3D6] mb-1.5">Score do sacado</div>
+            <div className="text-xs font-bold text-onNavy mb-1.5">Score do sacado</div>
             <Segmented dark options={['AA', 'A', 'B', 'C']} value={input.score} onChange={(v) => setField('score', v)} />
           </div>
         </div>
         <div className="flex gap-6 pt-4.5 flex-wrap" style={{ borderTop: '1px solid rgba(255,255,255,0.14)' }}>
           <div>
-            <div className="text-[#9FB3D6] text-xs font-semibold">Taxa estimada</div>
+            <div className="text-onNavy text-xs font-semibold">Taxa estimada</div>
             <div className="text-xl font-extrabold font-mono-num mt-1">{estimate?.rangeLabel}</div>
           </div>
           <div>
-            <div className="text-[#9FB3D6] text-xs font-semibold">Deságio estimado</div>
+            <div className="text-onNavy text-xs font-semibold">Deságio estimado</div>
             <div className="text-xl font-extrabold font-mono-num mt-1">{estimate?.desagioFmt}</div>
           </div>
           <div>
-            <div className="text-[#9FB3D6] text-xs font-semibold">Valor líquido a receber</div>
-            <div className="text-xl font-extrabold font-mono-num mt-1 text-[#4C8CFF]">{estimate?.liquidoFmt}</div>
+            <div className="text-onNavy text-xs font-semibold">Valor líquido a receber</div>
+            <div className="text-xl font-extrabold font-mono-num mt-1 text-onNavyBright">{estimate?.liquidoFmt}</div>
           </div>
         </div>
       </NavyCard>

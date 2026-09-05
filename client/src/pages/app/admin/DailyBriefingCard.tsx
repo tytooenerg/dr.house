@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
+import { PALETTE } from '../../../lib/palette';
 
 interface DailyBriefingItem {
   label: string;
@@ -13,9 +14,9 @@ interface DailyBriefing {
 }
 
 const SEVERITY_COLOR: Record<DailyBriefingItem['severity'], string> = {
-  critico: '#B3261E',
-  atencao: '#B8790A',
-  info: '#5B6472',
+  critico: PALETTE.red,
+  atencao: PALETTE.amber,
+  info: PALETTE.textSecondary,
 };
 
 // Maps a briefing item's label to the tab it's about, so clicking it jumps straight there

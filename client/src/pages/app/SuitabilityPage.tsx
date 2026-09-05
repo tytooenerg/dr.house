@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface SuitabilityOption {
   value: string;
@@ -25,7 +26,7 @@ interface SuitabilityView {
   expired: boolean;
 }
 
-const PROFILE_COLOR: Record<string, string> = { conservador: '#0A5C36', moderado: '#8A6D00', arrojado: '#B42318' };
+const PROFILE_COLOR: Record<string, string> = { conservador: PALETTE.green, moderado: PALETTE.amber, arrojado: PALETTE.red };
 
 export function SuitabilityPage() {
   const [questions, setQuestions] = useState<SuitabilityQuestion[]>([]);

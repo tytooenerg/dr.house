@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PublicNav, PublicFooter } from './PublicChrome';
+import { PALETTE } from '../../lib/palette';
 
 interface PublicStats {
   volumeEmitidoFmt: string;
@@ -43,9 +44,9 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
         href={`/api/public/advertisements/${ad.id}/click`}
         target="_blank"
         rel="noopener noreferrer sponsored"
-        className="flex items-center gap-5 border border-border rounded-card p-6 hover:bg-[#F7F8FA] transition-colors"
+        className="flex items-center gap-5 border border-border rounded-card p-6 hover:bg-surface transition-colors"
       >
-        <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-[#F7F8FA] flex-shrink-0" />
+        <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-surface flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="font-bold text-[16px]">{ad.titulo}</div>
           <div className="text-textSecondary text-[13.5px] mt-1">{ad.texto}</div>
@@ -61,7 +62,7 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
               onClick={() => setIndex(i)}
               aria-label={`Ver anúncio ${i + 1}`}
               className="rounded-full border-none cursor-pointer p-0"
-              style={{ width: 7, height: 7, background: i === index ? '#1E5EFF' : '#D6DCE5' }}
+              style={{ width: 7, height: 7, background: i === index ? PALETTE.blue : PALETTE.inputBorder }}
             />
           ))}
         </div>
@@ -143,7 +144,7 @@ export function LandingPage() {
         </div>
 
         <div className="bg-navy rounded-2xl p-7" style={{ boxShadow: '0 24px 60px rgba(11,31,58,0.18)' }}>
-          <div className="text-[#9FB3D6] text-[12px] font-bold uppercase tracking-wide mb-5">Como a Lastro conecta o mercado</div>
+          <div className="text-onNavy text-[12px] font-bold uppercase tracking-wide mb-5">Como a Lastro conecta o mercado</div>
           <div className="flex flex-col gap-2.5">
             {[
               ['Empresa (cedente)', 'Emite e antecipa a duplicata'],
@@ -151,9 +152,9 @@ export function LandingPage() {
               ['Leilão de investidores', 'Precificação por deságio'],
               ['Sacado & seguradora', 'Aceite e proteção de crédito'],
             ].map(([label, desc], i) => (
-              <div key={label} className="rounded-xl p-4" style={{ background: i === 2 ? '#1E5EFF' : 'rgba(255,255,255,0.06)' }}>
+              <div key={label} className="rounded-xl p-4" style={{ background: i === 2 ? PALETTE.blue : 'rgba(255,255,255,0.06)' }}>
                 <div className="font-bold text-[13.5px] text-white">{label}</div>
-                <div className="text-[11.5px] mt-0.5" style={{ color: i === 2 ? 'rgba(255,255,255,0.85)' : '#9FB3D6' }}>
+                <div className="text-[11.5px] mt-0.5" style={{ color: i === 2 ? 'rgba(255,255,255,0.85)' : PALETTE.onNavy }}>
                   {desc}
                 </div>
               </div>
@@ -163,10 +164,10 @@ export function LandingPage() {
       </div>
 
       {/* WHY NOW BAR */}
-      <div className="px-14 py-7 bg-[#F7F8FA] border-t border-b border-hairline">
+      <div className="px-14 py-7 bg-surface border-t border-b border-hairline">
         <div className="max-w-[1360px] mx-auto flex items-center justify-between flex-wrap gap-5">
           <div className="text-[12.5px] font-bold text-textTertiary uppercase tracking-wide">Lei 13.775/2018 tornou a duplicata escritural obrigatória via registradora</div>
-          <div className="flex gap-8 font-mono-num text-[13px] font-semibold text-[#B8C2D4] flex-wrap">
+          <div className="flex gap-8 font-mono-num text-[13px] font-semibold text-onNavyDim flex-wrap">
             {['B3', 'CERC', 'Núclea', 'Grafeno (SPC)'].map((n) => (
               <div key={n}>{n}</div>
             ))}
@@ -184,7 +185,7 @@ export function LandingPage() {
           {PROBLEMAS.map((p) => (
             <div key={p.t} className="border border-border rounded-card p-6.5">
               <div className="w-[38px] h-[38px] rounded-[9px] bg-chip flex items-center justify-center mb-4">
-                <span style={{ width: 14, height: 14, border: '2px solid #1E5EFF', borderRadius: 3 }} />
+                <span style={{ width: 14, height: 14, border: `2px solid ${PALETTE.blue}`, borderRadius: 3 }} />
               </div>
               <div className="font-bold text-base mb-2">{p.t}</div>
               <div className="text-textSecondary text-[13.5px] leading-relaxed">{p.d}</div>
@@ -194,7 +195,7 @@ export function LandingPage() {
       </div>
 
       {/* COMO FUNCIONA */}
-      <div id="como-funciona" className="px-14 py-20 bg-[#F7F8FA] border-t border-b border-hairline scroll-mt-6">
+      <div id="como-funciona" className="px-14 py-20 bg-surface border-t border-b border-hairline scroll-mt-6">
         <div className="max-w-[1360px] mx-auto">
           <div className="max-w-[640px] mb-12">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Como funciona</div>
@@ -227,7 +228,7 @@ export function LandingPage() {
           {PERFIS.map((p) => (
             <div key={p.t} className="bg-white border border-border rounded-card p-6">
               <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center mb-3.5">
-                <span style={{ width: 12, height: 12, border: '2px solid #1E5EFF', borderRadius: 2 }} />
+                <span style={{ width: 12, height: 12, border: `2px solid ${PALETTE.blue}`, borderRadius: 2 }} />
               </div>
               <div className="font-bold text-[15px] mb-2">{p.t}</div>
               <div className="text-textSecondary text-[13px] leading-relaxed">{p.d}</div>
@@ -237,7 +238,7 @@ export function LandingPage() {
       </div>
 
       {/* PRODUTO & TECNOLOGIA */}
-      <div className="px-14 py-20 bg-[#F7F8FA] border-t border-b border-hairline">
+      <div className="px-14 py-20 bg-surface border-t border-b border-hairline">
         <div className="max-w-[1360px] mx-auto">
           <div className="max-w-[640px] mb-12">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Produto</div>
@@ -247,7 +248,7 @@ export function LandingPage() {
             {PILARES.map((p) => (
               <div key={p.t} className="bg-white border border-border rounded-card p-6">
                 <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center mb-3.5">
-                  <span style={{ width: 12, height: 12, background: '#1E5EFF', transform: 'rotate(45deg)' }} />
+                  <span style={{ width: 12, height: 12, background: PALETTE.blue, transform: 'rotate(45deg)' }} />
                 </div>
                 <div className="font-bold text-[15px] mb-2">{p.t}</div>
                 <div className="text-textSecondary text-[13px] leading-relaxed">{p.d}</div>
@@ -267,29 +268,29 @@ export function LandingPage() {
         <div className="max-w-[1360px] mx-auto">
           <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
             <div>
-              <div className="text-[13px] font-bold text-[#4C8CFF] uppercase tracking-wide mb-2">Transparência</div>
+              <div className="text-[13px] font-bold text-onNavyBright uppercase tracking-wide mb-2">Transparência</div>
               <div className="text-[26px] font-extrabold tracking-tight">Números reais, calculados ao vivo — não são meta de marketing.</div>
             </div>
-            <Link to="/transparencia" className="text-[13px] font-bold text-[#4C8CFF] whitespace-nowrap">
+            <Link to="/transparencia" className="text-[13px] font-bold text-onNavyBright whitespace-nowrap">
               Ver todos os números →
             </Link>
           </div>
           <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <div>
               <div className="text-[38px] font-extrabold tracking-tight">{stats?.volumeEmitidoFmt ?? '—'}</div>
-              <div className="text-[#9FB3D6] text-[13.5px] mt-2">em duplicatas registradas na plataforma</div>
+              <div className="text-onNavy text-[13.5px] mt-2">em duplicatas registradas na plataforma</div>
             </div>
             <div>
               <div className="text-[38px] font-extrabold tracking-tight">{stats ? stats.totalDuplicatas : '—'}</div>
-              <div className="text-[#9FB3D6] text-[13.5px] mt-2">duplicatas emitidas</div>
+              <div className="text-onNavy text-[13.5px] mt-2">duplicatas emitidas</div>
             </div>
             <div>
               <div className="text-[38px] font-extrabold tracking-tight">{stats ? stats.totalCedentes : '—'}</div>
-              <div className="text-[#9FB3D6] text-[13.5px] mt-2">empresas cedentes</div>
+              <div className="text-onNavy text-[13.5px] mt-2">empresas cedentes</div>
             </div>
             <div>
               <div className="text-[38px] font-extrabold tracking-tight">{stats ? `${stats.taxaInadimplenciaPct}%` : '—'}</div>
-              <div className="text-[#9FB3D6] text-[13.5px] mt-2">taxa de inadimplência</div>
+              <div className="text-onNavy text-[13.5px] mt-2">taxa de inadimplência</div>
             </div>
           </div>
         </div>
@@ -298,7 +299,7 @@ export function LandingPage() {
       <AdCarousel ads={ads} />
 
       {/* CTA FINAL */}
-      <div className="px-14 py-20 text-center bg-[#F7F8FA]">
+      <div className="px-14 py-20 text-center bg-surface">
         <div className="text-[32px] font-extrabold tracking-tight">Quer saber mais sobre a Lastro?</div>
         <div className="text-textSecondary text-[15px] mt-2.5">Fale com nosso time — parcerias, imprensa ou dúvidas gerais sobre a plataforma.</div>
         <div className="flex gap-3 justify-center mt-6.5">

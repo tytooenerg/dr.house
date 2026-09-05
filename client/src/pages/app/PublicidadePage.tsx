@@ -7,6 +7,7 @@ import { Toggle } from '../../components/ui/Toggle';
 import { Badge } from '../../components/ui/Badge';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
+import { PALETTE } from '../../lib/palette';
 
 interface Advertisement {
   logoUrl: string;
@@ -25,9 +26,9 @@ interface AdvertisementData {
 }
 
 const STATUS_BADGE: Record<Advertisement['status'], { label: string; bg: string; color: string }> = {
-  pendente: { label: 'Em análise', bg: '#FBF1E0', color: '#8A5A00' },
-  aprovado: { label: 'Aprovado', bg: '#EAF3EE', color: '#0A5C36' },
-  rejeitado: { label: 'Rejeitado', bg: '#FBEAE8', color: '#B3261E' },
+  pendente: { label: 'Em análise', bg: PALETTE.amberBg, color: PALETTE.amber },
+  aprovado: { label: 'Aprovado', bg: PALETTE.greenBg, color: PALETTE.green },
+  rejeitado: { label: 'Rejeitado', bg: PALETTE.redBg, color: PALETTE.red },
 };
 
 export function PublicidadePage() {

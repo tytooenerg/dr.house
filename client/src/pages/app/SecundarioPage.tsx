@@ -197,7 +197,7 @@ export function SecundarioPage() {
           <div className="font-bold text-[15px] mb-3.5">Suas posições disponíveis para revenda</div>
           <div className="flex flex-col gap-2.5">
             {data.minhasPosicoes.map((p) => (
-              <div key={p.purchaseId} className="bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-3">
+              <div key={p.purchaseId} className="bg-surface border border-border rounded-lg px-3.5 py-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="font-semibold text-[13.5px]">{p.sacado}</div>
                   <div className="text-textTertiary text-[11.5px]">{p.diasRestantes}d até vencer</div>
@@ -221,7 +221,7 @@ export function SecundarioPage() {
 
           {data.meusAnuncios.length > 0 && (
             <>
-              <div className="h-px bg-[#EEF1F5] my-4" />
+              <div className="h-px bg-hairline my-4" />
               <div className="font-bold text-[13.5px] mb-2.5">Seus anúncios</div>
               <div className="flex flex-col gap-2.5">
                 {data.meusAnuncios.map((a) => (
@@ -244,7 +244,7 @@ export function SecundarioPage() {
                     {a.lances.length > 0 && (
                       <div className="mt-1.5 ml-2 flex flex-col gap-1.5">
                         {a.lances.map((b) => (
-                          <div key={b.id} className="flex items-center justify-between bg-[#F7F8FA] rounded-md px-2.5 py-1.5">
+                          <div key={b.id} className="flex items-center justify-between bg-surface rounded-md px-2.5 py-1.5">
                             <span className="text-textSecondary">
                               Lance de <b>{b.bidderCompanyName}</b>: {b.valorFmt}
                             </span>
@@ -278,7 +278,7 @@ export function SecundarioPage() {
 
           {data.meusLances.length > 0 && (
             <>
-              <div className="h-px bg-[#EEF1F5] my-4" />
+              <div className="h-px bg-hairline my-4" />
               <div className="font-bold text-[13.5px] mb-2.5">Seus lances</div>
               <div className="flex flex-col gap-1.5">
                 {data.meusLances.map((b) => (
@@ -316,7 +316,7 @@ export function SecundarioPage() {
           </div>
           <div className="flex flex-col gap-2.5">
             {sortedMarket.map((l) => (
-              <div key={l.id} className="bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-3">
+              <div key={l.id} className="bg-surface border border-border rounded-lg px-3.5 py-3">
                 <div className="flex items-center justify-between mb-1">
                   <div className="font-semibold text-[13.5px]">{l.sacado}</div>
                   <div className="text-textTertiary text-[11.5px]">{l.diasRestantes}d até vencer</div>
@@ -376,7 +376,7 @@ export function SecundarioPage() {
         </div>
 
         {blockResult && (
-          <div className="mb-3.5 p-3 rounded-lg bg-[#EAF3EE] text-[13px] font-semibold text-green">
+          <div className="mb-3.5 p-3 rounded-lg bg-greenBg text-[13px] font-semibold text-green">
             {blockResult.quantidade} anúncios comprados, total {blockResult.valorTotalFmt} — {blockResult.descontoPct}% de desconto institucional na
             taxa de plataforma.
           </div>
@@ -384,11 +384,11 @@ export function SecundarioPage() {
 
         {data.meusBlockTrades.length > 0 && (
           <>
-            <div className="h-px bg-[#EEF1F5] my-3.5" />
+            <div className="h-px bg-hairline my-3.5" />
             <div className="font-bold text-[13.5px] mb-2.5">Histórico de block trades</div>
             <div className="flex flex-col gap-2">
               {data.meusBlockTrades.map((bt) => (
-                <div key={bt.id} className="bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5 text-[12.5px]">
+                <div key={bt.id} className="bg-surface border border-border rounded-lg px-3.5 py-2.5 text-[12.5px]">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold">
                       {bt.quantidade} duplicatas — {bt.valorTotalFmt}

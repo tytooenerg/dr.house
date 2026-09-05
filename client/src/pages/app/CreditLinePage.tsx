@@ -306,7 +306,7 @@ export function CreditLinePage() {
                     <span className="font-mono-num">{d.valorOriginalFmt}</span>
                     <span className="font-mono-num font-bold">{d.saldoDevedorFmt}</span>
                     <span className="text-textSecondary">{d.taxaAmFmt}</span>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${d.status === 'quitado' ? 'bg-[#EAF3EE] text-green' : 'bg-[#FBF1E0] text-amber'}`}>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${d.status === 'quitado' ? 'bg-greenBg text-green' : 'bg-amberBg text-amber'}`}>
                       {d.status === 'quitado' ? 'Quitado' : 'Em aberto'}
                     </span>
                   </div>

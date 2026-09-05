@@ -8,6 +8,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 import { useSession } from '../../state/SessionContext';
+import { PALETTE } from '../../lib/palette';
 
 interface HorizonPoint {
   days: number;
@@ -82,21 +83,21 @@ function ForecastChart({ points }: { points: HorizonPoint[] }) {
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto">
-      <line x1={padding.left} y1={zeroY} x2={width - padding.right} y2={zeroY} stroke="#D6DCE5" strokeWidth={1} strokeDasharray="4 4" />
-      <path d={linePath} fill="none" stroke="#1E5EFF" strokeWidth={2.5} />
+      <line x1={padding.left} y1={zeroY} x2={width - padding.right} y2={zeroY} stroke={PALETTE.inputBorder} strokeWidth={1} strokeDasharray="4 4" />
+      <path d={linePath} fill="none" stroke={PALETTE.blue} strokeWidth={2.5} />
       {points.map((p, i) => (
         <g key={p.days}>
-          <circle cx={x(i)} cy={y(p.saldoProjetado)} r={4} fill={p.deficit ? '#B3261E' : '#1E5EFF'} />
-          <text x={x(i)} y={height - 8} textAnchor="middle" fontSize="10.5" fill="#5B6472">
+          <circle cx={x(i)} cy={y(p.saldoProjetado)} r={4} fill={p.deficit ? PALETTE.red : PALETTE.blue} />
+          <text x={x(i)} y={height - 8} textAnchor="middle" fontSize="10.5" fill={PALETTE.textSecondary}>
             {p.days}d
           </text>
         </g>
       ))}
-      <text x={4} y={y(max) + 4} fontSize="10" fill="#5B6472">
+      <text x={4} y={y(max) + 4} fontSize="10" fill={PALETTE.textSecondary}>
         {max >= 0 ? '+' : ''}
         {Math.round(max / 1000)}k
       </text>
-      <text x={4} y={y(min) + 4} fontSize="10" fill="#5B6472">
+      <text x={4} y={y(min) + 4} fontSize="10" fill={PALETTE.textSecondary}>
         {Math.round(min / 1000)}k
       </text>
     </svg>
@@ -104,10 +105,10 @@ function ForecastChart({ points }: { points: HorizonPoint[] }) {
 }
 
 const INSIGHT_STYLE: Record<CashflowInsight['tipo'], { background: string; color: string }> = {
-  deficit: { background: '#FBEAE8', color: '#B3261E' },
-  antecipacao_recomendada: { background: '#E9EEFB', color: '#1E5EFF' },
-  concentracao: { background: '#FBF1E0', color: '#8A5A00' },
-  ok: { background: '#EAF3EE', color: '#0A5C36' },
+  deficit: { background: PALETTE.redBg, color: PALETTE.red },
+  antecipacao_recomendada: { background: PALETTE.chip, color: PALETTE.blue },
+  concentracao: { background: PALETTE.amberBg, color: PALETTE.amber },
+  ok: { background: PALETTE.greenBg, color: PALETTE.green },
 };
 
 export function AiCfoPage() {
@@ -182,7 +183,7 @@ export function AiCfoPage() {
           {active.points.map((p) => (
             <div key={p.days} className="text-center">
               <div className="text-[10.5px] font-bold text-textSecondary uppercase">{p.days}d</div>
-              <div className="font-mono-num font-bold text-[12.5px]" style={{ color: p.deficit ? '#B3261E' : '#0A5C36' }}>
+              <div className="font-mono-num font-bold text-[12.5px]" style={{ color: p.deficit ? PALETTE.red : PALETTE.green }}>
                 {p.saldoProjetadoFmt}
               </div>
             </div>
@@ -228,7 +229,7 @@ export function AiCfoPage() {
               <div className="h-px bg-hairline my-1" />
               <div className="flex justify-between text-[13px] font-bold">
                 <span>Resultado</span>
-                <span className="font-mono-num" style={{ color: forecast.dre.resultado >= 0 ? '#0A5C36' : '#B3261E' }}>{forecast.dre.resultadoFmt}</span>
+                <span className="font-mono-num" style={{ color: forecast.dre.resultado >= 0 ? PALETTE.green : PALETTE.red }}>{forecast.dre.resultadoFmt}</span>
               </div>
               <div className="text-[11px] text-textTertiary mt-1">Valor bruto, sem descontar taxa/deságio da Lastro — visão simplificada, não substitui sua contabilidade.</div>
             </div>
@@ -283,7 +284,7 @@ export function AiCfoPage() {
               {forecast.benchmark.comparacao && (
                 <div
                   className="text-[12px] font-bold mt-1"
-                  style={{ color: forecast.benchmark.comparacao === 'melhor' ? '#0A5C36' : forecast.benchmark.comparacao === 'pior' ? '#B3261E' : '#5B6472' }}
+                  style={{ color: forecast.benchmark.comparacao === 'melhor' ? PALETTE.green : forecast.benchmark.comparacao === 'pior' ? PALETTE.red : PALETTE.textSecondary }}
                 >
                   Você está {forecast.benchmark.comparacao === 'melhor' ? 'melhor' : forecast.benchmark.comparacao === 'pior' ? 'pior' : 'igual'} que a média do mercado (Lastro Index)
                 </div>

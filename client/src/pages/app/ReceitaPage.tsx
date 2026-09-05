@@ -4,6 +4,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Donut } from '../../components/ui/Gauge';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface RevenueStream {
   label: string;
@@ -76,7 +77,7 @@ export function ReceitaPage() {
         </div>
         <div className="flex gap-2.5 flex-wrap">
           {data.realFees.faixasFmt.map((f) => (
-            <div key={f.ateFmt} className="flex-1 min-w-[160px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+            <div key={f.ateFmt} className="flex-1 min-w-[160px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
               <div className="text-textTertiary text-[11px] font-bold">{f.ateFmt}</div>
               <div className="text-[16px] font-extrabold mt-0.5">{f.pctFmt}</div>
             </div>
@@ -124,11 +125,11 @@ export function ReceitaPage() {
 
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1.6fr' }}>
         <NavyCard className="flex flex-col items-center py-6.5">
-          <Donut stops={data.streams.map((s) => ({ color: s.color, from: s.gradFrom, to: s.gradTo }))} size={150} innerBg="#0B1F3A">
-            <div className="text-[11px] text-[#9FB3D6]">total</div>
+          <Donut stops={data.streams.map((s) => ({ color: s.color, from: s.gradFrom, to: s.gradTo }))} size={150} innerBg={PALETTE.navy}>
+            <div className="text-[11px] text-onNavy">total</div>
             <div className="text-[15px] font-extrabold">{data.totalFmt}</div>
           </Donut>
-          <div className="text-[12.5px] text-[#9FB3D6] text-center mt-4">12 fontes de receita ativas — mix diversificado entre take rate, spread, API, dados e serviços agregados</div>
+          <div className="text-[12.5px] text-onNavy text-center mt-4">12 fontes de receita ativas — mix diversificado entre take rate, spread, API, dados e serviços agregados</div>
         </NavyCard>
 
         <Card>

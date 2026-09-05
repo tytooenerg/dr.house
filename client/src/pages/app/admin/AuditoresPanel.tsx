@@ -67,7 +67,7 @@ export function AuditoresPanel() {
       </div>
 
       {showForm && (
-        <div className="px-5 py-3.5 border-b border-[#F5F7FA] grid grid-cols-1 md:grid-cols-4 gap-2.5">
+        <div className="px-5 py-3.5 border-b border-bg grid grid-cols-1 md:grid-cols-4 gap-2.5">
           <input placeholder="Nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="border border-border rounded-md px-3 py-2 text-sm" />
           <input placeholder="E-mail" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="border border-border rounded-md px-3 py-2 text-sm" />
           <input
@@ -93,7 +93,7 @@ export function AuditoresPanel() {
       )}
 
       {auditores.map((a) => (
-        <div key={a.id} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+        <div key={a.id} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
           <div>
             <b>{a.nome}</b> — {a.email}
             <span className="text-textMuted"> · {a.companyName}</span>

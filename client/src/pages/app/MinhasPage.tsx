@@ -55,7 +55,7 @@ export function MinhasPage() {
         />
       </div>
 
-      <div className="border-2 border-dashed border-[#C7D0DE] rounded-card p-9 text-center bg-white mb-6">
+      <div className="border-2 border-dashed border-borderStrong rounded-card p-9 text-center bg-white mb-6">
         <div className="w-11 h-11 rounded-[10px] border-2 border-blue mx-auto mb-3.5 flex items-center justify-center relative">
           <div className="w-4 h-0.5 bg-blue absolute" />
           <div className="w-0.5 h-4 bg-blue absolute" />
@@ -68,7 +68,7 @@ export function MinhasPage() {
 
       {!loadError && (
       <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
+        <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
           <div>{t('minhas.colSacado', 'Sacado')}</div>
           <div>{t('minhas.colValor', 'Valor')}</div>
           <div>{t('minhas.colEmissao', 'Emissão')}</div>

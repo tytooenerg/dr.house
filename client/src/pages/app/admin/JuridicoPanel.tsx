@@ -3,6 +3,7 @@ import { api, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { PALETTE } from '../../../lib/palette';
 
 interface LegalDocRef {
   id: number;
@@ -251,7 +252,7 @@ export function JuridicoPanel() {
             type="button"
             onClick={() => setLegalSubTab(key)}
             className="px-3.5 py-1.5 rounded-md text-[12.5px] font-bold cursor-pointer"
-            style={{ background: legalSubTab === key ? '#fff' : 'transparent', color: legalSubTab === key ? '#0B1F3A' : '#5B6472' }}
+            style={{ background: legalSubTab === key ? '#fff' : 'transparent', color: legalSubTab === key ? PALETTE.navy : PALETTE.textSecondary }}
           >
             {label}
           </button>
@@ -260,7 +261,7 @@ export function JuridicoPanel() {
 
       {legalSubTab === 'cobranca' && (
         <div className="flex flex-col gap-4">
-          <div className="rounded-[10px] px-4 py-3 text-[12.5px]" style={{ background: '#FBF1E0', color: '#8A5A0A' }}>
+          <div className="rounded-[10px] px-4 py-3 text-[12.5px]" style={{ background: PALETTE.amberBg, color: PALETTE.amber }}>
             <b>Toda minuta é um rascunho.</b> {legalDisclaimer}
           </div>
 
@@ -300,7 +301,7 @@ export function JuridicoPanel() {
                   </div>
                 </div>
                 {o.eligible ? (
-                  <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md" style={{ background: '#F7E9E7', color: '#B3261E' }}>
+                  <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md" style={{ background: PALETTE.redBg, color: PALETTE.red }}>
                     Elegível para escalar
                   </span>
                 ) : (
@@ -343,7 +344,7 @@ export function JuridicoPanel() {
                         </span>
                         <span
                           className="text-[11px] font-bold px-2 py-0.5 rounded-md ml-2"
-                          style={doc.reviewed ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#FBF1E0', color: '#B8790A' }}
+                          style={doc.reviewed ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.amberBg, color: PALETTE.amber }}
                         >
                           {doc.reviewed ? 'Revisado' : 'Aguardando revisão'}
                         </span>
@@ -391,7 +392,7 @@ export function JuridicoPanel() {
           <div className="bg-white border border-border rounded-card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-border font-bold text-[14px]">Histórico de recuperações</div>
             {recoveries.map((r) => (
-              <div key={r.duplicataId} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+              <div key={r.duplicataId} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
                 <div>
                   <div className="font-mono-num font-bold text-textSecondary">{r.duplicataId}</div>
                   <div className="text-textSecondary text-[12px]">
@@ -413,7 +414,7 @@ export function JuridicoPanel() {
 
       {legalSubTab === 'minutas' && (
         <div className="flex flex-col gap-4">
-          <div className="rounded-[10px] px-4 py-3 text-[12.5px]" style={{ background: '#FBF1E0', color: '#8A5A0A' }}>
+          <div className="rounded-[10px] px-4 py-3 text-[12.5px]" style={{ background: PALETTE.amberBg, color: PALETTE.amber }}>
             Toda minuta é um rascunho gerado por IA — requer revisão de advogado antes de qualquer envio formal.
           </div>
           <form onSubmit={submitMinuta} className="bg-white border border-border rounded-card p-5 flex flex-col gap-2.5">
@@ -447,7 +448,7 @@ export function JuridicoPanel() {
                 </span>
                 <span
                   className="text-[11px] font-bold px-2 py-0.5 rounded-md ml-2"
-                  style={doc.reviewed ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#FBF1E0', color: '#B8790A' }}
+                  style={doc.reviewed ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.amberBg, color: PALETTE.amber }}
                 >
                   {doc.reviewed ? 'Revisado' : 'Aguardando revisão'}
                 </span>
@@ -483,7 +484,7 @@ export function JuridicoPanel() {
               )}
               {doc.signatureStatus === 'enviado' && (
                 <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#FBF1E0] text-amber">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amberBg text-amber">
                     Aguardando assinatura de {doc.signerName} ({doc.signerEmail})
                   </span>
                   <Button size="sm" variant="secondary" disabled={signingId === doc.id} onClick={() => checkMinutaSignature(doc.id)}>
@@ -537,7 +538,7 @@ export function JuridicoPanel() {
                 <div className="font-bold text-[14px]">{n.title}</div>
                 <span
                   className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
-                  style={n.acknowledged ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#FBF1E0', color: '#B8790A' }}
+                  style={n.acknowledged ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.amberBg, color: PALETTE.amber }}
                 >
                   {n.acknowledged ? 'Reconhecido' : 'Pendente'}
                 </span>

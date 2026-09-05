@@ -7,6 +7,7 @@ import { useSession } from '../../state/SessionContext';
 import { DEFAULT_TAB_BY_ROLE, NAV_ITEMS } from '../../data/navConfig';
 import type { Role } from '../../state/SessionContext';
 import { ROLES, INSURER_OPTIONS, RoleShape } from './LoginPage';
+import { PALETTE } from '../../lib/palette';
 
 // Second step of "Entrar com SSO corporativo" for a brand-new email — the identity
 // provider already authenticated the person (see server routes/auth.ts POST
@@ -82,7 +83,7 @@ export function CompleteSamlSignupPage() {
                     if (r.key !== 'seguradora') setInsurerKey(null);
                   }}
                   className="flex items-center gap-3 px-4 py-3.5 rounded-[10px] cursor-pointer text-left transition-colors"
-                  style={{ border: `2px solid ${selected ? '#1E5EFF' : '#E4E8EE'}`, background: selected ? '#EEF3FF' : '#fff' }}
+                  style={{ border: `2px solid ${selected ? PALETTE.blue : PALETTE.border}`, background: selected ? PALETTE.chip : '#fff' }}
                 >
                   <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center flex-shrink-0">
                     <RoleShape shape={r.shape} />
@@ -106,7 +107,7 @@ export function CompleteSamlSignupPage() {
                     type="button"
                     onClick={() => setInsurerKey(ins.key)}
                     className="px-3.5 py-2.5 rounded-lg border text-[13.5px] font-semibold text-left cursor-pointer"
-                    style={{ borderColor: insurerKey === ins.key ? '#1E5EFF' : '#E4E8EE', background: insurerKey === ins.key ? '#EEF3FF' : '#fff' }}
+                    style={{ borderColor: insurerKey === ins.key ? PALETTE.blue : PALETTE.border, background: insurerKey === ins.key ? PALETTE.chip : '#fff' }}
                   >
                     {ins.name}
                   </button>

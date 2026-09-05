@@ -4,6 +4,7 @@ import { Card } from './ui/Card';
 import { Select } from './ui/Input';
 import { Button } from './ui/Button';
 import { ErrorState } from './ui/ErrorState';
+import { PALETTE } from '../lib/palette';
 
 type FaturamentoBracket = 'acima_300m' | 'entre_90m_300m' | 'entre_4_8m_90m' | 'ate_4_8m';
 type Status = 'nao_informado' | 'assistida_disponivel' | 'obrigatorio_pleno';
@@ -26,9 +27,9 @@ const BRACKET_OPTIONS: { value: FaturamentoBracket; label: string }[] = [
 ];
 
 const STATUS_STYLE: Record<Status, { bg: string; color: string }> = {
-  nao_informado: { bg: '#F0F2F5', color: '#5B6472' },
-  assistida_disponivel: { bg: '#FBF1E0', color: '#8A5A00' },
-  obrigatorio_pleno: { bg: '#EAF3EE', color: '#0A5C36' },
+  nao_informado: { bg: PALETTE.hairline, color: PALETTE.textSecondary },
+  assistida_disponivel: { bg: PALETTE.amberBg, color: PALETTE.amber },
+  obrigatorio_pleno: { bg: PALETTE.greenBg, color: PALETTE.green },
 };
 
 // Card compartilhado entre CompliancePage (cedente) e SacadoPage (sacado) — cada um

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
+import { PALETTE } from '../../lib/palette';
 
 interface Apolice {
   id: string;
@@ -84,7 +85,7 @@ export function SeguradoraPage() {
 
       <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <NavyCard>
-          <div className="text-[#8B97AC] text-[13px] font-semibold">Apólices ativas</div>
+          <div className="text-textTertiary text-[13px] font-semibold">Apólices ativas</div>
           <div className="text-2xl font-extrabold mt-2.5">{data.totalApolices}</div>
         </NavyCard>
         <Card>
@@ -100,7 +101,7 @@ export function SeguradoraPage() {
       <div className="font-bold text-[15px] mb-3">Sinistros aguardando decisão</div>
       <div className="flex flex-col gap-4 mb-6">
         {data.sinistros.map((s) => (
-          <div key={s.id} className="bg-white rounded-card p-6" style={{ border: '1px solid #E9CFCB' }}>
+          <div key={s.id} className="bg-white rounded-card p-6" style={{ border: `1px solid ${PALETTE.redBorder}` }}>
             <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
               <div>
                 <div className="font-mono-num font-bold text-[13px] text-textSecondary">{s.id}</div>
@@ -151,7 +152,7 @@ export function SeguradoraPage() {
       <div className="font-bold text-[15px] mb-3">Apólices</div>
       <div className="bg-white border border-border rounded-card overflow-hidden">
         <div
-          className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
+          className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
           style={{ gridTemplateColumns: '1.2fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr' }}
         >
           <div>Cedente</div>

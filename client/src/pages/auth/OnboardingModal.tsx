@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ModalOverlay } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { useSession } from '../../state/SessionContext';
+import { PALETTE } from '../../lib/palette';
 
 export function OnboardingModal() {
   const { user, completeOnboarding } = useSession();
@@ -24,7 +25,7 @@ export function OnboardingModal() {
     <ModalOverlay onClose={completeOnboarding}>
       <div className="flex gap-1.5 mb-[22px]">
         {steps.map((_, i) => (
-          <div key={i} className="h-1 flex-1 rounded-full" style={{ background: i === step ? '#1E5EFF' : '#E4E8EE' }} />
+          <div key={i} className="h-1 flex-1 rounded-full" style={{ background: i === step ? PALETTE.blue : PALETTE.border }} />
         ))}
       </div>
       <div className="text-[21px] font-extrabold mb-2.5">{current.title}</div>

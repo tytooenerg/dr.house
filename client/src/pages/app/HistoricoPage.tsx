@@ -7,6 +7,7 @@ import { ProgressBar } from '../../components/ui/ProgressBar';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
+import { PALETTE } from '../../lib/palette';
 
 interface Historico {
   data: string;
@@ -191,7 +192,7 @@ export function HistoricoPage() {
       {!loadError && (
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <NavyCard>
-          <div className="text-[#8B97AC] text-[13px] font-semibold">Total investido</div>
+          <div className="text-textTertiary text-[13px] font-semibold">Total investido</div>
           <div className="text-2xl font-extrabold mt-2.5">{data?.totalInvestidoFmt ?? '—'}</div>
         </NavyCard>
         <Card>
@@ -209,7 +210,7 @@ export function HistoricoPage() {
         <Card className="mb-4 px-6 py-5">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
             <div className="font-bold text-[14.5px]">Rebalanceamento sugerido</div>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#EEF1F5] text-textSecondary">
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
               Perfil {rebalance.profile === 'conservador' ? 'Conservador' : rebalance.profile === 'moderado' ? 'Moderado' : 'Arrojado'}
               {rebalance.usingDefaultProfile ? ' (padrão — responda o questionário de suitability)' : ''}
             </span>
@@ -232,7 +233,7 @@ export function HistoricoPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {rebalance.suggestions.map((s, i) => (
-                <div key={i} className="text-[12.5px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+                <div key={i} className="text-[12.5px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
                   {s.message}
                 </div>
               ))}
@@ -309,7 +310,7 @@ export function HistoricoPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             {performance.positions.slice(0, 8).map((p) => (
-              <div key={p.duplicataId} className="flex items-center justify-between text-[12.5px] bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5">
+              <div key={p.duplicataId} className="flex items-center justify-between text-[12.5px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
                 <span className="font-semibold flex-1 min-w-0 truncate">{p.sacado}</span>
                 <span className="text-textSecondary">{p.diasCarencia}d</span>
                 <span className="font-mono-num font-bold ml-3">{p.retornoAnualizadoPct.toFixed(2).replace('.', ',')}% a.a.</span>
@@ -327,7 +328,7 @@ export function HistoricoPage() {
               <span className="text-textSecondary">Atraso ≤ 15 dias (% do PL)</span>
               <span className="font-bold font-mono-num">8,2%</span>
             </div>
-            <ProgressBar pct={8.2} color="#B8790A" height={7} />
+            <ProgressBar pct={8.2} color={PALETTE.amber} height={7} />
             <div className="text-textTertiary text-[11.5px] mt-1">Faixa saudável de mercado: 7,5%–9%</div>
           </div>
           <div>
@@ -335,7 +336,7 @@ export function HistoricoPage() {
               <span className="text-textSecondary">Inadimplência ≥ 90 dias (% do PL)</span>
               <span className="font-bold font-mono-num">3,9%</span>
             </div>
-            <ProgressBar pct={3.9} color="#0A5C36" height={7} />
+            <ProgressBar pct={3.9} color={PALETTE.green} height={7} />
             <div className="text-textTertiary text-[11.5px] mt-1">Faixa saudável de mercado: 3,5%–5%</div>
           </div>
         </div>
@@ -346,33 +347,33 @@ export function HistoricoPage() {
           <div className="flex items-center justify-between gap-4 flex-wrap mb-1">
             <div>
               <div className="font-bold text-[15px] mb-1.5">Relatórios Institucionais</div>
-              <div className="text-[#9FB3D6] text-[13.5px] leading-relaxed max-w-[600px]">
+              <div className="text-onNavy text-[13.5px] leading-relaxed max-w-[600px]">
                 Analytics de carteira acima do extrato por operação — concentração por rating, maiores exposições e desempenho mensal, com relatório em PDF pronto para o comitê. {institutional.priceFmt}/mês, a partir do plano {institutional.requiredPlan === 'pro' ? 'Pro' : institutional.requiredPlan}.
               </div>
             </div>
             {institutional.planOk ? (
               <Toggle on={institutional.enabled} onClick={() => toggleInstitutional(!institutional.enabled)} />
             ) : (
-              <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: '#2A3F5F', color: '#C7D6FF' }}>
+              <span className="text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: PALETTE.navyBorder, color: PALETTE.blueSoft }}>
                 Requer plano {institutional.requiredPlan === 'pro' ? 'Pro' : institutional.requiredPlan}
               </span>
             )}
           </div>
-          {institutionalError && <div className="text-[11.5px] mt-1" style={{ color: '#FF9E9E' }}>{institutionalError}</div>}
+          {institutionalError && <div className="text-[11.5px] mt-1" style={{ color: PALETTE.redOnNavy }}>{institutionalError}</div>}
 
           {institutional.enabled && analytics && (
-            <div className="mt-4 pt-4 border-t border-[#2A3F5F]">
+            <div className="mt-4 pt-4 border-t border-navyBorder">
               <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                 <div>
-                  <div className="text-[#9FB3D6] text-[11.5px] font-bold uppercase">Posições ativas</div>
+                  <div className="text-onNavy text-[11.5px] font-bold uppercase">Posições ativas</div>
                   <div className="font-mono-num text-lg font-extrabold mt-1">{analytics.posicoesAtivas}</div>
                 </div>
                 <div>
-                  <div className="text-[#9FB3D6] text-[11.5px] font-bold uppercase">Com regresso</div>
+                  <div className="text-onNavy text-[11.5px] font-bold uppercase">Com regresso</div>
                   <div className="font-mono-num text-lg font-extrabold mt-1">{analytics.comRegressoPct}%</div>
                 </div>
                 <div>
-                  <div className="text-[#9FB3D6] text-[11.5px] font-bold uppercase">Com seguro</div>
+                  <div className="text-onNavy text-[11.5px] font-bold uppercase">Com seguro</div>
                   <div className="font-mono-num text-lg font-extrabold mt-1">{analytics.comSeguroPct}%</div>
                 </div>
               </div>
@@ -382,7 +383,7 @@ export function HistoricoPage() {
                   <div className="flex flex-col gap-1.5">
                     {analytics.ratingDistribution.map((r) => (
                       <div key={r.rating} className="flex items-center justify-between text-[12.5px]">
-                        <span className="text-[#9FB3D6]">{r.rating}</span>
+                        <span className="text-onNavy">{r.rating}</span>
                         <span className="font-mono-num">{r.valorFmt} ({r.pct}%)</span>
                       </div>
                     ))}
@@ -391,10 +392,10 @@ export function HistoricoPage() {
                 <div>
                   <div className="font-bold text-[12.5px] mb-2">Maiores exposições</div>
                   <div className="flex flex-col gap-1.5">
-                    {analytics.maioresExposicoes.length === 0 && <span className="text-[#9FB3D6] text-[12px]">Nenhuma operação registrada ainda.</span>}
+                    {analytics.maioresExposicoes.length === 0 && <span className="text-onNavy text-[12px]">Nenhuma operação registrada ainda.</span>}
                     {analytics.maioresExposicoes.map((e) => (
                       <div key={e.sacado} className="flex items-center justify-between text-[12.5px] gap-2">
-                        <span className="text-[#9FB3D6] flex-1 min-w-0 truncate">{e.sacado}</span>
+                        <span className="text-onNavy flex-1 min-w-0 truncate">{e.sacado}</span>
                         <span className="font-mono-num flex-shrink-0">{e.valorFmt} ({e.pct}%)</span>
                       </div>
                     ))}
@@ -410,7 +411,7 @@ export function HistoricoPage() {
       )}
 
       <div className="bg-white border border-border rounded-card overflow-hidden">
-        <div className="grid gap-3 px-5 py-3.5 bg-[#F7F8FA] border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
+        <div className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide" style={{ gridTemplateColumns: COLS }}>
           <div>Data</div>
           <div>Empresa</div>
           <div>Investido</div>
@@ -427,7 +428,7 @@ export function HistoricoPage() {
             <span className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-greenBg text-green w-fit">{h.status}</span>
             <span
               className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md w-fit"
-              style={h.comRegresso ? { background: '#EEF3FF', color: '#1E5EFF' } : { background: '#F0F2F5', color: '#5B6472' }}
+              style={h.comRegresso ? { background: PALETTE.chip, color: PALETTE.blue } : { background: PALETTE.hairline, color: PALETTE.textSecondary }}
               title="Res. BCB 540/2025 — aquisição com regresso: o cedente permanece coobrigado pela duplicata"
             >
               {h.comRegresso ? 'Com regresso' : 'Sem regresso'}

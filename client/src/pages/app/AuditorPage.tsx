@@ -5,6 +5,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { useLang } from '../../lib/i18n';
+import { PALETTE } from '../../lib/palette';
 
 interface AuditorOverview {
   auditLog: {
@@ -48,7 +49,7 @@ export function AuditorPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Cadeia de auditoria</div>
-          <div className="font-bold text-lg" style={{ color: data.auditLog.chain.valid ? '#0A5C36' : '#B3261E' }}>
+          <div className="font-bold text-lg" style={{ color: data.auditLog.chain.valid ? PALETTE.green : PALETTE.red }}>
             {data.auditLog.chain.valid ? 'Íntegra ✓' : `Violação em #${data.auditLog.chain.brokenAt}`}
           </div>
         </Card>
@@ -58,7 +59,7 @@ export function AuditorPage() {
         </Card>
         <Card>
           <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-1.5">Reconciliação em aberto</div>
-          <div className="font-mono-num font-bold text-lg" style={{ color: data.reconciliation.abertas > 0 ? '#B3261E' : undefined }}>
+          <div className="font-mono-num font-bold text-lg" style={{ color: data.reconciliation.abertas > 0 ? PALETTE.red : undefined }}>
             {data.reconciliation.abertas}
           </div>
         </Card>
@@ -118,7 +119,7 @@ export function AuditorPage() {
                   <span>
                     {r.tipo} — {r.empresa}
                   </span>
-                  <span className="font-mono-num font-bold" style={{ color: r.status === 'aberta' ? '#B3261E' : '#0A5C36' }}>
+                  <span className="font-mono-num font-bold" style={{ color: r.status === 'aberta' ? PALETTE.red : PALETTE.green }}>
                     {r.valorFmt} · {r.status}
                   </span>
                 </div>

@@ -152,7 +152,7 @@ export function IaUsagePanel() {
           <div className="bg-white border border-border rounded-card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-border font-bold text-[14px]">Por recurso</div>
             {aiUsage.byFeature.map((f) => (
-              <div key={f.feature} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
+              <div key={f.feature} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 text-[13px]">
                 <div className="font-bold">{FEATURE_LABELS[f.feature] ?? f.feature}</div>
                 <div className="text-textSecondary flex items-center gap-4">
                   <span>{f.calls} chamadas</span>

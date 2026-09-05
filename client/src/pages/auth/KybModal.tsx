@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Field, Input } from '../../components/ui/Input';
 import { useSession } from '../../state/SessionContext';
 import { uploadFile } from '../../lib/api';
+import { PALETTE } from '../../lib/palette';
 
 export function KybModal() {
   const { user, submitKyb } = useSession();
@@ -61,7 +62,7 @@ export function KybModal() {
             >
               <span
                 className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
-                style={{ border: `2px solid ${naoResidente ? '#1E5EFF' : '#C7D0DE'}`, background: naoResidente ? '#1E5EFF' : '#fff' }}
+                style={{ border: `2px solid ${naoResidente ? PALETTE.blue : PALETTE.borderStrong}`, background: naoResidente ? PALETTE.blue : '#fff' }}
               >
                 {naoResidente && <span className="text-white text-[11px] leading-none">✓</span>}
               </span>
@@ -100,7 +101,7 @@ export function KybModal() {
                       type="button"
                       onClick={() => setTipo(t)}
                       className="px-3.5 py-2.5 rounded-lg border border-inputBorder text-[13.5px] font-semibold cursor-pointer text-left"
-                      style={{ background: selected ? '#1E5EFF' : '#fff', color: selected ? '#fff' : '#0B1F3A' }}
+                      style={{ background: selected ? PALETTE.blue : '#fff', color: selected ? '#fff' : PALETTE.navy }}
                     >
                       {t}
                     </button>
@@ -129,7 +130,7 @@ export function KybModal() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-[#C7D0DE] rounded-xl p-[22px] text-center cursor-pointer bg-transparent"
+              className="border-2 border-dashed border-borderStrong rounded-xl p-[22px] text-center cursor-pointer bg-transparent"
             >
               <div className="font-bold text-[13.5px]">{docUploaded ? 'Documento enviado ✓' : uploading ? 'Enviando…' : 'Envie sua autorização regulatória'}</div>
               <div className="text-textSecondary text-[12.5px] mt-1">Ato de autorização BCB/CVM ou contrato social + procuração</div>
@@ -141,9 +142,9 @@ export function KybModal() {
           <div className="flex flex-col gap-3 mb-2">
             <div className="p-4 rounded-[10px] bg-navy text-white">
               <div className="text-[22px] font-extrabold">R$ 128,4M</div>
-              <div className="text-[#9FB3D6] text-[12.5px] mt-1">já em oferta ativa no marketplace este mês — sua instituição pode começar a dar lances assim que aprovada</div>
+              <div className="text-onNavy text-[12.5px] mt-1">já em oferta ativa no marketplace este mês — sua instituição pode começar a dar lances assim que aprovada</div>
             </div>
-            <div className="p-4 rounded-[10px] bg-bg text-[13.5px] text-[#3D4658] leading-relaxed">
+            <div className="p-4 rounded-[10px] bg-bg text-[13.5px] text-slate leading-relaxed">
               Sua instituição será verificada junto ao Banco Central antes da liberação total para leilão — enquanto isso, você já pode explorar o marketplace em modo consulta.
             </div>
             <div className="flex items-center gap-2.5">

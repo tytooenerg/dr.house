@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useSession } from '../../state/SessionContext';
+import { PALETTE } from '../../lib/palette';
 
 interface ProfileData {
   profileForm: { nome: string; email: string; telefone: string };
@@ -18,9 +19,9 @@ interface ProfileData {
 }
 
 const TEAM_STATUS_LABEL: Record<'pending' | 'active' | 'revoked', { label: string; bg: string; color: string }> = {
-  pending: { label: 'Convite pendente', bg: '#FBF1E0', color: '#B8790A' },
-  active: { label: 'Ativo', bg: '#EAF3EE', color: '#0A5C36' },
-  revoked: { label: 'Revogado', bg: '#F7E9E7', color: '#B3261E' },
+  pending: { label: 'Convite pendente', bg: PALETTE.amberBg, color: PALETTE.amber },
+  active: { label: 'Ativo', bg: PALETTE.greenBg, color: PALETTE.green },
+  revoked: { label: 'Revogado', bg: PALETTE.redBg, color: PALETTE.red },
 };
 
 interface ReferralData {
@@ -361,7 +362,7 @@ export function PerfilPage() {
           {twoFactor && (
             <span
               className="text-[11.5px] font-bold px-2.5 py-1 rounded-md"
-              style={twoFactor.enabled ? { background: '#EAF3EE', color: '#0A5C36' } : { background: '#F0F2F5', color: '#5B6472' }}
+              style={twoFactor.enabled ? { background: PALETTE.greenBg, color: PALETTE.green } : { background: PALETTE.hairline, color: PALETTE.textSecondary }}
             >
               {twoFactor.enabled ? 'Ativada' : 'Desativada'}
             </span>
@@ -402,7 +403,7 @@ export function PerfilPage() {
         )}
 
         {twoFactorSetup && (
-          <form onSubmit={confirmTwoFactor} className="flex flex-col gap-2.5 p-4 rounded-lg bg-[#F7F8FA]">
+          <form onSubmit={confirmTwoFactor} className="flex flex-col gap-2.5 p-4 rounded-lg bg-surface">
             <div className="text-[12.5px] text-textSecondary">
               Adicione esta chave manualmente no seu app autenticador (issuer <b>Lastro</b>, conta {data.profileForm.email}, SHA1, 6 dígitos, 30s):
             </div>
@@ -425,7 +426,7 @@ export function PerfilPage() {
         )}
 
         {recoveryCodes && (
-          <div className="flex flex-col gap-2.5 p-4 rounded-lg bg-[#F7F8FA]">
+          <div className="flex flex-col gap-2.5 p-4 rounded-lg bg-surface">
             <div className="font-bold text-[13px] text-navy">2FA ativada — guarde estes códigos de recuperação</div>
             <div className="text-[12px] text-textSecondary">Cada um só pode ser usado uma vez, caso você perca acesso ao seu app autenticador. Eles não serão mostrados novamente.</div>
             <div className="grid gap-1.5 font-mono-num text-[13px] font-bold" style={{ gridTemplateColumns: '1fr 1fr' }}>
@@ -448,7 +449,7 @@ export function PerfilPage() {
           </button>
         </div>
         {inviting && (
-          <form onSubmit={submitInvite} className="flex items-end gap-2.5 px-5 py-3.5 border-b border-hairline bg-[#F7F8FA]">
+          <form onSubmit={submitInvite} className="flex items-end gap-2.5 px-5 py-3.5 border-b border-hairline bg-surface">
             <div className="flex-1">
               <Field label="Nome">
                 <Input value={inviteNome} onChange={(e) => setInviteNome(e.target.value)} placeholder="Nome do convidado" />
@@ -465,7 +466,7 @@ export function PerfilPage() {
           </form>
         )}
         {lastInviteUrl && (
-          <div className="flex items-center justify-between gap-2.5 px-5 py-3 border-b border-hairline bg-[#EEF3FF] text-[12.5px]">
+          <div className="flex items-center justify-between gap-2.5 px-5 py-3 border-b border-hairline bg-chip text-[12.5px]">
             <div className="truncate">
               Convite criado — se o e-mail não chegar, envie este link diretamente: <span className="font-mono-num text-navy">{lastInviteUrl}</span>
             </div>
@@ -513,7 +514,7 @@ export function PerfilPage() {
             {referral.bonusEmissoesMensais > 0 && <span className="font-bold text-green"> Você já tem +{referral.bonusEmissoesMensais} de bônus.</span>}
           </div>
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="flex-1 bg-[#F7F8FA] border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px] truncate">
+            <div className="flex-1 bg-surface border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px] truncate">
               {window.location.origin}
               {referral.link}
             </div>
@@ -551,8 +552,8 @@ export function PerfilPage() {
           </button>
         </div>
         {deleteConfirmOpen && (
-          <form onSubmit={submitDelete} className="mt-3.5 p-3.5 rounded-lg bg-[#F7E9E7] flex flex-col gap-2.5">
-            <div className="text-[12.5px] text-[#8A3A2E]">
+          <form onSubmit={submitDelete} className="mt-3.5 p-3.5 rounded-lg bg-redBg flex flex-col gap-2.5">
+            <div className="text-[12.5px] text-red">
               Isso apaga seus dados pessoais (nome, e-mail, telefone) e revoga todas as sessões, chaves de API e webhooks. Registros financeiros são
               mantidos de forma anonimizada, conforme obrigação legal. Confirme sua senha para continuar.
             </div>

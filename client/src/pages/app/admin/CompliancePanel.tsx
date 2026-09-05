@@ -3,6 +3,7 @@ import { api, downloadFile, ApiError } from '../../../lib/api';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { PALETTE } from '../../../lib/palette';
 
 interface ComplianceQueueItem {
   duplicataId: string;
@@ -207,7 +208,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
       </div>
 
       {complianceQueue.map((c) => (
-        <div key={c.duplicataId} className="bg-white rounded-card p-6" style={{ border: '1px solid #E9CFCB' }}>
+        <div key={c.duplicataId} className="bg-white rounded-card p-6" style={{ border: `1px solid ${PALETTE.redBorder}` }}>
           <div className="flex justify-between items-start flex-wrap gap-2.5 mb-3">
             <div>
               <div className="font-mono-num font-bold text-[13px] text-textSecondary">{c.duplicataId}</div>
@@ -280,7 +281,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
         </div>
 
         {sarReports.map((s) => (
-          <div key={s.id} className="rounded-[10px] p-4 mb-3 last:mb-0" style={{ border: `1px solid ${s.severidade === 'critico' ? '#E9CFCB' : '#E4E8EE'}` }}>
+          <div key={s.id} className="rounded-[10px] p-4 mb-3 last:mb-0" style={{ border: `1px solid ${s.severidade === 'critico' ? PALETTE.redBorder : PALETTE.border}` }}>
             <div className="flex items-start justify-between gap-2.5 mb-2">
               <div>
                 <div className="font-bold text-[13.5px]">
@@ -291,7 +292,7 @@ export function CompliancePanel({ onCount }: { onCount?: (n: number) => void }) 
               </div>
               <span
                 className="text-[11px] font-bold px-2.5 py-1 rounded-md whitespace-nowrap"
-                style={s.severidade === 'critico' ? { background: '#F7E9E7', color: '#B03A2E' } : { background: '#FBF1E0', color: '#8A6116' }}
+                style={s.severidade === 'critico' ? { background: PALETTE.redBg, color: PALETTE.red } : { background: PALETTE.amberBg, color: PALETTE.amber }}
               >
                 {s.severidade === 'critico' ? 'Crítico' : 'Atenção'}
               </span>

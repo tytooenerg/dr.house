@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { PALETTE } from '../../lib/palette';
 
 interface Dispute {
   id: number;
@@ -94,7 +95,7 @@ export function DisputaPage() {
       <div className="flex flex-col gap-4">
         {!loadError &&
           disputes.map((d) => (
-          <div key={d.id} className="bg-white rounded-card p-6" style={{ border: '1px solid #E9CFCB' }}>
+          <div key={d.id} className="bg-white rounded-card p-6" style={{ border: `1px solid ${PALETTE.redBorder}` }}>
             <div className="flex justify-between items-start mb-4 flex-wrap gap-2.5">
               <div>
                 <div className="font-mono-num font-bold text-[13px] text-textSecondary">{d.duplicataId}</div>
@@ -106,7 +107,7 @@ export function DisputaPage() {
             </div>
 
             <div className="rounded-[10px] px-4 py-3.5 mb-4 bg-amberBg">
-              <div className="text-[12.5px] font-bold mb-1" style={{ color: '#8A5A00' }}>
+              <div className="text-[12.5px] font-bold mb-1" style={{ color: PALETTE.amber }}>
                 Motivo da contestação
               </div>
               <div className="text-sm leading-snug">{d.motivo}</div>
@@ -115,7 +116,7 @@ export function DisputaPage() {
             <div className="flex flex-col gap-2.5 mb-4.5">
               {d.timeline.map((t, i) => (
                 <div key={i} className="flex gap-2.5 text-[13px]">
-                  <span className="rounded-full mt-1.5 flex-shrink-0" style={{ width: 6, height: 6, background: '#B8C2D4' }} />
+                  <span className="rounded-full mt-1.5 flex-shrink-0" style={{ width: 6, height: 6, background: PALETTE.onNavyDim }} />
                   <div>
                     <b>{t.autor}</b> {t.texto} <span className="text-textMuted">— {t.quando}</span>
                   </div>
@@ -151,7 +152,7 @@ export function DisputaPage() {
                 onClick={() => escalar(d.id)}
                 disabled={escalatingId === d.id || escalatedIds.has(d.id)}
                 className="px-3.5 py-2.5 rounded-lg bg-redBg text-red text-[13px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-default"
-                style={{ border: '1px solid #E9CFCB' }}
+                style={{ border: `1px solid ${PALETTE.redBorder}` }}
               >
                 {escalatedIds.has(d.id) ? 'Arbitragem solicitada ✓' : escalatingId === d.id ? 'Solicitando…' : 'Escalar para arbitragem BC'}
               </button>

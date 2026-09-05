@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/Input';
 import { Segmented } from '../../components/ui/Segmented';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
+import { PALETTE } from '../../lib/palette';
 
 type Rating = 'AA' | 'A' | 'B' | 'C';
 type LadderField = 'taxaInicial' | 'taxaAlvo' | 'decrementoPorEtapa' | 'intervaloHoras';
@@ -132,7 +133,7 @@ export function AutomacaoPage() {
           <Toggle on={data.autoBidEnabled} onClick={toggle} size="lg" />
           <div className="text-white font-bold text-[15px]">Lance automático</div>
         </div>
-        <div className="text-[13px] font-semibold" style={{ color: data.autoBidEnabled ? '#6FCF97' : '#8B97AC' }}>
+        <div className="text-[13px] font-semibold" style={{ color: data.autoBidEnabled ? PALETTE.greenOnNavy : PALETTE.textTertiary }}>
           {data.autoBidEnabled ? 'Automação ativa — participando dos leilões que atendem seus critérios' : 'Automação desligada — você só participa manualmente'}
         </div>
       </NavyCard>
@@ -247,7 +248,7 @@ export function AutomacaoPage() {
                     />
                   </div>
                 </div>
-                <div className="text-[12.5px] font-bold mt-3" style={{ color: '#0A5C36' }}>
+                <div className="text-[12.5px] font-bold mt-3" style={{ color: PALETTE.green }}>
                   Piso atual: {l.pisoAtualFmt}
                   {l.proximaQuedaEm && <span className="text-textSecondary font-normal"> · próxima queda em {fmtHoursUntil(l.proximaQuedaEm)}</span>}
                 </div>
@@ -266,7 +267,7 @@ export function AutomacaoPage() {
             <Toggle on={data.marketMakerEnabled} onClick={toggleMarketMaker} size="lg" />
             <div className="font-bold text-[15px]">Market Maker (fornecer liquidez)</div>
           </div>
-          <div className="text-[12.5px] font-semibold" style={{ color: data.marketMakerEnabled ? '#0A5C36' : '#8B97AC' }}>
+          <div className="text-[12.5px] font-semibold" style={{ color: data.marketMakerEnabled ? PALETTE.green : PALETTE.textTertiary }}>
             {data.marketMakerEnabled ? 'Ativo — dando lances em anúncios sem liquidez a cada 6h' : 'Desligado'}
           </div>
         </div>
@@ -298,7 +299,7 @@ export function AutomacaoPage() {
       <Card className="mb-4">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2.5">
           <div className="font-bold text-[15px]">Diversificação por classe de risco</div>
-          <div className="text-[12.5px] font-bold" style={{ color: divTotal === 100 ? '#0A5C36' : '#B03A2E' }}>
+          <div className="text-[12.5px] font-bold" style={{ color: divTotal === 100 ? PALETTE.green : PALETTE.red }}>
             {divTotal === 100 ? 'Alocação balanceada (100%)' : `Ajuste para somar 100% — atual: ${divTotal}%`}
           </div>
         </div>
@@ -319,7 +320,7 @@ export function AutomacaoPage() {
       <Card className="mb-4">
         <div className="flex items-center justify-between mb-1 flex-wrap gap-2.5">
           <div className="font-bold text-[15px]">Diversificação por setor do sacado</div>
-          <div className="text-[12.5px] font-bold" style={{ color: sectorTotal === 100 ? '#0A5C36' : '#B03A2E' }}>
+          <div className="text-[12.5px] font-bold" style={{ color: sectorTotal === 100 ? PALETTE.green : PALETTE.red }}>
             {sectorTotal === 100 ? 'Alocação balanceada (100%)' : `Ajuste para somar 100% — atual: ${sectorTotal}%`}
           </div>
         </div>

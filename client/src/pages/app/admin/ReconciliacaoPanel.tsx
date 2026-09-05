@@ -180,7 +180,7 @@ export function ReconciliacaoPanel() {
               <div key={f.id} className="border border-border rounded-xl p-4 flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-[#FBF1E0] text-[#9A6B10]">{TIPO_LABEL[f.tipo]}</span>
+                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-amberBg text-amber">{TIPO_LABEL[f.tipo]}</span>
                     <span className="text-[13px] font-bold text-navy">{f.company_name}</span>
                   </div>
                   <p className="text-[12.5px] text-navy/70 mt-1 max-w-2xl">{f.descricao}</p>

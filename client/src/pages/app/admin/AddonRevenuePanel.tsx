@@ -139,7 +139,7 @@ export function AddonRevenuePanel() {
         <div className="font-bold text-[14px]">Receita de add-ons</div>
         <div className="text-[12px] text-textMuted mt-0.5">Preços por produto e cobranças reais lançadas (lib/addOnBilling.ts)</div>
       </div>
-      <div className="px-5 py-3.5 border-b border-[#F5F7FA]">
+      <div className="px-5 py-3.5 border-b border-bg">
         <div className="text-[12px] font-bold text-textMuted uppercase mb-2">Franquia mensal da API (chamadas incluídas antes do excedente)</div>
         <div className="flex items-center gap-2">
           <input
@@ -155,7 +155,7 @@ export function AddonRevenuePanel() {
       {addonPrices.map((p) => {
         const summary = addonResumo.find((r) => r.kind === p.kind);
         return (
-          <div key={p.kind} className="px-5 py-3 border-b border-[#F5F7FA] last:border-b-0 flex items-center justify-between gap-3 flex-wrap text-[13px]">
+          <div key={p.kind} className="px-5 py-3 border-b border-bg last:border-b-0 flex items-center justify-between gap-3 flex-wrap text-[13px]">
             <div className="min-w-[220px]">
               <div className="font-semibold">{ADDON_KIND_LABELS[p.kind]}</div>
               <div className="text-textMuted text-[11.5px] mt-0.5">
@@ -180,7 +180,7 @@ export function AddonRevenuePanel() {
           </div>
         );
       })}
-      <div className="px-5 py-3.5 border-b border-[#F5F7FA] flex items-center gap-2 flex-wrap">
+      <div className="px-5 py-3.5 border-b border-bg flex items-center gap-2 flex-wrap">
         <span className="text-[12px] text-textMuted mr-1">Rodar cobrança mensal agora (mês anterior completo):</span>
         <Button size="sm" variant="secondary" disabled={runningAddonJob === 'api-overage'} onClick={() => runAddonBillingJob('api-overage')}>
           {runningAddonJob === 'api-overage' ? 'Cobrando…' : 'Excedente de API'}

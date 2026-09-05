@@ -11,30 +11,30 @@ export function PublicNav({ active }: { active?: 'developers' | 'docs' | 'precos
         <Link to="/">
           <Logo size={24} />
         </Link>
-        <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-[#3D4658]">
-          <Link to="/developers" className={active === 'developers' ? 'text-navy' : 'text-[#3D4658]'}>
+        <div className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate">
+          <Link to="/developers" className={active === 'developers' ? 'text-navy' : 'text-slate'}>
             {t('nav.developers', 'Desenvolvedores')}
           </Link>
-          <Link to="/docs" className={active === 'docs' ? 'text-navy' : 'text-[#3D4658]'}>
+          <Link to="/docs" className={active === 'docs' ? 'text-navy' : 'text-slate'}>
             {t('nav.docs', 'Docs')}
           </Link>
-          <Link to="/precos" className={active === 'precos' ? 'text-navy' : 'text-[#3D4658]'}>
+          <Link to="/precos" className={active === 'precos' ? 'text-navy' : 'text-slate'}>
             {t('nav.precos', 'Preços')}
           </Link>
-          <Link to="/transparencia" className={active === 'transparencia' ? 'text-navy' : 'text-[#3D4658]'}>
+          <Link to="/transparencia" className={active === 'transparencia' ? 'text-navy' : 'text-slate'}>
             {t('nav.transparencia', 'Transparência')}
           </Link>
-          <Link to="/status" className={active === 'status' ? 'text-navy' : 'text-[#3D4658]'}>
+          <Link to="/status" className={active === 'status' ? 'text-navy' : 'text-slate'}>
             {t('nav.status', 'Status')}
           </Link>
-          <Link to="/legal" className={active === 'legal' ? 'text-navy' : 'text-[#3D4658]'}>
+          <Link to="/legal" className={active === 'legal' ? 'text-navy' : 'text-slate'}>
             {t('nav.legal', 'Legal')}
           </Link>
         </div>
       </div>
       <div className="flex items-center gap-5 text-sm font-semibold">
         <LanguageToggle />
-        <Link to="/login" className="text-[#3D4658]">
+        <Link to="/login" className="text-slate">
           {t('nav.entrar', 'Entrar')}
         </Link>
         <Link to="/legal#contato" className="px-4.5 py-2.5 rounded-lg bg-navy text-white">

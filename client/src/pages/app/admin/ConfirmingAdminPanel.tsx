@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../../lib/api';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
+import { PALETTE } from '../../../lib/palette';
 
 interface ProgramaAdminView {
   id: number;
@@ -37,8 +38,8 @@ interface ConfirmingAdminData {
 }
 
 const STATUS_STYLE: Record<'ativo' | 'pausado', { bg: string; color: string; label: string }> = {
-  ativo: { bg: '#EAF3EE', color: '#0A5C36', label: 'Ativo' },
-  pausado: { bg: '#F0F2F5', color: '#5B6472', label: 'Pausado' },
+  ativo: { bg: PALETTE.greenBg, color: PALETTE.green, label: 'Ativo' },
+  pausado: { bg: PALETTE.hairline, color: PALETTE.textSecondary, label: 'Pausado' },
 };
 
 // Oversight do Programa Confirming — todo programa que já existe e o fundo real que os
@@ -74,7 +75,7 @@ export function ConfirmingAdminPanel() {
       </div>
 
       {!data.saude.fundoSuficiente && (
-        <div className="px-4 py-3 rounded-[10px] text-[12.5px] font-semibold" style={{ background: '#F7E9E7', color: '#B3261E' }}>
+        <div className="px-4 py-3 rounded-[10px] text-[12.5px] font-semibold" style={{ background: PALETTE.redBg, color: PALETTE.red }}>
           Atenção: os programas ativos prometem até {data.saude.headroomTotalFmt} em financiamento, mas o fundo tem só{' '}
           {data.saude.fundoBalanceFmt} em caixa real. Um financiamento automático pode cair no fluxo normal de leilão por falta de capital do
           fundo, mesmo com limite disponível no programa.
@@ -107,7 +108,7 @@ export function ConfirmingAdminPanel() {
                   <span className="font-bold text-[14px]">{p.sacadoNome}</span>
                   <span className="text-textSecondary font-normal text-[12.5px]">· rating {p.rating}</span>
                   {p.alertaLimite && (
-                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: '#FBF1E0', color: '#8A5A00' }}>
+                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: PALETTE.amberBg, color: PALETTE.amber }}>
                       {p.utilizacaoPct}% do limite utilizado
                     </span>
                   )}

@@ -1085,6 +1085,43 @@ diferentes), prazo médio real e estrutura (4 KPIs, 6 meses, donut fechando em 1
 `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32, sdks/node 9,
 e2e 12/12.
 
+### Cores: uma fonte única no lugar de 556 hex espalhados (e três vermelhos concorrentes)
+
+Terceira frente da revisão de interface, primeira parte (tipografia e adoção do `Badge` vêm
+depois). O client tinha **556 literais hex em 63 arquivos, 58 tons distintos** — e a maior
+parte já era um token do Tailwind reescrito à mão: `'#0A5C36'` aparecia 51 vezes e é o
+`green`, `'#1E5EFF'` 42 vezes e é o `blue`. Pior, vários papéis tinham tons concorrentes:
+**três vermelhos de erro** (`#B3261E`, `#B03A2E`, `#8A3A2E`) e **cinco âmbares de alerta**
+(`#B8790A`, `#8A5A00`, `#5B4200`, `#9A6B10`, `#8A6116`), chegando a aparecer no mesmo arquivo
+(`admin/KybPanel.tsx` usava dois vermelhos diferentes lado a lado).
+
+- **`client/src/lib/palette.ts`** (novo) e os tokens de `tailwind.config.js` passam a ter os
+  **mesmos nomes**, para os dois modos de uso: token do Tailwind em `className`
+  (`text-green`, `bg-surface`), `PALETTE.x` em valor de JS (style inline, props de
+  `Badge`/`Donut`/`ProgressBar`, mapas de status).
+- **Tokens novos** para papéis que existiam de fato mas não tinham nome: `surface`
+  (fundo sutil, 54 usos), `onNavy`/`onNavyBright`/`onNavyDim`/`onNavyFaint` (texto sobre
+  navy), `navyBorder`, `slate`, `blueSoft`, `amberMid`, `redBorder`/`greenBorder`,
+  `borderStrong` e — o caso mais claro — `greenOnNavy`/`redOnNavy`, porque `green`/`red` são
+  escuros demais para serem lidos sobre fundo navy.
+- **`SECTOR_COLORS`** ficou deliberadamente **fora** do `PALETTE` semântico: setor do sacado é
+  uma escala categórica, não um estado. "Indústria" não significa alerta e "serviços" não
+  significa sucesso — reaproveitar `amber`/`red`/`green` ali faria um setor herdar a cor de um
+  estado e mudar de significado junto com ele.
+- **Única exceção de hex no client**: as 4 cores da marca do Google dentro do SVG do botão
+  "entrar com Google" (`LoginPage.tsx`), com comentário explicando por que não viram token.
+
+Verificação visual: 11 telas capturadas antes e depois (landing, login, dashboard,
+marketplace, conta, histórico, minhas, ERP, risco e duas do back-office). **8 são idênticas
+pixel a pixel** — a prova de que a migração preservou a cor onde ela já era um token. As 3
+que mudam são exatamente as consolidações pretendidas: `#EEF1F5` → `hairline` (2 pontos de
+RGB de distância) em Minhas/Histórico e `#E9EEFB` → `chip` no Marketplace. Cada tela foi
+capturada duas vezes no mesmo build antes de comparar, para separar mudança real de conteúdo
+dinâmico.
+
+Verificado: `npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32,
+sdks/node 9, e2e 12/12.
+
 ## Running locally
 
 ```bash

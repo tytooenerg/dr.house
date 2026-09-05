@@ -7,6 +7,7 @@ import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
+import { PALETTE } from '../../lib/palette';
 
 interface EmitForm {
   sacado: string;
@@ -160,7 +161,7 @@ function LoteEmissaoCard() {
       <button
         type="button"
         onClick={() => loteFileRef.current?.click()}
-        className="w-full border-2 border-dashed border-[#C7D0DE] rounded-xl p-4 text-center cursor-pointer bg-transparent mb-3"
+        className="w-full border-2 border-dashed border-borderStrong rounded-xl p-4 text-center cursor-pointer bg-transparent mb-3"
       >
         <div className="font-bold text-[13px]">{fileName ? `${fileName} — ${rows.length} linha(s) reconhecida(s)` : 'Selecionar arquivo CSV'}</div>
       </button>
@@ -177,9 +178,9 @@ function LoteEmissaoCard() {
           </div>
           <div className="flex flex-col gap-1.5">
             {outcome.resultados.map((r) => (
-              <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md" style={{ background: r.ok ? '#EAF3EE' : '#F7E9E7' }}>
+              <div key={r.index} className="flex items-center justify-between text-[12px] px-2.5 py-1.5 rounded-md" style={{ background: r.ok ? PALETTE.greenBg : PALETTE.redBg }}>
                 <span className="font-semibold">{r.sacado || `linha ${r.index + 1}`}</span>
-                <span style={{ color: r.ok ? '#0A5C36' : '#B03A2E' }}>{r.ok ? `Registrada — ${r.registro}` : r.error}</span>
+                <span style={{ color: r.ok ? PALETTE.green : PALETTE.red }}>{r.ok ? `Registrada — ${r.registro}` : r.error}</span>
               </div>
             ))}
           </div>
@@ -351,14 +352,14 @@ export function EmitirPage() {
               if (f) handleNfFile(f);
             }}
           />
-          <button type="button" onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-[#C7D0DE] rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
+          <button type="button" onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
             <div className="font-bold text-[13.5px]">{nfAnexada ? 'NF-e anexada ✓' : uploading ? 'Enviando…' : 'Anexar NF-e (XML, PDF ou imagem)'}</div>
             <div className="text-textSecondary text-[12.5px] mt-1">
               {nfAnexada ? 'Sacado, CNPJ, valor e vencimento extraídos automaticamente por IA' : 'Lastro fiscal necessário para registro escritural — clique para enviar o arquivo'}
             </div>
           </button>
 
-          <div className="p-3.5 rounded-[10px] bg-[#F7F8FA]">
+          <div className="p-3.5 rounded-[10px] bg-surface">
             <div className="flex items-center justify-between mb-2">
               <div className="font-bold text-[13px]">Duplicatas adicionais deste sacado</div>
               <button type="button" onClick={addBatchRow} className="bg-transparent border-none text-blue text-xs font-bold cursor-pointer">
@@ -381,7 +382,7 @@ export function EmitirPage() {
             ))}
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-[10px] bg-[#F7F8FA]">
+          <div className="flex items-center justify-between p-3.5 rounded-[10px] bg-surface">
             <div>
               <div className="font-bold text-[13.5px]">Contratar seguro sobre o recebível</div>
               <div className="text-textSecondary text-xs mt-0.5">Protege o investidor contra inadimplência do sacado — prêmio de 0,6% do valor</div>
@@ -405,7 +406,7 @@ export function EmitirPage() {
             </div>
             <div className="text-textSecondary text-xs mb-3.5">Quanto mais completo, menor o risco percebido pelo financiador — e melhor a taxa</div>
             <div className="mb-4">
-              <ProgressBar pct={preview?.lastroChecklist.pct ?? 0} color={preview?.lastroChecklist.color ?? '#D6DCE5'} />
+              <ProgressBar pct={preview?.lastroChecklist.pct ?? 0} color={preview?.lastroChecklist.color ?? PALETTE.inputBorder} />
             </div>
             <div className="flex flex-col gap-2.5">
               {(preview?.lastroChecklist.items ?? []).map((item) => (
@@ -432,7 +433,7 @@ export function EmitirPage() {
               <div className="text-textSecondary text-xs mb-3">Sacados que já pré-aprovaram você — financiamento futuro sem passar pelo leilão</div>
               <div className="flex flex-col gap-2">
                 {matriculas.map((m) => (
-                  <div key={m.sacadoNome} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[#F7F8FA]">
+                  <div key={m.sacadoNome} className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface">
                     <div>
                       <div className="font-semibold text-[12.5px]">{m.sacadoNome}</div>
                       {!m.programaAtivo && <div className="text-textSecondary text-[11px]">Programa pausado no momento</div>}
@@ -458,7 +459,7 @@ export function EmitirPage() {
                 { label: 'R$ 200 mil – R$ 1 milhão', rate: '0,30%', active: !!preview && preview.emitSummary.totalValor > 200000 && preview.emitSummary.totalValor <= 1000000 },
                 { label: 'Acima de R$ 1 milhão', rate: '0,25%', active: !!preview && preview.emitSummary.totalValor > 1000000 },
               ].map((t) => (
-                <div key={t.label} className="flex justify-between px-2 py-1.5 rounded-md" style={{ background: t.active ? '#EEF3FF' : 'transparent' }}>
+                <div key={t.label} className="flex justify-between px-2 py-1.5 rounded-md" style={{ background: t.active ? PALETTE.chip : 'transparent' }}>
                   <div>{t.label}</div>
                   <div className="font-bold font-mono-num">{t.rate}</div>
                 </div>
@@ -470,29 +471,29 @@ export function EmitirPage() {
             <div className="font-bold text-[14.5px] mb-4">Resumo do registro</div>
             <div className="flex flex-col gap-3 text-[13.5px]">
               <div className="flex justify-between">
-                <span className="text-[#9FB3D6]">Valor da duplicata</span>
+                <span className="text-onNavy">Valor da duplicata</span>
                 <span className="font-bold font-mono-num">{preview?.emitSummary.valorFmt ?? '—'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#9FB3D6]">Prêmio do seguro</span>
+                <span className="text-onNavy">Prêmio do seguro</span>
                 <span className="font-bold font-mono-num">{preview?.emitSummary.premioFmt ?? '—'}</span>
               </div>
               <div className="h-px" style={{ background: 'rgba(255,255,255,0.14)' }} />
               <div className="flex justify-between">
-                <span className="text-[#9FB3D6]">Registradoras</span>
+                <span className="text-onNavy">Registradoras</span>
                 <span className="font-bold">CERC · B3 · Núclea</span>
               </div>
               <div className="h-px" style={{ background: 'rgba(255,255,255,0.14)' }} />
               <div className="flex justify-between">
-                <span className="text-[#9FB3D6]">Taxa estimada (leilão)</span>
-                <span className="font-bold font-mono-num text-[#4C8CFF]">{preview?.emitSummary.taxaEstimadaFmt ?? '—'}</span>
+                <span className="text-onNavy">Taxa estimada (leilão)</span>
+                <span className="font-bold font-mono-num text-onNavyBright">{preview?.emitSummary.taxaEstimadaFmt ?? '—'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#9FB3D6]">Sua taxa de plataforma</span>
+                <span className="text-onNavy">Sua taxa de plataforma</span>
                 <span className="font-bold font-mono-num">{preview?.emitSummary.plataformaFeeFmt ?? '—'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#9FB3D6]">Base legal</span>
+                <span className="text-onNavy">Base legal</span>
                 <span className="font-bold">Res. BCB 339/2023</span>
               </div>
             </div>

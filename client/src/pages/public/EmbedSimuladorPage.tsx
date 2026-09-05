@@ -62,7 +62,7 @@ export function EmbedSimuladorPage() {
       </form>
       {error && <div className="mt-3 text-red text-[12.5px] font-semibold">{error}</div>}
       {result && (
-        <div className="mt-4 p-4 rounded-[10px] bg-[#F7F8FA] border border-border">
+        <div className="mt-4 p-4 rounded-[10px] bg-surface border border-border">
           <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div>
               <div className="text-textTertiary text-[11px] font-bold">TAXA ESTIMADA</div>

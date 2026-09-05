@@ -1,5 +1,5 @@
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-[#E4E8EE] ${className}`} />;
+  return <div className={`animate-pulse rounded-md bg-border ${className}`} />;
 }
 
 export function PageSkeleton() {

@@ -3,6 +3,7 @@ import { api, ApiError } from '../../lib/api';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { STEP_LABELS, STEP_COLOR, stepSummary, type AgentRunOutcome, type AgentSummary, type PendingActionRow } from '../../lib/agentUi';
+import { PALETTE } from '../../lib/palette';
 
 // Embedded, single-agent version of the admin "Agentes IA" console — no agent picker, no
 // "run as another user" field, because self-service is always scoped to the caller's own
@@ -88,16 +89,16 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
       <div>
         <div className="font-bold text-[14.5px] flex items-center gap-2">
           {title}
-          <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-[#EEF3FF] text-blue">IA agêntica</span>
+          <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-chip text-blue">IA agêntica</span>
         </div>
         <div className="text-textSecondary text-[12.5px] mt-1">{agent.description}</div>
-        {!llmEnabled && <div className="text-[11.5px] font-bold text-[#8A5A00] mt-1.5">Modo simulado — peça ao admin para configurar a IA.</div>}
+        {!llmEnabled && <div className="text-[11.5px] font-bold text-amber mt-1.5">Modo simulado — peça ao admin para configurar a IA.</div>}
       </div>
 
       {pending.length > 0 && (
         <div className="flex flex-col gap-2">
           {pending.map((p) => (
-            <div key={p.id} className="p-3 rounded-lg bg-[#FBF1E0] flex items-start justify-between gap-3">
+            <div key={p.id} className="p-3 rounded-lg bg-amberBg flex items-start justify-between gap-3">
               <div>
                 <div className="font-bold text-[12.5px]">Aguardando sua confirmação — {p.tool_name}</div>
                 <pre className="text-[11px] text-textSecondary whitespace-pre-wrap mt-1">{renderPayloadShort(p.input)}</pre>
@@ -130,8 +131,8 @@ export function SelfServiceAgentCard({ agentId, title, placeholder }: { agentId:
       {lastRun && (
         <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
           {lastRun.steps.map((s, i) => (
-            <div key={i} className="border-l-2 pl-2.5" style={{ borderColor: STEP_COLOR[s.type] ?? '#E4E8EE' }}>
-              <div className="text-[10.5px] font-bold uppercase" style={{ color: STEP_COLOR[s.type] ?? '#5B6472' }}>
+            <div key={i} className="border-l-2 pl-2.5" style={{ borderColor: STEP_COLOR[s.type] ?? PALETTE.border }}>
+              <div className="text-[10.5px] font-bold uppercase" style={{ color: STEP_COLOR[s.type] ?? PALETTE.textSecondary }}>
                 {STEP_LABELS[s.type] ?? s.type}
                 {s.toolName ? ` — ${s.toolName}` : ''}
               </div>
