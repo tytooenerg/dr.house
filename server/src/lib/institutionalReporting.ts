@@ -7,6 +7,7 @@ import { ratingFromScore } from './riscoCore.js';
 import { fmtBRL, fmtBRLSigned, toIsoUtc } from './format.js';
 import { logger } from './logger.js';
 import type { Rating } from '../data/seed.js';
+import { precoPago } from './investorPositions.js';
 
 // Feature 5 — Institutional Reporting: a flat monthly subscription (lib/addOnBilling.ts,
 // kind='institutional_reporting') for portfolio-level analytics that go beyond the free
@@ -27,16 +28,6 @@ export interface InstitutionalAnalytics {
   maioresExposicoes: { sacado: string; valorFmt: string; pct: number }[];
 }
 
-// purchases.valor é valor de face numa compra primária/cesta/Confirming, mas preço pago
-// numa compra originada de revenda — "totalInvestido" e tudo que se apoia nele aqui
-// precisam ser sempre o dinheiro que de fato saiu do bolso do investidor. Só recupera via
-// faceValor - retorno enquanto a posição está ativa (retorno = faceValor - preço pago só
-// vale antes de qualquer revenda); uma posição já revendida (active=0) tem retorno
-// sobrescrito com o ganho/perda realizado da revenda (deactivatePurchase), então p.valor
-// (nunca tocado) já é o registro correto do que foi investido pra abrir aquela posição.
-function precoPago(p: { faceValor: number; retorno: number; valor: number; active: number }): number {
-  return p.active ? p.faceValor - p.retorno : p.valor;
-}
 
 export function buildInstitutionalAnalytics(investorId: number): InstitutionalAnalytics {
   const purchases = listPurchasesByInvestor(investorId);

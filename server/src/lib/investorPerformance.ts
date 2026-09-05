@@ -1,5 +1,6 @@
 import { listPurchasesByInvestor } from '../db/duplicatas.js';
 import { fmtBRL, parseFlexibleDate, toIsoUtc } from './format.js';
+import { precoPago } from './investorPositions.js';
 
 // Real risk-adjusted performance for an investor's own book — retorno vs. volatilidade,
 // not just the flat "saldo + histórico" Carteira & Histórico already shows. Built entirely
@@ -38,16 +39,6 @@ export interface PerformanceDashboard {
   positions: PerformancePosition[];
 }
 
-// purchases.valor é valor de face numa compra primária/cesta/Confirming, mas preço pago
-// numa compra originada de revenda — um ROI real (retornoPct) tem que dividir o ganho
-// pelo capital de fato desembolsado, não pelo valor de face, senão a rentabilidade
-// anualizada sai sistematicamente subestimada. Só recupera via faceValor - retorno
-// enquanto a posição está ativa (essa identidade só vale antes de qualquer revenda —
-// deactivatePurchase sobrescreve retorno com o ganho/perda realizado quando a posição é
-// fechada); nesse caso p.valor já é o preço pago correto, registrado na hora da compra.
-function precoPago(p: { faceValor: number; retorno: number; valor: number; active: number }): number {
-  return p.active ? p.faceValor - p.retorno : p.valor;
-}
 
 export function buildPerformanceDashboard(userId: number, opts: { year?: number | null; riskFreeRateAnnualPct?: number } = {}): PerformanceDashboard {
   const riskFree = opts.riskFreeRateAnnualPct ?? 0;

@@ -145,12 +145,19 @@ export function investInBasket(user: UserRow, cestaKey: CestaKey, valorRaw: stri
 
   recordAuditEvent(user.id, user.company_name, 'cesta.investido', { cesta: cestaKey, budget, comprados: comprados.length });
 
+  const investido = Math.round(budget - remaining);
+
   return {
     status: 200,
     body: {
       comprados,
-      totalInvestidoFmt: fmtBRL(budget - remaining),
-      restanteFmt: fmtBRL(remaining),
+      // Arredonda UMA vez e deriva o outro do valor já arredondado: `fmtBRL` usa
+      // maximumFractionDigits: 0, então formatar `budget - remaining` e `remaining`
+      // independentemente pode arredondar os dois pra cima e exibir um par que soma R$ 1 a
+      // mais que o orçamento ("investido R$ 15.782 + restante R$ 999.984.218" pra um
+      // orçamento de R$ 999.999.999). Derivando, investido + restante fecha sempre.
+      totalInvestidoFmt: fmtBRL(investido),
+      restanteFmt: fmtBRL(budget - investido),
       ofertasDisponiveis: candidates.length,
     },
   };

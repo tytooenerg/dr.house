@@ -78,48 +78,107 @@ describe('Comparador de Taxas — lógica real (routes/comparador.ts)', () => {
   });
 });
 
-describe('Dashboard — KPIs/gráficos reais (routes/dashboard.ts)', () => {
-  it('retorna 4 KPIs, barras mensais e os cortes do donut de risco no formato esperado pelo client', async () => {
+describe('Dashboard — KPIs reais por papel (lib/dashboardCore.ts)', () => {
+  // Achado corrigido: o dashboard inteiro era constante — os 4 KPIs vinham de KPIS_RAW
+  // ("R$ 128,4M", "342 duplicatas ativas"), as barras de MONTHS_RAW e o donut/legenda eram
+  // literais na rota. Investidor, cedente e sacado viam os mesmos números, sem relação com
+  // a conta de quem olhava, e a tela se contradizia: activeDuplicatas (real, no centro do
+  // donut) discordava do card "342" ao lado.
+
+  it('estrutura: 4 KPIs, 6 meses e cortes do donut fechando exatamente em 100', async () => {
     const token = await registerCedente();
     const res = await request(app).get('/api/dashboard').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
 
     expect(res.body.kpis).toHaveLength(4);
-    expect(res.body.kpis[0].cardBg).toBe('#0B1F3A'); // COLORS.NAVY — o primeiro KPI é destacado
-    expect(res.body.kpis[1].cardBg).toBe('#fff');
-
-    expect(res.body.monthlyBars.length).toBeGreaterThan(0);
+    for (const k of res.body.kpis) {
+      expect(typeof k.label).toBe('string');
+      expect(typeof k.value).toBe('string');
+      expect(typeof k.trend).toBe('string');
+    }
+    // Sempre 6 colunas, mesmo sem histórico — um gráfico que muda de largura confunde.
+    expect(res.body.monthlyBars).toHaveLength(6);
     for (const bar of res.body.monthlyBars) {
       expect(bar.heightPct).toBeGreaterThanOrEqual(0);
       expect(bar.heightPct).toBeLessThanOrEqual(100);
     }
-    expect(res.body.monthlyBars.some((b: { heightPct: number }) => b.heightPct === 100)).toBe(true); // o mês de maior volume bate 100%
-
-    expect(res.body.riskDonutStops).toHaveLength(4);
     expect(res.body.riskDonutStops[0].from).toBe(0);
     expect(res.body.riskDonutStops.at(-1).to).toBe(100);
-
     expect(typeof res.body.activeDuplicatas).toBe('number');
+    expect(typeof res.body.donutTitle).toBe('string');
+    expect(typeof res.body.monthlyTitle).toBe('string');
   });
 
-  it('activeDuplicatas reflete duplicatas reais em aprovada/no_mercado — sobe quando uma nova é emitida', async () => {
+  it('conta nova não inventa número: KPIs sem base vêm como — com a razão, nunca R$ 0', async () => {
+    const token = await registerInvestidor();
+    const res = await request(app).get('/api/dashboard').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+
+    const investido = res.body.kpis.find((k: { label: string }) => k.label === 'Total investido');
+    expect(investido.value).toBe('—');
+    expect(investido.trend).toBe('nenhuma compra ainda');
+    // "Posições abertas" é legitimamente 0 (uma contagem, não uma média sem base).
+    expect(res.body.kpis.find((k: { label: string }) => k.label === 'Posições abertas').value).toBe('0');
+    // Sem nada a distribuir, a rosca diz por que está vazia em vez de fingir uma carteira.
+    expect(res.body.donutEmptyHint).toBe('Sem posições abertas para distribuir');
+    // Mesma regra pro gráfico de barras: seis colunas de traço parecem um gráfico quebrado.
+    expect(res.body.monthlyEmptyHint).toBe('Nenhuma compra nos últimos 6 meses');
+  });
+
+  it('cada papel vê os SEUS próprios KPIs — investidor, cedente e sacado não compartilham mais os mesmos rótulos', async () => {
+    const labels = async (token: string) =>
+      (await request(app).get('/api/dashboard').set('Authorization', `Bearer ${token}`)).body.kpis.map((k: { label: string }) => k.label);
+
+    expect(await labels(await registerInvestidor())).toEqual(['Total investido', 'Retorno acumulado', 'Rentabilidade acumulada', 'Posições abertas']);
+    expect(await labels(await registerCedente())).toEqual(['Total antecipado', 'Deságio médio pago', 'Duplicatas ativas', 'Prazo médio']);
+  });
+
+  it('cedente: "Duplicatas ativas" e o prazo médio saem das duplicatas reais dele — sobem quando ele emite', async () => {
     const cedenteToken = await registerCedente();
     const before = await request(app).get('/api/dashboard').set('Authorization', `Bearer ${cedenteToken}`);
+    expect(before.body.kpis.find((k: { label: string }) => k.label === 'Duplicatas ativas').value).toBe('0');
+    expect(before.body.kpis.find((k: { label: string }) => k.label === 'Prazo médio').value).toBe('—');
 
     let emit = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: unique('Sacado Dashboard'), cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Dashboard ${unique()}`, cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
     for (let attempt = 0; attempt < 5 && emit.status !== 200; attempt++) {
       emit = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: unique('Sacado Dashboard'), cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+        .send({ sacado: `Sacado Dashboard ${unique()}`, cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
     }
     expect(emit.status).toBe(200);
 
     const after = await request(app).get('/api/dashboard').set('Authorization', `Bearer ${cedenteToken}`);
     expect(after.body.activeDuplicatas).toBe(before.body.activeDuplicatas + 1);
+    expect(after.body.kpis.find((k: { label: string }) => k.label === 'Duplicatas ativas').value).toBe('1');
+    // Emitida hoje, vence em 01/12/2026 — prazo real em dias, não mais um número fixo.
+    expect(after.body.kpis.find((k: { label: string }) => k.label === 'Prazo médio').value).toMatch(/^\d+ dias$/);
+    // Nada antecipado ainda: o total continua honesto em vez de virar R$ 0.
+    expect(after.body.kpis.find((k: { label: string }) => k.label === 'Total antecipado').value).toBe('—');
+  });
+
+  it('dois cedentes diferentes veem números diferentes — o KPI é da conta, não da plataforma', async () => {
+    const a = await registerCedente();
+    const b = await registerCedente();
+    let emit = await request(app)
+      .post('/api/emitir/submit')
+      .set('Authorization', `Bearer ${a}`)
+      .send({ sacado: `Sacado Isolado ${unique()}`, cnpj: '33.222.111/0001-77', valor: '7.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+    for (let attempt = 0; attempt < 5 && emit.status !== 200; attempt++) {
+      emit = await request(app)
+        .post('/api/emitir/submit')
+        .set('Authorization', `Bearer ${a}`)
+        .send({ sacado: `Sacado Isolado ${unique()}`, cnpj: '33.222.111/0001-77', valor: '7.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+    }
+    expect(emit.status).toBe(200);
+
+    const resA = await request(app).get('/api/dashboard').set('Authorization', `Bearer ${a}`);
+    const resB = await request(app).get('/api/dashboard').set('Authorization', `Bearer ${b}`);
+    expect(resA.body.kpis.find((k: { label: string }) => k.label === 'Duplicatas ativas').value).toBe('1');
+    expect(resB.body.kpis.find((k: { label: string }) => k.label === 'Duplicatas ativas').value).toBe('0');
   });
 });
 

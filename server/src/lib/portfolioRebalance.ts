@@ -4,6 +4,7 @@ import { ratingFromScore } from './riscoCore.js';
 import { fmtBRL } from './format.js';
 import type { Rating } from '../data/seed.js';
 import type { SuitabilityProfile } from './suitability.js';
+import { precoPago } from './investorPositions.js';
 
 // Suggested portfolio rebalancing — deterministic, explainable target-allocation bands
 // per suitability profile (lib/suitability.ts), same "every number traces to a rule, no
@@ -59,15 +60,6 @@ export interface RebalanceView {
   suggestions: RebalanceSuggestion[];
 }
 
-// purchases.valor é valor de face numa compra primária/cesta/Confirming, mas preço pago
-// numa compra originada de revenda — a alocação sugerida aqui precisa refletir o
-// dinheiro de fato investido, recuperado via faceValor - retorno. Essa identidade só vale
-// pra uma posição ainda ativa (buildRebalanceView já filtra .active abaixo — só sugere
-// rebalancear posições vivas, não faz sentido pra uma já revendida), mas mantém o mesmo
-// guard das outras 3 funções que leem listPurchasesByInvestor por segurança.
-function precoPago(p: { faceValor: number; retorno: number; valor: number; active: number }): number {
-  return p.active ? p.faceValor - p.retorno : p.valor;
-}
 
 export function buildRebalanceView(userId: number): RebalanceView {
   const purchases = listPurchasesByInvestor(userId).filter((p) => p.active);

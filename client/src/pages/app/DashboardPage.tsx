@@ -11,10 +11,6 @@ interface Kpi {
   value: string;
   trend: string;
   trendColor: string;
-  cardBg: string;
-  labelColor: string;
-  valueColor: string;
-  valueSize: number;
 }
 interface Bar {
   label: string;
@@ -33,6 +29,10 @@ interface DashboardData {
   ratingLegend: Legend[];
   riskDonutStops: { color: string; from: number; to: number }[];
   activeDuplicatas: number;
+  donutTitle: string;
+  monthlyTitle: string;
+  donutEmptyHint: string | null;
+  monthlyEmptyHint: string | null;
 }
 
 export function DashboardPage() {
@@ -64,24 +64,26 @@ export function DashboardPage() {
       />
 
       <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        {data.kpis.map((kpi) => (
-          <div key={kpi.label} className="rounded-card border border-border p-5" style={{ background: kpi.cardBg }}>
-            <div className="text-[13px] font-semibold" style={{ color: kpi.labelColor }}>
-              {kpi.label}
+        {data.kpis.map((kpi, i) => {
+          const destaque = i === 0;
+          return (
+            <div key={kpi.label} className={`rounded-card border border-border p-5 ${destaque ? 'bg-navy' : 'bg-white'}`}>
+              <div className={`text-[13px] font-semibold ${destaque ? 'text-[#9FB3D6]' : 'text-textSecondary'}`}>{kpi.label}</div>
+              <div className={`font-extrabold mt-2.5 tracking-tight ${destaque ? 'text-[30px] text-white' : 'text-[26px] text-navy'}`}>{kpi.value}</div>
+              <div className="text-[12.5px] mt-2 font-semibold" style={{ color: destaque && kpi.trendColor === '#5B6472' ? '#9FB3D6' : kpi.trendColor }}>
+                {kpi.trend}
+              </div>
             </div>
-            <div className="font-extrabold mt-2.5 tracking-tight" style={{ fontSize: kpi.valueSize, color: kpi.valueColor }}>
-              {kpi.value}
-            </div>
-            <div className="text-[12.5px] mt-2 font-semibold" style={{ color: kpi.trendColor }}>
-              {kpi.trend}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: '1.6fr 1fr' }}>
         <Card>
-          <div className="font-bold text-[15px] mb-5">{t('dashboard.volumeChart', 'Volume antecipado por mês')}</div>
+          <div className="font-bold text-[15px] mb-5">{data.monthlyTitle}</div>
+          {data.monthlyEmptyHint ? (
+            <div className="h-[180px] flex items-center justify-center text-[12.5px] text-textSecondary">{data.monthlyEmptyHint}</div>
+          ) : (
           <div className="flex items-end gap-4 h-[180px] px-1">
             {data.monthlyBars.map((bar) => (
               <div key={bar.label} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
@@ -91,14 +93,17 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
+          )}
         </Card>
 
         <Card className="flex flex-col items-center">
-          <div className="font-bold text-[15px] self-start mb-4">{t('dashboard.ratingChart', 'Carteira por rating')}</div>
+          <div className="font-bold text-[15px] self-start mb-4">{data.donutTitle}</div>
           <Donut stops={data.riskDonutStops} size={150}>
             <div className="text-xl font-extrabold">{data.activeDuplicatas}</div>
             <div className="text-[11px] text-textSecondary">{t('dashboard.operacoes', 'operações')}</div>
           </Donut>
+          {data.donutEmptyHint && <div className="text-[12.5px] text-textSecondary text-center mt-4">{data.donutEmptyHint}</div>}
+          {!data.donutEmptyHint && (
           <div className="flex flex-col gap-2 w-full mt-5">
             {data.ratingLegend.map((r) => (
               <div key={r.label} className="flex items-center gap-2 text-[13px]">
@@ -108,6 +113,7 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
+          )}
         </Card>
       </div>
     </div>

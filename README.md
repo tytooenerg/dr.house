@@ -1032,6 +1032,59 @@ Primeira frente de uma revisão de interface pedida pelo usuário ("a parte de f
 
 Novo `client/src/data/navConfig.test.ts` (6 casos — unicidade de chave/rota, tabs padrão de papel existindo, teto de 5 itens por grupo pra investidor e cedente sem nenhuma tab sumir, ordem/omissão de grupos, casamento por segmento). `e2e/tests/admin-reconciliation.spec.ts` ajustado (aba virou link e a URL agora muda). Verificado: `npm run typecheck`/`build`/`test`/`test:e2e` todos verdes.
 
+### Dashboard: KPIs reais por papel (o fim dos números fixos na primeira tela)
+
+Segunda frente da revisão de interface. O dashboard inteiro era constante: os 4 KPIs vinham de
+`KPIS_RAW` em `data/seed.ts` ("R$ 128,4M", "2,3% a.m.", "342 duplicatas ativas", "1,8% a.m."),
+as barras mensais de `MONTHS_RAW` (Fev–Jul fixos) e os cortes do donut/legenda eram literais
+dentro de `routes/dashboard.ts`. Investidor, cedente e sacado viam **exatamente os mesmos
+números**, sem nenhuma relação com a conta de quem estava olhando — e a tela se contradizia
+sozinha, porque `activeDuplicatas` (o único número real, no centro do donut) mostrava as
+operações de verdade enquanto o card ao lado anunciava 342.
+
+- **`lib/dashboardCore.ts`** (novo): monta a visão do papel a partir do banco.
+  - **Investidor** — Total investido, Retorno acumulado, Rentabilidade acumulada, Posições
+    abertas, de `listPurchasesByInvestor`. Bate exatamente com Carteira & Histórico, porque
+    usa o mesmo `precoPago`.
+  - **Cedente** — Total antecipado (valor de face das vendidas/pagas), Deságio médio pago
+    (`effectiveMonthlyRatePct` só das antecipadas, a taxa real e não a estimativa de uma
+    oferta que ninguém comprou), Duplicatas ativas, Prazo médio da emissão ao vencimento.
+  - **Sacado** — Aceites a confirmar, A vencer, Total confirmado, Disputas abertas, de
+    `listAceitesBySacadoNome`/`listBySacadoNome`.
+  - **Fallback de plataforma** para papéis sem carteira própria (admin/auditor/seguradora/
+    api_partner/anunciante): agregados reais, sem fingir uma carteira que não existe. Na
+    prática nenhum deles tem a tab `dashboard` em `ROLE_TABS`, mas a rota responde a qualquer
+    conta autenticada.
+- **Sem dado ≠ zero**: um KPI sem base vem como `—` com a razão ("nenhuma compra ainda"),
+  nunca R$ 0 — que seria a afirmação diferente, e possivelmente falsa, de que o resultado é
+  zero. Contagens legítimas (Posições abertas, Duplicatas ativas) continuam mostrando `0`.
+  Rosca e gráfico de barras sem nada a mostrar exibem a explicação em vez de uma rosca vazia
+  ou seis colunas de traço.
+- **Barras e donut reais**: últimos 6 meses do volume da própria conta (sempre 6 colunas, pra
+  o gráfico não mudar de largura conforme o histórico) e distribuição real por rating via
+  `ratingFromScore`, ponderada por valor, com os cortes fechando exatamente em 100.
+- **Apresentação saiu do payload**: o servidor mandava `cardBg`/`labelColor`/`valueColor`/
+  `valueSize` por KPI. O destaque do primeiro card é decisão de UI e agora vive no
+  `DashboardPage.tsx`.
+
+**`precoPago` virou fonte única** (`lib/investorPositions.ts`): a função estava copiada
+literalmente em 4 arquivos (`routes/historico.ts`, `lib/institutionalReporting.ts`,
+`lib/investorPerformance.ts`, `lib/portfolioRebalance.ts`), cada um com sua versão do
+comentário. O dashboard seria a quinta cópia — e uma divergência entre elas faria o mesmo
+investidor ver totais diferentes em telas diferentes.
+
+**Bug pré-existente corrigido de passagem** (`lib/cestasCore.ts`): `totalInvestidoFmt` e
+`restanteFmt` eram arredondados de forma independente por `fmtBRL` (`maximumFractionDigits:
+0`), então o par exibido podia somar R$ 1 a mais que o orçamento. Agora arredonda uma vez e
+deriva o outro. Isso quebrava `cestas-investir.test.ts` na main (o valor exato depende do
+prazo até o vencimento, que muda a cada dia).
+
+Testes de dashboard reescritos em `comparador-dashboard-cestas.test.ts`: rótulos por papel,
+`—` com a razão numa conta nova, KPI da conta e não da plataforma (dois cedentes veem números
+diferentes), prazo médio real e estrutura (4 KPIs, 6 meses, donut fechando em 100). Verificado:
+`npm run typecheck`/`test`/`build`/`test:e2e` verdes — server 750, client 32, sdks/node 9,
+e2e 12/12.
+
 ## Running locally
 
 ```bash

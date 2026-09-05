@@ -170,25 +170,6 @@ export const DISPUTE_TIMELINES: Record<number, { autor: string; texto: string; q
   2: [{ autor: 'Metalúrgica Serrana S.A.', texto: 'Contestou o valor — nota de devolução parcial anexada.', quando: 'há 2 dias' }],
 };
 
-export const KPIS_RAW = [
-  { label: 'Total antecipado', value: 'R$ 128,4M', trend: '+12,4% vs. mês anterior', trendColor: COLORS.GREEN },
-  { label: 'Taxa média de deságio', value: '2,3% a.m.', trend: '-0,2 p.p. vs. mês anterior', trendColor: COLORS.GREEN },
-  { label: 'Duplicatas ativas', value: '342', trend: '+28 novas esta semana', trendColor: COLORS.GREEN },
-  { label: 'Rendimento médio investidor', value: '1,8% a.m.', trend: 'estável', trendColor: '#5B6472' },
-];
-
-export const MONTHS_RAW = [
-  { label: 'Fev', v: 14.2 }, { label: 'Mar', v: 16.8 }, { label: 'Abr', v: 15.1 },
-  { label: 'Mai', v: 19.4 }, { label: 'Jun', v: 22.7 }, { label: 'Jul', v: 24.3 },
-];
-
-export const RATING_LEGEND = [
-  { label: 'AA / A — baixo risco', pct: '58%', color: COLORS.GREEN },
-  { label: 'B — risco moderado', pct: '27%', color: COLORS.AMBER },
-  { label: 'C — risco elevado', pct: '11%', color: COLORS.RED },
-  { label: 'Em análise', pct: '4%', color: '#B8C2D4' },
-];
-
 export const NOTIFICATIONS = [
   { text: 'Leilão da duplicata #3 (Metalúrgica Serrana) encerra em 18 min', time: 'agora', color: COLORS.RED },
   { text: 'Grupo Atlas Varejo aceitou a duplicata DUP-2026-0842', time: 'há 20 min', color: COLORS.GREEN },
