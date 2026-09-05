@@ -1,25 +1,27 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { NavIcon } from '../components/NavIcon';
-import { GROUP_LABELS, NAV_ITEMS } from '../data/navConfig';
+import { groupNavItems } from '../data/navConfig';
 import { useSession } from '../state/SessionContext';
-import { useIsMobile } from '../lib/useIsMobile';
 import { useLang } from '../lib/i18n';
 import { LanguageToggle } from '../components/LanguageToggle';
 
-const GROUPS: ('operacoes' | 'analise' | 'plataforma')[] = ['operacoes', 'analise', 'plataforma'];
-
-export function Sidebar() {
+// Sidebar é só o menu: quem decide se ela fica fixa ao lado (desktop) ou dentro de um drawer
+// (mobile) é o AppShell. `onNavigate` é chamado a cada clique em item pra o drawer se fechar.
+//
+// Itens são <NavLink> de verdade, não <button onClick={navigate}> — abre em nova aba com
+// botão do meio, aparece como link pra leitor de tela e ganha aria-current="page" sozinho
+// (inclusive em sub-rotas: /app/admin/kyb acende "Back-office").
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useSession();
-  const location = useLocation();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const { t } = useLang();
 
   if (!user) return null;
-  const allowed = new Set(user.navTabs);
+  const sections = groupNavItems(user.navTabs);
   const initials = user.nome
     .split(' ')
     .map((n) => n[0])
@@ -33,71 +35,74 @@ export function Sidebar() {
   };
 
   return (
-    <nav
-      aria-label="Navegação principal"
-      className="bg-navy flex flex-col gap-8 flex-shrink-0 py-7 px-[18px]"
-      style={{ width: isMobile ? '100%' : 248, maxHeight: isMobile ? 260 : undefined, overflowY: 'auto' }}
-    >
-      <Link to="/developers" className="flex items-center gap-2.5 px-2">
+    <nav aria-label="Navegação principal" className="bg-navy flex flex-col h-full w-[248px] py-5 px-3.5 overflow-y-auto">
+      <Link to="/developers" className="flex items-center gap-2.5 px-2 mb-5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
         <Logo dark />
       </Link>
 
-      <div className="flex items-start gap-2 px-3 py-2.5 rounded-[10px]" style={{ background: 'rgba(30,94,255,0.14)', border: '1px solid rgba(30,94,255,0.35)' }}>
-        <span className="rounded-full mt-1 flex-shrink-0" style={{ width: 7, height: 7, background: '#4C8CFF' }} />
-        <div>
-          <div className="text-white text-xs font-bold leading-snug">Conforme Duplicata Escritural</div>
-          <div className="text-[#9FB3D6] text-[11px] mt-0.5 leading-snug">Registro via CERC · B3 · Núclea — Res. BCB nº 339/2023</div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1 overflow-y-auto">
-        {GROUPS.map((group) => {
-          const items = NAV_ITEMS.filter((i) => i.group === group && allowed.has(i.key));
-          if (items.length === 0) return null;
-          const isOpen = !collapsed[group];
+      <div className="flex flex-col gap-3 flex-1">
+        {sections.map((section) => {
+          const isOpen = !collapsed[section.group];
           return (
-            <div key={group}>
-              <button
-                type="button"
-                aria-expanded={isOpen}
-                className="flex items-center justify-between px-3 pt-3 pb-0.5 border-none bg-transparent cursor-pointer w-full"
-                onClick={() => setCollapsed((c) => ({ ...c, [group]: !c[group] }))}
-              >
-                <span className="text-[10.5px] font-bold text-[#5C6B87] uppercase tracking-wider">{t(`group.${group}`, GROUP_LABELS[group])}</span>
-                <span className="text-[9px] text-[#5C6B87]" aria-hidden="true">
-                  {isOpen ? '▾' : '▸'}
-                </span>
-              </button>
-              {isOpen &&
-                items.map((item) => {
-                  const active = location.pathname === item.path;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      aria-current={active ? 'page' : undefined}
-                      onClick={() => navigate(item.path)}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg border-none cursor-pointer text-left text-sm font-semibold w-full mt-0.5 transition-colors"
-                      style={{ background: active ? '#1E5EFF' : 'transparent', color: active ? '#fff' : '#B8C2D4' }}
-                    >
-                      <NavIcon tab={item.key} />
-                      {t(`app.${item.key}`, item.label)}
-                    </button>
-                  );
-                })}
+            <div key={section.group}>
+              {section.label && (
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  className="flex items-center justify-between px-3 pb-1.5 border-none bg-transparent cursor-pointer w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                  onClick={() => setCollapsed((c) => ({ ...c, [section.group]: !c[section.group] }))}
+                >
+                  <span className="text-[10.5px] font-bold text-[#7C8BA6] uppercase tracking-wider">{t(`group.${section.group}`, section.label)}</span>
+                  <ChevronDown size={12} className="text-[#7C8BA6] transition-transform" style={{ transform: isOpen ? 'none' : 'rotate(-90deg)' }} aria-hidden="true" />
+                </button>
+              )}
+              {isOpen && (
+                <ul className="list-none m-0 p-0 flex flex-col gap-0.5">
+                  {section.items.map((item) => (
+                    <li key={item.key}>
+                      <NavLink
+                        to={item.path}
+                        onClick={onNavigate}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-3 py-[7px] rounded-lg text-[13px] font-semibold no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
+                            isActive ? 'bg-blue text-white' : 'text-[#B8C2D4] hover:bg-white/[0.06] hover:text-white'
+                          }`
+                        }
+                      >
+                        <NavIcon tab={item.key} />
+                        <span className="truncate">{t(`app.${item.key}`, item.label)}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           );
         })}
       </div>
 
-      <div className="mt-auto flex items-center gap-2.5 p-3 rounded-[10px]" style={{ background: 'rgba(255,255,255,0.06)' }}>
-        <div className="w-[34px] h-[34px] rounded-full bg-blue text-white flex items-center justify-center font-bold text-[13px]">{initials}</div>
+      {/* Selo de conformidade: antes era um card grande logo abaixo da logo, empurrando o menu
+          pra baixo em todo papel. Continua visível, mas como rodapé discreto. */}
+      <div className="mt-6 px-3 text-[10.5px] leading-snug text-[#7C8BA6]">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#4C8CFF] mr-1.5 align-middle" aria-hidden="true" />
+        Conforme Duplicata Escritural · Res. BCB nº 339/2023
+      </div>
+
+      <div className="mt-3 flex items-center gap-2.5 p-3 rounded-[10px]" style={{ background: 'rgba(255,255,255,0.06)' }}>
+        <div className="w-[34px] h-[34px] rounded-full bg-blue text-white flex items-center justify-center font-bold text-[13px] flex-shrink-0">{initials}</div>
         <div className="flex-1 min-w-0">
           <div className="text-white text-[13px] font-semibold truncate">{user.nome}</div>
-          <div className="text-[#8B97AC] text-[11.5px]">{user.sessionLabel}{user.isTeamMember ? ' · somente leitura' : ''}</div>
+          <div className="text-[#8B97AC] text-[11.5px] truncate">
+            {user.sessionLabel}
+            {user.isTeamMember ? ' · somente leitura' : ''}
+          </div>
         </div>
         <LanguageToggle className="text-[#8B97AC]" />
-        <button type="button" className="bg-transparent border-none text-[#8B97AC] text-[11.5px] font-bold cursor-pointer" onClick={handleLogout}>
+        <button
+          type="button"
+          className="bg-transparent border-none text-[#8B97AC] text-[11.5px] font-bold cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          onClick={handleLogout}
+        >
           {t('app.sair', 'Sair')}
         </button>
       </div>

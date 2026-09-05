@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Bell } from 'lucide-react';
 import { api } from '../lib/api';
 import { Dot } from '../components/ui/Badge';
 
@@ -44,7 +45,7 @@ export function NotificationBell() {
   };
 
   return (
-    <div className="fixed top-6 right-9 z-50" ref={ref}>
+    <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={toggle}
@@ -54,7 +55,7 @@ export function NotificationBell() {
         className="w-[38px] h-[38px] rounded-[10px] border border-border bg-white cursor-pointer flex items-center justify-center relative"
         style={{ boxShadow: '0 2px 6px rgba(11,31,58,0.06)' }}
       >
-        <span className="rounded-full border-2 border-navy" style={{ width: 14, height: 14, borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }} />
+        <Bell size={17} strokeWidth={1.75} className="text-navy" aria-hidden="true" />
         {unread && <span className="absolute rounded-full bg-red border-[1.5px] border-white" style={{ top: 7, right: 8, width: 8, height: 8 }} />}
       </button>
       {open && (

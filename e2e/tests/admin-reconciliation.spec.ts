@@ -8,7 +8,9 @@ test('admin runs the reconciliation scan from the back-office and sees a result'
   await expect(page).toHaveURL(/\/app\/admin/, { timeout: 15_000 });
   await dismissOnboardingIfPresent(page);
 
-  await page.getByRole('button', { name: 'Reconciliação' }).click();
+  // As abas do back-office são sub-rotas (/app/admin/reconciliacao) — links, não botões.
+  await page.getByRole('link', { name: 'Reconciliação' }).click();
+  await expect(page).toHaveURL(/\/app\/admin\/reconciliacao/);
   await expect(page.getByText('Reconciliação de pagamentos')).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole('button', { name: 'Rodar reconciliação agora' }).click();

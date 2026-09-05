@@ -115,7 +115,7 @@ export default function App() {
             <Route path="perfil" element={<Gate tab="perfil"><PerfilPage /></Gate>} />
             <Route path="conta" element={<Gate tab="conta"><ContaPage /></Gate>} />
             <Route path="receita" element={<Gate tab="receita"><ReceitaPage /></Gate>} />
-            <Route path="admin" element={<Gate tab="admin"><AdminPage /></Gate>} />
+            <Route path="admin/:tab?" element={<Gate tab="admin"><AdminPage /></Gate>} />
             <Route path="assinatura" element={<Gate tab="assinatura"><AssinaturaPage /></Gate>} />
             <Route path="seguradora" element={<Gate tab="seguradora"><SeguradoraPage /></Gate>} />
             <Route path="auditor" element={<Gate tab="auditor"><AuditorPage /></Gate>} />

@@ -1018,6 +1018,20 @@ Pedido do usuário: a Automação de Lances tinha um único campo, "Taxa máxima
 
 Novo `server/test/automation-ladder.test.ts` (15 casos — decaimento por etapa, nunca abaixo do alvo, banda ao vivo como default, validação da rota, rearme após compra numa duplicata criada direto pro teste). `automation-routes.test.ts`/`comparador-dashboard-cestas.test.ts` ajustados pro novo formato. Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 747 testes, client 26/26, sdks/node 9/9).
 
+### Navegação: menu agrupado por tarefa, cabeçalho fixo, drawer no celular e back-office em sub-rotas
+
+Primeira frente de uma revisão de interface pedida pelo usuário ("a parte de frontend está bagunçada"). O diagnóstico que motivou esta PR: investidor e cedente viam **17 itens de menu cada** (9 e 8 só no grupo "Operações"), com 21 "ícones" feitos de `<div>` — 8 tabs eram o mesmo quadradinho, então o menu era uma parede de texto; não havia cabeçalho nem indicação de onde o usuário estava; o sino de notificações flutuava em `position: fixed` por cima do conteúdo; no celular o menu inteiro virava uma caixa de rolagem de 260px empilhada acima da página; e o back-office era uma única tela com 12 abas em `useState` e 17 imports estáticos (o maior chunk do app, ~88KB, baixado inteiro pra ver uma fila vazia, sem URL por aba).
+
+- **Grupos por tarefa** (`data/navConfig.ts`): os 3 grupos antigos (Operações / Análise / Plataforma) viram 5 — `inicio` (só a Visão Geral, sem cabeçalho), `operacoes`, `financeiro`, `risco` (Risco & Compliance) e `plataforma`. Nenhum grupo passa de 5 itens pra um papel real, garantido por teste. Novos helpers `groupNavItems(navTabs)` (grupos vazios somem) e `findNavItem(pathname)` (casa por segmento — `/app/admin/kyb` acende "Back-office", `/app/contas-pagar` não vaza pra `/app/conta`). Quem pode ver cada tab continua sendo `ROLE_TABS` no servidor: só o agrupamento mudou, nenhuma permissão.
+- **Ícones reais** (`components/NavIcon.tsx`): um glifo `lucide-react` por tab (tree-shaken, `currentColor`, 16px) no lugar dos `<div>` com `border`/`rotate`. Mesmo ícone no sino de notificações.
+- **Itens do menu viraram `<NavLink>`** em vez de `<button onClick={navigate}>` — abrem em nova aba com o botão do meio, são anunciados como link por leitor de tela e ganham `aria-current="page"` sozinhos, inclusive em sub-rotas. Todo alvo focável do shell tem anel de foco visível (`focus-visible`), que antes não existia em lugar nenhum do app.
+- **`layout/TopBar.tsx`** (novo): cabeçalho fixo com breadcrumb "Grupo / Página", o sino (agora ancorado nele, não mais `fixed` sobre o conteúdo) e, no celular, o botão de menu. O conteúdo passou a viver num `<main>` de verdade.
+- **Drawer no celular** (`AppShell.tsx`): a sidebar vira gaveta sobreposta com overlay, fecha ao navegar/no Esc/ao voltar pro desktop e trava o scroll do fundo enquanto aberta. No desktop ela é `sticky` de altura total, com o menu rolando sozinho.
+- **Selo "Conforme Duplicata Escritural"** desceu pro rodapé da sidebar — continua visível, mas não empurra mais o menu inteiro pra baixo em todo papel.
+- **Back-office em sub-rotas** (`AdminPage.tsx` + rota `admin/:tab?` em `App.tsx`): cada aba é uma URL real (`/app/admin/reconciliacao`) e um chunk `lazy()` próprio. O chunk do AdminPage caiu de **~88KB para 7,1KB**; `/app/admin` sem aba continua válida (é onde o login do admin cai) e mostra a fila de KYB.
+
+Novo `client/src/data/navConfig.test.ts` (6 casos — unicidade de chave/rota, tabs padrão de papel existindo, teto de 5 itens por grupo pra investidor e cedente sem nenhuma tab sumir, ordem/omissão de grupos, casamento por segmento). `e2e/tests/admin-reconciliation.spec.ts` ajustado (aba virou link e a URL agora muda). Verificado: `npm run typecheck`/`build`/`test`/`test:e2e` todos verdes.
+
 ## Running locally
 
 ```bash
