@@ -6,6 +6,7 @@ import { effectiveOwnerId } from '../db/users.js';
 import { aceiteConfirmado } from '../lib/aceiteCore.js';
 import { fmtBRL } from '../lib/format.js';
 import { estimateRateBand } from '../lib/dynamicPricing.js';
+import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { ratingFromScore } from '../lib/riscoCore.js';
 import { COLORS } from '../data/seed.js';
 
@@ -102,6 +103,18 @@ minhasRouter.post('/:id/leilao', (req, res) => {
       return;
     }
   }
-  dispararLeilao(d.id, new Date(Date.now() + 6 * 3600 * 1000).toISOString(), reserva);
+  const closeAt = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
+  dispararLeilao(d.id, closeAt, reserva);
+  // 'leilao.aberto' era anunciado na tela de Desenvolvedores desde sempre e nunca disparava:
+  // dava pra assinar o evento e esperar pra sempre. Este é o único ponto do sistema em que um
+  // leilão de verdade abre, então é aqui que ele nasce. Mesmo padrão de entrega dos outros
+  // (void: uma falha de webhook nunca derruba a operação que já aconteceu).
+  void deliverWebhookEvent(req.user!.id, 'leilao.aberto', {
+    duplicataId: d.id,
+    sacado: d.sacado_nome,
+    valor: d.valor,
+    closeAt,
+    reservaTaxaAm: reserva ?? null,
+  });
   res.json({ duplicatas: listByCedente(req.user!.id).map(view) });
 });

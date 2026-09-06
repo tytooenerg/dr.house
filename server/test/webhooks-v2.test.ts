@@ -7,6 +7,27 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb, updateKybForm } from '../src/db/users.js';
 import { db } from '../src/db/index.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { createDuplicata } from '../src/db/duplicatas.js';
+import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
+
+// Duplicata pronta pra ir a leilão pelo caminho real: lastro 100% e aceite confirmado, que é
+// o que routes/minhas.ts exige antes de aceitar o disparo.
+function criarDuplicataAprovada(cedenteId: number): string {
+  const d = createDuplicata({
+    cedenteId,
+    cedenteNome: 'Cedente WH2',
+    sacadoNome: `Sacado WH2 ${unique()} Ltda`,
+    sacadoCnpj: '',
+    valor: 25000,
+    vencimento: '2026-12-31',
+    emissao: '10/08/2026',
+    status: 'aprovada',
+    lastroPct: 100,
+    seguro: false,
+  });
+  setAceiteStatus(ensureAceite(d.id, 'Aceite confirmado na emissão').id, 'aceita');
+  return d.id;
+}
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -273,5 +294,90 @@ describe('Webhooks v2 — rating.alterado', () => {
     await waitForDelivery(receivedPromise);
     server.close();
     expect(received.event).toBe('rating.alterado');
+  });
+});
+
+// Os três eventos do leilão eram anunciados na tela de Desenvolvedores (WEBHOOK_EVENTS em
+// data/seed.ts, aceitos pelo Zod de POST /dev/webhooks) e NENHUM tinha emissor: dava pra
+// assinar 'leilao.encerrado' e esperar para sempre. A doc pública já os tinha removido em
+// silêncio, então as duas listas discordavam. Estes testes provam que cada um sai de verdade.
+describe('Webhooks do leilão — eventos que eram anunciados e nunca disparavam', () => {
+  async function assinar(token: string, event: string) {
+    const { server, received, receivedPromise } = startReceiver();
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as { port: number }).port;
+    const created = await request(app)
+      .post('/api/dev/webhooks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ url: `http://127.0.0.1:${port}/hook`, event });
+    expect(created.status).toBe(200);
+    return { server, received, receivedPromise };
+  }
+
+  it('leilao.aberto sai quando o cedente dispara o leilão, com prazo e reserva', async () => {
+    const { token, userId } = await registerEmpresarialCedente();
+    const hook = await assinar(token, 'leilao.aberto');
+
+    const d = criarDuplicataAprovada(userId);
+    const res = await request(app).post(`/api/minhas/${d}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '2,00' });
+    expect(res.status).toBe(200);
+
+    await waitForDelivery(hook.receivedPromise);
+    hook.server.close();
+    const body = JSON.parse(hook.received.body);
+    expect(body.event).toBe('leilao.aberto');
+    expect(body.data.duplicataId).toBe(d);
+    expect(body.data.reservaTaxaAm).toBeCloseTo(2, 5);
+    expect(body.data.closeAt).toBeTruthy();
+  });
+
+  it('lance.recebido sai pro cedente a cada lance, com a taxa proposta', async () => {
+    const { token, userId } = await registerEmpresarialCedente();
+    const hook = await assinar(token, 'lance.recebido');
+
+    const d = criarDuplicataAprovada(userId);
+    await request(app).post(`/api/minhas/${d}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '3,00' });
+    const inv = await registerInvestidor();
+    const lance = await request(app).post(`/api/market/${d}/lance`).set('Authorization', `Bearer ${inv.token}`).send({ taxaAm: 2.5 });
+    expect(lance.status).toBe(200);
+
+    await waitForDelivery(hook.receivedPromise);
+    hook.server.close();
+    const body = JSON.parse(hook.received.body);
+    expect(body.event).toBe('lance.recebido');
+    expect(body.data.duplicataId).toBe(d);
+    expect(body.data.taxaAm).toBeCloseTo(2.5, 5);
+    expect(body.data.totalLances).toBe(1);
+  });
+
+  it('leilao.encerrado sai no fechamento, dizendo se foi arrematado ou ficou sem lance', async () => {
+    const { token, userId } = await registerEmpresarialCedente();
+    const arrematado = await assinar(token, 'leilao.encerrado');
+
+    const d = criarDuplicataAprovada(userId);
+    await request(app).post(`/api/minhas/${d}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '3,00' });
+    const inv = await registerInvestidor();
+    await request(app).post(`/api/market/${d}/lance`).set('Authorization', `Bearer ${inv.token}`).send({ taxaAm: 2.5 });
+    fecharLeiloes(d);
+
+    await waitForDelivery(arrematado.receivedPromise);
+    arrematado.server.close();
+    const vendido = JSON.parse(arrematado.received.body);
+    expect(vendido.data.resultado).toBe('arrematado');
+    expect(vendido.data.investorId).toBe(inv.userId);
+    expect(vendido.data.taxaAm).toBeCloseTo(2.5, 5);
+
+    // E o outro desfecho: leilão que fecha sem nenhum lance também avisa.
+    const semLance = await assinar(token, 'leilao.encerrado');
+    const d2 = criarDuplicataAprovada(userId);
+    await request(app).post(`/api/minhas/${d2}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '3,00' });
+    fecharLeiloes(d2);
+
+    await waitForDelivery(semLance.receivedPromise);
+    semLance.server.close();
+    const vazio = JSON.parse(semLance.received.body);
+    expect(vazio.data.duplicataId).toBe(d2);
+    expect(vazio.data.resultado).toBe('sem_lance');
+    expect(vazio.data.totalLances).toBe(0);
   });
 });

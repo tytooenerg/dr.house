@@ -11,6 +11,7 @@ import {
 } from '../db/auctionBids.js';
 import { computePurchasePrice, effectiveMonthlyRatePct } from './marketCompute.js';
 import { fmtBRL } from './format.js';
+import { deliverWebhookEvent } from './webhookDelivery.js';
 
 // O leilão primário de verdade, no lugar da encenação anterior (ver o comentário da
 // migração 0067). Regras, todas verificáveis no código abaixo:
@@ -89,6 +90,20 @@ export function placeAuctionBid(user: UserRow, duplicataId: string, taxaAm: numb
   const anterior = getActiveAuctionBid(duplicataId, user.id);
   if (anterior) setAuctionBidStatus(anterior.id, 'cancelado');
   const bid = createAuctionBid(duplicataId, user.id, taxaAm, preco);
+
+  // 'lance.recebido' também era anunciado e nunca disparava. Emitir aqui, e não na rota,
+  // cobre TODOS os caminhos de lance de uma vez — rota manual, cestas, automação, Fundo do
+  // Confirming e o agente de auto-bid passam todos por placeAuctionBid. Quem recebe é o
+  // cedente: é a duplicata dele que está sendo disputada.
+  const dono = getDuplicata(duplicataId)?.cedente_id ?? null;
+  if (dono !== null) {
+    void deliverWebhookEvent(dono, 'lance.recebido', {
+      duplicataId,
+      taxaAm,
+      preco,
+      totalLances: listActiveAuctionBids(duplicataId).length,
+    });
+  }
   return { status: 200, body: { bidId: bid.id, taxaFmt: fmtTaxa(taxaAm), precoFmt: fmtBRL(preco) } };
 }
 

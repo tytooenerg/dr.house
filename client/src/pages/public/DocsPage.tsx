@@ -54,8 +54,15 @@ const RATE_LIMITS = [
   { tier: 'Risk Score API / PLD Screening API (produto avulso)', limit: '200/min' },
 ];
 
+// Espelha WEBHOOK_EVENTS de server/src/data/seed.ts — a lista que a tela de Desenvolvedores
+// oferece pra assinatura. Os três do leilão faltavam aqui porque, até então, eram anunciados
+// e nunca disparavam; agora têm emissor real (routes/minhas.ts, lib/auctionCore.ts e
+// lib/auctionClose.ts) e as duas listas voltam a dizer a mesma coisa.
 const WEBHOOK_EVENTS = [
   'duplicata.registrada',
+  'leilao.aberto',
+  'lance.recebido',
+  'leilao.encerrado',
   'pagamento.confirmado',
   'sinistro.decidido',
   'rating.alterado',
