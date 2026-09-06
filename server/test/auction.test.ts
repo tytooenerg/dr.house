@@ -104,6 +104,49 @@ describe('leilão primário — quem vence', () => {
   });
 });
 
+describe('leilão primário — a reserva é do cedente', () => {
+  it('a taxa máxima informada pelo cedente vira a reserva, no lugar da banda de mercado', async () => {
+    const id = duplicataEmLeilao(); // desagio fixado em 3,00% pela banda
+    const mercado = reserveRate(id)!;
+    expect(mercado.taxaAm).toBeCloseTo(3, 5);
+    expect(mercado.doCedente).toBe(false);
+
+    // O cedente reabre o leilão dizendo que não aceita pior que 2% a.m.
+    dispararLeilao(id, new Date(Date.now() + 3600_000).toISOString(), 2);
+    const doCedente = reserveRate(id)!;
+    expect(doCedente.taxaAm).toBeCloseTo(2, 5);
+    expect(doCedente.doCedente).toBe(true);
+    // Preço maior: deságio menor = o cedente recebe mais.
+    expect(doCedente.preco).toBeGreaterThan(mercado.preco);
+
+    const inv = await investidor();
+    // 2,5% caberia na banda de mercado, mas é pior que o limite do cedente.
+    const recusado = await lance(inv.token, id, 2.5);
+    expect(recusado.status).toBe(409);
+    expect(recusado.body.error).toBe('above_reserve');
+    expect((await lance(inv.token, id, 2)).status).toBe(200);
+  });
+
+  it('POST /minhas/:id/leilao grava a taxa máxima do cedente e recusa valor fora da faixa', async () => {
+    const cedente = await request(app)
+      .post('/api/auth/register')
+      .send({ nome: 'Cedente', email: `ced-${unique()}@example.com`, password: 'senha123', companyName: 'Cedente Reserva', role: 'cedente' });
+    const token = cedente.body.token as string;
+    const id = duplicataEmLeilao();
+    // Põe a duplicata no nome deste cedente e a devolve pra 'aprovada' (estado de disparo).
+    db.prepare("UPDATE duplicatas SET cedente_id = ?, status = 'aprovada', close_at = NULL WHERE id = ?").run(cedente.body.user.id, id);
+
+    const invalida = await request(app).post(`/api/minhas/${id}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '150' });
+    expect(invalida.status).toBe(400);
+    expect(getDuplicata(id)!.status).toBe('aprovada');
+
+    const ok = await request(app).post(`/api/minhas/${id}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '1,80' });
+    expect(ok.status).toBe(200);
+    expect(getDuplicata(id)!.reserva_taxa_am).toBeCloseTo(1.8, 5);
+    expect(reserveRate(id)!.doCedente).toBe(true);
+  });
+});
+
 describe('leilão primário — a reserva', () => {
   it('recusa lance com deságio pior que a reserva do cedente', async () => {
     const id = duplicataEmLeilao();

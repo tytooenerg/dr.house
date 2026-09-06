@@ -1,10 +1,20 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { listByCedente, getDuplicata, dispararLeilao } from '../db/duplicatas.js';
 import { effectiveOwnerId } from '../db/users.js';
 import { aceiteConfirmado } from '../lib/aceiteCore.js';
 import { fmtBRL } from '../lib/format.js';
+import { estimateRateBand } from '../lib/dynamicPricing.js';
+import { ratingFromScore } from '../lib/riscoCore.js';
 import { COLORS } from '../data/seed.js';
+
+// Teto de sanidade pra taxa de reserva. Não é uma regra de mercado — é uma barreira contra
+// dedo errado (digitar "150" quando queria "1,50"), que a essa altura significaria aceitar
+// entregar a duplicata quase de graça.
+const RESERVA_MAX_PCT = 20;
+
+const leilaoSchema = z.object({ taxaMaxima: z.union([z.number(), z.string()]).optional() });
 
 export const minhasRouter = Router();
 minhasRouter.use(requireAuth);
@@ -32,6 +42,10 @@ function view(d: ReturnType<typeof getDuplicata>) {
     statusBg: meta.bg,
     statusColor: meta.color,
     lastroFmt: d.lastro_pct + '%',
+    // Banda de mercado de HOJE pro rating deste sacado — sugestão pro cedente escolher a
+    // reserva com referência, não um número que a plataforma impõe por ele.
+    reservaSugeridaAm: estimateRateBand(ratingFromScore(d.score ?? 60)).mid,
+    reservaTaxaAm: d.reserva_taxa_am,
     lastroColor: d.lastro_pct === 100 ? COLORS.GREEN : d.lastro_pct >= 60 ? COLORS.AMBER : COLORS.RED,
     canDisparar: d.lastro_pct === 100 && d.status === 'aprovada' && aceiteConfirmado(d.id),
     aguardandoAceite: d.status === 'aprovada' && !aceiteConfirmado(d.id),
@@ -68,6 +82,26 @@ minhasRouter.post('/:id/leilao', (req, res) => {
     });
     return;
   }
-  dispararLeilao(d.id, new Date(Date.now() + 6 * 3600 * 1000).toISOString());
+  // A reserva é do cedente: é ele quem diz o pior deságio que aceita. Opcional pra não
+  // quebrar quem já chamava esta rota sem corpo — nesse caso vale a banda de mercado, o
+  // comportamento antigo (ver reserveRate em lib/auctionCore.ts).
+  const parsed = leilaoSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const raw = parsed.data.taxaMaxima;
+  let reserva: number | undefined;
+  if (raw !== undefined && String(raw).trim() !== '') {
+    reserva = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(',', '.'));
+    if (!Number.isFinite(reserva) || reserva <= 0 || reserva > RESERVA_MAX_PCT) {
+      res.status(400).json({
+        error: 'validation_error',
+        message: `A taxa máxima precisa ser um número entre 0 e ${RESERVA_MAX_PCT}% a.m.`,
+      });
+      return;
+    }
+  }
+  dispararLeilao(d.id, new Date(Date.now() + 6 * 3600 * 1000).toISOString(), reserva);
   res.json({ duplicatas: listByCedente(req.user!.id).map(view) });
 });

@@ -39,27 +39,26 @@ export interface BidView {
   isMine: boolean;
 }
 
-// Taxa de reserva: o deságio implícito no preço que o servidor calcula. É o teto do que o
-// cedente aceita — nada a ver com o que o investidor gostaria de pagar.
-export function reserveRate(duplicataId: string): { taxaAm: number; preco: number } | null {
+// Taxa de reserva: o pior deságio que o CEDENTE aceita. Quando ele informa uma ao disparar o
+// leilão (reserva_taxa_am, migração 0069), é ela que vale; sem isso cai na banda de mercado
+// (lib/dynamicPricing.ts), que é sugestão e não decisão — antes disso a plataforma arbitrava
+// sozinha o piso de quem estava vendendo.
+export function reserveRate(duplicataId: string): { taxaAm: number; preco: number; doCedente: boolean } | null {
   const d = getDuplicata(duplicataId);
   if (!d) return null;
-  const { precoCompra, taxaAmPct } = computePurchasePrice(d);
-  return { taxaAm: taxaAmPct, preco: precoCompra };
+  const doCedente = d.reserva_taxa_am !== null && d.reserva_taxa_am > 0;
+  const taxaAm = doCedente ? d.reserva_taxa_am! : computePurchasePrice(d).taxaAmPct;
+  return { taxaAm, preco: computePurchasePrice(d, taxaAm).precoCompra, doCedente };
 }
 
-// Preço em reais que uma taxa proposta implica, mantendo a mesma proporção que o servidor
-// usa na reserva — assim o vencedor paga exatamente o que propôs, não uma reprecificação.
+// Preço em reais que uma taxa proposta implica: a mesma fórmula de desconto por prazo que o
+// resto do sistema usa, com a taxa do lance no lugar da taxa de mercado (rateOverridePct). O
+// vencedor paga exatamente o que propôs, sem reprecificação e sem arredondamento — a coluna
+// `preco` é REAL e a liquidação sempre trabalhou com o valor fracionário.
 export function priceForRate(duplicataId: string, taxaAm: number): number | null {
   const d = getDuplicata(duplicataId);
   if (!d) return null;
-  const { precoCompra, taxaAmPct } = computePurchasePrice(d);
-  if (taxaAmPct <= 0) return precoCompra;
-  const descontoReserva = d.valor - precoCompra;
-  const desconto = (descontoReserva * taxaAm) / taxaAmPct;
-  // Sem arredondar: a coluna preco é REAL e a liquidação (settlePurchase) sempre trabalhou
-  // com o precoCompra fracionário — arredondar aqui muda o ledger em R$ 1.
-  return d.valor - desconto;
+  return computePurchasePrice(d, taxaAm).precoCompra;
 }
 
 export function placeAuctionBid(user: UserRow, duplicataId: string, taxaAm: number): AuctionOutcome<{ bidId: number; taxaFmt: string; precoFmt: string }> {

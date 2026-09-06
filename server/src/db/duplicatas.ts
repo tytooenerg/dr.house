@@ -163,13 +163,21 @@ export function setComplianceScore(id: string, score: number) {
   db.prepare('UPDATE duplicatas SET compliance_score = ? WHERE id = ?').run(score, id);
 }
 
-export function dispararLeilao(id: string, closeAtIso: string) {
+export function dispararLeilao(id: string, closeAtIso: string, reservaTaxaAm?: number | null) {
   // leilao_fechado_em zera junto: uma duplicata reofertada abre um leilão NOVO, e o carimbo
   // do leilão anterior faria auctionIsOpen (lib/auctionGate.ts) recusar todo lance com
   // auction_closed antes mesmo do primeiro investidor ver a oferta.
+  // reserva_taxa_am só é sobrescrita quando o cedente informa uma: reofertar sem mexer na
+  // taxa mantém a que ele já tinha escolhido.
+  if (reservaTaxaAm === undefined) {
+    db.prepare(
+      "UPDATE duplicatas SET status = 'no_mercado', close_at = ?, leilao_started_at = ?, leilao_fechado_em = NULL WHERE id = ?"
+    ).run(closeAtIso, new Date().toISOString(), id);
+    return;
+  }
   db.prepare(
-    "UPDATE duplicatas SET status = 'no_mercado', close_at = ?, leilao_started_at = ?, leilao_fechado_em = NULL WHERE id = ?"
-  ).run(closeAtIso, new Date().toISOString(), id);
+    "UPDATE duplicatas SET status = 'no_mercado', close_at = ?, leilao_started_at = ?, leilao_fechado_em = NULL, reserva_taxa_am = ? WHERE id = ?"
+  ).run(closeAtIso, new Date().toISOString(), reservaTaxaAm, id);
 }
 
 // Leilão encerrado sem nenhum lance dentro da reserva: a duplicata volta pro cedente, no

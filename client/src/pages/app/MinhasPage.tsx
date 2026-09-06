@@ -18,6 +18,9 @@ interface Duplicata {
   statusBg: string;
   statusColor: string;
   canDisparar: boolean;
+  // Banda de mercado de hoje pro rating do sacado — sugestão, não imposição.
+  reservaSugeridaAm: number;
+  reservaTaxaAm: number | null;
 }
 
 const COLS = '1.2fr 0.8fr 0.7fr 0.7fr 0.7fr 1.2fr';
@@ -39,9 +42,32 @@ export function MinhasPage() {
     load();
   }, []);
 
+  // O leilão só abre depois que o cedente diz qual é o pior deságio que aceita. Antes disso
+  // a plataforma escolhia esse piso por ele (banda de mercado em lib/dynamicPricing.ts), e o
+  // cedente podia ver a duplicata vendida a uma taxa que nunca aprovou.
+  const [reservaPara, setReservaPara] = useState<string | null>(null);
+  const [taxaMaxima, setTaxaMaxima] = useState('');
+  const [dispararErro, setDispararErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  const abrirReserva = (d: Duplicata) => {
+    setDispararErro('');
+    setReservaPara(d.id);
+    setTaxaMaxima((d.reservaTaxaAm ?? d.reservaSugeridaAm).toFixed(2).replace('.', ','));
+  };
+
   const disparar = async (id: string) => {
-    const data = await api.post<{ duplicatas: Duplicata[] }>(`/minhas/${id}/leilao`);
-    setDuplicatas(data.duplicatas);
+    setEnviando(true);
+    setDispararErro('');
+    try {
+      const data = await api.post<{ duplicatas: Duplicata[] }>(`/minhas/${id}/leilao`, { taxaMaxima });
+      setDuplicatas(data.duplicatas);
+      setReservaPara(null);
+    } catch (err) {
+      setDispararErro(err instanceof ApiError ? err.message : 'Não foi possível abrir o leilão.');
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -94,10 +120,39 @@ export function MinhasPage() {
               <span className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: d.statusBg, color: d.statusColor }}>
                 {d.status}
               </span>
-              {d.canDisparar && (
-                <button type="button" onClick={() => disparar(d.id)} className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">
+              {d.canDisparar && reservaPara !== d.id && (
+                <button type="button" onClick={() => abrirReserva(d)} className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">
                   {t('minhas.disparar', 'Disparar leilão')}
                 </button>
+              )}
+              {d.canDisparar && reservaPara === d.id && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <label className="text-[11.5px] font-bold text-textSecondary" htmlFor={`reserva-${d.id}`}>
+                    Aceito até
+                  </label>
+                  <input
+                    id={`reserva-${d.id}`}
+                    value={taxaMaxima}
+                    onChange={(e) => setTaxaMaxima(e.target.value)}
+                    className="w-[68px] px-2 py-1 rounded-md border border-inputBorder text-[12.5px] font-mono-num"
+                  />
+                  <span className="text-[11.5px] text-textSecondary">% a.m.</span>
+                  <button
+                    type="button"
+                    disabled={enviando}
+                    onClick={() => disparar(d.id)}
+                    className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer disabled:bg-onNavyDim"
+                  >
+                    {enviando ? 'Abrindo…' : 'Abrir leilão'}
+                  </button>
+                  <button type="button" onClick={() => setReservaPara(null)} className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer underline">
+                    Cancelar
+                  </button>
+                  <span className="text-[11.5px] text-textTertiary w-full">
+                    Mercado hoje para este sacado: ~{d.reservaSugeridaAm.toFixed(2).replace('.', ',')}% a.m. Lance com deságio pior que o seu limite é recusado.
+                  </span>
+                  {dispararErro && <span className="text-[11.5px] font-semibold text-red w-full">{dispararErro}</span>}
+                </div>
               )}
             </TableCell>
           </TableRow>

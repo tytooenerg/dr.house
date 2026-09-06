@@ -222,6 +222,9 @@ export interface DuplicataRow {
   // Instante em que o job de fechamento adjudicou o leilão (lib/auctionClose.ts) — null
   // enquanto aberto, e também quando fechou sem nenhum lance elegível.
   leilao_fechado_em: string | null;
+  // Pior deságio mensal que o cedente aceita neste leilão. NULL = usa a banda de mercado
+  // (lib/dynamicPricing.ts) como sugestão — ver migração 0069.
+  reserva_taxa_am: number | null;
 }
 
 export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';

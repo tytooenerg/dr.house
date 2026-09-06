@@ -1378,6 +1378,33 @@ Verificado: server **764** testes (dois novos em `test/auction.test.ts` — o fe
 lance devolve pra `'aprovada'` e some do marketplace; e o cedente reoferta, recebe lance e a
 duplicata é arrematada de verdade no segundo leilão).
 
+### A taxa de reserva passa a ser do cedente, não da plataforma
+
+No leilão reverso de recebíveis — o modelo que Monkey, Antecipa Fácil e afins operam — quem
+pede a cotação e decide se aceita a taxa vencedora é o **fornecedor**. A banda de mercado é
+referência, não decisão.
+
+Aqui era o contrário. `reserveRate` caía em `computePurchasePrice`, que cai em
+`estimateRateBand(rating)` (`lib/dynamicPricing.ts`) porque `desagio` **nunca é preenchido na
+emissão real**. Ou seja: a plataforma arbitrava o pior deságio que o cedente "aceitava". Ele
+podia ver a duplicata arrematada a uma taxa que nunca aprovou — ou não vender, por um piso
+que não escolheu.
+
+Agora `POST /minhas/:id/leilao` recebe `taxaMaxima`, e é ela que vira a reserva
+(`duplicatas.reserva_taxa_am`, migração 0069). Na tela, "Disparar leilão" abre um campo já
+preenchido com a banda de mercado do rating daquele sacado e a frase que diz o que ela é:
+*"Mercado hoje para este sacado: ~X% a.m."*. NULL continua significando "usa a banda" — é o
+que toda duplicata já existente tem, então nada quebra.
+
+`priceForRate` encolheu junto: em vez de derivar o preço por uma proporção contra a reserva,
+usa `computePurchasePrice(d, taxaDoLance)` — o parâmetro `rateOverridePct` que já existia
+para o Confirming. Mesma fórmula de desconto por prazo do resto do sistema, sem
+arredondamento intermediário.
+
+Verificado: server **766** testes (2 novos — a taxa do cedente substitui a banda e recusa
+lance que caberia no mercado mas não no limite dele; e a rota grava a taxa e rejeita valor
+fora da faixa de sanidade).
+
 ## Running locally
 
 ```bash
