@@ -1,5 +1,4 @@
-import { getDuplicata } from '../db/duplicatas.js';
-import { createPurchase } from '../db/duplicatas.js';
+import { getDuplicata, createPurchase, devolverDeLeilaoSemLance } from '../db/duplicatas.js';
 import { listActiveAuctionBids, listAuctionsToClose, markAuctionClosed, setAuctionBidStatus } from '../db/auctionBids.js';
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent } from '../db/audit.js';
@@ -37,12 +36,15 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
     const bids = listActiveAuctionBids(id);
 
     if (bids.length === 0) {
-      markAuctionClosed(id, nowIso);
+      // Volta pro cedente em 'aprovada' — é o estado de onde ela saiu e o único em que
+      // dispararLeilao aceita reabrir o leilão. Nada de markAuctionClosed aqui: o carimbo
+      // serve pra não readjudicar um leilão vendido, e esta duplicata não foi vendida.
+      devolverDeLeilaoSemLance(id);
       semLance++;
       if (d.cedente_id) {
         addNotification(
           d.cedente_id,
-          `Leilão de ${d.sacado_nome} encerrou sem lances dentro da reserva — você pode reofertar a duplicata.`,
+          `Leilão de ${d.sacado_nome} encerrou sem lances dentro da reserva — a duplicata voltou pra "Minhas Duplicatas" e pode ser reofertada.`,
           COLORS.AMBER,
           'leilao'
         );

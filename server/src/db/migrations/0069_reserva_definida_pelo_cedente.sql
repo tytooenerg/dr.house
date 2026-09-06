@@ -1,0 +1,12 @@
+-- A taxa de reserva do leilão passa a ser do CEDENTE, não da plataforma.
+--
+-- Até aqui a reserva saía de computePurchasePrice, que cai em estimateRateBand(rating)
+-- (lib/dynamicPricing.ts) porque `desagio` nunca é preenchido na emissão real. Ou seja: a
+-- plataforma arbitrava o pior deságio que o cedente "aceita" — ele podia ver a duplicata
+-- vendida a uma taxa que nunca aprovou, ou não vender por um piso que não escolheu. No
+-- mercado real (leilão reverso de recebíveis) quem pede a cotação e decide se aceita a taxa
+-- vencedora é o fornecedor; a banda de mercado é sugestão, não decisão.
+--
+-- NULL continua significando "usa a banda de mercado": é o que toda duplicata já existente
+-- tem, e o fallback segue valendo em lib/auctionCore.ts's reserveRate.
+ALTER TABLE duplicatas ADD COLUMN reserva_taxa_am REAL;

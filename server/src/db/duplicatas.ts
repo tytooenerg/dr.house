@@ -163,8 +163,32 @@ export function setComplianceScore(id: string, score: number) {
   db.prepare('UPDATE duplicatas SET compliance_score = ? WHERE id = ?').run(score, id);
 }
 
-export function dispararLeilao(id: string, closeAtIso: string) {
-  db.prepare("UPDATE duplicatas SET status = 'no_mercado', close_at = ?, leilao_started_at = ? WHERE id = ?").run(closeAtIso, new Date().toISOString(), id);
+export function dispararLeilao(id: string, closeAtIso: string, reservaTaxaAm?: number | null) {
+  // leilao_fechado_em zera junto: uma duplicata reofertada abre um leilão NOVO, e o carimbo
+  // do leilão anterior faria auctionIsOpen (lib/auctionGate.ts) recusar todo lance com
+  // auction_closed antes mesmo do primeiro investidor ver a oferta.
+  // reserva_taxa_am só é sobrescrita quando o cedente informa uma: reofertar sem mexer na
+  // taxa mantém a que ele já tinha escolhido.
+  if (reservaTaxaAm === undefined) {
+    db.prepare(
+      "UPDATE duplicatas SET status = 'no_mercado', close_at = ?, leilao_started_at = ?, leilao_fechado_em = NULL WHERE id = ?"
+    ).run(closeAtIso, new Date().toISOString(), id);
+    return;
+  }
+  db.prepare(
+    "UPDATE duplicatas SET status = 'no_mercado', close_at = ?, leilao_started_at = ?, leilao_fechado_em = NULL, reserva_taxa_am = ? WHERE id = ?"
+  ).run(closeAtIso, new Date().toISOString(), reservaTaxaAm, id);
+}
+
+// Leilão encerrado sem nenhum lance dentro da reserva: a duplicata volta pro cedente, no
+// mesmo estado de onde saiu ('aprovada'), em vez de ficar encalhada em 'no_mercado' com um
+// leilão morto. Sem isso a notificação "você pode reofertar" era falsa: canDisparar
+// (routes/minhas.ts) exige status 'aprovada', e nada devolvia a duplicata pra lá — ela
+// ficava no marketplace exibindo "Leilão encerrado" para sempre.
+export function devolverDeLeilaoSemLance(id: string) {
+  db.prepare(
+    "UPDATE duplicatas SET status = 'aprovada', close_at = NULL, leilao_started_at = NULL, leilao_fechado_em = NULL WHERE id = ?"
+  ).run(id);
 }
 
 export function setInsurer(id: string, insurerKey: string | null) {

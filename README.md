@@ -1348,6 +1348,63 @@ novos em `test/auction.test.ts` cobrindo menor deságio vence, desempate por ord
 recusa acima da reserva, fechamento sem lance, substituição/cancelamento de lance e fechar duas
 vezes sem readjudicar), client 39, sdks/node 9.
 
+### Leilão sem lance devolve a duplicata, e prazo legado deixa de matar o marketplace
+
+Dois defeitos da PR do leilão real, os dois encontrados rodando o projeto do zero num banco
+que já existia:
+
+**1. A duplicata ficava encalhada.** Quando o leilão fechava sem nenhum lance dentro da
+reserva, ela continuava em `no_mercado` com `leilao_fechado_em` carimbado, e o cedente
+recebia "você pode reofertar a duplicata" — só que `canDisparar` (`routes/minhas.ts`) exige
+`status = 'aprovada'` e nada devolvia a duplicata pra lá. Ela ficava no marketplace exibindo
+"Leilão encerrado" para sempre, e a notificação prometia algo que o sistema não permitia
+fazer. Agora o fechamento sem lance devolve a duplicata ao cedente em `'aprovada'`
+(`devolverDeLeilaoSemLance`), que é o estado de onde ela saiu e o único em que
+`dispararLeilao` reabre o leilão. `dispararLeilao` também limpa `leilao_fechado_em`, senão o
+carimbo do leilão anterior recusaria todo lance no leilão novo.
+
+**2. Instalação existente acordava com o marketplace morto.** Antes do leilão de verdade,
+`close_at` era decorativo — alimentava o cronômetro falso e não fechava nada. A migração
+0067 só deu prazo novo a quem tinha `close_at` NULL, mas a instalação típica tinha o campo
+preenchido com um prazo desses, quase sempre já vencido: no primeiro boot da versão nova,
+**toda** oferta virava "leilão encerrado" e nenhum investidor conseguia dar lance em nada.
+Verificado num banco semeado dois dias antes: `canBuy` falso em 100% das ofertas. A migração
+`0068` dá um prazo real de 24h a quem está em mercado com prazo vencido ou ausente, em vez
+de tirar a duplicata do mercado — o cedente pôs aquela duplicata à venda, e o upgrade não é
+hora de desfazer isso; se ninguém lançar nas 24h, aí sim ela volta pro cedente pelo caminho
+normal.
+
+Verificado: server **764** testes (dois novos em `test/auction.test.ts` — o fechamento sem
+lance devolve pra `'aprovada'` e some do marketplace; e o cedente reoferta, recebe lance e a
+duplicata é arrematada de verdade no segundo leilão).
+
+### A taxa de reserva passa a ser do cedente, não da plataforma
+
+No leilão reverso de recebíveis — o modelo que Monkey, Antecipa Fácil e afins operam — quem
+pede a cotação e decide se aceita a taxa vencedora é o **fornecedor**. A banda de mercado é
+referência, não decisão.
+
+Aqui era o contrário. `reserveRate` caía em `computePurchasePrice`, que cai em
+`estimateRateBand(rating)` (`lib/dynamicPricing.ts`) porque `desagio` **nunca é preenchido na
+emissão real**. Ou seja: a plataforma arbitrava o pior deságio que o cedente "aceitava". Ele
+podia ver a duplicata arrematada a uma taxa que nunca aprovou — ou não vender, por um piso
+que não escolheu.
+
+Agora `POST /minhas/:id/leilao` recebe `taxaMaxima`, e é ela que vira a reserva
+(`duplicatas.reserva_taxa_am`, migração 0069). Na tela, "Disparar leilão" abre um campo já
+preenchido com a banda de mercado do rating daquele sacado e a frase que diz o que ela é:
+*"Mercado hoje para este sacado: ~X% a.m."*. NULL continua significando "usa a banda" — é o
+que toda duplicata já existente tem, então nada quebra.
+
+`priceForRate` encolheu junto: em vez de derivar o preço por uma proporção contra a reserva,
+usa `computePurchasePrice(d, taxaDoLance)` — o parâmetro `rateOverridePct` que já existia
+para o Confirming. Mesma fórmula de desconto por prazo do resto do sistema, sem
+arredondamento intermediário.
+
+Verificado: server **766** testes (2 novos — a taxa do cedente substitui a banda e recusa
+lance que caberia no mercado mas não no limite dele; e a rota grava a taxa e rejeita valor
+fora da faixa de sanidade).
+
 ## Running locally
 
 ```bash

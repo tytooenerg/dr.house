@@ -4,7 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { approveKyb } from '../src/db/users.js';
 import { db } from '../src/db/index.js';
-import { createDuplicata, dispararLeilao, getDuplicata, isPurchased } from '../src/db/duplicatas.js';
+import { createDuplicata, dispararLeilao, getDuplicata, isPurchased, listMarketplace } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { listActiveAuctionBids } from '../src/db/auctionBids.js';
 import { reserveRate } from '../src/lib/auctionCore.js';
@@ -104,6 +104,49 @@ describe('leilão primário — quem vence', () => {
   });
 });
 
+describe('leilão primário — a reserva é do cedente', () => {
+  it('a taxa máxima informada pelo cedente vira a reserva, no lugar da banda de mercado', async () => {
+    const id = duplicataEmLeilao(); // desagio fixado em 3,00% pela banda
+    const mercado = reserveRate(id)!;
+    expect(mercado.taxaAm).toBeCloseTo(3, 5);
+    expect(mercado.doCedente).toBe(false);
+
+    // O cedente reabre o leilão dizendo que não aceita pior que 2% a.m.
+    dispararLeilao(id, new Date(Date.now() + 3600_000).toISOString(), 2);
+    const doCedente = reserveRate(id)!;
+    expect(doCedente.taxaAm).toBeCloseTo(2, 5);
+    expect(doCedente.doCedente).toBe(true);
+    // Preço maior: deságio menor = o cedente recebe mais.
+    expect(doCedente.preco).toBeGreaterThan(mercado.preco);
+
+    const inv = await investidor();
+    // 2,5% caberia na banda de mercado, mas é pior que o limite do cedente.
+    const recusado = await lance(inv.token, id, 2.5);
+    expect(recusado.status).toBe(409);
+    expect(recusado.body.error).toBe('above_reserve');
+    expect((await lance(inv.token, id, 2)).status).toBe(200);
+  });
+
+  it('POST /minhas/:id/leilao grava a taxa máxima do cedente e recusa valor fora da faixa', async () => {
+    const cedente = await request(app)
+      .post('/api/auth/register')
+      .send({ nome: 'Cedente', email: `ced-${unique()}@example.com`, password: 'senha123', companyName: 'Cedente Reserva', role: 'cedente' });
+    const token = cedente.body.token as string;
+    const id = duplicataEmLeilao();
+    // Põe a duplicata no nome deste cedente e a devolve pra 'aprovada' (estado de disparo).
+    db.prepare("UPDATE duplicatas SET cedente_id = ?, status = 'aprovada', close_at = NULL WHERE id = ?").run(cedente.body.user.id, id);
+
+    const invalida = await request(app).post(`/api/minhas/${id}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '150' });
+    expect(invalida.status).toBe(400);
+    expect(getDuplicata(id)!.status).toBe('aprovada');
+
+    const ok = await request(app).post(`/api/minhas/${id}/leilao`).set('Authorization', `Bearer ${token}`).send({ taxaMaxima: '1,80' });
+    expect(ok.status).toBe(200);
+    expect(getDuplicata(id)!.reserva_taxa_am).toBeCloseTo(1.8, 5);
+    expect(reserveRate(id)!.doCedente).toBe(true);
+  });
+});
+
 describe('leilão primário — a reserva', () => {
   it('recusa lance com deságio pior que a reserva do cedente', async () => {
     const id = duplicataEmLeilao();
@@ -116,21 +159,46 @@ describe('leilão primário — a reserva', () => {
     expect(listActiveAuctionBids(id)).toHaveLength(0);
   });
 
-  it('sem nenhum lance dentro da reserva a duplicata NÃO vende — volta pro cedente reofertar', async () => {
+  it('sem nenhum lance dentro da reserva a duplicata NÃO vende — volta pro cedente em "aprovada"', async () => {
     const id = duplicataEmLeilao();
     expect(fecharLeiloes(id)).toMatchObject({ fechados: 1, vendidos: 0, semLance: 1 });
     expect(isPurchased(id)).toBe(false);
-    expect(getDuplicata(id)!.status).toBe('no_mercado');
-    expect(getDuplicata(id)!.leilao_fechado_em).toBeTruthy();
+    // Volta pro estado de onde saiu: é o único em que dispararLeilao aceita reabrir, e é o
+    // que faz a notificação "pode reofertar" ser verdade. Ficar em 'no_mercado' com o leilão
+    // carimbado deixava a duplicata encalhada exibindo "Leilão encerrado" pra sempre.
+    const d = getDuplicata(id)!;
+    expect(d.status).toBe('aprovada');
+    expect(d.leilao_fechado_em).toBeNull();
+    expect(d.close_at).toBeNull();
+    expect(listMarketplace().some((o) => o.id === id)).toBe(false);
   });
 
-  it('leilão já encerrado não aceita mais lance', async () => {
+  it('depois de encerrar sem lance, o cedente reoferta e o novo leilão aceita lance de verdade', async () => {
     const id = duplicataEmLeilao();
     fecharLeiloes(id);
+
+    // Mesmo caminho que a tela do cedente usa (routes/minhas.ts's POST /:id/leilao).
+    dispararLeilao(id, new Date(Date.now() + 3600_000).toISOString());
     const inv = await investidor();
     const res = await lance(inv.token, id, reserveRate(id)!.taxaAm);
+    expect(res.status).toBe(200);
+
+    fecharLeiloes(id);
+    expect(isPurchased(id)).toBe(true);
+    expect(getDuplicata(id)!.status).toBe('vendida');
+  });
+
+  it('leilão já adjudicado não aceita mais lance', async () => {
+    const id = duplicataEmLeilao();
+    const reserva = reserveRate(id)!;
+    const vencedor = await investidor('Vencedor');
+    await lance(vencedor.token, id, reserva.taxaAm);
+    fecharLeiloes(id);
+
+    const atrasado = await investidor('Atrasado');
+    const res = await lance(atrasado.token, id, reserva.taxaAm);
     expect(res.status).toBe(409);
-    expect(res.body.error).toBe('auction_closed');
+    expect(res.body.error).toBe('already_purchased');
   });
 
   it('leilão cujo prazo já passou não aceita lance nem antes do job rodar', async () => {
