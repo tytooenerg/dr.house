@@ -1405,6 +1405,35 @@ Verificado: server **766** testes (2 novos — a taxa do cedente substitui a ban
 lance que caberia no mercado mas não no limite dele; e a rota grava a taxa e rejeita valor
 fora da faixa de sanidade).
 
+### Os três eventos de webhook do leilão que eram anunciados e nunca disparavam
+
+Primeira etapa do fluxo desenhado para o orquestrador externo (n8n): um orquestrador reage a
+eventos, e três dos oito que a plataforma oferece **não tinham emissor nenhum**.
+
+`WEBHOOK_EVENTS` (`server/src/data/seed.ts`) lista oito eventos, o Zod de `POST /dev/webhooks`
+aceita os oito, e a tela de Desenvolvedores deixa assinar os oito. Mas `leilao.aberto`,
+`lance.recebido` e `leilao.encerrado` não eram emitidos em lugar nenhum do código — dava para
+assinar `leilao.encerrado`, ver a inscrição salva e esperar para sempre. A doc pública
+(`DocsPage.tsx`) já listava só os cinco que funcionavam, então as duas fontes discordavam em
+silêncio.
+
+Agora cada um sai do ponto onde o fato acontece de verdade:
+
+- **`leilao.aberto`** — em `routes/minhas.ts`, o único lugar onde um leilão real abre. Leva
+  prazo (`closeAt`) e a reserva que o cedente definiu.
+- **`lance.recebido`** — dentro de `placeAuctionBid` (`lib/auctionCore.ts`), e não na rota:
+  todos os caminhos de lance passam por lá (rota manual, cestas, automação, Fundo do
+  Confirming e o agente de auto-bid), então um emissor cobre os cinco.
+- **`leilao.encerrado`** — em `lib/auctionClose.ts`, nos **dois** desfechos, com
+  `resultado: 'arrematado' | 'sem_lance'`. Quem assina quer saber que o leilão terminou, não
+  só quando terminou em venda.
+
+`DocsPage.tsx` volta a listar os oito, com um comentário dizendo de onde a lista vem.
+
+Verificado: server **769** testes (3 novos em `webhooks-v2.test.ts`, cada um com um servidor
+HTTP real recebendo a entrega). Confirmado que são reais: removendo só o emissor de
+`lance.recebido`, o teste correspondente falha com `webhook not received in time`.
+
 ## Running locally
 
 ```bash

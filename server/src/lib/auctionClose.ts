@@ -49,6 +49,15 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
           'leilao'
         );
       }
+      // 'leilao.encerrado' vale para os DOIS desfechos: quem assina o evento quer saber que
+      // o leilão terminou, não só quando terminou em venda. Antes ele nunca disparava.
+      if (d.cedente_id) {
+        void deliverWebhookEvent(d.cedente_id, 'leilao.encerrado', {
+          duplicataId: id,
+          resultado: 'sem_lance',
+          totalLances: 0,
+        });
+      }
       recordAuditEvent(null, 'Leilão', 'leilao.encerrado_sem_lance', { duplicataId: id });
       continue;
     }
@@ -78,6 +87,14 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
         valor: vencedor.preco,
       });
       if (d.cedente_id) {
+        void deliverWebhookEvent(d.cedente_id, 'leilao.encerrado', {
+          duplicataId: id,
+          resultado: 'arrematado',
+          taxaAm: vencedor.taxa_am,
+          preco: vencedor.preco,
+          investorId: vencedor.bidder_id,
+          totalLances: bids.length,
+        });
         void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: id, valor: d.valor, investorId: vencedor.bidder_id });
         addNotification(d.cedente_id, `Leilão de ${d.sacado_nome} arrematado a ${fmtTaxa(vencedor.taxa_am)} a.m. — ${fmtBRL(vencedor.preco)} liberados.`, COLORS.GREEN, 'leilao');
       }
