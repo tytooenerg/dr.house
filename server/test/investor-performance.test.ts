@@ -52,9 +52,13 @@ describe('Investor performance dashboard — degenerate/empty portfolio', () => 
     expect(res.status).toBe(200);
     expect(res.body.positionsCount).toBe(0);
     expect(res.body.totalInvestido).toBe(0);
-    expect(res.body.retornoMedioPonderadoPct).toBe(0);
-    expect(res.body.volatilidadePct).toBe(0);
+    // null, e não 0: "retorno anualizado médio de 0%" afirma um fato (retorno zero) sobre
+    // uma carteira que não tem posição nenhuma. A tela mostra "—" para null.
+    expect(res.body.retornoMedioPonderadoPct).toBeNull();
+    expect(res.body.volatilidadePct).toBeNull();
     expect(res.body.sharpeLike).toBeNull();
+    expect(res.body.saude.atrasoAte15Pct).toBe(0);
+    expect(res.body.saude.inadimplencia90Pct).toBe(0);
     expect(res.body.sacadosDistintos).toBe(0);
     expect(res.body.positions).toEqual([]);
   });
@@ -129,5 +133,84 @@ describe('Investor performance dashboard — real weighted math', () => {
     const allTime = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${token}`);
     expect(allTime.body.year).toBeNull();
     expect(allTime.body.positionsCount).toBe(1);
+  });
+});
+
+describe('não publica número anualizado que o prazo não sustenta', () => {
+  it('recusa anualizar uma posição comprada às vésperas do vencimento', async () => {
+    const { token, userId } = await registerInvestidor();
+    // Comprar uma duplicata perto do vencimento é operação normal — é a de MENOR risco.
+    // Um dia de carência com 2% de retorno anualizava para 730% a.a., e esse número
+    // aparecia como "retorno anualizado médio" do investidor.
+    buyPosition(userId, 'Curto Prazo Ltda', 100000, 2000, '2031-06-14T12:00:00.000Z', '2031-06-15');
+
+    const res = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    const pos = res.body.positions.find((p: { sacado: string }) => p.sacado === 'Curto Prazo Ltda');
+    expect(pos.diasCarencia).toBeLessThan(res.body.diasMinimosParaAnualizar);
+    expect(pos.retornoAnualizadoPct).toBeNull();
+    // O retorno do período continua sendo dito — ele é honesto em qualquer prazo.
+    expect(pos.retornoPeriodoPct).toBeCloseTo(2.04, 1);
+
+    // E o agregado não engole o número impossível: sem nenhuma posição anualizável, os
+    // três KPIs anualizados saem nulos em vez de exibirem centenas de por cento.
+    expect(res.body.retornoMedioPonderadoPct).toBeNull();
+    expect(res.body.volatilidadePct).toBeNull();
+    expect(res.body.sharpeLike).toBeNull();
+    expect(res.body.posicoesSemAnualizacao).toBe(1);
+    // O retorno do período ponderado existe mesmo assim.
+    expect(res.body.retornoPeriodoPonderadoPct).toBeCloseTo(2.04, 1);
+  });
+
+  it('anualiza normalmente quando o prazo sustenta, e mistura os dois casos sem contaminar', async () => {
+    const { token, userId } = await registerInvestidor();
+    buyPosition(userId, 'Prazo Longo SA', 100000, 2000, '2031-06-15T12:00:00.000Z', '2032-06-14'); // 365d
+    buyPosition(userId, 'Curto Prazo Ltda', 100000, 2000, '2031-06-14T12:00:00.000Z', '2031-06-15'); // 1d
+
+    const res = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${token}`);
+    const longa = res.body.positions.find((p: { sacado: string }) => p.sacado === 'Prazo Longo SA');
+    expect(longa.retornoAnualizadoPct).toBeCloseTo(2.04, 1);
+    expect(res.body.posicoesSemAnualizacao).toBe(1);
+    // A média anualizada é a da posição longa apenas — se a de 1 dia entrasse, o número
+    // saltaria pra centenas de por cento.
+    expect(res.body.retornoMedioPonderadoPct).toBeCloseTo(2.04, 1);
+    expect(res.body.retornoMedioPonderadoPct).toBeLessThan(10);
+  });
+});
+
+describe('saúde da carteira sai das posições reais', () => {
+  it('mede atraso e inadimplência sobre o investido, e não repete números fixos', async () => {
+    const { token, userId } = await registerInvestidor();
+    const ontem = new Date(Date.now() - 5 * 24 * 3600 * 1000);
+    const cemDiasAtras = new Date(Date.now() - 100 * 24 * 3600 * 1000);
+    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+
+    // 100k vencida há 5 dias (faixa ≤15), 100k vencida há 100 dias (faixa ≥90),
+    // 200k ainda a vencer — que não entra em nenhuma das duas.
+    buyPosition(userId, 'Atrasada Curta', 100000, 0, '2020-01-01T12:00:00.000Z', fmt(ontem));
+    buyPosition(userId, 'Atrasada Longa', 100000, 0, '2020-01-01T12:00:00.000Z', fmt(cemDiasAtras));
+    buyPosition(userId, 'Em Dia SA', 200000, 0, '2020-01-01T12:00:00.000Z', '31/12/2032');
+
+    const res = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${token}`);
+    const s = res.body.saude;
+    expect(s.baseInvestido).toBe(400000);
+    expect(s.atrasoAte15Valor).toBe(100000);
+    expect(s.atrasoAte15Pct).toBeCloseTo(25, 1);
+    expect(s.inadimplencia90Valor).toBe(100000);
+    expect(s.inadimplencia90Pct).toBeCloseTo(25, 1);
+    // Os números fixos que a tela mostrava para todo mundo.
+    expect(s.atrasoAte15Pct).not.toBeCloseTo(8.2, 1);
+    expect(s.inadimplencia90Pct).not.toBeCloseTo(3.9, 1);
+  });
+
+  it('uma duplicata paga nunca conta como atraso, por mais tarde que tenha vencido', async () => {
+    const { token, userId } = await registerInvestidor();
+    const id = buyPosition(userId, 'Paga Atrasada', 100000, 0, '2020-01-01T12:00:00.000Z', '01/01/2021');
+    const { setStatus } = await import('../src/db/duplicatas.js');
+    setStatus(id, 'paga');
+
+    const res = await request(app).get('/api/historico/performance').set('Authorization', `Bearer ${token}`);
+    expect(res.body.saude.inadimplencia90Valor).toBe(0);
+    expect(res.body.saude.inadimplencia90Pct).toBe(0);
   });
 });

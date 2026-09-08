@@ -285,14 +285,14 @@ export interface PurchaseRow {
 // retorno fabricado) — sem precisar saber a origem da linha.
 export function listPurchasesByInvestor(
   investorId: number
-): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number })[] {
+): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number; duplicata_status: string })[] {
   return db
     .prepare(
-      `SELECT p.*, d.sacado_nome as sacado_nome, d.score as score, d.seguro as seguro, d.vencimento as vencimento, d.valor as faceValor FROM purchases p
+      `SELECT p.*, d.sacado_nome as sacado_nome, d.score as score, d.seguro as seguro, d.vencimento as vencimento, d.valor as faceValor, d.status as duplicata_status FROM purchases p
        JOIN duplicatas d ON d.id = p.duplicata_id
        WHERE p.investor_id = ? ORDER BY p.created_at DESC`
     )
-    .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number })[];
+    .all(investorId) as (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number; duplicata_status: string })[];
 }
 
 // Face value of every position this investor still actually holds — an active purchase
