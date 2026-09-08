@@ -32,7 +32,7 @@ interface ChecklistItem {
 interface Preview {
   lastroChecklist: { items: ChecklistItem[]; pct: number; color: string };
   preApprovedLimit: number;
-  emitSummary: { valorFmt: string; premioFmt: string; taxaEstimadaFmt: string; plataformaFeeFmt: string; totalValor: number };
+  emitSummary: { valorFmt: string; premioFmt: string; premioNota: string; taxaEstimadaFmt: string; registradoraEscolhida: string | null; plataformaFeeFmt: string; totalValor: number };
   sacadoRecognized: boolean;
   sacadoRecognizedText: string;
 }
@@ -386,8 +386,14 @@ export function EmitirPage() {
 
           <div className="flex items-center justify-between p-3.5 rounded-[10px] bg-surface">
             <div>
-              <div className="font-bold text-[13px]">Contratar seguro sobre o recebível</div>
-              <div className="text-textSecondary text-xs mt-0.5">Protege o investidor contra inadimplência do sacado — prêmio de 0,6% do valor</div>
+              {/* "Contratar" não descrevia o que o controle faz: ele OFERECE a duplicata com
+                  seguro, e quem contrata e paga é o investidor, na compra. E o prêmio não é
+                  0,6% fixo — cada seguradora cota este risco (0,30% a 0,90%), faixa que o
+                  Resumo do registro ao lado mostra para esta duplicata. */}
+              <div className="font-bold text-[13px]">Oferecer com seguro de crédito</div>
+              <div className="text-textSecondary text-xs mt-0.5">
+                Protege o investidor contra inadimplência do sacado. Ele contrata e paga o prêmio na compra — o valor não sai do seu recebível.
+              </div>
             </div>
             <Toggle on={form.seguro} onClick={() => setField('seguro', !form.seguro)} />
           </div>
@@ -477,13 +483,19 @@ export function EmitirPage() {
                 <span className="font-bold font-mono-num">{preview?.emitSummary.valorFmt ?? '—'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-onNavy">Prêmio do seguro</span>
+                <span className="text-onNavy">Prêmio do seguro (pago pelo investidor)</span>
                 <span className="font-bold font-mono-num">{preview?.emitSummary.premioFmt ?? '—'}</span>
               </div>
+              {preview?.emitSummary.premioNota && (
+                <div className="text-onNavy text-[11.5px] leading-snug -mt-1.5">{preview.emitSummary.premioNota}</div>
+              )}
               <div className="h-px" style={{ background: 'rgba(255,255,255,0.14)' }} />
               <div className="flex justify-between">
-                <span className="text-onNavy">Registradoras</span>
-                <span className="font-bold">CERC · B3 · Núclea</span>
+                <span className="text-onNavy">Registradora</span>
+                <span className="font-bold">{preview?.emitSummary.registradoraEscolhida ?? '—'}</span>
+              </div>
+              <div className="text-onNavy text-[11.5px] leading-snug -mt-1.5">
+                Escolhida automaticamente entre CERC, B3, Núclea e Grafeno pelo menor custo elegível para este valor.
               </div>
               <div className="h-px" style={{ background: 'rgba(255,255,255,0.14)' }} />
               <div className="flex justify-between">

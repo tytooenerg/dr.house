@@ -47,6 +47,8 @@ export interface DashboardView {
   ratingLegend: DashboardLegend[];
   riskDonutStops: { color: string; from: number; to: number }[];
   activeDuplicatas: number;
+  /** Quantos itens o donut de fato distribui — é este que vai no centro do anel. */
+  donutCount: number;
   // Rótulo do que o donut e a legenda estão medindo — muda por papel (posições compradas
   // pro investidor, duplicatas emitidas pro cedente, recebidas pro sacado).
   donutTitle: string;
@@ -78,6 +80,12 @@ function pct(n: number): string {
 // uma faixa "Em análise" pro que ainda não tem score atribuído.
 function buildRiskDistribution(items: { score: number | null; peso: number }[], donutTitle: string, emptyHint: string) {
   const total = items.reduce((s, i) => s + i.peso, 0);
+  // O número impresso DENTRO do anel tem que descrever o anel. A tela mostrava ali o
+  // `activeDuplicatas` — um subconjunto filtrado (abertas/ativas/a vencer) — enquanto as
+  // fatias somavam o conjunto inteiro: no cedente demo, quatro faixas não-nulas em volta de
+  // um "3 operações", o que é aritmeticamente impossível com 3 itens e foi o que denunciou
+  // a divergência. Vale para os quatro papéis que usam este mesmo componente.
+  const donutCount = items.length;
   const buckets = { baixo: 0, moderado: 0, elevado: 0, analise: 0 };
   for (const i of items) {
     if (i.score === null) buckets.analise += i.peso;
@@ -107,6 +115,7 @@ function buildRiskDistribution(items: { score: number | null; peso: number }[], 
   });
 
   return {
+    donutCount,
     ratingLegend: parts.map((p) => ({ label: p.label, pct: pct(p.value), color: p.color })),
     riskDonutStops: total > 0 ? stops : [{ color: '#E4E8EE', from: 0, to: 100 }],
     donutTitle,
