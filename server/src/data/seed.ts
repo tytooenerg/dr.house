@@ -132,13 +132,20 @@ export const MINHAS_RAW = [
   { id: 'm5', sacado: 'Metalúrgica Serrana S.A.', valor: 132000, emissao: '30/06/2026', vencimento: '20/08/2026', status: 'Aprovada', lastro: 80 },
 ];
 
+// `data` é quando o investidor comprou; `prazoDias`, quanto faltava para o vencimento. O
+// seed usava `data` para as três coisas ao mesmo tempo (emissão, vencimento e data da
+// compra), o que produzia carência ZERO — comprar um recebível no dia em que ele vence, que
+// não é uma operação que existe. Era esse dado que alimentava o "1115,57% anualizado" da
+// Carteira & Histórico (o cálculo já se protege disso, ver lib/investorPerformance.ts, mas
+// o dado continuava impossível). Prazos variados, todos ainda no passado, para continuarem
+// coerentes com `status: 'paga'`.
 export const HISTORICO_RAW = [
-  { data: '02/07/2026', empresa: 'Grupo Atlas Varejo', investido: 40000, retorno: 1520 },
-  { data: '18/06/2026', empresa: 'Distribuidora Bom Preço', investido: 22000, retorno: 780 },
-  { data: '30/05/2026', empresa: 'Auto Peças Rio', investido: 9800, retorno: 340 },
-  { data: '14/05/2026', empresa: 'Farmácias União', investido: 61000, retorno: 2190 },
-  { data: '02/05/2026', empresa: 'Grupo Atlas Varejo', investido: 35400, retorno: 1280 },
-  { data: '20/04/2026', empresa: 'Distribuidora Bom Preço', investido: 18000, retorno: 610 },
+  { data: '02/07/2026', prazoDias: 44, empresa: 'Grupo Atlas Varejo', investido: 40000, retorno: 1520 },
+  { data: '18/06/2026', prazoDias: 31, empresa: 'Distribuidora Bom Preço', investido: 22000, retorno: 780 },
+  { data: '30/05/2026', prazoDias: 58, empresa: 'Auto Peças Rio', investido: 9800, retorno: 340 },
+  { data: '14/05/2026', prazoDias: 37, empresa: 'Farmácias União', investido: 61000, retorno: 2190 },
+  { data: '02/05/2026', prazoDias: 63, empresa: 'Grupo Atlas Varejo', investido: 35400, retorno: 1280 },
+  { data: '20/04/2026', prazoDias: 45, empresa: 'Distribuidora Bom Preço', investido: 18000, retorno: 610 },
 ];
 
 export const ACEITES_RAW = [
