@@ -16,6 +16,7 @@ import {
   viewResaleMarket,
 } from '../lib/resaleCore.js';
 import { blockTradeCriteriaSchema, runBlockTrade, viewMyBlockTrades } from '../lib/blockTrade.js';
+import { abrirOtc, contrapropor, aceitarOtc, encerrarOtc, viewMinhasOtc, OTC_PRAZO_MAX_HORAS } from '../lib/otcCore.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 
 export const secundarioRouter = Router();
@@ -28,6 +29,8 @@ function payload(userId: number) {
     meusAnuncios: viewMyListings(userId),
     meusLances: viewMyBids(userId),
     meusBlockTrades: viewMyBlockTrades(userId),
+    // Só as negociações DESTE usuário: balcão não tem visão pública (lib/otcCore.ts).
+    minhasOtc: viewMinhasOtc(userId),
   };
 }
 
@@ -111,3 +114,71 @@ secundarioRouter.post(
     res.status(200).json({ ...outcome.body, ...payload(req.user!.id) });
   })
 );
+
+
+// --- Balcão (OTC) ---
+// Negociação dirigida a quem detém uma posição, sobre uma duplicata que não precisa estar
+// anunciada, com contraproposta e prazo. Privada entre as duas partes — ver lib/otcCore.ts
+// para por que o book existente não cobre este caso.
+const otcAberturaSchema = z.object({
+  duplicataId: z.string().trim().min(1),
+  valor: z.string().trim().min(1),
+  prazoHoras: z.number().positive().max(OTC_PRAZO_MAX_HORAS).optional(),
+  nota: z.string().trim().max(500).optional(),
+});
+const otcContrapropostaSchema = z.object({ valor: z.string().trim().min(1), nota: z.string().trim().max(500).optional() });
+
+secundarioRouter.post('/otc', (req, res) => {
+  const parsed = otcAberturaSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const outcome = abrirOtc(req.user!, {
+    duplicataId: parsed.data.duplicataId,
+    valorRaw: parsed.data.valor,
+    prazoHoras: parsed.data.prazoHoras,
+    nota: parsed.data.nota,
+  });
+  if (outcome.status !== 200) {
+    res.status(outcome.status).json(outcome.body);
+    return;
+  }
+  res.json({ ...outcome.body, ...payload(req.user!.id) });
+});
+
+secundarioRouter.post('/otc/:id/contraproposta', (req, res) => {
+  const parsed = otcContrapropostaSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const outcome = contrapropor(req.user!, Number(req.params.id), parsed.data.valor, parsed.data.nota);
+  if (outcome.status !== 200) {
+    res.status(outcome.status).json(outcome.body);
+    return;
+  }
+  res.json({ ...outcome.body, ...payload(req.user!.id) });
+});
+
+secundarioRouter.post('/otc/:id/aceitar', (req, res) => {
+  const outcome = aceitarOtc(req.user!, Number(req.params.id));
+  if (outcome.status !== 200) {
+    res.status(outcome.status).json(outcome.body);
+    return;
+  }
+  res.json({ ...outcome.body, ...payload(req.user!.id) });
+});
+
+secundarioRouter.post('/otc/:id/encerrar', (req, res) => {
+  const neg = viewMinhasOtc(req.user!.id).find((n) => n.id === Number(req.params.id));
+  // Recusar (a proposta é da contraparte) e cancelar (a proposta é sua) são o mesmo ato visto
+  // de lados diferentes da mesa; o rótulo sai de quem está encerrando.
+  const como = neg?.minhaVez ? 'recusada' : 'cancelada';
+  const outcome = encerrarOtc(req.user!, Number(req.params.id), como);
+  if (outcome.status !== 200) {
+    res.status(outcome.status).json(outcome.body);
+    return;
+  }
+  res.json({ ...outcome.body, ...payload(req.user!.id) });
+});

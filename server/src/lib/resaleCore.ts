@@ -176,8 +176,14 @@ export function cancelResaleListing(user: UserRow, listingId: number): ResaleOut
 // Isso não significa que o desconto é neutro: como não há conta de ledger representando
 // "a plataforma" (ver lib/settlement.ts's settleResale), uma taxa menor vira dinheiro
 // extra creditado no próprio vendedor, nunca uma perda — mas também nunca um efeito zero.
+/**
+ * `listing.id` é null numa venda de balcão (lib/otcCore.ts): a negociação acontece fora do
+ * book, então não há anúncio pra marcar como vendido. Todo o resto — liquidação, fechamento
+ * da posição do vendedor, abertura da posição do comprador, aviso à registradora — é
+ * idêntico, e tem que ser: OTC é outro jeito de chegar ao preço, não outra transação.
+ */
 export function executeResaleTrade(
-  listing: { id: number; purchase_id: number; duplicata_id: string; seller_id: number },
+  listing: { id: number | null; purchase_id: number; duplicata_id: string; seller_id: number },
   duplicata: { valor: number; sacado_nome: string; registradora: string | null },
   buyerId: number,
   valor: number,
@@ -209,7 +215,7 @@ export function executeResaleTrade(
   // cheio no vencimento, então isso é o ganho real dele (pode ser negativo se comprou com
   // ágio acima do valor de face — honesto, não um número fabricado por Math.random()).
   createPurchase(listing.duplicata_id, buyerId, valor, desagioPct, Math.round(duplicata.valor - valor));
-  setListingStatus(listing.id, 'vendido');
+  if (listing.id !== null) setListingStatus(listing.id, 'vendido');
   // Res. BCB nº 540/2025 — ver comentário de informarNegociacao (lib/registradoras.ts).
   void informarNegociacao({ registradoraKey: duplicata.registradora as RegistradoraKey | null, duplicataId: listing.duplicata_id, evento: 'revenda', valor });
   return settlement;

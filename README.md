@@ -1781,6 +1781,50 @@ carteira com 0 de 7 posições fora da anualização.
 
 Com isto, os nove achados da varredura estão fechados.
 
+### Balcão (OTC) — negociar uma posição que ninguém anunciou
+
+Último quadro em aberto do diagrama. O book do secundário (`resale_listings` + `resale_bids`)
+já existia, mas cobre um caso só: **o dono decide vender**, anuncia, e quem quiser compra pelo
+preço pedido ou dá um lance. Três coisas ficavam de fora:
+
+1. **A negociação só começa se o dono quiser.** Quem precisa de uma duplicata específica — pra
+   fechar uma concentração, casar um vencimento — não tinha como chegar em quem a detém.
+2. **O lance é uma via só.** O vendedor aceita ou recusa; não há contraproposta, então não há
+   negociação, há leilão de uma ponta.
+3. **Tudo é público.** Uma mesa institucional não expõe ao mercado inteiro que está montando
+   posição num sacado.
+
+O balcão (migração 0072, `lib/otcCore.ts`) resolve os três: proposta **dirigida** a quem detém
+a duplicata — anunciada ou não —, com contraproposta em rodadas, prazo de validade e
+visibilidade restrita às duas partes.
+
+**A liquidação é a mesma do book** (`executeResaleTrade`, que passou a aceitar uma venda sem
+anúncio): OTC é outro jeito de chegar ao preço, não outra transação. E os gates são os mesmos
+de `buyResaleListing` — investidor credenciado, duplicata não vencida, não contestada, posição
+ainda ativa —, **revalidados no aceite**, não na proposta: entre uma coisa e outra a posição
+pode ter mudado de mãos. Se isso acontecer, a negociação morre em vez de liquidar sobre um
+estado que não existe mais.
+
+Três decisões que valem explicitar:
+
+- **Prazo obrigatório** (padrão 48h, teto 168h). Uma proposta firme sem validade é uma opção de
+  compra que ninguém pagou por ela — a contraparte ficaria presa a um preço indefinidamente.
+- **Quem propõe não aceita a própria proposta.** A vez alterna a cada rodada; aceitar é sempre
+  o ato de quem recebeu.
+- **Aceitar cancela o anúncio**, se a posição também estava no book. A mesma posição não pode
+  ser vendida duas vezes.
+- **404, não 403, para quem não é parte.** A existência de uma negociação de balcão alheia já é
+  informação de mercado.
+
+Verificado: server **854** testes (11 novos), client 39, sdks 12+12, build e e2e 12/12. Os dois
+pontos que mais importam — privacidade e revalidação no aceite — têm teste que falha quando o
+gate é removido. E o ciclo inteiro contra um servidor de produção real, incluindo esperar o job
+real de fechamento do leilão formar a posição: MesaBeta abre balcão sobre uma duplicata **não
+anunciada** de MesaAlfa → MesaGama (terceiro) não vê nada e leva 404 ao tentar aceitar → 50.000
+→ 55.000 → 53.000 em contrapropostas → MesaAlfa aceita → a posição troca de mãos com retorno de
+R$ 7.000 sobre face de R$ 60.000, e o extrato do vendedor mostra R$ 52.814,50 líquidos da taxa
+de plataforma.
+
 ## Running locally
 
 ```bash
