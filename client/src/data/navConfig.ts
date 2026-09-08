@@ -49,6 +49,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'linha-credito', label: 'Linha de Crédito', path: '/app/linha-credito', group: 'financeiro' },
   { key: 'contas-pagar', label: 'Contas a Pagar', path: '/app/contas-pagar', group: 'financeiro' },
   { key: 'ai-cfo', label: 'AI CFO', path: '/app/ai-cfo', group: 'financeiro' },
+  { key: 'fiscal', label: 'Fiscal', path: '/app/fiscal', group: 'financeiro' },
 
   // Risco & Compliance: análise, perfil, comparação de taxa, obrigações e disputas.
   { key: 'risco', label: 'Análise de Risco', path: '/app/risco', group: 'risco' },

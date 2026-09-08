@@ -26,6 +26,7 @@ const MinhasPage = lazy(() => import('./pages/app/MinhasPage').then((m) => ({ de
 const CreditLinePage = lazy(() => import('./pages/app/CreditLinePage').then((m) => ({ default: m.CreditLinePage })));
 const ContasPagarPage = lazy(() => import('./pages/app/ContasPagarPage').then((m) => ({ default: m.ContasPagarPage })));
 const AiCfoPage = lazy(() => import('./pages/app/AiCfoPage').then((m) => ({ default: m.AiCfoPage })));
+const FiscalPage = lazy(() => import('./pages/app/FiscalPage').then((m) => ({ default: m.FiscalPage })));
 const RiscoPage = lazy(() => import('./pages/app/RiscoPage').then((m) => ({ default: m.RiscoPage })));
 const HistoricoPage = lazy(() => import('./pages/app/HistoricoPage').then((m) => ({ default: m.HistoricoPage })));
 const ErpPage = lazy(() => import('./pages/app/ErpPage').then((m) => ({ default: m.ErpPage })));
@@ -99,6 +100,7 @@ export default function App() {
                 </Gate>
               }
             />
+            <Route path="fiscal" element={<Gate tab="fiscal"><FiscalPage /></Gate>} />
             <Route path="secundario" element={<Gate tab="secundario"><SecundarioPage /></Gate>} />
             <Route path="cestas" element={<Gate tab="cestas"><CestasPage /></Gate>} />
             <Route path="suitability" element={<Gate tab="suitability"><SuitabilityPage /></Gate>} />
