@@ -71,7 +71,10 @@ export function buildInstitutionalAnalytics(investorId: number): InstitutionalAn
   return {
     totalInvestidoFmt: fmtBRL(totalInvestido),
     retornoAcumuladoFmt: fmtBRLSigned(totalRetorno),
-    rentabilidadeMediaFmt: rentMedia.toFixed(1).replace('.', ',') + '% a.m.',
+    // Mesmo rótulo errado que a tela de Carteira & Histórico carregava: isto é retorno
+    // sobre o capital investido, acumulado, não uma taxa mensal. Aqui pesa mais, porque
+    // este PDF vai para um comitê de investimento.
+    rentabilidadeMediaFmt: rentMedia.toFixed(1).replace('.', ',') + '%',
     posicoesAtivas: purchases.filter((p) => p.active).length,
     comRegressoPct: purchases.length > 0 ? Math.round((comRegresso / purchases.length) * 100) : 0,
     comSeguroPct: purchases.length > 0 ? Math.round((comSeguro / purchases.length) * 100) : 0,
@@ -97,7 +100,7 @@ export function streamInstitutionalReportPdf(res: Response, companyName: string,
   doc.fontSize(10).fillColor('#0B1F3A');
   doc.text(`Total investido: ${analytics.totalInvestidoFmt}`);
   doc.text(`Retorno acumulado: ${analytics.retornoAcumuladoFmt}`);
-  doc.text(`Rentabilidade média: ${analytics.rentabilidadeMediaFmt}`);
+  doc.text(`Retorno sobre o capital investido (acumulado): ${analytics.rentabilidadeMediaFmt}`);
   doc.text(`Posições ativas: ${analytics.posicoesAtivas}`);
   doc.text(`Com direito de regresso: ${analytics.comRegressoPct}%`);
   doc.text(`Com seguro de crédito: ${analytics.comSeguroPct}%`);

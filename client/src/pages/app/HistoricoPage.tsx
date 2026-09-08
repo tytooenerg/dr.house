@@ -8,6 +8,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
+import { Notice } from '../../components/ui/Notice';
 import { Badge } from '../../components/ui/Badge';
 
 interface Historico {
@@ -52,13 +53,23 @@ interface RebalanceView {
 interface PerformanceDashboard {
   positionsCount: number;
   totalInvestidoFmt: string;
-  retornoMedioPonderadoPct: number;
-  volatilidadePct: number;
+  retornoMedioPonderadoPct: number | null;
+  volatilidadePct: number | null;
   sharpeLike: number | null;
+  retornoPeriodoPonderadoPct: number;
+  posicoesSemAnualizacao: number;
+  diasMinimosParaAnualizar: number;
+  saude: {
+    atrasoAte15Pct: number;
+    atrasoAte15Valor: number;
+    inadimplencia90Pct: number;
+    inadimplencia90Valor: number;
+    baseInvestido: number;
+  };
   riskFreeRateAnnualPct: number;
   maiorConcentracaoSacadoPct: number;
   sacadosDistintos: number;
-  positions: { duplicataId: string; sacado: string; retornoAnualizadoPct: number; diasCarencia: number }[];
+  positions: { duplicataId: string; sacado: string; retornoPeriodoPct: number; retornoAnualizadoPct: number | null; diasCarencia: number }[];
 }
 
 const COLS = '1fr 1.4fr 0.9fr 0.9fr 0.9fr 1fr';
@@ -201,8 +212,9 @@ export function HistoricoPage() {
           <div className="text-2xl font-extrabold mt-2.5 text-green">{data?.retornoAcumuladoFmt ?? '—'}</div>
         </Card>
         <Card>
-          <div className="text-textSecondary text-[13px] font-semibold">Rentabilidade média</div>
+          <div className="text-textSecondary text-[13px] font-semibold">Retorno sobre o investido</div>
           <div className="text-2xl font-extrabold mt-2.5">{data?.rentabilidadeMediaFmt ?? '—'}</div>
+          <div className="text-textTertiary text-[12px] mt-1">Acumulado, não é taxa mensal</div>
         </Card>
       </div>
       )}
@@ -291,11 +303,15 @@ export function HistoricoPage() {
           <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <div>
               <div className="text-textSecondary text-[11.5px] font-bold uppercase">Retorno anualizado médio</div>
-              <div className="font-mono-num text-lg font-extrabold mt-1">{performance.retornoMedioPonderadoPct.toFixed(2).replace('.', ',')}%</div>
+              <div className="font-mono-num text-lg font-extrabold mt-1">
+                {performance.retornoMedioPonderadoPct == null ? '—' : performance.retornoMedioPonderadoPct.toFixed(2).replace('.', ',') + '%'}
+              </div>
             </div>
             <div>
               <div className="text-textSecondary text-[11.5px] font-bold uppercase">Volatilidade (dispersão)</div>
-              <div className="font-mono-num text-lg font-extrabold mt-1">{performance.volatilidadePct.toFixed(2).replace('.', ',')}%</div>
+              <div className="font-mono-num text-lg font-extrabold mt-1">
+                {performance.volatilidadePct == null ? '—' : performance.volatilidadePct.toFixed(2).replace('.', ',') + '%'}
+              </div>
             </div>
             <div>
               <div className="text-textSecondary text-[11.5px] font-bold uppercase">Índice tipo Sharpe</div>
@@ -307,41 +323,60 @@ export function HistoricoPage() {
             </div>
           </div>
           <div className="text-textTertiary text-[11.5px] mb-2">
-            {performance.positionsCount} posições · {performance.sacadosDistintos} sacados distintos · {performance.totalInvestidoFmt} investidos
+            {performance.positionsCount} posições · {performance.sacadosDistintos} sacados distintos · {performance.totalInvestidoFmt} investidos ·
+            retorno do período: {performance.retornoPeriodoPonderadoPct.toFixed(2).replace('.', ',')}%
           </div>
+          {performance.posicoesSemAnualizacao > 0 && (
+            <Notice variant="neutral" className="mb-2">
+              {performance.posicoesSemAnualizacao} posição(ões) com prazo abaixo de {performance.diasMinimosParaAnualizar} dias ficaram fora dos números
+              anualizados — anualizar um prazo tão curto multiplica o retorno por um fator grande demais para descrever desempenho. O retorno do período
+              delas continua contando.
+            </Notice>
+          )}
           <div className="flex flex-col gap-1.5">
             {performance.positions.slice(0, 8).map((p) => (
               <div key={p.duplicataId} className="flex items-center justify-between text-[12.5px] bg-surface border border-border rounded-lg px-3.5 py-2.5">
                 <span className="font-semibold flex-1 min-w-0 truncate">{p.sacado}</span>
                 <span className="text-textSecondary">{p.diasCarencia}d</span>
-                <span className="font-mono-num font-bold ml-3">{p.retornoAnualizadoPct.toFixed(2).replace('.', ',')}% a.a.</span>
+                <span className="font-mono-num font-bold ml-3">{p.retornoPeriodoPct.toFixed(2).replace('.', ',')}% no período</span>
+                <span className="font-mono-num text-textSecondary ml-3">
+                  {p.retornoAnualizadoPct == null ? 'não anualizado' : p.retornoAnualizadoPct.toFixed(2).replace('.', ',') + '% a.a.'}
+                </span>
               </div>
             ))}
           </div>
         </Card>
       )}
 
-      <Card className="mb-4 px-6 py-5">
-        <div className="font-bold text-[14px] mb-3.5">Saúde da carteira — mesma linguagem usada em FIDCs</div>
-        <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          <div>
-            <div className="flex justify-between items-center text-[13px] mb-1.5">
-              <span className="text-textSecondary">Atraso ≤ 15 dias (% do PL)</span>
-              <span className="font-bold font-mono-num">8,2%</span>
-            </div>
-            <ProgressBar pct={8.2} color={PALETTE.amber} height={7} />
-            <div className="text-textTertiary text-[11.5px] mt-1">Faixa saudável de mercado: 7,5%–9%</div>
+      {/* Números da carteira REAL. Eram 8,2% e 3,9% escritos aqui, iguais para todo
+          investidor — inclusive para quem não tem posição nenhuma. As faixas "saudáveis de
+          mercado" (7,5%–9% e 3,5%–5%) saíram junto: eram afirmadas sem fonte, e este
+          repositório não tem série de mercado verificável para sustentá-las. O cartão só
+          aparece quando há desempenho carregado — sem dado, 0,0% afirmaria carteira limpa. */}
+      {performance && (
+        <Card className="mb-4 px-6 py-5">
+          <div className="font-bold text-[14px] mb-1">Saúde da carteira — mesma linguagem usada em FIDCs</div>
+          <div className="text-textSecondary text-[12.5px] mb-3.5">
+            Quanto do seu capital investido está em título vencido e não pago. Base: {performance.totalInvestidoFmt}.
           </div>
-          <div>
-            <div className="flex justify-between items-center text-[13px] mb-1.5">
-              <span className="text-textSecondary">Inadimplência ≥ 90 dias (% do PL)</span>
-              <span className="font-bold font-mono-num">3,9%</span>
+          <div className="grid gap-5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <div className="flex justify-between items-center text-[13px] mb-1.5">
+                <span className="text-textSecondary">Atraso ≤ 15 dias (% do investido)</span>
+                <span className="font-bold font-mono-num">{performance.saude.atrasoAte15Pct.toFixed(1).replace('.', ',')}%</span>
+              </div>
+              <ProgressBar pct={performance.saude.atrasoAte15Pct} color={PALETTE.amber} height={7} />
             </div>
-            <ProgressBar pct={3.9} color={PALETTE.green} height={7} />
-            <div className="text-textTertiary text-[11.5px] mt-1">Faixa saudável de mercado: 3,5%–5%</div>
+            <div>
+              <div className="flex justify-between items-center text-[13px] mb-1.5">
+                <span className="text-textSecondary">Inadimplência ≥ 90 dias (% do investido)</span>
+                <span className="font-bold font-mono-num">{performance.saude.inadimplencia90Pct.toFixed(1).replace('.', ',')}%</span>
+              </div>
+              <ProgressBar pct={performance.saude.inadimplencia90Pct} color={PALETTE.green} height={7} />
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {institutional && (
         <NavyCard className="mb-4">

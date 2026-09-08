@@ -34,6 +34,10 @@ historicoRouter.get('/', (req, res) => {
   const purchases = listPurchasesByInvestor(effectiveOwnerId(req.user!));
   const totalInvestido = purchases.reduce((sum, p) => sum + precoPago(p), 0);
   const totalRetorno = purchases.reduce((sum, p) => sum + p.retorno, 0);
+  // Retorno sobre o capital investido, acumulado — NÃO uma taxa mensal. Ia rotulado como
+  // "% a.m.", e não é: é a razão retorno/investido do livro inteiro, com posições de prazos
+  // diferentes (de dias a meses) somadas. Chamar isso de taxa mensal multiplica ou divide o
+  // desempenho real por um fator que depende do prazo de cada operação.
   const rentMedia = totalInvestido > 0 ? (totalRetorno / totalInvestido) * 100 : 0;
 
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -43,7 +47,7 @@ historicoRouter.get('/', (req, res) => {
   res.json({
     totalInvestidoFmt: fmtBRL(totalInvestido),
     retornoAcumuladoFmt: fmtBRLSigned(totalRetorno),
-    rentabilidadeMediaFmt: rentMedia.toFixed(1).replace('.', ',') + '% a.m.',
+    rentabilidadeMediaFmt: rentMedia.toFixed(1).replace('.', ',') + '%',
     historico: all.slice((page - 1) * pageSize, page * pageSize),
     page,
     pageSize,

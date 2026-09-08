@@ -1661,6 +1661,51 @@ servidor de produção real: declarar limite de R$ 200.000 total e R$ 50.000 por
 concentração de R$ 84.500 no Grupo Atlas Varejo aparece marcada → contratar na Too recusa com o
 motivo certo → contratar na Junto passa → remover o teto devolve a Too à lista.
 
+### Varredura pelos seis papéis — três números que a tela do investidor inventava
+
+Percorri os seis papéis (investidor, cedente, sacado, admin, seguradora, auditor) contra um
+servidor real, comparando cada número exibido com a verdade do banco. Nove achados; este PR
+fecha os três do investidor, que são os mais graves porque saem na tela de desempenho, em
+linguagem de FIDC, e são exatamente o tipo de número em que se toma decisão.
+
+**1. "Retorno anualizado médio: 1115,57%".** `lib/investorPerformance.ts` anualizava sobre um
+prazo travado em 1 dia por `Math.max(1, …)`. Comprar uma duplicata perto do vencimento é
+operação normal neste mercado — é justamente a de menor risco —, e a 1 dia de carência o fator
+de anualização é 365: 2% de retorno viravam 730% a.a. Na conta demo saíam posições a 1441,79%
+a.a., e o "Índice tipo Sharpe" era calculado sobre esses mesmos números.
+
+Agora a plataforma **não anualiza abaixo de 30 dias**. A posição curta continua mostrando o
+retorno do período (honesto em qualquer prazo) e sai marcada como "não anualizado"; os
+agregados anualizados são calculados só sobre o que sustenta a conta, e a tela diz quantas
+posições ficaram de fora e por quê. Sem nenhuma posição anualizável, os três KPIs saem `—` em
+vez de um número inventado.
+
+**2. "Saúde da carteira: 8,2% de atraso, 3,9% de inadimplência".** Escritos no JSX. Todo
+investidor via os mesmos dois números, inclusive quem não tem posição nenhuma. Agora saem das
+posições reais: capital investido em título vencido e não pago, nas faixas ≤15 e ≥90 dias, com
+a base explícita. Uma duplicata `paga` nunca conta como atraso, por mais tarde que tenha vencido.
+
+Junto saíram as faixas "saudável de mercado" (7,5%–9% e 3,5%–5%): eram afirmadas sem fonte, e
+este repositório não tem série de mercado verificável para sustentá-las. Um número da carteira
+sem régua é melhor que um número com régua inventada.
+
+**3. "Rentabilidade média — % a.m."** É `retorno ÷ investido` do livro inteiro, do período
+inteiro, com posições de prazos que vão de dias a meses, rotulado como taxa **mensal**. Virou
+"Retorno sobre o investido — acumulado, não é taxa mensal". O mesmo rótulo errado estava no
+**relatório institucional em PDF**, que vai para comitê de investimento, e foi corrigido lá também.
+
+Verificado: server **827** testes (4 novos), client 39, sdks 12+12, build e e2e 12/12. Os dois
+consertos de cálculo têm teste que falha sem eles — o da anualização produz exatamente
+`744,89%` no lugar do `null`. E a tela conferida contra servidor real: 18,66% no lugar de
+1115,57%, seis posições marcadas "não anualizado", e a saúde da carteira em 0,0% porque as
+posições da conta demo estão pagas ou ainda a vencer — conferido linha a linha no banco.
+
+**Os outros seis achados** (donut do cedente somando 12 duplicatas com "3 operações" no centro;
+prêmio de seguro fixo em 0,6% no resumo de emissão, pago pelo investidor e não pelo cedente;
+"CERC · B3 · Núclea" fixo quando o roteamento escolhe **uma** registradora e a padrão é a
+Grafeno; taxa de plataforma dita como fixa em 0,35% quando é escalonada; e dois do seed) ficam
+para os próximos dois PRs.
+
 ## Running locally
 
 ```bash
