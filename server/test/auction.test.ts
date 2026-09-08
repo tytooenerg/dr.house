@@ -2,7 +2,6 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb } from '../src/db/users.js';
 import { db } from '../src/db/index.js';
 import { createDuplicata, dispararLeilao, getDuplicata, isPurchased, listMarketplace } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
@@ -10,6 +9,7 @@ import { listActiveAuctionBids } from '../src/db/auctionBids.js';
 import { reserveRate } from '../src/lib/auctionCore.js';
 import { closeDueAuctions } from '../src/lib/auctionClose.js';
 import { fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // O leilão primário de verdade. Antes desta suíte não existia nenhuma: o "leilão" era
 // BID_TEMPLATES/EXTRA_BIDDERS (data/seed.ts) desenhando concorrentes fabricados sobre um
@@ -27,7 +27,7 @@ async function investidor(nome = 'Fundo') {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ nome: 'Investidor', email: `inv-${unique()}@example.com`, password: 'senha123', companyName: `${nome} ${unique()}`, role: 'investidor' });
-  approveKyb(res.body.user.id);
+  credenciarInvestidor(res.body.user.id);
   return { token: res.body.token as string, userId: res.body.user.id as number, empresa: res.body.user.companyName as string };
 }
 

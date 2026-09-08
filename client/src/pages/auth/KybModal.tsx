@@ -10,7 +10,7 @@ export function KybModal() {
   const { user, submitKyb } = useSession();
   const [step, setStep] = useState(0);
   const [cnpj, setCnpj] = useState('');
-  const [tipo, setTipo] = useState('Banco comercial');
+  const [tipo, setTipo] = useState('');
   const [pl, setPl] = useState('');
   const [naoResidente, setNaoResidente] = useState(false);
   const [paisDomicilio, setPaisDomicilio] = useState('');
@@ -91,23 +91,27 @@ export function KybModal() {
               </Field>
             )}
             <div>
-              <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">Tipo de instituição</div>
+              <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">Sob qual veículo você adquire recebíveis?</div>
               <div className="flex flex-col gap-2">
-                {user.kybTipoOptions.map((t) => {
-                  const selected = tipo === t;
+                {user.veiculoOptions.map((v) => {
+                  const selected = tipo === v.key;
                   return (
                     <button
-                      key={t}
+                      key={v.key}
                       type="button"
-                      onClick={() => setTipo(t)}
-                      className="px-3.5 py-2.5 rounded-lg border border-inputBorder text-[13px] font-semibold cursor-pointer text-left"
+                      onClick={() => setTipo(v.key)}
+                      className="px-3.5 py-2.5 rounded-lg border border-inputBorder text-[13px] cursor-pointer text-left"
                       style={{ background: selected ? PALETTE.blue : '#fff', color: selected ? '#fff' : PALETTE.navy }}
                     >
-                      {t}
+                      <div className="font-semibold">{v.label}</div>
+                      <div className="text-[11.5px] mt-0.5" style={{ color: selected ? '#fff' : PALETTE.textTertiary }}>
+                        {v.descricao}
+                      </div>
                     </button>
                   );
                 })}
               </div>
+              <div className="text-[11.5px] text-textTertiary leading-relaxed mt-2">{user.veiculoDisclaimer}</div>
             </div>
           </div>
         )}

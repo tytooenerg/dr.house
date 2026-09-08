@@ -1,0 +1,15 @@
+-- Sob qual VEÍCULO um investidor adquire o crédito.
+--
+-- Comprar direito creditório no Brasil não é atividade livre: é factoring (fomento
+-- mercantil), securitizadora, FIDC ou instituição financeira, cada um com regime jurídico e
+-- tributário próprio. A plataforma precisa saber qual é — é isso que diz sob que regra a
+-- cessão acontece. Até aqui existia um `tipo` no formulário de KYB (banco/fundo/fintech/
+-- family office), usado SÓ pela triagem de investidor estrangeiro (lib/foreignInvestorCompliance.ts)
+-- e por mais nada: no caminho doméstico ele era decorativo — ninguém validava, ninguém exibia,
+-- nada dependia dele.
+--
+-- 'nao_informado' é o estado inicial de todo mundo. O backfill a partir do `tipo` antigo roda
+-- em TypeScript (backfillInvestorVeiculo, em db/users.ts, chamado no boot pelo index.ts como
+-- o backfillDuplicataSetor já faz) porque ler JSON em SQL não é portável entre SQLite e
+-- Postgres — json_extract() não existe no Postgres, e o espelho é gerado deste arquivo.
+ALTER TABLE users ADD COLUMN veiculo TEXT NOT NULL DEFAULT 'nao_informado';

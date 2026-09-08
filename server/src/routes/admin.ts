@@ -10,7 +10,7 @@ import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
 import { addNotification, addLedgerEntry } from '../db/misc.js';
 import { recordAuditEvent, listAuditLog, verifyAuditChain } from '../db/audit.js';
-import { COLORS } from '../data/seed.js';
+import { COLORS, VEICULO_KEYS, VEICULO_LABEL, type VeiculoKey } from '../data/seed.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { listComplianceCalendarSummary } from '../lib/complianceCalendarCore.js';
@@ -112,6 +112,8 @@ adminRouter.get('/kyb', (_req, res) => {
       email: u.email,
       companyName: u.company_name,
       kybForm,
+      veiculo: u.veiculo,
+      veiculoLabel: VEICULO_LABEL[u.veiculo] ?? 'Não informado',
       naoResidente: !!kybForm.naoResidente,
       submittedAt: fmtRelative(u.created_at),
       pldStatus: u.pld_status,
@@ -126,6 +128,18 @@ adminRouter.post(
   '/kyb/:userId/approve',
   asyncHandler(async (req, res) => {
     const userId = Number(req.params.userId);
+    // Aprovar um investidor sem saber sob qual veículo ele adquire crédito é liberar uma
+    // cessão sem saber que regra a rege. O gate de lance (lib/auctionCore.ts) recusaria
+    // depois de qualquer jeito — recusar aqui diz ao admin o que falta enquanto ele ainda
+    // está olhando a ficha, em vez de deixar a conta aprovada e travada.
+    const alvo = getUserById(userId);
+    if (alvo?.role === 'investidor' && !VEICULO_KEYS.includes(alvo.veiculo as VeiculoKey)) {
+      res.status(400).json({
+        error: 'veiculo_required',
+        message: 'Este investidor não informou sob qual veículo adquire recebíveis (instituição financeira, FIDC, fundo ou factoring). Peça a classificação antes de aprovar.',
+      });
+      return;
+    }
     approveKyb(userId);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'kyb.approved', { targetUserId: userId });
     res.json({ ok: true });

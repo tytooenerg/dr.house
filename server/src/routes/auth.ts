@@ -12,6 +12,7 @@ import {
   linkSamlAccount,
   submitKybForReview,
   updateKybForm,
+  setVeiculo,
   updateSettings,
   approveKyb,
 } from '../db/users.js';
@@ -39,7 +40,7 @@ import crypto from 'node:crypto';
 import { createRefreshToken, findValidRefreshToken, revokeAllRefreshTokensForUser, revokeRefreshToken } from '../db/refreshTokens.js';
 import { requireAuth } from '../auth/middleware.js';
 import { recordAuditEvent } from '../db/audit.js';
-import { INSURERS, KYB_TIPOS, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
+import { INSURERS, VEICULOS, VEICULO_KEYS, VEICULO_DISCLAIMER, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { runPldScreening } from '../lib/pldScreening.js';
 import { runAgent } from '../lib/agentRuntime.js';
@@ -111,7 +112,8 @@ function publicUser(user: UserRow) {
     role: user.role,
     kybDone: !!user.kyb_done,
     kybForm: JSON.parse(user.kyb_form || '{}'),
-    kybTipoOptions: KYB_TIPOS,
+    veiculoOptions: VEICULOS,
+    veiculoDisclaimer: VEICULO_DISCLAIMER,
     kybStatus: user.kyb_status,
     kybRejectReason: user.kyb_reject_reason,
     needsKyb: user.role === 'investidor' && (user.kyb_status === 'none' || user.kyb_status === 'rejected'),
@@ -556,7 +558,9 @@ authRouter.get('/me', requireAuth, (req, res) => {
 
 const kybSchema = z.object({
   cnpj: z.string().trim().min(1).optional().default(''),
-  tipo: z.enum(KYB_TIPOS as [string, ...string[]]).optional(),
+  // `tipo` virou o VEÍCULO sob o qual o investidor adquire crédito (migração 0070) — antes
+  // era um rótulo livre que só a triagem de estrangeiro lia.
+  tipo: z.enum(VEICULO_KEYS as [string, ...string[]]).optional(),
   pl: z.string().trim().optional().default(''),
   // Non-resident investor (INR) fields — see lib/foreignInvestorCompliance.ts. CNPJ
   // doesn't apply to a foreign entity, so naoResidente=true swaps it for a foreign tax ID
@@ -580,7 +584,10 @@ authRouter.post(
     }
     const userId = req.user!.id;
     if (parsed.data.cnpj) updateKybForm(userId, 'cnpj', parsed.data.cnpj);
-    if (parsed.data.tipo) updateKybForm(userId, 'tipo', parsed.data.tipo);
+    if (parsed.data.tipo) {
+      updateKybForm(userId, 'tipo', parsed.data.tipo);
+      setVeiculo(userId, parsed.data.tipo);
+    }
     if (parsed.data.pl) updateKybForm(userId, 'pl', parsed.data.pl);
     updateKybForm(userId, 'naoResidente', parsed.data.naoResidente ? '1' : '');
     if (parsed.data.paisDomicilio) updateKybForm(userId, 'paisDomicilio', parsed.data.paisDomicilio);

@@ -2,10 +2,11 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb, updateKybForm } from '../src/db/users.js';
+import {updateKybForm} from '../src/db/users.js';
 import { createDuplicata, createPurchase } from '../src/db/duplicatas.js';
 import { createSuspiciousActivityReport } from '../src/db/suspiciousActivity.js';
 import { buildCvmPeriodStats } from '../src/lib/regulatoryReports.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -25,7 +26,7 @@ async function registerInvestidor() {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ nome: 'Investidor', email, password: 'senha123', companyName: `Fundo ${unique()}`, role: 'investidor' });
-  approveKyb(res.body.user.id);
+  credenciarInvestidor(res.body.user.id);
   updateKybForm(res.body.user.id, 'cnpj', '11.222.333/0001-44');
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }

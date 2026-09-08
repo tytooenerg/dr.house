@@ -2,12 +2,13 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb, updateKybForm, setInstitutionalReportingEnabled } from '../src/db/users.js';
+import {updateKybForm, setInstitutionalReportingEnabled} from '../src/db/users.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // Achado corrigido: "Investido"/totalInvestido em routes/historico.ts,
 // lib/institutionalReporting.ts, lib/portfolioRebalance.ts e lib/investorPerformance.ts
@@ -32,7 +33,7 @@ async function registerInvestidor() {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ nome: 'Investidor', email, password: 'senha123', companyName: `Fundo ${unique()}`, role: 'investidor' });
-  approveKyb(res.body.user.id);
+  credenciarInvestidor(res.body.user.id);
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }
 

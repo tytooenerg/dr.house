@@ -90,7 +90,7 @@ describe('PLD/FT demo screening at KYB submission', () => {
       role: 'investidor',
     });
     const token = reg.body.token as string;
-    const kyb = await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${token}`).send({ cnpj: '99.999.999/0001-99', tipo: 'Fundo (FIDC)', pl: '1.000.000' });
+    const kyb = await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${token}`).send({ cnpj: '99.999.999/0001-99', tipo: 'fidc', pl: '1.000.000' });
     expect(kyb.status).toBe(200);
 
     const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
@@ -107,7 +107,7 @@ describe('PLD/FT demo screening at KYB submission', () => {
       role: 'investidor',
     });
     const token = reg.body.token as string;
-    await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${token}`).send({ cnpj: '11.111.111/0001-11', tipo: 'Fundo (FIDC)', pl: '1.000.000' });
+    await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${token}`).send({ cnpj: '11.111.111/0001-11', tipo: 'fidc', pl: '1.000.000' });
 
     const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
     expect(me.body.user.pldStatus).toBe('clear');

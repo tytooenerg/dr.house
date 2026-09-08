@@ -12,7 +12,7 @@ import {
   markFundoRedeemed,
 } from '../db/confirmingFundo.js';
 import { addLedgerEntry } from '../db/misc.js';
-import { createUser, getUserByEmail, approveKyb } from '../db/users.js';
+import { createUser, getUserByEmail, approveKyb, setVeiculo } from '../db/users.js';
 import { sumOutstandingPurchasesByInvestor } from '../db/duplicatas.js';
 import { hashPassword } from '../auth/password.js';
 import { fmtBRL } from './format.js';
@@ -38,6 +38,9 @@ export async function getOrCreateFundoSistemaUserId(): Promise<number> {
     role: 'investidor',
   });
   approveKyb(user.id);
+  // O pool do Confirming é um fundo: sem classificar, a conta de sistema seria aprovada e
+  // mesmo assim recusada no lance (lib/auctionCore.ts).
+  setVeiculo(user.id, 'fundo');
   return user.id;
 }
 

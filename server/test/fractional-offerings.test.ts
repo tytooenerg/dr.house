@@ -2,12 +2,12 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb } from '../src/db/users.js';
 import { createDuplicata, getDuplicata } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { FRACTIONAL_MIN_VALOR, FRACTIONAL_TOTAL_TOKENS } from '../src/lib/fractionalOfferings.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -22,7 +22,7 @@ async function registerInvestidor() {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ nome: 'Investidor', email, password: 'senha123', companyName: `Fundo ${unique()}`, role: 'investidor' });
-  approveKyb(res.body.user.id);
+  credenciarInvestidor(res.body.user.id);
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }
 

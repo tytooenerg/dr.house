@@ -18,7 +18,10 @@ export interface SessionUser {
   role: Role;
   kybDone: boolean;
   kybForm: { cnpj?: string; tipo?: string; pl?: string };
-  kybTipoOptions: string[];
+  // Espelha VEICULOS de server/src/data/seed.ts — sob qual veículo o investidor adquire
+  // crédito, que desde a migração 0070 é requisito pra dar lance.
+  veiculoOptions: { key: string; label: string; descricao: string }[];
+  veiculoDisclaimer: string;
   kybStatus: 'none' | 'pending' | 'approved' | 'rejected';
   kybRejectReason: string;
   needsKyb: boolean;

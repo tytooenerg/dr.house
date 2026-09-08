@@ -198,6 +198,41 @@ export function updateKybForm(
   return form;
 }
 
+export function setVeiculo(userId: number, veiculo: string) {
+  db.prepare('UPDATE users SET veiculo = ? WHERE id = ?').run(veiculo, userId);
+}
+
+// Backfill do veículo a partir do `tipo` que o KYB antigo guardava. Mapeia SÓ os dois casos
+// inequívocos: 'Banco comercial' é instituição financeira e 'Fundo (FIDC)' é FIDC. 'Fintech de
+// crédito' e 'Family office' ficam em 'nao_informado' de propósito — a primeira pode ser SCD,
+// SEP ou nenhuma das duas, e a segunda não é um veículo que adquire crédito (opera através de
+// um fundo). Classificação jurídica errada é pior que classificação ausente, então essas duas
+// pedem reclassificação explícita. Idempotente: só toca em quem ainda está 'nao_informado'.
+const VEICULO_POR_TIPO_ANTIGO: Record<string, string> = {
+  'Banco comercial': 'banco',
+  'Fundo (FIDC)': 'fidc',
+};
+
+export function backfillInvestorVeiculo(): number {
+  const rows = db
+    .prepare("SELECT id, kyb_form FROM users WHERE role = 'investidor' AND veiculo = 'nao_informado' AND kyb_form != ''")
+    .all() as { id: number; kyb_form: string }[];
+  let updated = 0;
+  for (const row of rows) {
+    let tipo = '';
+    try {
+      tipo = (JSON.parse(row.kyb_form || '{}') as { tipo?: string }).tipo ?? '';
+    } catch {
+      continue;
+    }
+    const veiculo = VEICULO_POR_TIPO_ANTIGO[tipo];
+    if (!veiculo) continue;
+    setVeiculo(row.id, veiculo);
+    updated++;
+  }
+  return updated;
+}
+
 export function markKybDone(userId: number) {
   db.prepare('UPDATE users SET kyb_done = 1 WHERE id = ?').run(userId);
 }

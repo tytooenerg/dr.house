@@ -2,9 +2,9 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb } from '../src/db/users.js';
 import { listAuditLog } from '../src/db/audit.js';
 import { classifyCompliance, OBRIGATORIEDADE_POR_BRACKET } from '../src/lib/complianceCalendarCore.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -19,7 +19,7 @@ async function register(role: 'cedente' | 'sacado' | 'investidor') {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ nome: 'Empresa Teste', email, password: 'senha123', companyName: `Empresa ${unique()}`, role });
-  approveKyb(res.body.user.id);
+  credenciarInvestidor(res.body.user.id);
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }
 

@@ -29,15 +29,15 @@ export function setAuctionBidStatus(id: number, status: AuctionBidStatus) {
 // Ordenado pelo critério de vitória: menor deságio primeiro; empate desempata por quem
 // lançou antes (created_at, depois id), a regra de leilão mais comum e a única que não
 // depende de nada fora da mesa.
-export function listActiveAuctionBids(duplicataId: string): (AuctionBidRow & { bidder_company_name: string })[] {
+export function listActiveAuctionBids(duplicataId: string): (AuctionBidRow & { bidder_company_name: string; bidder_veiculo: string })[] {
   return db
     .prepare(
-      `SELECT b.*, u.company_name as bidder_company_name FROM auction_bids b
+      `SELECT b.*, u.company_name as bidder_company_name, u.veiculo as bidder_veiculo FROM auction_bids b
        JOIN users u ON u.id = b.bidder_id
        WHERE b.duplicata_id = ? AND b.status = 'ativo'
        ORDER BY b.taxa_am ASC, b.created_at ASC, b.id ASC`
     )
-    .all(duplicataId) as (AuctionBidRow & { bidder_company_name: string })[];
+    .all(duplicataId) as (AuctionBidRow & { bidder_company_name: string; bidder_veiculo: string })[];
 }
 
 export function listMyAuctionBids(bidderId: number): (AuctionBidRow & { sacado_nome: string; valor: number; close_at: string | null })[] {

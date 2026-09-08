@@ -164,6 +164,9 @@ export interface UserRow {
   kyb_form: string;
   kyb_status: KybStatus;
   kyb_reject_reason: string;
+  // Sob qual veículo este investidor adquire crédito (migração 0070). 'nao_informado' até que
+  // ele se classifique — e enquanto for isso, não dá lance (lib/auctionGate.ts).
+  veiculo: string;
   plan: Plan;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;

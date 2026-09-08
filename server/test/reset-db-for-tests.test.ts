@@ -3,8 +3,8 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { db, resetDbForTests } from '../src/db/index.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb } from '../src/db/users.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // resetDbForTests() itself isn't called by any other test today (each test file already
 // gets its own fresh :memory: database from Vitest's per-file isolation) — this is the
@@ -26,7 +26,7 @@ describe('resetDbForTests', () => {
     // an aceite -> a dispute, a duplicata -> a compliance/insurance row...).
     const email = `reset-check-${Date.now()}@example.com`;
     const reg = await request(app).post('/api/auth/register').send({ nome: 'Reset Check', email, password: 'senha123', companyName: 'Reset Check Ltda', role: 'investidor' });
-    approveKyb(reg.body.user.id);
+    credenciarInvestidor(reg.body.user.id);
     const token = reg.body.token as string;
 
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
