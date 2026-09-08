@@ -34,8 +34,12 @@ export function backfillDuplicataSetor(): number {
 // data — sandbox=1 rows created via a test-mode partner API key (lib/sandboxData.ts) are
 // filtered out here, at the query layer, so no caller can accidentally leak them into a
 // real list just by forgetting to check a flag.
-export function listByCedente(cedenteId: number): DuplicataRow[] {
-  return db.prepare('SELECT * FROM duplicatas WHERE cedente_id = ? AND sandbox = 0 ORDER BY created_at DESC').all(cedenteId) as DuplicataRow[];
+// sandbox default false: a SPA sempre opera no plano de dados real. Só a API pública passa
+// true, e só quando a chave é de teste — mesma regra de listMarketplace/listAceitesByCedente.
+export function listByCedente(cedenteId: number, sandbox = false): DuplicataRow[] {
+  return db
+    .prepare('SELECT * FROM duplicatas WHERE cedente_id = ? AND sandbox = ? ORDER BY created_at DESC')
+    .all(cedenteId, sandbox ? 1 : 0) as DuplicataRow[];
 }
 
 // Feature "AI CFO — DRE simplificado (Empresarial)": revenue the cedente actually received

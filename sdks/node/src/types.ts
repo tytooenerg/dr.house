@@ -38,6 +38,52 @@ export interface DuplicataView {
   seguro: boolean;
 }
 
+/** Uma linha da listagem. Traz o valor em número, além do formatado, porque quem integra
+ * costuma somar/comparar antes de exibir. */
+export interface DuplicataListItem {
+  id: string;
+  status: string;
+  sacado: string;
+  valor: number;
+  valorFmt: string;
+  emissao: string;
+  vencimento: string;
+  registro: string | null;
+  registradora: string | null;
+  lastroPct: number;
+  seguro: boolean;
+  reservaTaxaAm: number | null;
+  closeAt: string | null;
+}
+
+export interface DuplicataListPage {
+  total: number;
+  limit: number;
+  offset: number;
+  mode: 'live' | 'test';
+  duplicatas: DuplicataListItem[];
+}
+
+export interface ListDuplicatasQuery {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AbrirLeilaoInput {
+  /** Reserva: o pior deságio mensal que o cedente aceita, entre 0 e 20 (% a.m.). */
+  taxaMaxima?: number | string;
+  /** Prazo do leilão em horas. Padrão 6, teto 168. */
+  duracaoHoras?: number;
+}
+
+export interface AbrirLeilaoResult {
+  duplicataId: string;
+  closeAt: string;
+  reservaTaxaAm: number | null;
+  mode: 'live' | 'test';
+}
+
 export interface MarketplaceOffer {
   id: string;
   sacado: string;

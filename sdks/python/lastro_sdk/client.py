@@ -86,6 +86,56 @@ class LastroClient:
     def get_duplicata(self, duplicata_id: str) -> Dict[str, Any]:
         return self._request("GET", f"/duplicatas/{self._quote(duplicata_id)}")
 
+    def list_duplicatas(
+        self,
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """List this account's duplicatas, paginated.
+
+        A test-mode key only ever sees sandbox rows, and a live key only real ones.
+        """
+        params = {}
+        if status is not None:
+            params["status"] = status
+        if limit is not None:
+            params["limit"] = str(limit)
+        if offset is not None:
+            params["offset"] = str(offset)
+        suffix = f"?{urllib.parse.urlencode(params)}" if params else ""
+        return self._request("GET", f"/duplicatas{suffix}")
+
+    def abrir_leilao(
+        self,
+        duplicata_id: str,
+        taxa_maxima: Optional[float] = None,
+        duracao_horas: Optional[float] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Put a duplicata up for auction.
+
+        Requires a write-scope key on a cedente account, and the duplicata must already be
+        approved with the sacado's aceite confirmed. `taxa_maxima` is the reserve — the worst
+        monthly discount rate the cedente is willing to take (0 to 20 % a.m.).
+        """
+        body: Dict[str, Any] = {}
+        if taxa_maxima is not None:
+            body["taxaMaxima"] = taxa_maxima
+        if duracao_horas is not None:
+            body["duracaoHoras"] = duracao_horas
+        return self._request("POST", f"/duplicatas/{self._quote(duplicata_id)}/leilao", body, idempotency_key)
+
+    # --- Fluxo de caixa (cedente accounts, plano Pro+) ---
+
+    def get_cashflow(self) -> Dict[str, Any]:
+        """Cash-flow forecast plus the decision engine's recommendation.
+
+        This is what an external supervisor reads to decide *when* to anticipate. Live keys
+        only: there is no sandbox cash position to serve.
+        """
+        return self._request("GET", "/cashflow")
+
     # --- Marketplace ---
 
     def list_marketplace(self) -> Dict[str, Any]:

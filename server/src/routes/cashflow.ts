@@ -4,7 +4,8 @@ import { requireAuth, requirePlan, requireRole } from '../auth/middleware.js';
 import { buildCashflowForecast } from '../lib/cashflowForecast.js';
 import { buildCfoRecommendation, candidatasParaAntecipacao } from '../lib/cfoDecisionEngine.js';
 import { getSettings } from '../db/users.js';
-import { dispararLeilao, setInsurer } from '../db/duplicatas.js';
+import { setInsurer } from '../db/duplicatas.js';
+import { abrirLeilao } from '../lib/auctionOpen.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { listInsuranceQuotes } from '../lib/insuranceQuotes.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -58,7 +59,6 @@ cashflowRouter.post(
     const elegiveis = new Map(candidatasParaAntecipacao(req.user!.id, null).map((d) => [d.id, d]));
     const abertas: string[] = [];
     const ignoradas: string[] = [];
-    const closeAt = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
 
     for (const id of parsed.data.duplicataIds) {
       const d = elegiveis.get(id);
@@ -70,7 +70,14 @@ cashflowRouter.post(
         const cotacao = listInsuranceQuotes(d)[0];
         if (cotacao) setInsurer(d.id, cotacao.key);
       }
-      dispararLeilao(d.id, closeAt, parsed.data.taxaMaxima);
+      // Passa por abrirLeilao em vez de chamar dispararLeilao direto: era aqui que
+      // 'leilao.aberto' deixava de ser emitido, e quem integrava perdia justamente os
+      // leilões abertos pelo motor de decisão — o caminho automatizado.
+      const out = abrirLeilao(req.user!, d.id, { reservaTaxaAm: parsed.data.taxaMaxima });
+      if (out.status !== 200) {
+        ignoradas.push(id);
+        continue;
+      }
       abertas.push(d.id);
     }
 

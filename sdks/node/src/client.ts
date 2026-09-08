@@ -1,9 +1,13 @@
 import { LastroApiError, LastroNetworkError } from './errors.js';
 import type {
+  AbrirLeilaoInput,
+  AbrirLeilaoResult,
   AceiteStatus,
   AceiteView,
   DecidirSinistroInput,
+  DuplicataListPage,
   DuplicataView,
+  ListDuplicatasQuery,
   EmitirDuplicataInput,
   EmitirDuplicataResult,
   MarketplaceOffer,
@@ -91,6 +95,35 @@ export class LastroClient {
 
   getDuplicata(id: string): Promise<DuplicataView> {
     return this.request('GET', `/duplicatas/${encodeURIComponent(id)}`);
+  }
+
+  /** List this account's duplicatas, paginated. A test-mode key only ever sees sandbox rows. */
+  listDuplicatas(query: ListDuplicatasQuery = {}): Promise<DuplicataListPage> {
+    const qs = new URLSearchParams();
+    if (query.status) qs.set('status', query.status);
+    if (query.limit !== undefined) qs.set('limit', String(query.limit));
+    if (query.offset !== undefined) qs.set('offset', String(query.offset));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return this.request('GET', `/duplicatas${suffix}`);
+  }
+
+  /**
+   * Put a duplicata up for auction. Requires a write-scope key on a cedente account, and the
+   * duplicata must already be approved with the sacado's aceite confirmed. `taxaMaxima` is the
+   * reserve — the worst monthly discount rate the cedente is willing to take.
+   */
+  abrirLeilao(id: string, input: AbrirLeilaoInput = {}, opts?: RequestOptions): Promise<AbrirLeilaoResult> {
+    return this.request('POST', `/duplicatas/${encodeURIComponent(id)}/leilao`, input, opts);
+  }
+
+  // --- Fluxo de caixa (cedente accounts, plano Pro+) ---
+
+  /**
+   * Cash-flow forecast plus the decision engine's recommendation — what an external supervisor
+   * reads to decide *when* to anticipate. Live keys only: there is no sandbox cash position.
+   */
+  getCashflow(): Promise<{ forecast: unknown; recomendacao: unknown; mode: 'live' }> {
+    return this.request('GET', '/cashflow');
   }
 
   // --- Marketplace ---

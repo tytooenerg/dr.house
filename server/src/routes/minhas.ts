@@ -1,19 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
-import { listByCedente, getDuplicata, dispararLeilao } from '../db/duplicatas.js';
+import { listByCedente, getDuplicata } from '../db/duplicatas.js';
 import { effectiveOwnerId } from '../db/users.js';
 import { aceiteConfirmado } from '../lib/aceiteCore.js';
 import { fmtBRL } from '../lib/format.js';
 import { estimateRateBand } from '../lib/dynamicPricing.js';
-import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
+import { abrirLeilao } from '../lib/auctionOpen.js';
 import { ratingFromScore } from '../lib/riscoCore.js';
 import { COLORS } from '../data/seed.js';
-
-// Teto de sanidade pra taxa de reserva. Não é uma regra de mercado — é uma barreira contra
-// dedo errado (digitar "150" quando queria "1,50"), que a essa altura significaria aceitar
-// entregar a duplicata quase de graça.
-const RESERVA_MAX_PCT = 20;
 
 const leilaoSchema = z.object({ taxaMaxima: z.union([z.number(), z.string()]).optional() });
 
@@ -62,59 +57,19 @@ minhasRouter.get('/', (req, res) => {
   res.json({ duplicatas });
 });
 
+// Os gates, a validação da reserva e o evento 'leilao.aberto' vivem em lib/auctionOpen.ts —
+// esta rota é só a porta da tela pra ele, e devolve a lista atualizada porque é disso que a
+// tela precisa pra rerenderizar.
 minhasRouter.post('/:id/leilao', (req, res) => {
-  const d = getDuplicata(req.params.id);
-  if (!d || d.cedente_id !== req.user!.id) {
-    res.status(404).json({ error: 'not_found' });
-    return;
-  }
-  if (d.lastro_pct !== 100 || d.status !== 'aprovada') {
-    res.status(409).json({ error: 'not_ready', message: 'Esta duplicata ainda não está pronta para leilão.' });
-    return;
-  }
-  // Achado corrigido: uma duplicata só pode entrar em negociação depois que o sacado
-  // aceita (explícito ou tácito, ver lib/aceiteCore.ts's aceiteConfirmado) — antes disso
-  // nem chega a 'no_mercado', pra que compra direta/cesta/auto-bid, que operam sobre
-  // listMarketplace(), fiquem protegidos de graça.
-  if (!aceiteConfirmado(d.id)) {
-    res.status(409).json({
-      error: 'aceite_pendente',
-      message: 'Aguardando aceite do sacado (ou o prazo tácito vencer) antes de poder negociar esta duplicata.',
-    });
-    return;
-  }
-  // A reserva é do cedente: é ele quem diz o pior deságio que aceita. Opcional pra não
-  // quebrar quem já chamava esta rota sem corpo — nesse caso vale a banda de mercado, o
-  // comportamento antigo (ver reserveRate em lib/auctionCore.ts).
   const parsed = leilaoSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
     return;
   }
-  const raw = parsed.data.taxaMaxima;
-  let reserva: number | undefined;
-  if (raw !== undefined && String(raw).trim() !== '') {
-    reserva = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(',', '.'));
-    if (!Number.isFinite(reserva) || reserva <= 0 || reserva > RESERVA_MAX_PCT) {
-      res.status(400).json({
-        error: 'validation_error',
-        message: `A taxa máxima precisa ser um número entre 0 e ${RESERVA_MAX_PCT}% a.m.`,
-      });
-      return;
-    }
+  const out = abrirLeilao(req.user!, req.params.id, { reservaTaxaAm: parsed.data.taxaMaxima });
+  if (out.status !== 200) {
+    res.status(out.status).json(out.body);
+    return;
   }
-  const closeAt = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
-  dispararLeilao(d.id, closeAt, reserva);
-  // 'leilao.aberto' era anunciado na tela de Desenvolvedores desde sempre e nunca disparava:
-  // dava pra assinar o evento e esperar pra sempre. Este é o único ponto do sistema em que um
-  // leilão de verdade abre, então é aqui que ele nasce. Mesmo padrão de entrega dos outros
-  // (void: uma falha de webhook nunca derruba a operação que já aconteceu).
-  void deliverWebhookEvent(req.user!.id, 'leilao.aberto', {
-    duplicataId: d.id,
-    sacado: d.sacado_nome,
-    valor: d.valor,
-    closeAt,
-    reservaTaxaAm: reserva ?? null,
-  });
-  res.json({ duplicatas: listByCedente(req.user!.id).map(view) });
+  res.json({ duplicatas: listByCedente(effectiveOwnerId(req.user!)).map(view) });
 });
