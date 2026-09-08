@@ -16,6 +16,10 @@ interface Insurer {
   premioFmt: string;
   selo: string;
   recommended?: boolean;
+  // Capacidade que a seguradora declarou (migração 0071). Quem estourou o próprio teto
+  // aparece desabilitada com o motivo, em vez de ser oferecida e recusar na contratação.
+  temCapacidade?: boolean;
+  motivoSemCapacidade?: string | null;
 }
 interface Bid {
   id: number;
@@ -516,25 +520,35 @@ export function MarketplacePage() {
                     <div className="px-4 py-3 text-xs font-bold text-textSecondary border-b border-hairline">
                       {t('marketplace.liveQuotesHint', 'Cotações em tempo real — cada seguradora precifica este risco de forma diferente')}
                     </div>
-                    {offer.insurerOptions.map((ins) => (
-                      <button
-                        key={ins.key}
-                        type="button"
-                        onClick={() => insure(offer.id, ins.key)}
-                        className="w-full flex items-center justify-between gap-2.5 px-4 py-3 border-none bg-transparent cursor-pointer text-left border-b border-bg last:border-b-0"
-                      >
-                        <div>
-                          <div className="font-bold text-[13px] text-navy flex items-center gap-1.5">
-                            {ins.name}
-                            {ins.recommended && (
-                              <Badge variant="success" size="sm">{t('marketplace.bestQuote', 'Melhor cotação')}</Badge>
-                            )}
+                    {offer.insurerOptions.map((ins) => {
+                      const semCapacidade = ins.temCapacidade === false;
+                      return (
+                        <button
+                          key={ins.key}
+                          type="button"
+                          disabled={semCapacidade}
+                          title={ins.motivoSemCapacidade ?? undefined}
+                          onClick={() => insure(offer.id, ins.key)}
+                          className={`w-full flex items-center justify-between gap-2.5 px-4 py-3 border-none bg-transparent text-left border-b border-bg last:border-b-0 ${semCapacidade ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                        >
+                          <div>
+                            <div className="font-bold text-[13px] text-navy flex items-center gap-1.5">
+                              {ins.name}
+                              {ins.recommended && (
+                                <Badge variant="success" size="sm">{t('marketplace.bestQuote', 'Melhor cotação')}</Badge>
+                              )}
+                              {semCapacidade && (
+                                <Badge variant="neutral" size="sm">{t('marketplace.noCapacity', 'Sem capacidade')}</Badge>
+                              )}
+                            </div>
+                            <div className="text-textTertiary text-[11.5px] mt-0.5">
+                              {semCapacidade ? ins.motivoSemCapacidade ?? ins.selo : ins.selo}
+                            </div>
                           </div>
-                          <div className="text-textTertiary text-[11.5px] mt-0.5">{ins.selo}</div>
-                        </div>
-                        <div className="font-mono-num font-bold text-[13px] text-blue flex-shrink-0">{ins.premioFmt}</div>
-                      </button>
-                    ))}
+                          <div className="font-mono-num font-bold text-[13px] text-blue flex-shrink-0">{ins.premioFmt}</div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 

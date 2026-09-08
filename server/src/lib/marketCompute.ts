@@ -7,7 +7,7 @@ import { isPurchased } from '../db/duplicatas.js';
 import { auctionIsOpen } from './auctionGate.js';
 import { ratingFromScore, SETOR_LABELS } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
-import { listInsuranceQuotes } from './insuranceQuotes.js';
+import { listInsuranceQuotesComCapacidade } from './insuranceQuotes.js';
 import { getLatestInsuranceSettlement } from '../db/insuranceSettlements.js';
 
 const ACEITE_BADGE = {
@@ -122,7 +122,9 @@ export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) 
     const premioFmt = settlement && d.valor > 0 ? ((settlement.premio / d.valor) * 100).toFixed(2).replace('.', ',') + '%' : catalogEntry?.premioFmt ?? '—';
     insurer = catalogEntry ? { key: catalogEntry.key, name: catalogEntry.name, premioFmt, selo: catalogEntry.selo } : null;
   }
-  const insurerOptions = listInsuranceQuotes(d);
+  // Com capacidade: uma seguradora que já estourou o limite que ela mesma declarou aparece
+  // marcada e não é recomendada, em vez de ser oferecida e recusar na contratação.
+  const insurerOptions = listInsuranceQuotesComCapacidade(d, !!d.sandbox);
   const rating = ratingFromScore(score);
   const prazoDias = Math.max(0, Math.round((parseFlexibleDate(d.vencimento).getTime() - Date.now()) / 86_400_000));
 

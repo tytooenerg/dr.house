@@ -1,6 +1,9 @@
 import { db } from './index.js';
 import { createUser, approveKyb, updateSubscription, setVeiculo } from './users.js';
 import { createDuplicata, dispararLeilao, setInsurer } from './duplicatas.js';
+import { recordInsuranceSettlement } from './insuranceSettlements.js';
+import { computeInsurerQuotePct } from '../lib/insuranceQuotes.js';
+import { INSURANCE_COMMISSION_PCT } from '../lib/settlement.js';
 import { ensureAceite, setAceiteStatus } from './aceites.js';
 import { addLedgerEntry, addNotification, inviteTeamMember } from './misc.js';
 import { hashPassword } from '../auth/password.js';
@@ -48,6 +51,25 @@ export async function seedIfEmpty() {
   const demoPassword = await hashPassword('demo1234');
 
   const investidor = createUser({ email: 'investidor@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Kayrós Capital', role: 'investidor' });
+
+  // Uma apólice semeada precisa ter a cobrança REGISTRADA, não só a seguradora apontada. O
+  // painel da seguradora soma o que está em insurance_settlements — o único registro do que
+  // foi de fato cobrado. Sem isto, a conta demo abre com apólices que ninguém pagou e prêmio
+  // zero; e a alternativa, estimar o prêmio na hora de exibir, é exatamente o bug que fazia
+  // a seguradora ver um faturamento que não era o dela (premioPct fixo do catálogo em vez da
+  // cotação real daquela duplicata).
+  const segurarNoSeed = (duplicataId: string, insurerKey: string, risco: { score: number | null; valor: number; vencimento: string }) => {
+    setInsurer(duplicataId, insurerKey);
+    const premio = risco.valor * (computeInsurerQuotePct(insurerKey, risco) / 100);
+    recordInsuranceSettlement({
+      duplicataId,
+      investorId: investidor.id,
+      insurerKey,
+      premio,
+      comissaoLastro: premio * INSURANCE_COMMISSION_PCT,
+      repasseSeguradora: premio * (1 - INSURANCE_COMMISSION_PCT),
+    });
+  };
   const cedente = createUser({ email: 'cedente@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Fornecedor Lima Ltda', role: 'cedente' });
   const sacado = createUser({ email: 'sacado@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Grupo Atlas Varejo', role: 'sacado' });
   createUser({ email: 'admin@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' });
@@ -87,7 +109,7 @@ export async function seedIfEmpty() {
       seguro: o.id <= 2,
       desagio: o.desagio,
     });
-    if (o.id <= 2) setInsurer(d.id, 'too');
+    if (o.id <= 2) segurarNoSeed(d.id, 'too', { score: d.score, valor: d.valor, vencimento: d.vencimento });
     dispararLeilao(d.id, new Date(Date.now() + o.countdownSec * 1000).toISOString());
     const aceite = ensureAceite(d.id, 'Aceite confirmado na emissão');
     setAceiteStatus(aceite.id, OFFER_ACEITE_STATUS[o.id] ?? 'aguardando');
@@ -107,7 +129,7 @@ export async function seedIfEmpty() {
     lastroPct: 100,
     seguro: true,
   });
-  setInsurer(overdue.id, 'too');
+  segurarNoSeed(overdue.id, 'too', { score: overdue.score, valor: overdue.valor, vencimento: overdue.vencimento });
 
   // Cedente demo account's own issued duplicatas.
   for (const m of MINHAS_RAW) {
