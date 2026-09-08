@@ -1,5 +1,5 @@
 import type { DuplicataRow } from '../db/types.js';
-import { COLORS, INSURERS } from '../data/seed.js';
+import { COLORS, INSURERS, VEICULO_LABEL } from '../data/seed.js';
 import { listActiveAuctionBids } from '../db/auctionBids.js';
 import { fmtBRL, scoreColorFor, parseFlexibleDate } from './format.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
@@ -76,6 +76,9 @@ export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) 
   const bids = bidRows.map((b, i) => ({
     id: b.id,
     name: b.bidder_company_name,
+    // Sob qual veículo este lance compraria — o cedente tem o direito de saber se quem está
+    // financiando é um banco, um FIDC, um fundo ou uma factoring: são regimes diferentes.
+    veiculo: VEICULO_LABEL[b.bidder_veiculo] ?? 'Não informado',
     initials: b.bidder_company_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase(),
     tipo: b.bidder_id === viewerId ? 'Seu lance' : 'Investidor',
     avatarBg: b.bidder_id === viewerId ? COLORS.BLUE : COLORS.NAVY,

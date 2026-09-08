@@ -90,7 +90,7 @@ describe('POST /auth/kyb — non-resident investor fields', () => {
         paisDomicilio: 'Estados Unidos',
         taxIdEstrangeiro: '12-3456789',
         representanteLegal: 'Banco XP S.A.',
-        tipo: 'Banco comercial',
+        tipo: 'banco',
         pl: '50.000.000',
       });
     expect(submit.status).toBe(200);
@@ -108,7 +108,7 @@ describe('POST /auth/kyb — non-resident investor fields', () => {
   it('a domestic investor is never flagged as non-resident', async () => {
     const companyName = `Fundo Doméstico ${unique()} Ltda`;
     const { token, userId } = await registerInvestidor(companyName);
-    await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${token}`).send({ cnpj: '11.222.333/0001-44', tipo: 'Fundo (FIDC)', pl: '5.000.000' });
+    await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${token}`).send({ cnpj: '11.222.333/0001-44', tipo: 'fidc', pl: '5.000.000' });
 
     const admin = await adminToken();
     const pending = await request(app).get('/api/admin/kyb').set('Authorization', `Bearer ${admin}`);
@@ -124,7 +124,7 @@ describe('checkForeignInvestorEligibility — deterministic memo', () => {
     await request(app)
       .post('/api/auth/kyb')
       .set('Authorization', `Bearer ${token}`)
-      .send({ naoResidente: true, paisDomicilio: 'Ilhas Cayman', taxIdEstrangeiro: 'KY-000111', representanteLegal: 'Itaú BBA', tipo: 'Fundo (FIDC)' });
+      .send({ naoResidente: true, paisDomicilio: 'Ilhas Cayman', taxIdEstrangeiro: 'KY-000111', representanteLegal: 'Itaú BBA', tipo: 'fidc' });
 
     const user = getUserById(userId)!;
     const result = await checkForeignInvestorEligibility(user);
@@ -160,7 +160,7 @@ describe('checkForeignInvestorEligibility — deterministic memo', () => {
     await request(app)
       .post('/api/auth/kyb')
       .set('Authorization', `Bearer ${token}`)
-      .send({ naoResidente: true, paisDomicilio: 'Suíça', taxIdEstrangeiro: 'CH-1', representanteLegal: 'BTG', tipo: 'Banco comercial' });
+      .send({ naoResidente: true, paisDomicilio: 'Suíça', taxIdEstrangeiro: 'CH-1', representanteLegal: 'BTG', tipo: 'banco' });
     const user = getUserById(userId)!;
     const result = await checkForeignInvestorEligibility(user);
     expect(result.memo.endsWith(FOREIGN_INVESTOR_DISCLAIMER)).toBe(true);
@@ -174,7 +174,7 @@ describe('Admin: generate + list foreign investor eligibility memos', () => {
     await request(app)
       .post('/api/auth/kyb')
       .set('Authorization', `Bearer ${token}`)
-      .send({ naoResidente: true, paisDomicilio: 'Holanda', taxIdEstrangeiro: 'NL-1', representanteLegal: 'BTG', tipo: 'Family office' });
+      .send({ naoResidente: true, paisDomicilio: 'Holanda', taxIdEstrangeiro: 'NL-1', representanteLegal: 'BTG', tipo: 'fundo' });
 
     const admin = await adminToken();
     const gen = await request(app).post(`/api/admin/kyb/${userId}/elegibilidade-estrangeiro/gerar`).set('Authorization', `Bearer ${admin}`);

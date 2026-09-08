@@ -11,6 +11,7 @@ import {
 } from '../db/auctionBids.js';
 import { computePurchasePrice, effectiveMonthlyRatePct } from './marketCompute.js';
 import { fmtBRL } from './format.js';
+import { VEICULO_KEYS, type VeiculoKey } from '../data/seed.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 
 // O leilão primário de verdade, no lugar da encenação anterior (ver o comentário da
@@ -67,6 +68,19 @@ export function placeAuctionBid(user: UserRow, duplicataId: string, taxaAm: numb
     return { status: 403, body: { error: 'forbidden', message: 'Apenas contas de investidor podem dar lances.' } };
   if (user.kyb_status !== 'approved')
     return { status: 403, body: { error: 'kyb_required', message: 'Seu credenciamento institucional ainda está em análise — assim que for aprovado você poderá dar lances.' } };
+  // Sob qual veículo o crédito seria adquirido? Comprar direito creditório é atividade
+  // regulada — factoring, FIDC, fundo ou instituição financeira, cada um com o seu regime — e
+  // a plataforma não pode registrar uma cessão sem saber sob qual regra ela acontece. Contas
+  // anteriores à migração 0070 cujo KYB antigo não permitia deduzir o veículo caem aqui, e a
+  // mensagem diz exatamente o que fazer.
+  if (!VEICULO_KEYS.includes(user.veiculo as VeiculoKey))
+    return {
+      status: 403,
+      body: {
+        error: 'veiculo_required',
+        message: 'Informe sob qual veículo você adquire recebíveis (instituição financeira, FIDC, fundo ou factoring) em Perfil & Configurações antes de dar lances.',
+      },
+    };
 
   const open = auctionIsOpen(duplicataId);
   if (!open.ok) return { status: open.status, body: { error: open.error, message: open.message } };

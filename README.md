@@ -1478,6 +1478,54 @@ pagar de R$ 150.000 em 30 dias → duplicatas emitidas → aceite do sacado → 
 (R$ 160.000 elegíveis, levanta R$ 141.053 ao custo de R$ 18.947, 13,43%) → executar → as duas
 duplicatas aparecem no marketplace com "Dar lance" e reserva de 1,75% a.m.
 
+### Sob qual veículo o investidor adquire o crédito
+
+Comprar direito creditório no Brasil não é atividade livre: é **factoring** (fomento
+mercantil), **FIDC**, **fundo** ou **instituição financeira**, cada um com regime jurídico e
+tributário próprio. A plataforma precisa saber qual é — é isso que diz sob que regra a cessão
+acontece.
+
+Existia um `tipo` no formulário de KYB ("Banco comercial", "Fundo (FIDC)", "Fintech de
+crédito", "Family office") lido **só** pela triagem de investidor não residente
+(`lib/foreignInvestorCompliance.ts`). No caminho doméstico ele era decorativo: ninguém
+validava, ninguém exibia, nada dependia dele. E a lista misturava veículo com perfil de
+instituição — "family office" não é um veículo que adquire crédito, ele opera através de um
+fundo.
+
+Agora `users.veiculo` (migração 0070) é um dos quatro do catálogo `VEICULOS`, e ele **morde**:
+
+- **Sem veículo classificado não se dá lance** (`403 veiculo_required`), no mesmo ponto onde o
+  KYB já era exigido. Uma classificação que não gate nada é decoração.
+- **O admin não aprova investidor sem veículo**: o gate de lance recusaria depois de qualquer
+  jeito, e recusar na aprovação diz o que falta enquanto o admin ainda olha a ficha, em vez de
+  deixar a conta aprovada e travada.
+- **O cedente vê sob qual veículo cada lance compraria** — banco, FIDC, fundo ou factoring são
+  contrapartes diferentes, e quem está cedendo o recebível tem direito de saber qual é.
+- O **disclaimer** que só existia para o investidor estrangeiro passa a ser dito também para o
+  doméstico: a Lastro é originadora e provedora de tecnologia, não administradora de fundo nem
+  distribuidora de valores mobiliários.
+
+**O que este PR deliberadamente NÃO faz**: nenhum gate de "investidor qualificado". Essa regra
+governa a **distribuição de cotas** de um fundo aos investidores dele — não é o que acontece
+aqui, onde o veículo compra o recebível diretamente. Aplicá-la seria transplantar uma regra
+para fora do lugar dela.
+
+O backfill (`backfillInvestorVeiculo`, no boot como o `backfillDuplicataSetor` já fazia) mapeia
+só os dois casos inequívocos — "Banco comercial" → `banco`, "Fundo (FIDC)" → `fidc`. "Fintech
+de crédito" pode ser SCD, SEP ou nenhuma das duas, e "Family office" não é veículo: as duas
+ficam pedindo reclassificação explícita, porque **classificação jurídica errada é pior que
+classificação ausente**. Roda em TypeScript e não em SQL porque `json_extract()` não existe no
+Postgres, e o espelho da migração é gerado do arquivo SQLite.
+
+**Achado de tabela**: `GET /api/market` montava as ofertas **sem `viewerId`** — o feed
+WebSocket virou por espectador quando o leilão ficou real, mas o GET que carrega a página antes
+do primeiro frame não, então o investidor via os próprios lances como de terceiros até o socket
+chegar. Uma linha.
+
+Verificado: server **786** testes (9 novos em `veiculo-investidor.test.ts`), client 39,
+sdks/node 9, build e e2e 12/12. Os 29 pontos de teste que faziam `approveKyb()` sozinho passaram
+a usar `credenciarInvestidor()`, que reflete o que a plataforma agora exige de verdade.
+
 ## Running locally
 
 ```bash

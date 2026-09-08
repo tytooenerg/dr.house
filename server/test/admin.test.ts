@@ -44,7 +44,7 @@ describe('KYB approval flow', () => {
     await request(app)
       .post('/api/auth/kyb')
       .set('Authorization', `Bearer ${token}`)
-      .send({ cnpj: '11.111.111/0001-11', tipo: 'Fundo (FIDC)', pl: '10.000.000' });
+      .send({ cnpj: '11.111.111/0001-11', tipo: 'fidc', pl: '10.000.000' });
 
     const market = await request(app).get('/api/market').set('Authorization', `Bearer ${token}`);
     const buyable = market.body.offers.find((o: { canBuy: boolean }) => o.canBuy);

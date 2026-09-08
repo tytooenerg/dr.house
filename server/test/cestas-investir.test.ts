@@ -2,13 +2,13 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb } from '../src/db/users.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { fmtBRLSigned } from '../src/lib/format.js';
 import { fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // lib/cestasCore.ts's investInBasket reusa computePurchasePrice/settlePurchase/
 // createPurchase exatamente como routes/market.ts faz — nenhum bug financeiro achado
@@ -49,7 +49,7 @@ async function registerInvestidorParaCestas() {
     .send({ nome: 'Investidor', email, password: 'senha123', companyName: `Fundo Cestas ${unique()}`, role: 'investidor' });
   const token = res.body.token as string;
   const userId = res.body.user.id as number;
-  approveKyb(userId);
+  credenciarInvestidor(userId);
   await request(app).post('/api/suitability/submit').set('Authorization', `Bearer ${token}`).send({ answers: ARROJADO_ANSWERS });
   return { token, userId };
 }

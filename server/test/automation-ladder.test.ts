@@ -5,11 +5,12 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
 import { listActiveAuctionBids } from '../src/db/auctionBids.js';
 import { fecharLeiloes } from './helpers/auction.js';
-import { approveKyb, updateSubscription, getSettings, getUserById } from '../src/db/users.js';
+import {updateSubscription, getSettings, getUserById} from '../src/db/users.js';
 import { createDuplicata, dispararLeilao, getDuplicata } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { currentFloor, nextStepAt, armLadder, getLadderBand } from '../src/lib/autoBidLadder.js';
 import type { LadderConfig } from '../src/db/types.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // Achado corrigido (pedido do usuário): "taxa máxima a oferecer" era um teto de risco
 // vestigial — o preço sempre foi calculado pelo servidor, o investidor nunca propunha nada
@@ -30,7 +31,7 @@ async function registerProInvestidor() {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ nome: 'Investidor', email, password: 'senha123', companyName: `Fundo ${unique()}`, role: 'investidor' });
-  approveKyb(res.body.user.id);
+  credenciarInvestidor(res.body.user.id);
   updateSubscription(res.body.user.id, { plan: 'pro', subscriptionStatus: 'active' });
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }

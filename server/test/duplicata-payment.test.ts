@@ -5,12 +5,12 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
 import { computeFundoNav } from '../src/lib/confirmingFundo.js';
-import { approveKyb } from '../src/db/users.js';
 import { getProgramaBySacado } from '../src/db/confirming.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // Nenhuma parte da plataforma modelava "sacado pagou no vencimento, caminho feliz" antes
 // desta feature — nem o marketplace normal, nem a linha de crédito, nem o Confirming. Self-
@@ -29,7 +29,7 @@ async function register(role: 'cedente' | 'sacado' | 'investidor', companyName: 
   const email = `${unique(role)}@example.com`;
   const res = await request(app).post('/api/auth/register').send({ nome: 'Teste', email, password: 'senha123', companyName, role });
   // POST /market/:id/buy exige kyb_status 'approved' — mesmo padrão de settlement.test.ts.
-  if (role === 'investidor') approveKyb(res.body.user.id);
+  if (role === 'investidor') credenciarInvestidor(res.body.user.id);
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }
 

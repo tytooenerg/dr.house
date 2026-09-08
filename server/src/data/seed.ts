@@ -275,7 +275,31 @@ export const CHAT_ANSWERS: Record<string, string> = {
   'Como funciona o leilão?': 'Quando uma duplicata entra em leilão, bancos, FIDCs e fintechs cadastrados enviam lances (taxas de deságio). A menor taxa competitiva vence, e o cedente recebe o valor líquido assim que o leilão fecha — normalmente em até 24h.',
 };
 
-export const KYB_TIPOS = ['Banco comercial', 'Fundo (FIDC)', 'Fintech de crédito', 'Family office'];
+// Sob qual veículo um investidor adquire o crédito. Não é taxonomia de marketing: comprar
+// direito creditório como atividade é regulado, e cada um destes tem regime jurídico e
+// tributário próprio (IOF e lucro real no factoring, isenção no FIDC, e por aí). Substitui o
+// antigo KYB_TIPOS ('Banco comercial'/'Fundo (FIDC)'/'Fintech de crédito'/'Family office'),
+// que misturava veículo com perfil de instituição — "family office" não é um veículo que
+// adquire crédito, ele opera através de um fundo.
+export const VEICULOS = [
+  { key: 'banco', label: 'Instituição financeira', descricao: 'Banco, SCD ou SEP autorizada pelo Banco Central.' },
+  { key: 'fidc', label: 'FIDC', descricao: 'Fundo de Investimento em Direitos Creditórios, com administrador e gestor registrados na CVM.' },
+  { key: 'fundo', label: 'Fundo de investimento', descricao: 'Outro fundo regulado que adquire recebíveis dentro da sua política.' },
+  { key: 'factoring', label: 'Factoring / fomento mercantil', descricao: 'Empresa de fomento mercantil que compra recebíveis com recursos próprios.' },
+] as const;
+
+export type VeiculoKey = (typeof VEICULOS)[number]['key'];
+export const VEICULO_KEYS = VEICULOS.map((v) => v.key) as VeiculoKey[];
+export const VEICULO_LABEL: Record<string, string> = Object.fromEntries(VEICULOS.map((v) => [v.key, v.label]));
+
+// O que a Lastro é e não é nesta cadeia — a mesma fronteira que o memorando de investidor
+// não residente (lib/foreignInvestorCompliance.ts) já declarava, que valia igualmente pro
+// investidor doméstico e não estava dita em lugar nenhum pra ele.
+export const VEICULO_DISCLAIMER =
+  'A Lastro atua como originadora e provedora de tecnologia: ela não é administradora de fundo autorizada pela CVM nem ' +
+  'distribuidora de valores mobiliários. A aquisição do recebível é feita pelo seu veículo, sob a regulação aplicável a ele, ' +
+  'e a classificação informada aqui é declaratória — cabe a você e ao seu jurídico garantir que o veículo pode adquirir ' +
+  'direitos creditórios nos termos em que opera.';
 
 export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'admin' | 'seguradora' | 'auditor' | 'api_partner' | 'anunciante', { title: string; body: string }[]> = {
   admin: [],

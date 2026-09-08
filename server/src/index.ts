@@ -10,6 +10,7 @@ import { startTracing } from './lib/tracing.js';
 import { app } from './app.js';
 import { seedIfEmpty } from './db/seed.js';
 import { backfillDuplicataSetor } from './db/duplicatas.js';
+import { backfillInvestorVeiculo } from './db/users.js';
 import { attachWebSocketServer } from './ws.js';
 import { startHealthMonitor } from './lib/healthMonitor.js';
 import { startAceiteReminderJob } from './lib/aceiteReminder.js';
@@ -40,6 +41,8 @@ async function main() {
   await seedIfEmpty();
   const backfilled = backfillDuplicataSetor();
   if (backfilled > 0) logger.info(`[duplicatas] classificou setor de ${backfilled} duplicata(s) existente(s) sem essa coluna preenchida`);
+  const veiculos = backfillInvestorVeiculo();
+  if (veiculos > 0) logger.info(`[investidores] veículo classificado a partir do KYB antigo em ${veiculos} conta(s)`);
   const server = createServer(app);
   attachWebSocketServer(server);
   startHealthMonitor();

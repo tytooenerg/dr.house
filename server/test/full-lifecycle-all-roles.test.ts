@@ -6,6 +6,7 @@ import { db } from '../src/db/index.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { applyTacitAcceptance } from '../src/lib/aceiteCore.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // Simulação de uma operação real de duplicata escritural jogando o papel de TODOS os 6
 // papéis da plataforma (cedente, investidor, sacado, seguradora, admin, auditor) numa
@@ -61,13 +62,13 @@ async function seguradoraLogin() {
 }
 
 // Aprovação de KYB via o endpoint HTTP real do admin (POST /api/admin/kyb/:userId/approve),
-// em vez do atalho approveKyb() direto no módulo db/users.js que outros testes usam — aqui
+// em vez do atalho credenciarInvestidor() direto no módulo db/users.js que outros testes usam — aqui
 // o próprio objetivo é simular o papel do admin de ponta a ponta, não só desbloquear o
 // investidor pra poder comprar.
 async function registrarInvestidorAprovado(companyName: string) {
   const admin = await adminLogin();
   const investidor = await register('investidor', companyName);
-  await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${investidor.token}`).send({ cnpj: '12.345.678/0001-90', tipo: 'Fundo (FIDC)', pl: '2.000.000' });
+  await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${investidor.token}`).send({ cnpj: '12.345.678/0001-90', tipo: 'fidc', pl: '2.000.000' });
   const approve = await request(app).post(`/api/admin/kyb/${investidor.userId}/approve`).set('Authorization', `Bearer ${admin}`);
   expect(approve.status).toBe(200);
   return investidor;

@@ -39,7 +39,11 @@ marketRouter.get('/', (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
 
-  let offers = listMarketplace().map(buildOfferView);
+  // Com viewerId: sem ele esta rota devolvia a lista cega, sem "Seu lance"/"Alterar lance" —
+  // o feed WebSocket é por espectador desde o leilão real, mas o GET que carrega a página
+  // antes do primeiro frame não era, então o investidor via os próprios lances como de
+  // terceiros até o socket chegar.
+  let offers = listMarketplace().map((d) => buildOfferView(d, req.user!.id));
   if (q) offers = offers.filter((o) => o.sacado.toLowerCase().includes(q) || o.cedente.toLowerCase().includes(q));
   if (setor) offers = offers.filter((o) => o.setor === setor);
   if (rating) offers = offers.filter((o) => o.rating === rating);

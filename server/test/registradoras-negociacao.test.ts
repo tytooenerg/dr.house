@@ -4,9 +4,9 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
-import { approveKyb } from '../src/db/users.js';
 import * as registradoras from '../src/lib/registradoras.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // Achado corrigido (auditoria de conformidade — Resolução BCB nº 540/2025): o sacador
 // deve informar a registradora sobre atos de negociação da duplicata, não só registrar a
@@ -44,7 +44,7 @@ describe('informarNegociacao é chamada nos pontos reais de negociação, não s
       .post('/api/auth/register')
       .send({ nome: 'Investidor', email: `inv-negoc-${unique()}@example.com`, password: 'senha123', companyName: `Fundo Negoc ${unique()}`, role: 'investidor' });
     const investorToken = investorRes.body.token as string;
-    approveKyb(investorRes.body.user.id);
+    credenciarInvestidor(investorRes.body.user.id);
 
     let duplicataId = '';
     for (let attempt = 0; attempt < 8 && !duplicataId; attempt++) {

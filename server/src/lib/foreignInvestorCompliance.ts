@@ -29,11 +29,16 @@ export const FOREIGN_INVESTOR_DISCLAIMER =
 export type ClassificacaoInvestidor = 'profissional' | 'qualificado' | 'nao_classificado';
 
 // Foreign institutional types are treated as profissional per Res. CVM 160/2022 art. 12 —
-// banks, funds, fintechs de crédito and family offices are all institutional categories
-// that qualify without a separate written declaration. Anything else needs an admin to
-// classify manually (e.g. based on a declared financial-investment threshold), so this
-// never silently promotes an unclear case to "profissional".
-const INSTITUTIONAL_TIPOS = new Set(['Banco comercial', 'Fundo (FIDC)', 'Fintech de crédito', 'Family office']);
+// instituição financeira, FIDC e fundo são categorias institucionais que qualificam sem uma
+// declaração escrita à parte. Anything else needs an admin to classify manually (e.g. based on
+// a declared financial-investment threshold), so this never silently promotes an unclear case
+// to "profissional".
+//
+// As chaves são as de VEICULOS (data/seed.ts) desde a migração 0070, que substituiu os rótulos
+// livres do KYB antigo ('Banco comercial', 'Fundo (FIDC)', 'Fintech de crédito', 'Family
+// office'). 'factoring' fica DE FORA de propósito: fomento mercantil não é categoria
+// institucional do art. 12 — uma factoring estrangeira precisa da classificação manual.
+const INSTITUTIONAL_TIPOS = new Set(['banco', 'fidc', 'fundo']);
 
 function classify(tipo: string | undefined): ClassificacaoInvestidor {
   if (tipo && INSTITUTIONAL_TIPOS.has(tipo)) return 'profissional';

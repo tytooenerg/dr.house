@@ -1,5 +1,5 @@
 import { db } from './index.js';
-import { createUser, approveKyb, updateSubscription } from './users.js';
+import { createUser, approveKyb, updateSubscription, setVeiculo } from './users.js';
 import { createDuplicata, dispararLeilao, setInsurer } from './duplicatas.js';
 import { ensureAceite, setAceiteStatus } from './aceites.js';
 import { addLedgerEntry, addNotification, inviteTeamMember } from './misc.js';
@@ -53,6 +53,9 @@ export async function seedIfEmpty() {
   createUser({ email: 'admin@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' });
   createUser({ email: 'seguradora@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Too', companyName: 'Too Seguros', role: 'seguradora', insurerKey: 'too' });
   approveKyb(investidor.id);
+  // Kayrós Capital é um fundo de investimento — sem veículo classificado a conta seria
+  // aprovada e mesmo assim incapaz de dar lance (lib/auctionCore.ts).
+  setVeiculo(investidor.id, 'fundo');
   // Demo accounts start on the top plans so the full feature set (Automação de Lances,
   // Comparador, Desenvolvedores) is visible out of the box — a freshly self-registered
   // account starts on Básico instead, so the paywall itself is also demoable.

@@ -2,11 +2,12 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
-import { approveKyb, updateSettings, updateSubscription } from '../src/db/users.js';
+import {updateSettings, updateSubscription} from '../src/db/users.js';
 import { marketMakerAgent } from '../src/lib/agents/marketMaker.js';
 import { runMarketMakerAgentScan } from '../src/lib/marketMakerAgentJob.js';
 import type { AgentRunContext } from '../src/lib/agentRuntime.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -21,7 +22,7 @@ async function registerInvestidor() {
   const res = await request(app)
     .post('/api/auth/register')
     .send({ nome: 'Investidor', email, password: 'senha123', companyName: `Fundo ${unique()}`, role: 'investidor' });
-  approveKyb(res.body.user.id);
+  credenciarInvestidor(res.body.user.id);
   return { token: res.body.token as string, userId: res.body.user.id as number };
 }
 

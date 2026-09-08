@@ -26,7 +26,7 @@ describe('KYB pre-triage (Onboarding agent)', () => {
     const kyb = await request(app)
       .post('/api/auth/kyb')
       .set('Authorization', `Bearer ${reg.body.token}`)
-      .send({ cnpj: '22.333.444/0001-55', tipo: 'Fundo (FIDC)', pl: '5.000.000' });
+      .send({ cnpj: '22.333.444/0001-55', tipo: 'fidc', pl: '5.000.000' });
     expect(kyb.status).toBe(200);
 
     const tok = await adminToken();
@@ -45,7 +45,7 @@ describe('KYB pre-triage (Onboarding agent)', () => {
     await request(app)
       .post('/api/auth/kyb')
       .set('Authorization', `Bearer ${reg.body.token}`)
-      .send({ cnpj: '22.333.444/0001-66', tipo: 'Fundo (FIDC)', pl: '5.000.000' });
+      .send({ cnpj: '22.333.444/0001-66', tipo: 'fidc', pl: '5.000.000' });
 
     // Simulate what the fire-and-forget trigger would have produced had ANTHROPIC_API_KEY
     // been configured — same tables, same shape.

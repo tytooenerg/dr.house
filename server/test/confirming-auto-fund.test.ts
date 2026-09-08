@@ -3,13 +3,13 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
-import { approveKyb } from '../src/db/users.js';
 import { getFundoBalance } from '../src/db/confirmingFundo.js';
 import { getProgramaBySacado } from '../src/db/confirming.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
+import { credenciarInvestidor } from './helpers/investidor.js';
 
 // Achado corrigido (mudança de modelo de negócio): o financiamento automático do Programa
 // Confirming costumava pular o leilão inteiramente na emissão (a suíte antiga cobria esse
@@ -275,7 +275,7 @@ describe('Fundo de Fomento do Confirming — compra dentro do leilão, nunca por
     await aceitarEDisparar(cedenteToken, sacadoToken, duplicataId);
 
     const { token: outroInvestidorToken, userId: outroInvestidorId } = await register('investidor', unique('Investidor Rápido'));
-    approveKyb(outroInvestidorId);
+    credenciarInvestidor(outroInvestidorId);
     const buy = (await arrematar(outroInvestidorToken, duplicataId)).lance;
     expect(buy.status).toBe(200);
 
