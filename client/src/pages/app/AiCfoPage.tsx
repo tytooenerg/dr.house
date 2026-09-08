@@ -4,6 +4,7 @@ import { api, ApiError } from '../../lib/api';
 import { PageHeader, Card } from '../../components/ui/Card';
 import { Segmented } from '../../components/ui/Segmented';
 import { AiTag } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
@@ -112,6 +113,38 @@ const INSIGHT_STYLE: Record<CashflowInsight['tipo'], { background: string; color
   ok: { background: PALETTE.greenBg, color: PALETTE.green },
 };
 
+interface CfoPlanoItem {
+  duplicataId: string;
+  sacado: string;
+  vencimento: string;
+  valorFmt: string;
+  precoCompraFmt: string;
+  custoFmt: string;
+  taxaAmFmt: string;
+  seguradora: string | null;
+  premioFmt: string;
+}
+interface CfoPlano {
+  comSeguro: boolean;
+  itens: CfoPlanoItem[];
+  liquidoLevantadoFmt: string;
+  custoTotalFmt: string;
+  custoPctFmt: string;
+  cobreDeficit: boolean;
+  reservaSugeridaAm: number;
+  reservaSugeridaFmt: string;
+}
+interface CfoRecommendation {
+  temDeficit: boolean;
+  deficit: { emDias: number; valorFmt: string } | null;
+  elegiveis: { quantidade: number; valorFmt: string };
+  plano: CfoPlano | null;
+  planoComSeguro: CfoPlano | null;
+  esperar: { custoTotalFmt: string; economiaFmt: string } | null;
+  mensagem: string;
+  motivo: string | null;
+}
+
 export function AiCfoPage() {
   const { t } = useLang();
   const { user } = useSession();
@@ -119,6 +152,37 @@ export function AiCfoPage() {
   const [scenario, setScenario] = useState<ScenarioResult['scenario']>('base');
 
   const { data: forecast, error: loadError, reload: load, setData: setForecast } = useApi<CashflowForecast>('/cashflow/forecast', { fallbackMessage: 'Falha ao carregar a projeção de caixa.' });
+  // O Motor de Decisão (server/src/lib/cfoDecisionEngine.ts) transforma a projeção numa
+  // recomendação executável. Vem numa chamada separada de propósito: a projeção continua
+  // aparecendo mesmo se a recomendação falhar.
+  const { data: recomendacao, reload: reloadRecomendacao } = useApi<CfoRecommendation>('/cashflow/recomendacao');
+  const [verComparacao, setVerComparacao] = useState(false);
+  const [dispensado, setDispensado] = useState(false);
+  const [executando, setExecutando] = useState(false);
+  const [execErro, setExecErro] = useState('');
+  const [execOk, setExecOk] = useState('');
+
+  const executarPlano = async (plano: CfoPlano) => {
+    setExecutando(true);
+    setExecErro('');
+    try {
+      const res = await api.post<{ abertas: string[]; ignoradas: string[] }>('/cashflow/recomendacao/executar', {
+        duplicataIds: plano.itens.map((i) => i.duplicataId),
+        comSeguro: plano.comSeguro,
+        taxaMaxima: plano.reservaSugeridaAm,
+      });
+      setExecOk(
+        `${res.abertas.length} ${res.abertas.length === 1 ? 'duplicata foi' : 'duplicatas foram'} a leilão com reserva de ${plano.reservaSugeridaFmt} a.m.` +
+          (res.ignoradas.length ? ` ${res.ignoradas.length} ficaram de fora por não estarem mais elegíveis.` : '')
+      );
+      void reloadRecomendacao();
+      void load();
+    } catch (err) {
+      setExecErro(err instanceof ApiError ? err.message : 'Não foi possível executar o plano.');
+    } finally {
+      setExecutando(false);
+    }
+  };
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
   if (!forecast) return null;
@@ -134,6 +198,98 @@ export function AiCfoPage() {
           'Projeção baseada nos seus recebíveis reais (Minhas Duplicatas + ERP conectado) e contas a pagar cadastradas — sem números inventados',
         )}
       />
+
+      {recomendacao && !dispensado && (
+        <div className="bg-white border border-border rounded-card p-5 mb-6" style={{ borderLeft: `4px solid ${PALETTE.blue}` }}>
+          <div className="flex items-center gap-2 mb-2.5">
+            <AiTag label="CFO AI" />
+            <span className="text-[11.5px] font-bold text-textSecondary uppercase tracking-wide">Recomendação</span>
+          </div>
+          <p className="text-[13.5px] text-navy leading-relaxed mb-3">{recomendacao.mensagem}</p>
+
+          {recomendacao.plano && (
+            <>
+              <div className="flex gap-5 flex-wrap mb-3">
+                <div>
+                  <div className="text-[11.5px] text-textSecondary">Você levanta</div>
+                  <div className="font-mono-num font-bold text-lg text-green">{recomendacao.plano.liquidoLevantadoFmt}</div>
+                </div>
+                <div>
+                  <div className="text-[11.5px] text-textSecondary">Custo total</div>
+                  <div className="font-mono-num font-bold text-lg">{recomendacao.plano.custoTotalFmt}</div>
+                </div>
+                <div>
+                  <div className="text-[11.5px] text-textSecondary">Custo sobre o levantado</div>
+                  <div className="font-mono-num font-bold text-lg">{recomendacao.plano.custoPctFmt}</div>
+                </div>
+                <div>
+                  <div className="text-[11.5px] text-textSecondary">Reserva do leilão</div>
+                  <div className="font-mono-num font-bold text-lg">{recomendacao.plano.reservaSugeridaFmt} a.m.</div>
+                </div>
+              </div>
+
+              {recomendacao.esperar && (
+                <p className="text-[12.5px] text-textSecondary mb-3">
+                  Esperando até a data do déficit, o mesmo plano custaria {recomendacao.esperar.custoTotalFmt} —{' '}
+                  {recomendacao.esperar.economiaFmt} a menos. O deságio é proporcional ao prazo que falta.
+                </p>
+              )}
+
+              {verComparacao && (
+                <div className="bg-surface rounded-lg p-3.5 mb-3">
+                  <div className="text-[11.5px] font-bold text-textSecondary uppercase mb-2">Com seguro x sem seguro</div>
+                  <div className="text-[12.5px] mb-2">
+                    Sem seguro: <b className="font-mono-num">{recomendacao.plano.custoTotalFmt}</b> ({recomendacao.plano.custoPctFmt})
+                    {recomendacao.planoComSeguro && (
+                      <>
+                        {' · '}Com seguro: <b className="font-mono-num">{recomendacao.planoComSeguro.custoTotalFmt}</b> (
+                        {recomendacao.planoComSeguro.custoPctFmt})
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {recomendacao.plano.itens.map((i) => (
+                      <div key={i.duplicataId} className="flex items-center gap-3 text-[12.5px] flex-wrap">
+                        <span className="font-semibold flex-1 min-w-[150px]">{i.sacado}</span>
+                        <span className="text-textSecondary">vence {i.vencimento}</span>
+                        <span className="font-mono-num">{i.valorFmt}</span>
+                        <span className="font-mono-num text-green">recebe {i.precoCompraFmt}</span>
+                        <span className="font-mono-num text-textSecondary">custo {i.custoFmt}</span>
+                        <span className="font-mono-num">{i.taxaAmFmt} a.m.</span>
+                      </div>
+                    ))}
+                  </div>
+                  {recomendacao.planoComSeguro?.itens[0]?.seguradora && (
+                    <div className="text-[11.5px] text-textTertiary mt-2">
+                      Cobertura pela {recomendacao.planoComSeguro.itens[0].seguradora} — prêmio já incluído no custo com seguro.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {execErro && <div className="text-red text-[12.5px] font-semibold mb-2">{execErro}</div>}
+              {execOk && <div className="text-green text-[12.5px] font-semibold mb-2">{execOk}</div>}
+
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" disabled={executando} onClick={() => executarPlano(recomendacao.plano!)}>
+                  {executando ? 'Executando…' : 'Executar'}
+                </Button>
+                {recomendacao.planoComSeguro && (
+                  <Button size="sm" variant="secondary" disabled={executando} onClick={() => executarPlano(recomendacao.planoComSeguro!)}>
+                    Executar com seguro
+                  </Button>
+                )}
+                <Button size="sm" variant="secondary" onClick={() => setVerComparacao((v) => !v)}>
+                  {verComparacao ? 'Fechar comparação' : 'Comparar'}
+                </Button>
+                <button type="button" onClick={() => setDispensado(true)} className="bg-transparent border-none text-textTertiary text-[12.5px] font-bold cursor-pointer underline">
+                  Não fazer nada
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>

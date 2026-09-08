@@ -1434,6 +1434,50 @@ Verificado: server **769** testes (3 novos em `webhooks-v2.test.ts`, cada um com
 HTTP real recebendo a entrega). Confirmado que são reais: removendo só o emissor de
 `lance.recebido`, o teste correspondente falha com `webhook not received in time`.
 
+### Motor de Decisão do CFO — da projeção de déficit à recomendação executável
+
+O AI CFO já projetava o caixa e já apontava "você terá déficit de X em N dias". Faltava o passo
+seguinte: **o que fazer a respeito**. Todas as peças existiam soltas — projeção
+(`cashflowForecast.ts`), elegibilidade, preço (`computePurchasePrice`), cotação de seguro
+(`insuranceQuotes.ts`), leilão com reserva — e nada as compunha. O agente `cfoAntecipacao`
+chegava mais perto e parava no meio: uma tool, que lista recebíveis ordenados **por risco**.
+
+`lib/cfoDecisionEngine.ts` fecha o circuito e produz uma recomendação com números reais:
+
+- **Candidatos** são exatamente o que `POST /minhas/:id/leilao` aceitaria hoje — lastro 100%,
+  status `aprovada` e aceite confirmado. Recomendar o que a própria plataforma recusaria seria
+  oferecer uma opção que não existe.
+- **Só duplicata que vence depois do déficit.** Uma que vence antes já está contada no saldo
+  projetado daquela data: antecipá-la não põe dinheiro novo lá, só adianta (com deságio) o que
+  já ia entrar.
+- **Ordenação por custo por real levantado**, não por risco: para cobrir um déficit gastando
+  menos, prazo curto ganha de score alto.
+- **Duas variantes**, sem e com seguro, com o prêmio real da melhor cotação embutido no custo —
+  é o botão "Comparar".
+- **Quanto custaria esperar** até a data do déficit, já que o deságio é proporcional ao prazo
+  que falta: "antecipar agora" vira escolha, não pressuposto.
+
+Na tela, um cartão do CFO com a recomendação em texto, os quatro números (levanta / custo /
+custo sobre o levantado / reserva) e **[Executar] [Executar com seguro] [Comparar] [Não fazer
+nada]**. Executar contrata o seguro escolhido e abre o leilão de cada duplicata com a reserva
+da recomendação — **revalidando cada id contra o estado de agora**, porque entre ver a
+recomendação e clicar em Executar uma duplicata pode ter deixado de ser elegível; o que não
+passa volta na resposta como `ignoradas`, não some em silêncio.
+
+`computePurchasePrice` ganhou um parâmetro `nowMs` opcional para responder "quanto custaria
+daqui a N dias" sem recopiar a fórmula do deságio.
+
+**Uma armadilha encontrada no caminho**: `npx tsc -p client/tsconfig.json --noEmit` **não
+verifica nada** — esse tsconfig tem `"files": []` e só referências de projeto. O comando real é
+`npm run typecheck` (que roda `tsc -b` em cada workspace), e foi ele que pegou um import
+faltando aqui.
+
+Verificado: server **777** testes (8 novos em `cfo-decision-engine.test.ts`), client 39,
+sdks/node 9. E o cenário inteiro contra um servidor de produção real: cedente novo → conta a
+pagar de R$ 150.000 em 30 dias → duplicatas emitidas → aceite do sacado → recomendação
+(R$ 160.000 elegíveis, levanta R$ 141.053 ao custo de R$ 18.947, 13,43%) → executar → as duas
+duplicatas aparecem no marketplace com "Dar lance" e reserva de 1,75% a.m.
+
 ## Running locally
 
 ```bash

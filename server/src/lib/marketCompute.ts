@@ -42,10 +42,15 @@ const MAX_DESCONTO_PCT = 0.6;
 // rate (Confirming's programa.taxa_am) use that instead of the generic marketplace rate.
 export function computePurchasePrice(
   d: DuplicataRow,
-  rateOverridePct?: number
+  rateOverridePct?: number,
+  // `nowMs` existe pro Motor de Decisão do CFO (lib/cfoDecisionEngine.ts) poder responder
+  // "quanto custaria antecipar daqui a N dias?" sem recopiar esta fórmula — o deságio é
+  // proporcional ao prazo que falta, então adiar barateia, e essa comparação só é honesta se
+  // sair do mesmo lugar que o preço real.
+  nowMs: number = Date.now()
 ): { precoCompra: number; descontoValor: number; descontoPct: number; taxaAmPct: number } {
   const taxaAmPct = rateOverridePct ?? effectiveMonthlyRatePct(d);
-  const prazoDias = Math.max(0, Math.round((parseFlexibleDate(d.vencimento).getTime() - Date.now()) / 86_400_000));
+  const prazoDias = Math.max(0, Math.round((parseFlexibleDate(d.vencimento).getTime() - nowMs) / 86_400_000));
   const descontoPct = Math.min((taxaAmPct * (prazoDias / 30)) / 100, MAX_DESCONTO_PCT);
   const descontoValor = d.valor * descontoPct;
   return { precoCompra: d.valor - descontoValor, descontoValor, descontoPct, taxaAmPct };
