@@ -31,6 +31,7 @@ interface DashboardData {
   ratingLegend: Legend[];
   riskDonutStops: { color: string; from: number; to: number }[];
   activeDuplicatas: number;
+  donutCount: number;
   donutTitle: string;
   monthlyTitle: string;
   donutEmptyHint: string | null;
@@ -89,7 +90,8 @@ export function DashboardPage() {
         <Card className="flex flex-col items-center">
           <div className="font-bold text-[15px] self-start mb-4">{data.donutTitle}</div>
           <Donut stops={data.riskDonutStops} size={150}>
-            <div className="text-xl font-extrabold">{data.activeDuplicatas}</div>
+            {/* donutCount, não activeDuplicatas: o número dentro do anel descreve o anel. */}
+            <div className="text-xl font-extrabold">{data.donutCount}</div>
             <div className="text-[11.5px] text-textSecondary">{t('dashboard.operacoes', 'operações')}</div>
           </Donut>
           {data.donutEmptyHint && <div className="text-[12.5px] text-textSecondary text-center mt-4">{data.donutEmptyHint}</div>}

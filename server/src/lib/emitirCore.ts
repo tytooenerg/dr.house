@@ -9,6 +9,7 @@ import { addNotification } from '../db/misc.js';
 import { getSacadoAccountByCompanyName, getSettings } from '../db/users.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from './billing.js';
+import { listInsuranceQuotes } from './insuranceQuotes.js';
 import { platformFee } from './settlement.js';
 import { chooseRegistradora, registrarNaRegistradora } from './registradoras.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
@@ -36,7 +37,20 @@ export function computeEmitirPreview(form: EmitirForm) {
   const batchTotal = form.batchValores.reduce((sum, v) => sum + parseBRLNumber(v), 0);
   const totalValor = valorNum + batchTotal;
   const matched = SACADOS[form.sacado];
-  const emitPremio = form.seguro ? valorNum * 0.006 : 0;
+  // Faixa REAL de prêmio para ESTA duplicata, das três seguradoras (lib/insuranceQuotes.ts),
+  // no lugar de um 0,6% fixo que não correspondia a cotação nenhuma — as cotações variam de
+  // 0,30% a 0,90% conforme score, valor e prazo.
+  //
+  // E, mais importante: marcar "seguro" na emissão NÃO contrata nem cobra nada. Só liga um
+  // flag na duplicata; a apólice é contratada depois pelo INVESTIDOR, em
+  // POST /market/:id/insure, e é ele quem paga o prêmio (lib/settlement.ts's settleInsurance
+  // debita o investidor). O resumo mostrava esse valor como se fosse custo do cedente.
+  const cotacoes = form.seguro && form.valor && form.vencimento
+    ? listInsuranceQuotes({ score: matched?.score ?? null, valor: valorNum, vencimento: form.vencimento })
+    : [];
+  const premioRange = cotacoes.length
+    ? { minPct: cotacoes[0].premioPct, maxPct: cotacoes[cotacoes.length - 1].premioPct }
+    : null;
   // Real supply/demand adjustment (lib/dynamicPricing.ts) instead of a fixed band — the
   // same rating can quote a different rate today than last month depending on how much
   // capital is actually chasing offers right now.
@@ -64,8 +78,22 @@ export function computeEmitirPreview(form: EmitirForm) {
     preApprovedLimit,
     emitSummary: {
       valorFmt: valorNum ? fmtBRL(valorNum) : '—',
-      premioFmt: emitPremio ? fmtBRL(emitPremio) : form.seguro ? 'R$ 0' : 'Não contratado',
+      premioFmt: premioRange
+        ? `${fmtBRL(valorNum * (premioRange.minPct / 100))} a ${fmtBRL(valorNum * (premioRange.maxPct / 100))}`
+        : form.seguro
+          ? 'a cotar na contratação'
+          : 'Não oferecido',
+      /** Quem paga: o investidor, na contratação. Nunca sai do bolso do cedente. */
+      premioPagoPor: 'investidor' as const,
+      premioNota: form.seguro
+        ? 'Faixa das cotações das seguradoras para esta duplicata. Quem contrata e paga é o investidor, no momento da compra — não sai do seu valor a receber.'
+        : 'Sem seguro de crédito oferecido nesta duplicata.',
       taxaEstimadaFmt: taxaMid.toFixed(1).replace('.', ',') + '% a.m.',
+      // A registradora que ESTA duplicata vai usar. A tela listava "CERC · B3 · Núclea"
+      // fixo, mas chooseRegistradora escolhe UMA (a de menor custo entre as elegíveis por
+      // valor) — e até R$ 200 mil a escolhida é a Grafeno, que nem aparecia na lista.
+      // A função é determinística no valor, então dá pra dizer qual antes de emitir.
+      registradoraEscolhida: valorNum > 0 ? chooseRegistradora(valorNum).name : null,
       plataformaFeeFmt: totalValor ? fmtBRL(platformFee(totalValor)) : '—',
       totalValor,
       // Transparency for the UI/API consumer: this is why the estimate moved since last

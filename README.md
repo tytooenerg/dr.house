@@ -1706,6 +1706,42 @@ prêmio de seguro fixo em 0,6% no resumo de emissão, pago pelo investidor e nã
 Grafeno; taxa de plataforma dita como fixa em 0,35% quando é escalonada; e dois do seed) ficam
 para os próximos dois PRs.
 
+### Varredura pelos seis papéis (2/3) — três coisas que a tela do cedente prometia errado
+
+**1. O número dentro do anel não descrevia o anel.** O donut "Suas duplicatas por rating"
+distribuía as 12 duplicatas do cedente por valor, mas imprimia no centro o `activeDuplicatas`
+— só as 3 ativas. Quatro faixas não-nulas em volta de um "3 operações" é aritmeticamente
+impossível com 3 itens, e foi o que denunciou a divergência. O descasamento era sistemático:
+os quatro papéis que usam o componente passavam o conjunto inteiro para as fatias e um
+subconjunto filtrado para o centro. `buildRiskDistribution` passou a devolver a própria
+contagem, então o número no meio sempre descreve o que está desenhado em volta dele.
+
+**2. "Prêmio do seguro: R$ 507" no resumo de custos do cedente.** Dois erros num campo só.
+O valor era 0,6% fixo, quando as seguradoras cotam este risco entre 0,30% e 0,90% conforme
+score, valor e prazo (`lib/insuranceQuotes.ts`). E o custo não é do cedente: marcar seguro na
+emissão **não contrata nem cobra nada** — só liga um flag na duplicata. A apólice é contratada
+depois pelo **investidor**, em `POST /market/:id/insure`, e é ele quem paga.
+
+Agora o resumo mostra a faixa real das cotações **para aquela duplicata**, rotulada "pago pelo
+investidor", com a nota de que não sai do valor a receber do cedente. O próprio controle deixou
+de se chamar "Contratar seguro" — quem contrata não é quem está ali — e virou "Oferecer com
+seguro de crédito".
+
+**3. "Registradoras: CERC · B3 · Núclea".** Escrito no JSX, e errado de duas formas:
+`chooseRegistradora` escolhe **uma** (a de menor custo entre as elegíveis por valor), e até
+R$ 200 mil a escolhida é a **Grafeno**, que não estava na lista. Ou seja, na faixa mais comum
+a tela nomeava três registradoras e usava uma quarta. A função é determinística no valor, então
+o preview diz qual será usada antes de emitir.
+
+Verificado: server **836** testes (9 novos), client 39, sdks 12+12, build e e2e 12/12. Os três
+consertos têm teste que falha sem eles — o do prêmio acusa `expected 'R$ 507' to contain '379'`
+e o da registradora, `expected 'CERC · B3 · Núclea' to be 'Grafeno (SPC)'`. Telas conferidas
+contra servidor real: o donut do cedente com 12 no centro, e o resumo de emissão nomeando uma
+registradora só.
+
+Sobram para o 3/3: a taxa de plataforma dita como fixa em 0,35% quando é escalonada, e os dois
+achados do seed (compras com carência zero; ausência de conta de auditor).
+
 ## Running locally
 
 ```bash
