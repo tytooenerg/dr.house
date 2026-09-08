@@ -10,6 +10,7 @@ import { informarNegociacao, type RegistradoraKey } from '../lib/registradoras.j
 import { settlePurchase, settleInsurance } from '../lib/settlement.js';
 import { computeInsurerQuotePct, diasAteVencimento } from '../lib/insuranceQuotes.js';
 import { checkFractionalEligibility, buyFractionalTokens, buyTokensSchema, buildOfferingView, listMyFractionalHoldings } from '../lib/fractionalOfferings.js';
+import { cabeNaCapacidade } from '../lib/insurerExposure.js';
 import { INSURERS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { explainFundingOffer } from '../lib/fundingExplainability.js';
@@ -144,6 +145,16 @@ marketRouter.post('/:id/insure', (req, res) => {
       message: 'Não é possível contratar seguro sobre uma duplicata que já foi vendida no mercado — o cedente já foi pago, o risco que esta apólice cobre (o cedente nunca receber pelo mercado) deixou de existir.',
     });
     return;
+  }
+  // Capacidade declarada pela seguradora (migração 0071). Sem limite declarado isto sempre
+  // passa; com limite, é aqui que a subscrição para de aceitar risco que ela disse não
+  // comportar — antes disso uma seguradora acumulava exposição sem teto nenhum.
+  if (isNewContract) {
+    const capacidade = cabeNaCapacidade(newKey!, d, !!d.sandbox);
+    if (!capacidade.ok) {
+      res.status(409).json({ error: 'sem_capacidade', motivo: capacidade.motivo, message: capacidade.message });
+      return;
+    }
   }
   setInsurer(d.id, newKey);
   if (isNewContract) {

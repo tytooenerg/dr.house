@@ -1,6 +1,7 @@
 import { INSURERS } from '../data/seed.js';
 import { parseFlexibleDate } from './format.js';
 import type { DuplicataRow } from '../db/types.js';
+import { cabeNaCapacidade } from './insurerExposure.js';
 
 // Real competing insurance quotes — until now every insurer quoted the exact same flat
 // premioPct for every duplicata regardless of risk, which isn't how underwriting actually
@@ -73,4 +74,26 @@ export function listInsuranceQuotes(d: Pick<DuplicataRow, 'score' | 'valor' | 'v
     return { key: ins.key, name: ins.name, premioPct, premioFmt: premioPct.toFixed(2).replace('.', ',') + '%', selo: ins.selo };
   }).sort((a, b) => a.premioPct - b.premioPct);
   return quotes.map((q, i) => ({ ...q, recommended: i === 0 }));
+}
+
+// A mesma cotação, anotada com a capacidade declarada de cada seguradora (migração 0071).
+// Existe separada de listInsuranceQuotes porque preço e capacidade são perguntas
+// diferentes: quanto custaria, e se a seguradora ainda comporta este risco.
+//
+// `recommended` passa a ser escolhida entre quem TEM capacidade — recomendar uma
+// seguradora que vai recusar a contratação é a mesma desonestia de mostrar um preço que
+// não é o cobrado. Se nenhuma tem capacidade, ninguém é recomendada.
+export interface InsuranceQuoteComCapacidade extends InsuranceQuote {
+  temCapacidade: boolean;
+  motivoSemCapacidade: string | null;
+}
+
+export function listInsuranceQuotesComCapacidade(d: DuplicataRow, sandbox = false): InsuranceQuoteComCapacidade[] {
+  const anotadas = listInsuranceQuotes(d).map((q) => {
+    const veredito = cabeNaCapacidade(q.key, d, sandbox);
+    return { ...q, recommended: false, temCapacidade: veredito.ok, motivoSemCapacidade: veredito.ok ? null : veredito.message ?? null };
+  });
+  const maisBarataComCapacidade = anotadas.find((q) => q.temCapacidade);
+  if (maisBarataComCapacidade) maisBarataComCapacidade.recommended = true;
+  return anotadas;
 }

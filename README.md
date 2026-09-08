@@ -1614,6 +1614,53 @@ a duplicata em `no_mercado` aparecendo no marketplace com `canBuy` verdadeiro.
 Os SDKs oficiais (Node e Python) ganharam os três métodos, cobertos por testes que rodam contra
 o servidor de verdade — não contra um mock do que ele deveria responder.
 
+### Capacidade da seguradora — e o prêmio que ela realmente recebeu
+
+O diagrama pedia **resseguro**. Não construí, e a razão importa: o próprio catálogo de receita
+da plataforma diz o que a Lastro é nessa cadeia — *"Seguro 100% terceirizado com seguradora
+parceira — a Lastro recebe comissão de distribuição, sem assumir risco de sinistro"*. Resseguro
+é contrato entre seguradora e ressegurador, e a Lastro não é parte dele. Registrar aqui um
+contrato de que a plataforma não participa seria inventar um papel que ela não tem.
+
+O que **é** dela nessa camada, e não existia: a Lastro distribui as apólices, então é a única
+parte que enxerga o livro inteiro distribuído. Até aqui não enxergava nada — uma seguradora
+acumulava exposição ilimitada num mesmo sacado e seguia sendo oferecida como se tivesse
+capacidade infinita, o que nenhuma subscrição real faz.
+
+**Capacidade declarada** (migração 0071, `insurer_limits`): a seguradora informa um limite total
+e um limite por sacado, e só então a plataforma passa a recusar contratações. Os dois campos são
+nulos por padrão de propósito — "sem limite declarado" significa que a Lastro **não impõe teto
+nenhum**, em vez de inventar uma capacidade que a seguradora nunca informou. Esvaziar um campo
+remove aquele teto; não vira zero.
+
+**Exposição viva** (`lib/insurerExposure.ts`): conta só o risco que ainda pode virar sinistro —
+uma apólice vendida ou paga sai da conta, porque o risco que ela cobria deixou de existir. Isso
+é diferente do "total já segurado alguma vez", que era o único número que havia e só cresce.
+A concentração agrupa por CNPJ do sacado.
+
+Com isso, uma seguradora sem capacidade aparece marcada e desabilitada no seletor do investidor
+(com o motivo), deixa de ser a "melhor cotação" recomendada, e `POST /market/:id/insure` recusa
+com `409 sem_capacidade` dizendo qual dos dois tetos foi atingido.
+
+**Bug corrigido no caminho:** o painel da seguradora mostrava um faturamento que não era o dela.
+O prêmio realmente cobrado é gravado por apólice em `insurance_settlements` no momento da
+contratação (migração 0010) — e `seguradoraCore` ignorava esse registro, recalculando com o
+`premioPct` fixo do catálogo (0,55%/0,60%/0,68%), quando as cotações reais variam de 0,30% a
+0,90% conforme o risco de cada duplicata. O investidor e o relatório de receita já liam o valor
+gravado; só quem vende o seguro não lia. O KPI do topo, que rotulava o total com esse percentual
+único, também perdeu o rótulo — cada apólice tem a sua taxa.
+
+O seed passou a **registrar a cobrança** das apólices que cria, em vez de só apontar a
+seguradora: a conta demo tinha três apólices que ninguém pagou. Corrigir isso do lado do seed é o
+oposto de estimar o prêmio na hora de exibir, que era exatamente o bug.
+
+Verificado: server **823** testes (12 novos), client 39, sdks/node 12, sdks/python 12, build e
+e2e 12/12. Os dois consertos têm teste que falha sem eles (o do prêmio produz exatamente
+`R$ 1.100` — os 0,55% fixos — no lugar do `R$ 1.234` cobrado). E o ciclo inteiro contra um
+servidor de produção real: declarar limite de R$ 200.000 total e R$ 50.000 por sacado → a
+concentração de R$ 84.500 no Grupo Atlas Varejo aparece marcada → contratar na Too recusa com o
+motivo certo → contratar na Junto passa → remover o teto devolve a Too à lista.
+
 ## Running locally
 
 ```bash

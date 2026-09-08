@@ -5,6 +5,8 @@ import { addNotification, addLedgerEntry } from '../db/misc.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { INSURERS, COLORS } from '../data/seed.js';
 import { fmtBRL } from './format.js';
+import { getLatestInsuranceSettlement } from '../db/insuranceSettlements.js';
+import { buildExposicao, apoliceEmRisco } from './insurerExposure.js';
 import type { UserRow } from '../db/types.js';
 
 export const sinistroDecisionSchema = z.object({ decision: z.enum(['aprovado', 'negado']), note: z.string().trim().min(1) });
@@ -21,8 +23,21 @@ export function buildSeguradoraPayload(user: UserRow, sandbox = false) {
   const insurer = insurerDef(user.insurer_key);
   const apolices = insurer ? listInsuredByInsurerKey(insurer.key, sandbox) : [];
   const claimable = insurer ? listClaimableByInsurerKey(insurer.key, sandbox) : [];
-  const totalPremio = apolices.reduce((sum, d) => sum + d.valor * ((insurer?.premioPct ?? 0) / 100), 0);
   const totalSegurado = apolices.reduce((sum, d) => sum + d.valor, 0);
+
+  // O prêmio de cada apólice é o que foi REALMENTE cobrado, gravado uma vez em
+  // insurance_settlements no momento da contratação (migração 0010). Este painel
+  // recalculava com o premioPct fixo do catálogo (0,55%/0,60%/0,68%), ignorando que as
+  // cotações variam de 0,30% a 0,90% conforme o risco de cada duplicata
+  // (lib/insuranceQuotes.ts) — ou seja, a seguradora via um faturamento que não era o dela.
+  // O investidor e o relatório de receita já liam o valor gravado; só o painel de quem
+  // vende o seguro não lia.
+  const premioDe = (duplicataId: string): number | null => getLatestInsuranceSettlement(duplicataId)?.premio ?? null;
+  // Apólice sem registro de liquidação nunca teve prêmio cobrado (dado semeado ou legado):
+  // entra como "não registrado" e soma zero, em vez de receber um número estimado que
+  // apareceria como receita que ninguém pagou.
+  const totalPremio = apolices.reduce((sum, d) => sum + (premioDe(d.id) ?? 0), 0);
+  const exposicao = insurer ? buildExposicao(insurer.key, sandbox) : null;
 
   return {
     insurerName: insurer?.name ?? 'Seguradora não configurada',
@@ -30,16 +45,21 @@ export function buildSeguradoraPayload(user: UserRow, sandbox = false) {
     totalApolices: apolices.length,
     totalSeguradoFmt: fmtBRL(totalSegurado),
     totalPremioFmt: fmtBRL(totalPremio),
-    apolices: apolices.map((d) => ({
-      id: d.id,
-      cedente: d.cedente_nome,
-      sacado: d.sacado_nome,
-      valorFmt: fmtBRL(d.valor),
-      vencimento: d.vencimento,
-      premioFmt: fmtBRL(d.valor * ((insurer?.premioPct ?? 0) / 100)),
-      status: d.status,
-      sinistroStatus: d.sinistro_status,
-    })),
+    exposicao,
+    apolices: apolices.map((d) => {
+      const premio = premioDe(d.id);
+      return {
+        id: d.id,
+        cedente: d.cedente_nome,
+        sacado: d.sacado_nome,
+        valorFmt: fmtBRL(d.valor),
+        vencimento: d.vencimento,
+        premioFmt: premio === null ? 'não registrado' : fmtBRL(premio),
+        emRisco: apoliceEmRisco(d),
+        status: d.status,
+        sinistroStatus: d.sinistro_status,
+      };
+    }),
     sinistros: claimable.map((d) => ({
       id: d.id,
       cedente: d.cedente_nome,
