@@ -19,9 +19,9 @@ async function adminToken() {
 }
 
 describe('agentic AI layer — registry', () => {
-  it('registers exactly the 15 agents, each with at least one tool and a description', () => {
+  it('registers exactly the 16 agents, each with at least one tool and a description', () => {
     const ids = Object.keys(AGENTS);
-    expect(ids).toHaveLength(15);
+    expect(ids).toHaveLength(16);
     for (const id of ids) {
       const def = AGENTS[id];
       expect(def.label.length).toBeGreaterThan(0);
@@ -62,11 +62,11 @@ describe('agentic AI layer — API authorization', () => {
     expect(res.status).toBe(401);
   });
 
-  it('lists all 15 agents for an admin', async () => {
+  it('lists all 16 agents for an admin', async () => {
     const tok = await adminToken();
     const res = await request(app).get('/api/agents').set('Authorization', `Bearer ${tok}`);
     expect(res.status).toBe(200);
-    expect(res.body.agents).toHaveLength(15);
+    expect(res.body.agents).toHaveLength(16);
     expect(typeof res.body.llmEnabled).toBe('boolean');
   });
 });
@@ -87,11 +87,11 @@ describe('agentic AI layer — self-service scoping (cedente/investidor)', () =>
     // 'cfo' is listed here regardless of plan — listAgentSummaries filters by role only, the
     // same layered-gate design cashflow's own page uses (visible, 402s on run if underpaid);
     // a fresh self-registered cedente starts on Básico, so it can't actually run yet.
-    expect(res.body.agents.map((a: { id: string }) => a.id).sort()).toEqual(['cfo', 'emissao', 'suporte']);
+    expect(res.body.agents.map((a: { id: string }) => a.id).sort()).toEqual(['cfo', 'emissao', 'fiscal', 'suporte']);
 
     const inv = await registerAndLogin('investidor');
     const res2 = await request(app).get('/api/agents').set('Authorization', `Bearer ${inv.token}`);
-    expect(res2.body.agents.map((a: { id: string }) => a.id)).toEqual(['autobid', 'market_maker']);
+    expect(res2.body.agents.map((a: { id: string }) => a.id)).toEqual(['autobid', 'market_maker', 'fiscal']);
   });
 
   it('lets a cedente run the emissão agent on itself, but not the pld agent', async () => {

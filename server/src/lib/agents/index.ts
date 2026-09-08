@@ -15,6 +15,7 @@ import { reconciliationAgent } from './reconciliation.js';
 import { cfoAgent } from './cfo.js';
 import { cfoConcentracaoAgent } from './cfoConcentracao.js';
 import { cfoAntecipacaoAgent } from './cfoAntecipacao.js';
+import { fiscalAgent } from './fiscal.js';
 
 // The 15 agentic AI deployments — every one wraps real Lastro data/pipelines (never
 // fabricated tool results) behind the shared tool-use loop in lib/agentRuntime.ts. Any
@@ -39,6 +40,7 @@ export const AGENTS: Record<string, AgentDefinition> = {
   [cfoAgent.id]: cfoAgent,
   [cfoConcentracaoAgent.id]: cfoConcentracaoAgent,
   [cfoAntecipacaoAgent.id]: cfoAntecipacaoAgent,
+  [fiscalAgent.id]: fiscalAgent,
 };
 
 // Lets agentRuntime.ts's handoff tool (createHandoffTool) call another agent by id without

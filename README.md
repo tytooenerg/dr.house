@@ -1526,6 +1526,50 @@ Verificado: server **786** testes (9 novos em `veiculo-investidor.test.ts`), cli
 sdks/node 9, build e e2e 12/12. Os 29 pontos de teste que faziam `approveKyb()` sozinho passaram
 a usar `credenciarInvestidor()`, que reflete o que a plataforma agora exige de verdade.
 
+### Agente Fiscal — e a camada fiscal do cedente, que não existia
+
+**Correção de um diagnóstico anterior meu**: eu havia dito que "não existe nada tributário no
+repo". Existe, e é sólido — `lib/incomeTaxStatement.ts` tem a tabela regressiva do IR (Lei
+11.033/2004) e o informe de rendimentos em PDF (`GET /historico/informe-rendimentos`), e
+`lib/darfGenerator.ts` calcula o DARF agregado da plataforma no código 3426.
+
+O que **não** existia é o outro lado da mesa: tudo isso olha o **investidor** e a
+**plataforma**. Quem antecipa — a empresa — não tinha nada.
+
+`lib/fiscalCedente.ts` fecha essa lacuna:
+
+- **IOF por operação, decidido pelo veículo de quem comprou.** Cessão a factoring e a
+  instituição financeira é operação de crédito e sofre IOF (Decreto 6.306/2007); aquisição de
+  direitos creditórios por FIDC ou fundo não é, e não sofre. Cada linha traz o motivo por
+  extenso. **Antes da migração 0070 isso não era computável** — a plataforma não sabia o
+  veículo do adquirente.
+- **Quem não se classificou sai como `indeterminado`, nunca como "sem IOF"**, e o total não
+  absorve o desconhecido como zero. Afirmar não-incidência para quem não se sabe seria dizer o
+  que não se sabe.
+- **Deságio como despesa financeira**: o número real da compra (`valor − precoCompra`), o mesmo
+  que a liquidação usou — mais a taxa de plataforma já cobrada, que o contador precisa.
+- **Alíquotas sobrescrevíveis** por `platform_settings`, com a fonte legal e um aviso explícito
+  de que legislação tributária muda por decreto. Mesma disciplina que `darfGenerator.ts` aplica
+  ao código de receita: computa de verdade e diz o que é.
+
+O **Agente Fiscal** (`lib/agents/fiscal.ts`, 16º do registro) lê e explica: resumo do cedente,
+informe do investidor, a faixa da tabela regressiva e o IR que incidiria numa posição levada ao
+vencimento. **Nenhuma tool é `sensitive`, de propósito** — a Lastro não apura, não retém e não
+recolhe tributo, e uma tool "emitir guia" daria a impressão contrária. O `systemPrompt` proíbe
+inventar alíquota, prazo ou dispositivo que não venha das tools.
+
+Fora de escopo, dito e não calculado: PIS/COFINS e a apuração de IRPJ/CSLL dependem do regime
+tributário da empresa (lucro real ou presumido), que a plataforma não conhece — supor mudaria o
+número.
+
+Aba **Fiscal** nova para o cedente, com os quatro pontos que este guia exige (ROLE_TABS,
+NAV_ITEMS, rota `lazy()` + `Gate`).
+
+Verificado: server **796** testes (10 novos), client 39, sdks/node 9, build e e2e 12/12. E o
+caminho inteiro contra um servidor de produção real: mesmo cedente, duas duplicatas, uma
+arrematada por uma **factoring** (IOF de R$ 718 sobre R$ 45.300 por 294 dias) e outra por um
+**FIDC** (sem incidência) — cada uma com o motivo escrito na tela.
+
 ## Running locally
 
 ```bash
