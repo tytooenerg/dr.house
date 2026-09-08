@@ -74,6 +74,13 @@ export async function seedIfEmpty() {
   const sacado = createUser({ email: 'sacado@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Grupo Atlas Varejo', role: 'sacado' });
   createUser({ email: 'admin@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' });
   createUser({ email: 'seguradora@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Too', companyName: 'Too Seguros', role: 'seguradora', insurerKey: 'too' });
+  // O papel 'auditor' existia sem nenhuma conta semeada: era alcançável só criando uma à mão
+  // pelo back-office (POST /admin/auditores), então o painel somente-leitura não podia ser
+  // demonstrado. Continua fora do enum de registro público (routes/auth.ts) de propósito —
+  // uma conta que lê o log de auditoria de todos os tenants não deve ser auto-servível —, e
+  // esta aqui só existe porque todo o bloco de contas demo é pulado em produção por padrão
+  // (ver o guard de NODE_ENV mais abaixo).
+  createUser({ email: 'auditor@lastro.demo', passwordHash: demoPassword, nome: 'Auditoria Independente', companyName: 'Auditoria Externa', role: 'auditor' });
   approveKyb(investidor.id);
   // Kayrós Capital é um fundo de investimento — sem veículo classificado a conta seria
   // aprovada e mesmo assim incapaz de dar lance (lib/auctionCore.ts).
@@ -226,13 +233,19 @@ export async function seedIfEmpty() {
 
   // Historical (settled) purchases for the demo investor, so Carteira & Histórico isn't empty.
   for (const h of HISTORICO_RAW) {
+    // O vencimento é a data da compra MAIS o prazo. Usar `h.data` para emissão, vencimento e
+    // data da compra ao mesmo tempo dava carência zero — ninguém antecipa um recebível no dia
+    // em que ele vence, e era esse dado que produzia retornos anualizados absurdos.
+    const compraEm = new Date(h.data.split('/').reverse().join('-'));
+    const venceEm = new Date(compraEm.getTime() + h.prazoDias * 24 * 3600 * 1000);
+    const vencimentoBr = `${String(venceEm.getUTCDate()).padStart(2, '0')}/${String(venceEm.getUTCMonth() + 1).padStart(2, '0')}/${venceEm.getUTCFullYear()}`;
     const d = createDuplicata({
       cedenteId: null,
       cedenteNome: h.empresa,
       sacadoNome: h.empresa,
       sacadoCnpj: '',
       valor: h.investido,
-      vencimento: h.data,
+      vencimento: vencimentoBr,
       emissao: h.data,
       status: 'paga',
       lastroPct: 100,
@@ -244,7 +257,7 @@ export async function seedIfEmpty() {
       h.investido,
       '',
       h.retorno,
-      new Date(h.data.split('/').reverse().join('-')).toISOString()
+      compraEm.toISOString()
     );
   }
 

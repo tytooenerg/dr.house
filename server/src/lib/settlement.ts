@@ -6,8 +6,28 @@ import { fmtBRL } from './format.js';
 // Single source of truth for the platform fee — reused by the Emitir Duplicata preview
 // (lib/emitirCore.ts) and here, at the moment money actually moves, so the number shown
 // to a cedente before emitting is exactly the number that gets deducted at liquidação.
+// A escada da taxa de plataforma, em um lugar só. Era um ternário aninhado aqui e uma frase
+// no client dizendo "0,35% sobre o valor de cada operação" — que superestima a taxa de
+// qualquer operação acima de R$ 200 mil, e ainda contradizia a própria tela de Emissão, que
+// já mostrava a escada certa. Agora o client recebe estas faixas em vez de reescrevê-las.
+//
+// Fronteiras inclusivas embaixo: exatamente R$ 200.000 paga 0,35%, exatamente R$ 1.000.000
+// paga 0,30% — o comportamento do ternário original, preservado por `ateValor`.
+export interface PlatformFeeTier {
+  /** Teto INCLUSIVO da faixa; null na última, que não tem teto. */
+  ateValor: number | null;
+  pct: number;
+  label: string;
+}
+
+export const PLATFORM_FEE_TIERS: PlatformFeeTier[] = [
+  { ateValor: 200_000, pct: 0.0035, label: 'Até R$ 200 mil' },
+  { ateValor: 1_000_000, pct: 0.003, label: 'R$ 200 mil – R$ 1 milhão' },
+  { ateValor: null, pct: 0.0025, label: 'Acima de R$ 1 milhão' },
+];
+
 export function platformFeePct(valor: number): number {
-  return valor > 1_000_000 ? 0.0025 : valor > 200_000 ? 0.003 : 0.0035;
+  return (PLATFORM_FEE_TIERS.find((t) => t.ateValor === null || valor <= t.ateValor) ?? PLATFORM_FEE_TIERS[PLATFORM_FEE_TIERS.length - 1]).pct;
 }
 
 export function platformFee(valor: number): number {

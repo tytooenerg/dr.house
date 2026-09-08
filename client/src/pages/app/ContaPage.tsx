@@ -64,6 +64,7 @@ interface StablecoinDeposit {
   endereco: string;
 }
 interface AccountData {
+  taxaFaixas: { label: string; pctFmt: string }[];
   kycChecklist: KycItem[];
   bankAccountDisplay: string;
   pixEnabled: boolean;
@@ -689,9 +690,23 @@ export function ContaPage() {
 
       <NavyCard className="p-6.5">
         <div className="font-bold text-[15px] mb-2.5">Como a Lastro monetiza</div>
-        <div className="text-onNavy text-[13px] leading-relaxed mb-4.5 max-w-[640px]">
-          Cobramos uma taxa de plataforma de 0,35% sobre o valor de cada operação, descontada automaticamente na liquidação — sem mensalidade e sem taxa de adesão.
+        <div className="text-onNavy text-[13px] leading-relaxed mb-4 max-w-[640px]">
+          {/* A taxa é escalonada por valor da operação (lib/settlement.ts). A frase antiga
+              dizia "0,35% sobre o valor de cada operação", o que superestima a taxa de
+              qualquer operação acima de R$ 200 mil — e contradizia a tela de Emissão, que já
+              mostrava a escada certa. As faixas vêm do servidor, não de uma cópia aqui. */}
+          Cobramos uma taxa de plataforma sobre o valor de cada operação, descontada automaticamente na liquidação — sem mensalidade e sem
+          taxa de adesão. A alíquota cai conforme o valor:
         </div>
+        <div className="flex flex-col gap-1.5 mb-4.5 max-w-[640px]">
+          {(data?.taxaFaixas ?? []).map((f) => (
+            <div key={f.label} className="flex justify-between text-[13px]">
+              <span className="text-onNavy">{f.label}</span>
+              <span className="font-bold font-mono-num">{f.pctFmt}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-onNavy text-[12px] mb-3">Exemplo de uma operação de R$ 84.500 (faixa de 0,35%):</div>
         <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div className="text-onNavy text-xs font-semibold">Valor da operação</div>

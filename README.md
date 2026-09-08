@@ -1742,6 +1742,45 @@ registradora só.
 Sobram para o 3/3: a taxa de plataforma dita como fixa em 0,35% quando é escalonada, e os dois
 achados do seed (compras com carência zero; ausência de conta de auditor).
 
+### Varredura pelos seis papéis (3/3) — a taxa escalonada e os dois achados do seed
+
+Fecha os três achados restantes da varredura.
+
+**1. A taxa de plataforma é escalonada, e a tela de Conta dizia que era fixa.** A frase era
+*"Cobramos uma taxa de plataforma de 0,35% sobre o valor de cada operação"*, mas
+`platformFeePct` cobra 0,35% até R$ 200 mil, 0,30% até R$ 1 milhão e 0,25% acima disso. A
+frase **superestimava** a taxa de qualquer operação acima de R$ 200 mil — e a plataforma se
+contradizia entre duas telas, porque a de Emissão já mostrava a escada certa.
+
+As faixas viraram uma constante única (`PLATFORM_FEE_TIERS`), de onde `platformFeePct` lê e
+que a rota `/account` publica — o client renderiza a escada em vez de reescrever os números.
+As fronteiras inclusivas do ternário original foram preservadas: exatamente R$ 200.000 paga
+0,35%, exatamente R$ 1.000.000 paga 0,30%, e há teste para cada borda. Os três cards ao lado,
+que eram números fixos sem aviso, passaram a se declarar exemplo.
+
+**2. Seis das sete compras semeadas tinham carência zero.** O seed usava a mesma data para
+emissão, vencimento e data da compra, produzindo "comprada no dia em que vence" — que não é
+uma operação que existe. Era esse dado que alimentava o "1115,57% anualizado" corrigido no
+1/3. Agora cada linha do histórico tem um prazo próprio.
+
+O efeito fecha o ciclo com o 1/3: aquele PR ensinou o cálculo a **recusar** anualizar prazos
+curtos demais; este dá a ele dado real para trabalhar. A carteira demo saiu de *sete posições
+não anualizáveis* para **zero**, com retorno ponderado de **29,73% a.a.** — plausível para
+deságios de 2–3% a.m., no lugar dos 1115,57%.
+
+**3. O papel de auditor não podia ser demonstrado.** Existia como papel completo — aba, rota
+somente-leitura, migração própria — mas sem conta semeada, alcançável só criando uma à mão
+pelo back-office. Agora há `auditor@lastro.demo`. Continua **fora do registro público** de
+propósito (uma conta que lê o log de auditoria de todos os tenants não deve ser auto-servível)
+e herda o guard que pula todo o seed demo em produção.
+
+Verificado: server **843** testes (7 novos), client 39, sdks 12+12, build e e2e 12/12. Os três
+consertos têm teste que falha sem eles. Contra servidor real: login direto como auditor
+chegando ao painel (HTTP 200), a escada 0,35% / 0,30% / 0,25% servida pela `/account`, e a
+carteira com 0 de 7 posições fora da anualização.
+
+Com isto, os nove achados da varredura estão fechados.
+
 ## Running locally
 
 ```bash
@@ -1760,6 +1799,7 @@ On first boot the server seeds four demo accounts (password `demo1234` for all):
 | Sacado | `sacado@lastro.demo` | Grupo Atlas Varejo |
 | Admin (back-office) | `admin@lastro.demo` | Lastro (plataforma) |
 | Seguradora | `seguradora@lastro.demo` | Too Seguros |
+| Auditor (somente-leitura) | `auditor@lastro.demo` | Auditoria Externa |
 
 The demo investidor starts on the **Pro** plan and the demo cedente on **Empresarial**, so every plan-gated feature (Automação de Lances, Desenvolvedores) is visible right away — Comparador de Taxas is free on every plan and always visible. A freshly self-registered account starts on **Básico** instead, so the paywall itself is demoable too — visit **Assinatura** in the sidebar to upgrade (instant/simulated without a Stripe key).
 

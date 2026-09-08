@@ -9,6 +9,7 @@ import { revokeAllRefreshTokensForUser } from '../db/refreshTokens.js';
 import { listByCedente, listBySacadoNome } from '../db/duplicatas.js';
 import { listAceitesByCedente, listAceitesBySacadoNome } from '../db/aceites.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { PLATFORM_FEE_TIERS } from '../lib/settlement.js';
 import { verifyPassword } from '../auth/password.js';
 import { fmtBRL } from '../lib/format.js';
 import { getRevenueStreams } from '../lib/revenue.js';
@@ -68,6 +69,12 @@ function payload(req: import('express').Request) {
         action: settings.pixChave ? null : { label: 'Cadastrar chave Pix', key: 'bank' },
       },
     ],
+    // A escada real da taxa (lib/settlement.ts), não uma segunda cópia dos números no
+    // client — que era como a tela acabava afirmando 0,35% fixo para toda operação.
+    // Duas casas sempre: numa escada, "0,35% / 0,3% / 0,25%" desalinha a leitura — o
+    // pctLabel() do settlement corta o zero à direita porque é usado numa frase de extrato,
+    // não numa coluna de números.
+    taxaFaixas: PLATFORM_FEE_TIERS.map((t) => ({ label: t.label, pctFmt: (t.pct * 100).toFixed(2).replace('.', ',') + '%' })),
     pixEnabled,
     pixChave: settings.pixChave,
     bankAccountDisplay: settings.pixChave
