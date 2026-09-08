@@ -9,7 +9,7 @@ import {
   listActiveAuctionBids,
   setAuctionBidStatus,
 } from '../db/auctionBids.js';
-import { computePurchasePrice, effectiveMonthlyRatePct } from './marketCompute.js';
+import { computePurchasePrice, effectiveMonthlyRatePct, reserveRateFor } from './marketCompute.js';
 import { fmtBRL } from './format.js';
 import { VEICULO_KEYS, type VeiculoKey } from '../data/seed.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
@@ -48,8 +48,9 @@ export interface BidView {
 export function reserveRate(duplicataId: string): { taxaAm: number; preco: number; doCedente: boolean } | null {
   const d = getDuplicata(duplicataId);
   if (!d) return null;
-  const doCedente = d.reserva_taxa_am !== null && d.reserva_taxa_am > 0;
-  const taxaAm = doCedente ? d.reserva_taxa_am! : computePurchasePrice(d).taxaAmPct;
+  // Uma definição só, em lib/marketCompute.ts, pra que a reserva que o investidor VÊ na
+  // oferta e a que o backend APLICA no lance não possam divergir de novo.
+  const { taxaAm, doCedente } = reserveRateFor(d);
   return { taxaAm, preco: computePurchasePrice(d, taxaAm).precoCompra, doCedente };
 }
 

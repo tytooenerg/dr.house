@@ -1570,6 +1570,50 @@ caminho inteiro contra um servidor de produção real: mesmo cedente, duas dupli
 arrematada por uma **factoring** (IOF de R$ 718 sobre R$ 45.300 por 294 dias) e outra por um
 **FIDC** (sem incidência) — cada uma com o motivo escrito na tela.
 
+### A porta de entrada da automação — o n8n do cedente entra no ciclo da duplicata
+
+O diagrama tem **EMPRESA → n8n → motor → marketplace**. A seta quebrava no meio: a API pública
+emitia a duplicata e parava ali. Não havia como listar o que já fora emitido (só existia consulta
+por id, o que obriga a já saber o id que se procura) nem como levar a duplicata a leilão — o
+passo que efetivamente antecipa o dinheiro só acontecia com alguém abrindo a tela e clicando.
+
+Três endpoints fecham isso, todos na mesma chave de API que já existia (escopo de escrita,
+modo test/live, rate limit por plano):
+
+- `GET /v1/duplicatas` — lista da própria conta, com filtro por status e paginação;
+- `POST /v1/duplicatas/{id}/leilao` — abre o leilão, com a reserva do cedente e a duração;
+- `GET /v1/cashflow` — projeção de caixa e a recomendação do motor de decisão, que é o que um
+  supervisor externo precisa ler pra decidir *quando* antecipar em vez de só mandar antecipar.
+
+Esse último **recusa uma chave de teste** com `409 sandbox_indisponivel`. Não existe posição de
+caixa de mentira: servir os números reais sob uma chave de sandbox seria entregar a situação
+financeira verdadeira a um workflow ainda em depuração, e inventar números seria pior.
+
+Dois bugs achados no caminho, ambos de coisas que a plataforma dizia e não fazia:
+
+**1. `leilao.aberto` não era emitido pelo motor de decisão.** `routes/cashflow.ts` abria leilões
+chamando `dispararLeilao` direto; só o botão da tela emitia o evento. Quem assinasse o webhook
+perdia silenciosamente todo leilão aberto pela automação — justamente os que mais interessam a
+quem integra. A abertura virou um núcleo único (`lib/auctionOpen.ts`), no mesmo raciocínio que
+`placeAuctionBid` já aplicava a `lance.recebido`: emitir no núcleo cobre todos os caminhos de
+uma vez, agora incluindo a API pública.
+
+**2. A "reserva" mostrada ao investidor não era a reserva.** `buildOfferView` preenchia
+`reservaTaxaAm`/`reservaTaxaFmt`/`reservaPrecoFmt` com a taxa de **mercado**, ignorando a
+`reserva_taxa_am` que o cedente definiu e que o backend de fato aplica no lance. Um cedente que
+aceitava até 4,50% aparecia para o investidor com "reserva 1,75%" — quem lesse aquilo deixaria
+de dar lances entre os dois valores acreditando que seriam recusados, quando seriam aceitos.
+Agora existe uma definição só (`reserveRateFor`), de onde tanto a exibição quanto o gate leem.
+
+Verificado: server **811** testes (15 novos), client 39, sdks/node 12, sdks/python 12, build e
+e2e 12/12. Os dois consertos têm teste que falha sem eles (conferido revertendo cada um). E o
+ciclo inteiro contra um servidor de produção real: emitir pela API → recusa por aceite pendente →
+o sacado aceita na conta dele → abrir o leilão pela API com reserva de 1,90% e prazo de 24h →
+a duplicata em `no_mercado` aparecendo no marketplace com `canBuy` verdadeiro.
+
+Os SDKs oficiais (Node e Python) ganharam os três métodos, cobertos por testes que rodam contra
+o servidor de verdade — não contra um mock do que ele deveria responder.
+
 ## Running locally
 
 ```bash

@@ -56,12 +56,22 @@ export function computePurchasePrice(
   return { precoCompra: d.valor - descontoValor, descontoValor, descontoPct, taxaAmPct };
 }
 
+// A reserva de VERDADE: o pior deságio que o cedente aceita. Quando ele informa uma ao
+// disparar o leilão (reserva_taxa_am), é ela que vale; sem isso cai na banda de mercado.
+// Mora aqui, e não em auctionCore.reserveRate, porque quem exibe a oferta precisa dela sem
+// reabrir o ciclo de import que auctionGate.ts existe pra evitar — auctionCore delega pra cá.
+export function reserveRateFor(d: DuplicataRow): { taxaAm: number; doCedente: boolean } {
+  const doCedente = d.reserva_taxa_am !== null && d.reserva_taxa_am > 0;
+  return { taxaAm: doCedente ? d.reserva_taxa_am! : effectiveMonthlyRatePct(d), doCedente };
+}
+
 export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) {
   const score = d.score ?? 60;
   const sc = scoreColorFor(score);
   const baseRate = effectiveMonthlyRatePct(d);
   const desagio = baseRate.toFixed(2).replace('.', ',') + '%';
   const { precoCompra, descontoValor } = computePurchasePrice(d, baseRate);
+  const reserva = reserveRateFor(d);
   const aceite = getAceiteByDuplicata(d.id);
   const aceiteStatus = aceite?.status ?? 'aguardando';
   const aceiteBadge = ACEITE_BADGE[aceiteStatus];
@@ -163,9 +173,14 @@ export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) 
     closeAtIso: d.close_at,
     leilaoFechadoEm: d.leilao_fechado_em,
     // Reserva: o pior deságio que o cedente aceita. Lance acima disso é recusado com 409.
-    reservaTaxaAm: baseRate,
-    reservaTaxaFmt: desagio,
-    reservaPrecoFmt: fmtBRL(precoCompra),
+    // Estes três campos mostravam `baseRate` — a taxa de MERCADO —, ignorando a reserva que
+    // o cedente tinha definido. Quem investe via um número rotulado "reserva" que não era a
+    // reserva que o backend aplica, e portanto deixava de dar lances entre os dois valores
+    // acreditando que seriam recusados.
+    reservaTaxaAm: reserva.taxaAm,
+    reservaTaxaFmt: reserva.taxaAm.toFixed(2).replace('.', ',') + '%',
+    reservaPrecoFmt: fmtBRL(computePurchasePrice(d, reserva.taxaAm).precoCompra),
+    reservaDoCedente: reserva.doCedente,
     melhorTaxaFmt: bidRows.length ? bidRows[0].taxa_am.toFixed(2).replace('.', ',') + '%' : null,
     meuLance: meuLanceRow
       ? {

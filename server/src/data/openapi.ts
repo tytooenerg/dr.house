@@ -38,6 +38,21 @@ export const openApiSpec = {
   },
   paths: {
     '/duplicatas': {
+      get: {
+        summary: 'Listar as duplicatas emitidas pela própria conta (somente contas cedente)',
+        description:
+          'Paginado. Uma chave de teste lista apenas o plano de dados sandbox; uma chave live, apenas o real.',
+        parameters: [
+          { name: 'status', in: 'query', required: false, schema: { type: 'string' }, description: 'Filtra por status exato (ex.: aprovada, no_mercado, vendida, paga).' },
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', default: 50, maximum: 200 } },
+          { name: 'offset', in: 'query', required: false, schema: { type: 'integer', default: 0 } },
+        ],
+        responses: {
+          '200': { description: 'Página de duplicatas, com o total do conjunto filtrado.' },
+          '400': { description: 'Erro de validação nos parâmetros de consulta.' },
+          '403': { description: 'Chave não pertence a uma conta cedente.' },
+        },
+      },
       post: {
         summary: 'Emitir uma duplicata escriturada (somente contas cedente)',
         parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
@@ -74,6 +89,48 @@ export const openApiSpec = {
         summary: 'Consultar uma duplicata pelo id',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Duplicata encontrada.' }, '404': { description: 'Não encontrada.' } },
+      },
+    },
+    '/duplicatas/{id}/leilao': {
+      post: {
+        summary: 'Levar a duplicata a leilão (somente contas cedente)',
+        description:
+          'Abre o leilão primário. A duplicata precisa estar aprovada, com lastro 100% e com o aceite do sacado já confirmado (expresso ou tácito). A taxa máxima é a RESERVA — o pior deságio mensal que o cedente aceita; sem ela vale a banda de mercado. Dispara o evento de webhook leilao.aberto.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { $ref: '#/components/parameters/IdempotencyKey' }],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  taxaMaxima: { oneOf: [{ type: 'number' }, { type: 'string' }], example: 2.5, description: 'Reserva em % a.m., entre 0 e 20.' },
+                  duracaoHoras: { type: 'number', default: 6, maximum: 168, description: 'Prazo do leilão em horas.' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Leilão aberto; devolve o closeAt e a reserva gravada.' },
+          '400': { description: 'Reserva fora da faixa de sanidade, ou duração inválida.' },
+          '403': { description: 'Chave não pertence a uma conta cedente, ou é somente-leitura.' },
+          '404': { description: 'Duplicata não encontrada nesta conta (ou no plano de dados desta chave).' },
+          '409': { description: 'Ainda não negociável: aguardando o aceite do sacado, ou a duplicata não está aprovada com lastro 100%.' },
+        },
+      },
+    },
+    '/cashflow': {
+      get: {
+        summary: 'Projeção de caixa e recomendação do motor de decisão (somente contas cedente)',
+        description:
+          'Leitura. É o que um supervisor externo consulta para decidir QUANDO antecipar. Não tem equivalente em sandbox — é calculada sobre a posição financeira real da conta.',
+        responses: {
+          '200': { description: 'Projeção de caixa e a recomendação de antecipação.' },
+          '402': { description: 'Requer o plano Pro ou superior.' },
+          '403': { description: 'Chave não pertence a uma conta cedente.' },
+          '409': { description: 'Chave de teste: a projeção não existe em sandbox — use uma chave live.' },
+        },
       },
     },
     '/marketplace': {

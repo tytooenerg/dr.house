@@ -8,7 +8,12 @@ import { buildBlendedRiscoView } from '../lib/riscoCore.js';
 import { addSignal } from '../db/networkSignals.js';
 import { getRegistradora, chooseRegistradora, registrarNaRegistradora, checkDuplicidadeNaRegistradora, RegistroIndisponivelError } from '../lib/registradoras.js';
 import { withIdempotency } from '../lib/idempotency.js';
-import { getDuplicata, listMarketplace, listBySacadoNome } from '../db/duplicatas.js';
+import { getDuplicata, listMarketplace, listBySacadoNome, listByCedente } from '../db/duplicatas.js';
+import { abrirLeilao } from '../lib/auctionOpen.js';
+import { buildCashflowForecast } from '../lib/cashflowForecast.js';
+import { buildCfoRecommendation } from '../lib/cfoDecisionEngine.js';
+import { getSettings, effectiveOwnerId } from '../db/users.js';
+import { planAtLeast } from '../lib/billing.js';
 import { buildOfferView } from '../lib/marketCompute.js';
 import { fmtBRL } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
@@ -121,6 +126,130 @@ v1Router.get('/duplicatas/:id', (req, res) => {
     seguro: !!d.seguro,
   });
 });
+
+// Listar as duplicatas da própria conta. Existia só GET /duplicatas/{id}, o que obrigava
+// um integrador a já saber o id que procura — inviabilizando qualquer rotina de
+// conciliação ou de monitoramento, que é justamente o que um workflow externo faz.
+const listaQuerySchema = z.object({
+  status: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+v1Router.get('/duplicatas', (req, res) => {
+  if (req.apiUser!.role !== 'cedente') {
+    res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas cedente podem listar duplicatas emitidas.' });
+    return;
+  }
+  const parsed = listaQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const limit = parsed.data.limit ?? 50;
+  const offset = parsed.data.offset ?? 0;
+  const todas = listByCedente(effectiveOwnerId(req.apiUser!), req.apiKey!.mode === 'test');
+  const filtradas = parsed.data.status ? todas.filter((d) => d.status === parsed.data.status) : todas;
+  res.json({
+    total: filtradas.length,
+    limit,
+    offset,
+    mode: req.apiKey!.mode,
+    duplicatas: filtradas.slice(offset, offset + limit).map((d) => ({
+      id: d.id,
+      status: d.status,
+      sacado: d.sacado_nome,
+      valor: d.valor,
+      valorFmt: fmtBRL(d.valor),
+      emissao: d.emissao,
+      vencimento: d.vencimento,
+      registro: d.registro,
+      registradora: getRegistradora(d.registradora)?.name ?? null,
+      lastroPct: d.lastro_pct,
+      seguro: !!d.seguro,
+      reservaTaxaAm: d.reserva_taxa_am,
+      closeAt: d.close_at,
+    })),
+  });
+});
+
+// Levar a duplicata ao leilão. Sem isto a API emitia e parava: dava pra criar a duplicata
+// pela integração e não havia como colocá-la no mercado sem alguém abrir a tela e clicar —
+// o passo que efetivamente antecipa o dinheiro ficava de fora da automação.
+const v1LeilaoSchema = z.object({
+  taxaMaxima: z.union([z.number(), z.string()]).optional(),
+  duracaoHoras: z.number().positive().optional(),
+});
+
+v1Router.post(
+  '/duplicatas/:id/leilao',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    if (req.apiUser!.role !== 'cedente') {
+      res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas cedente podem abrir leilões.' });
+      return;
+    }
+    const d = getDuplicata(req.params.id);
+    // Mesmo isolamento de plano de dados do GET /duplicatas/{id}: uma chave de teste nunca
+    // toca uma duplicata real, nem descobre que ela existe.
+    if (!d || !!d.sandbox !== (req.apiKey!.mode === 'test')) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const parsed = v1LeilaoSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const outcome = await withIdempotency(req.apiUser!.id, 'POST /v1/duplicatas/:id/leilao', idempotencyHeader(req), req.body ?? {}, async () =>
+      abrirLeilao(req.apiUser!, req.params.id, {
+        reservaTaxaAm: parsed.data.taxaMaxima,
+        duracaoHoras: parsed.data.duracaoHoras,
+      })
+    );
+    res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
+  })
+);
+
+// Projeção de caixa e a recomendação do motor de decisão, em leitura. É o que faltava pra
+// um supervisor externo (o workflow do CFO) saber QUANDO antecipar em vez de só conseguir
+// mandar antecipar — sem isto ele estaria decidindo sem os números que a própria plataforma
+// já calcula.
+v1Router.get(
+  '/cashflow',
+  asyncHandler(async (req, res) => {
+    if (req.apiUser!.role !== 'cedente') {
+      res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas cedente têm projeção de caixa.' });
+      return;
+    }
+    if (!planAtLeast(req.apiUser!.plan, 'pro')) {
+      res.status(402).json({
+        error: 'plan_required',
+        requiredPlan: 'pro',
+        message: 'A projeção de caixa e o motor de decisão requerem o plano Pro ou superior.',
+      });
+      return;
+    }
+    // Não existe caixa de mentira. A projeção é construída sobre as duplicatas, contas a
+    // pagar e saldo REAIS da conta, e não há plano de dados sandbox equivalente — servir
+    // esses números sob uma chave de teste seria entregar a posição financeira verdadeira
+    // pra um workflow que o integrador ainda está depurando. Então recusa e diz por quê,
+    // em vez de devolver um número inventado ou o número real disfarçado de sandbox.
+    if (req.apiKey!.mode === 'test') {
+      res.status(409).json({
+        error: 'sandbox_indisponivel',
+        message: 'A projeção de caixa não tem equivalente em sandbox — ela é calculada sobre a posição financeira real da conta. Use uma chave live.',
+      });
+      return;
+    }
+    const settings = getSettings(req.apiUser!);
+    const [forecast, recomendacao] = await Promise.all([
+      buildCashflowForecast(req.apiUser!.id, req.apiUser!.plan, settings.companyCnpj),
+      buildCfoRecommendation(req.apiUser!.id, req.apiUser!.plan, settings.companyCnpj),
+    ]);
+    res.json({ forecast, recomendacao, mode: req.apiKey!.mode });
+  })
+);
 
 // A test-mode key sees only the seeded sandbox marketplace (lib/sandboxData.ts) — never
 // the real, live offers other partners' live keys operate on.
