@@ -2007,6 +2007,44 @@ Verificado: server **880** testes, client **117** (65 novos, quase todos da varr
 página), sdks 12+12, build e e2e 13/13. A trava falha quando a desambiguação é revertida
 (conferido): `app/ContaPage.tsx tem controles que se anunciam com o mesmo nome: Sacar (×2)`.
 
+### Vinte chaves que pediam tradução e não tinham — e a trava
+
+O escopo da tradução é deliberadamente parcial, e o cabeçalho de `client/src/lib/i18n.tsx`
+sempre explicou quais partes entram (chrome público, menu lateral, cabeçalhos/rótulos/botões
+das telas principais) e quais ficam em PT-BR de propósito (corpo de página, formulários, e todo
+**dado** vindo do servidor). Isso não mudou e não é o problema.
+
+O problema era a outra frase do mesmo comentário: *"Every key present here has a real
+translation on both sides"* — que tinha deixado de ser verdade. **Vinte chaves** eram passadas a
+`t()` sem par em inglês:
+
+- quatro abas do admin (`admin.tab.confirming`, `conformidade`, `publicidade`, `reconciliacao`);
+- os oito filtros do marketplace (rating, setor, valor mín./máx., prazo mín./máx., limpar, sem capacidade);
+- `nav.docs`;
+- quatro itens do menu lateral (`app.confirming`, `linha-credito`, `fiscal`, `publicidade`) e `group.inicio`;
+- duas do painel de auditoria — **minhas**, adicionadas junto com o balcão sem o par.
+
+Todas dentro do escopo declarado. O `t()` faz `TRANSLATIONS.en[key] ?? ptDefault`, então a falta
+sumia em silêncio: sem erro, sem chave crua na tela, sem nada.
+
+`client/src/lib/traducoes-completas.test.ts` fecha isso. **Chamar `t()` é declarar que aquele
+pedaço entra no escopo** — decidir que algo fica em português se diz *não* chamando `t()`,
+escrevendo o texto direto, como as centenas de strings que corretamente não passam por lá.
+
+O teste também derruba **tradução órfã**, e achou duas: `dashboard.volumeChart` e
+`dashboard.ratingChart`, títulos de gráfico que a tela não desenha mais. É o mesmo "servido e
+nunca lido" visto do outro lado.
+
+Um detalhe que valeu a pena: o menu monta as chaves em runtime (`` t(`app.${item.key}`) ``), então
+elas não existem como literal em lugar nenhum. A primeira versão do teste marcou trinta
+traduções vivas como mortas. Resolvê-las a partir da mesma fonte que o menu usa (`NAV_ITEMS`,
+`NAV_GROUPS`) foi o que tornou a checagem honesta — e foi assim que os cinco itens de menu sem
+tradução apareceram, que a varredura por texto literal jamais teria achado.
+
+Verificado: server 880 testes, client **120** (3 novos), sdks 12+12, build e e2e 13/13. A trava
+falha quando uma tradução é removida (conferido), e diz o arquivo: `auditor.otc
+(pages/app/AuditorPage.tsx)`.
+
 ## Running locally
 
 ```bash

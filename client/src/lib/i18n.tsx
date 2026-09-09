@@ -11,10 +11,23 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 // surrounding UI chrome around it. Content *inside* Admin's tabs (KYB queue, disputes,
 // compliance queue, Jurídico, AI Agents, Feature flags, Auditores, Reconciliação, etc.) is
 // deliberately out of scope too, same reasoning — only the tab bar itself is translated, not
-// each tab's back-office internals. Every key present here has a real translation on both
-// sides; t() falls back to the caller-supplied PT default for anything not yet covered, so
-// nothing ever renders a raw translation key.
+// each tab's back-office internals.
+//
+// Toda chave passada a t() tem par em inglês, e isso agora é travado por
+// lib/traducoes-completas.test.ts — a frase estava aqui e tinha deixado de ser verdade:
+// vinte chaves (quatro abas do admin, os filtros do marketplace, nav.docs, quatro itens do
+// menu lateral, group.inicio e duas do painel de auditoria) foram adicionadas sem o par, e o
+// `?? ptDefault` fez a falta sumir em silêncio. Chamar t() é declarar que aquele pedaço entra
+// no escopo; decidir que algo fica em português se diz NÃO chamando t(), escrevendo o texto
+// direto — como as centenas de strings que corretamente não passam por aqui. O mesmo teste
+// derruba tradução órfã, que envelhece sem ninguém notar.
+//
+// O fallback continua existindo pra que nada renderize uma chave crua na tela.
 export type Lang = 'pt' | 'en';
+
+// Exportado só para lib/traducoes-completas.test.ts, que trava a segunda promessa do
+// comentário acima — toda chave passada a t() tem par em inglês. O app usa t(), nunca isto.
+
 
 const STORAGE_KEY = 'lastro_lang';
 
@@ -26,6 +39,14 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'nav.precos': 'Pricing',
     'nav.transparencia': 'Transparency',
     'nav.status': 'Status',
+    'nav.docs': 'Docs',
+    // O grupo "início" não renderiza cabeçalho (GROUP_LABELS.inicio é vazio) — a entrada em
+    // inglês é vazia pelo mesmo motivo, não por esquecimento.
+    'group.inicio': '',
+    'app.confirming': 'Confirming programme',
+    'app.linha-credito': 'Credit line',
+    'app.fiscal': 'Tax',
+    'app.publicidade': 'Advertising',
     'nav.legal': 'Legal',
     'nav.entrar': 'Log in',
     'nav.falarVendas': 'Talk to sales',
@@ -72,8 +93,6 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     // Dashboard page (static chrome only — KPI/chart data itself stays server-driven PT-BR)
     'dashboard.title': 'Overview',
     'dashboard.subtitle': 'Summary of your activity on the platform',
-    'dashboard.volumeChart': 'Volume advanced by month',
-    'dashboard.ratingChart': 'Portfolio by rating',
     'dashboard.operacoes': 'operations',
 
     // Marketplace page (static chrome only — offers, amounts, sacado/cedente names,
@@ -94,6 +113,14 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'marketplace.colVencimento': 'Due date',
     'marketplace.colAction': 'Score / Acceptance / Action',
     'marketplace.closeAuction': 'Close auction',
+    'marketplace.filterRating': 'Rating: all',
+    'marketplace.filterSector': 'Sector: all',
+    'marketplace.valueMin': 'Min. amount',
+    'marketplace.valueMax': 'Max. amount',
+    'marketplace.prazoMin': 'Min. term (days)',
+    'marketplace.prazoMax': 'Max. term (days)',
+    'marketplace.clearFilters': 'Clear filters',
+    'marketplace.noCapacity': 'No capacity',
     'marketplace.viewAuction': 'View auction',
     'marketplace.buying': 'Buying…',
     'marketplace.swap': 'Swap',
@@ -146,6 +173,10 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'admin.tab.agentes': 'AI Agents',
     'admin.tab.flags': 'Feature flags',
     'admin.tab.auditoria': 'Audit trail',
+    'admin.tab.confirming': 'Confirming programme',
+    'admin.tab.conformidade': 'Book-entry compliance',
+    'admin.tab.publicidade': 'Advertising',
+    'admin.tab.reconciliacao': 'Reconciliation',
 
     // Payables page (static chrome only — the payables list and form stay PT-BR, same
     // scoping choice already made for Emitir's own CSV batch-import card)
@@ -165,6 +196,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'auditor.trail': 'Audit trail (last 100 events)',
     'auditor.complianceQueue': 'Pending compliance queue',
     'auditor.recentReconciliation': 'Recent reconciliation',
+    'auditor.disputes': 'Acceptance disputes',
+    'auditor.otc': 'OTC desk — bilateral negotiation',
   },
 };
 // PT strings live inline in each component as the ptDefault argument to t() — the app's
@@ -178,6 +211,10 @@ interface LangContextValue {
 }
 
 const LangContext = createContext<LangContextValue | null>(null);
+
+// Exportado só para lib/traducoes-completas.test.ts, que trava a segunda promessa do
+// comentário do topo — toda chave passada a t() tem par em inglês. O app usa t(), nunca isto.
+export const TRANSLATIONS_EN = TRANSLATIONS.en;
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
