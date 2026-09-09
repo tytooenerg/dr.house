@@ -381,7 +381,7 @@ export function ErpPage() {
                     {renderDiagnosisBlock('omie', omieRawError ?? omieError)}
                   </>
                 )}
-                <Button variant="primary" disabled={busy || !appKey || !appSecret} onClick={connectOmie}>
+                <Button variant="primary" disabled={busy || !appKey || !appSecret} aria-label="Validar e conectar Omie" onClick={connectOmie}>
                   Validar e conectar
                 </Button>
               </div>
@@ -412,7 +412,7 @@ export function ErpPage() {
                     {renderDiagnosisBlock('sap', sapError)}
                   </>
                 )}
-                <Button variant="primary" disabled={busy || !sapBaseUrl || !sapCompanyDb || !sapUsername || !sapPassword} onClick={connectSap}>
+                <Button variant="primary" disabled={busy || !sapBaseUrl || !sapCompanyDb || !sapUsername || !sapPassword} aria-label="Validar e conectar SAP" onClick={connectSap}>
                   Validar e conectar
                 </Button>
               </div>
@@ -442,7 +442,7 @@ export function ErpPage() {
                     {renderDiagnosisBlock('totvs', totvsError)}
                   </>
                 )}
-                <Button variant="primary" disabled={busy || !totvsBaseUrl || !totvsClientId || !totvsClientSecret} onClick={connectTotvs}>
+                <Button variant="primary" disabled={busy || !totvsBaseUrl || !totvsClientId || !totvsClientSecret} aria-label="Validar e conectar TOTVS" onClick={connectTotvs}>
                   Validar e conectar
                 </Button>
               </div>

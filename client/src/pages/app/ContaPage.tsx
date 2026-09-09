@@ -357,7 +357,7 @@ export function ContaPage() {
                 placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
                 className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
               />
-              <Button variant="primary" disabled={busy || !pixKeyInput.trim()} onClick={saveChave}>
+              <Button variant="primary" aria-label="Salvar chave Pix" disabled={busy || !pixKeyInput.trim()} onClick={saveChave}>
                 Salvar
               </Button>
             </div>
@@ -430,7 +430,7 @@ export function ContaPage() {
                   inputMode="decimal"
                   className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
                 />
-                <Button variant="primary" disabled={busy || !withdrawValor} onClick={sacar}>
+                <Button variant="primary" aria-label="Sacar via Pix" disabled={busy || !withdrawValor} onClick={sacar}>
                   Sacar
                 </Button>
               </div>
@@ -590,7 +590,7 @@ export function ContaPage() {
                   inputMode="decimal"
                   className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
                 />
-                <Button variant="primary" disabled={busy || !tedWithdrawValor} onClick={sacarTed}>
+                <Button variant="primary" aria-label="Sacar via TED" disabled={busy || !tedWithdrawValor} onClick={sacarTed}>
                   Sacar
                 </Button>
               </div>
@@ -647,7 +647,7 @@ export function ContaPage() {
                 placeholder={`Endereço da carteira (rede ${data.stablecoinNetwork})`}
                 className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
               />
-              <Button variant="primary" disabled={busy || !stablecoinWalletInput.trim()} onClick={saveWalletStablecoin}>
+              <Button variant="primary" aria-label="Salvar endereço da carteira" disabled={busy || !stablecoinWalletInput.trim()} onClick={saveWalletStablecoin}>
                 Salvar
               </Button>
             </div>
@@ -665,7 +665,7 @@ export function ContaPage() {
                   inputMode="decimal"
                   className="flex-1 border border-border rounded-md px-3 py-2 text-[13px]"
                 />
-                <Button variant="primary" disabled={busy || !stablecoinWithdrawValor} onClick={sacarStablecoin}>
+                <Button variant="primary" aria-label="Sacar em stablecoin" disabled={busy || !stablecoinWithdrawValor} onClick={sacarStablecoin}>
                   Sacar
                 </Button>
               </div>

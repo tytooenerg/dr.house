@@ -1969,6 +1969,44 @@ Verificado: server **880** testes (5 novos), client **52** (5 novos), sdks 12+12
 13/13. O teste de página falha quando a UI é removida (conferido): `Unable to find an element
 with the text: Domínio próprio`.
 
+### Oito controles que se anunciavam com o mesmo nome
+
+Uma passada anterior de acessibilidade garantiu que todo controle **tem** nome (aria-label ou
+texto visível). Ela não checou **colisão** — e nome sem unicidade não resolve o problema que o
+nome existe para resolver. Quem navega por leitor de tela ouve só o nome acessível, sem o cartão
+em volta, sem o título da seção, sem a coluna.
+
+O primeiro caso apareceu por acidente: um teste de página falhou com
+`getMultipleElementsFoundError` porque a tela de ERP tinha dois "Remover". A varredura achou o
+resto:
+
+| Tela | Nome repetido | O que cada um faz |
+|---|---|---|
+| Conta | **"Sacar"** ×3 | saca por Pix · por TED · em stablecoin |
+| Conta | **"Salvar"** ×2 | salva a chave Pix · o endereço da carteira |
+| Integrações ERP | **"Validar e conectar"** ×3 | conecta Omie · SAP · TOTVS |
+
+Todos coexistem na tela — não são ramos alternativos. Na página de Conta são exatamente os
+controles que **movem dinheiro de verdade**: três botões idênticos, três rails diferentes. Cada
+um ganhou um `aria-label` que diz o que ELE faz; o texto visível continua curto.
+
+`client/src/lib/nomes-acessiveis.test.ts` fecha a classe: varre todas as páginas e falha quando
+dois controles da mesma tela compartilham nome acessível. Exceção exige motivo escrito, como nas
+outras travas. É uma rede grossa — analisa o texto-fonte e só enxerga `<Button>` com rótulo
+literal, não resolve rótulo vindo de variável ou de `t()` —, e o comentário do arquivo diz isso
+em vez de deixar parecer auditoria completa.
+
+**A fragilidade de teste que eu vinha reportando foi consertada, não contornada.** Os dois testes
+assíncronos de `insurance-quotes.test.ts` pegavam `offers[0]` e "a primeira oferta sem seguro" de
+um marketplace **compartilhado entre todos os arquivos de teste** — bastava outro arquivo segurar
+aquela duplicata entre o GET e o POST para o teste falhar sem bug nenhum (~1 vez em 10). O
+problema nunca foi timing: era o teste afirmar coisas sobre um recurso que não era dele. Agora
+cada um cria a própria oferta. Suíte do servidor rodada 3× seguidas: 880/880 nas três.
+
+Verificado: server **880** testes, client **117** (65 novos, quase todos da varredura por
+página), sdks 12+12, build e e2e 13/13. A trava falha quando a desambiguação é revertida
+(conferido): `app/ContaPage.tsx tem controles que se anunciam com o mesmo nome: Sacar (×2)`.
+
 ## Running locally
 
 ```bash
