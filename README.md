@@ -2045,6 +2045,31 @@ Verificado: server 880 testes, client **120** (3 novos), sdks 12+12, build e e2e
 falha quando uma tradução é removida (conferido), e diz o arquivo: `auditor.otc
 (pages/app/AuditorPage.tsx)`.
 
+### O último papel sem teste de navegador
+
+O auditor era o único dos seis sem e2e — e isso importa mais nele do que nos outros, porque o
+papel é definido por uma **negativa**: acesso somente-leitura. Negativa não se prova olhando o
+servidor. As rotas de escrita podem estar todas fechadas e a tela ainda oferecer um botão que
+leva a 403; a barra lateral pode ganhar uma aba que o papel não deveria ver. Só o navegador
+enxerga isso.
+
+`e2e/tests/auditor.spec.ts` cobre quatro coisas: o painel carrega com as **cinco seções** que
+`lib/auditorOverview.ts` monta (incluindo disputas, que ficou servida e nunca desenhada por
+meses); a barra lateral oferece só as duas abas de `ROLE_TABS.auditor` e nenhuma das proibidas;
+não existe **nenhum** botão de escrita no conteúdo — o subtítulo do papel promete isso com todas
+as letras; e um investidor que digita `/app/auditor` é barrado.
+
+**O teste do gate passou com o gate removido, na primeira versão.** Eu tinha afirmado "o título
+não aparece" — e ele não aparece nos dois casos: sem o `<Gate>`, a API também recusa e a página
+só renderiza o `ErrorState`. A asserção que de fato distingue é a **URL**, porque o `Gate`
+*redireciona* para a aba padrão do papel. Vale como lembrete geral: um teste de negativa passa
+por vacuidade com facilidade, e a única forma de saber é revertendo o alvo.
+
+Verificado: e2e **17/17** (era 13), server 880, client 120, sdks 12+12, build. Os dois testes
+que mais importam falham quando o alvo é revertido, conferido um a um: sem o card de disputas,
+`Unable to find an element with the text: Disputas de aceite`; sem o `<Gate>`, `Expected
+pattern: /\/app\/dashboard/ · Received string: "http://localhost:4000/app/auditor"`.
+
 ## Running locally
 
 ```bash
