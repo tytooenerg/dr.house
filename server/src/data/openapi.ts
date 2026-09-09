@@ -398,5 +398,98 @@ export const openApiSpec = {
         responses: { '200': { description: '`avgDesagioGeralPct`, `taxaInadimplenciaGeralPct` e `porRating` (por AA/A/B/C).' } },
       },
     },
+    '/otc': {
+      get: {
+        summary: 'Listar minhas negociações de balcão (somente contas investidor)',
+        description:
+          'Todas as negociações em que a conta é parte, dos dois lados da mesa, com o histórico de rodadas. Não existe visão pública do balcão: uma negociação alheia não aparece aqui nem por id.',
+        responses: {
+          '200': { description: 'Lista de negociações com as rodadas de cada uma.' },
+          '403': { description: 'Chave não pertence a uma conta investidor.' },
+          '409': { description: 'Chave de teste: o balcão não existe em sandbox — use uma chave live.' },
+        },
+      },
+      post: {
+        summary: 'Abrir uma negociação de balcão sobre a posição de outra conta',
+        description:
+          'Proposta dirigida a quem detém a duplicata — ela NÃO precisa estar anunciada no book. O prazo é obrigatório (padrão 48h, teto 168h): proposta firme sem validade é uma opção de compra que ninguém pagou. Dispara otc.proposta_recebida para a contraparte. Uma proposta aberta por vez, por posição.',
+        parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['duplicataId', 'valor'],
+                properties: {
+                  duplicataId: { type: 'string', example: 'DUP-2026-1025-0baf' },
+                  valor: { oneOf: [{ type: 'number' }, { type: 'string' }], example: 50000, description: 'Proposta em reais.' },
+                  prazoHoras: { type: 'number', default: 48, maximum: 168, description: 'Validade da proposta.' },
+                  nota: { type: 'string', maxLength: 500 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Negociação aberta; devolve o negociacaoId e a lista atualizada.' },
+          '400': { description: 'Valor ou prazo inválido.' },
+          '403': { description: 'Chave somente-leitura, conta não investidor, ou credenciamento (KYB) ainda em análise.' },
+          '404': { description: 'Ninguém detém esta duplicata no momento.' },
+          '409': { description: 'A posição já é sua, já há uma negociação aberta sobre ela, a duplicata venceu/foi contestada, ou a chave é de teste.' },
+        },
+      },
+    },
+    '/otc/{id}/contraproposta': {
+      post: {
+        summary: 'Contrapropor numa negociação de balcão',
+        description: 'Troca o valor em cima da mesa e passa a vez para o outro lado. Só age quem está com a vez. Dispara otc.contraproposta para a contraparte.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }, { $ref: '#/components/parameters/IdempotencyKey' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { type: 'object', required: ['valor'], properties: { valor: { oneOf: [{ type: 'number' }, { type: 'string' }] }, nota: { type: 'string', maxLength: 500 } } },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Contraproposta registrada.' },
+          '400': { description: 'Valor inválido.' },
+          '404': { description: 'Negociação não encontrada — inclusive quando ela existe mas a conta não é parte dela.' },
+          '409': { description: 'A negociação não está aberta, ou a proposta em cima da mesa é sua.' },
+        },
+      },
+    },
+    '/otc/{id}/aceitar': {
+      post: {
+        summary: 'Aceitar a proposta em cima da mesa — LIQUIDA a operação',
+        description:
+          'Fecha a negociação pelo mesmo caminho de liquidação do book (a posição troca de mãos, a taxa de plataforma é descontada do vendedor, a registradora é informada da negociação). Quem propôs não aceita a própria proposta. Os gates (posição ainda ativa, duplicata não vencida nem contestada) são revalidados AQUI, não na proposta: se a posição mudou de mãos enquanto as partes negociavam, a negociação morre em vez de liquidar sobre estado velho. Dispara otc.aceita para as duas pontas. Envie Idempotency-Key: um retry de rede sobre um aceite que já passou não pode comprar duas vezes.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }, { $ref: '#/components/parameters/IdempotencyKey' }],
+        responses: {
+          '200': { description: 'Negociação fechada e liquidada.' },
+          '403': { description: 'Chave somente-leitura, conta não investidor, ou KYB em análise.' },
+          '404': { description: 'Negociação não encontrada, ou a conta não é parte dela.' },
+          '409': { description: 'Não está aberta, a proposta na mesa é sua, ou a posição deixou de ser negociável (stale_position/expired/contested).' },
+        },
+      },
+    },
+    '/otc/{id}/encerrar': {
+      post: {
+        summary: 'Recusar ou cancelar uma negociação de balcão',
+        description: 'Recusar e cancelar são o mesmo ato visto de cada lado da mesa. Dispara otc.encerrada para a contraparte.',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }, { $ref: '#/components/parameters/IdempotencyKey' }],
+        requestBody: {
+          required: false,
+          content: { 'application/json': { schema: { type: 'object', properties: { como: { type: 'string', enum: ['recusada', 'cancelada'], default: 'recusada' } } } } },
+        },
+        responses: {
+          '200': { description: 'Negociação encerrada.' },
+          '404': { description: 'Negociação não encontrada, ou a conta não é parte dela.' },
+          '409': { description: 'A negociação já não estava aberta.' },
+        },
+      },
+    },
   },
 };

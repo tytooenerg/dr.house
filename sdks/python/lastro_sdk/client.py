@@ -136,6 +136,72 @@ class LastroClient:
         """
         return self._request("GET", "/cashflow")
 
+    # --- Balcão (OTC) ---
+
+    def list_otc(self) -> Dict[str, Any]:
+        """Negociações de balcão em que esta conta é parte, dos dois lados da mesa.
+
+        Não existe visão pública do balcão — uma negociação alheia não aparece aqui, nem por
+        id. Live keys only: o balcão negocia posições reais entre duas contas, e não há
+        contraparte de mentira em sandbox.
+        """
+        return self._request("GET", "/otc")
+
+    def abrir_otc(
+        self,
+        duplicata_id: str,
+        valor: Any,
+        prazo_horas: Optional[float] = None,
+        nota: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Abre uma negociação sobre a posição de outra conta.
+
+        A duplicata NÃO precisa estar anunciada no book — é esse o ponto do balcão. O prazo é
+        obrigatório (padrão 48h, teto 168h): uma proposta firme sem validade é uma opção de
+        compra que ninguém pagou por ela.
+        """
+        body: Dict[str, Any] = {"duplicataId": duplicata_id, "valor": valor}
+        if prazo_horas is not None:
+            body["prazoHoras"] = prazo_horas
+        if nota is not None:
+            body["nota"] = nota
+        return self._request("POST", "/otc", body, idempotency_key)
+
+    def contrapropor_otc(
+        self,
+        negociacao_id: int,
+        valor: Any,
+        nota: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Troca o valor em cima da mesa e passa a vez pro outro lado.
+
+        Só age quem está com a vez: quem fez a proposta que está na mesa aguarda a resposta.
+        """
+        body: Dict[str, Any] = {"valor": valor}
+        if nota is not None:
+            body["nota"] = nota
+        return self._request("POST", f"/otc/{int(negociacao_id)}/contraproposta", body, idempotency_key)
+
+    def aceitar_otc(self, negociacao_id: int, idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+        """Aceita a proposta em cima da mesa — isto LIQUIDA.
+
+        A posição troca de mãos e a taxa de plataforma é descontada do vendedor. Passe uma
+        `idempotency_key`: um retry de rede sobre um aceite que já passou não pode comprar
+        duas vezes.
+        """
+        return self._request("POST", f"/otc/{int(negociacao_id)}/aceitar", {}, idempotency_key)
+
+    def encerrar_otc(
+        self,
+        negociacao_id: int,
+        como: str = "recusada",
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Recusar e cancelar são o mesmo ato, visto de cada lado da mesa."""
+        return self._request("POST", f"/otc/{int(negociacao_id)}/encerrar", {"como": como}, idempotency_key)
+
     # --- Marketplace ---
 
     def list_marketplace(self) -> Dict[str, Any]:
