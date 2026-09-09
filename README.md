@@ -2128,6 +2128,8 @@ On first boot the server seeds four demo accounts (password `demo1234` for all):
 | Seguradora | `seguradora@lastro.demo` | Too Seguros |
 | Auditor (somente-leitura) | `auditor@lastro.demo` | Auditoria Externa |
 
+O seed base só roda quando a tabela `users` está vazia, então uma conta acrescentada a esta tabela depois não chegaria a um `server/data/lastro.db` já existente — o login diria "E-mail ou senha incorretos" para uma conta que simplesmente não existe. `seedMissingDemoAccounts()` (`db/seed.ts`, chamado no boot) cria no próximo `npm run dev` só as contas desta lista que faltarem, e só num banco que já é de demonstração. Apagar `server/data/lastro.db*` continua sendo o reset completo.
+
 The demo investidor starts on the **Pro** plan and the demo cedente on **Empresarial**, so every plan-gated feature (Automação de Lances, Desenvolvedores) is visible right away — Comparador de Taxas is free on every plan and always visible. A freshly self-registered account starts on **Básico** instead, so the paywall itself is demoable too — visit **Assinatura** in the sidebar to upgrade (instant/simulated without a Stripe key).
 
 You can also register a brand-new account for any of the four self-service roles (investidor/cedente/sacado/seguradora) from the login screen — seguradora registration also asks which of the three seeded insurers the account represents. New investidor accounts start in KYB `pending`/`none` status and can't bid until an admin approves them from the back-office.

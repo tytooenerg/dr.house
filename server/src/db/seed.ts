@@ -1,5 +1,6 @@
 import { db } from './index.js';
-import { createUser, approveKyb, updateSubscription, setVeiculo } from './users.js';
+import type { Role } from './types.js';
+import { createUser, approveKyb, updateSubscription, setVeiculo, getUserByEmail } from './users.js';
 import { createDuplicata, dispararLeilao, setInsurer } from './duplicatas.js';
 import { recordInsuranceSettlement } from './insuranceSettlements.js';
 import { computeInsurerQuotePct } from '../lib/insuranceQuotes.js';
@@ -28,19 +29,80 @@ function daysFromNow(dias: number): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+/**
+ * As contas de demonstração documentadas no README, em um lugar só.
+ *
+ * Fonte única de propósito: é desta lista que `seedIfEmpty()` cria as contas e é dela que
+ * `seedMissingDemoAccounts()` completa um banco antigo. Se fossem duas listas, a segunda
+ * envelheceria sem ninguém notar — que é exatamente o bug que a segunda existe pra consertar.
+ */
+export const DEMO_ACCOUNTS: { email: string; nome: string; companyName: string; role: Role; insurerKey?: string }[] = [
+  { email: 'investidor@lastro.demo', nome: 'Marina Costa', companyName: 'Kayrós Capital', role: 'investidor' },
+  { email: 'cedente@lastro.demo', nome: 'Marina Costa', companyName: 'Fornecedor Lima Ltda', role: 'cedente' },
+  { email: 'sacado@lastro.demo', nome: 'Marina Costa', companyName: 'Grupo Atlas Varejo', role: 'sacado' },
+  { email: 'admin@lastro.demo', nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' },
+  { email: 'seguradora@lastro.demo', nome: 'Equipe Too', companyName: 'Too Seguros', role: 'seguradora', insurerKey: 'too' },
+  // O papel 'auditor' existia sem nenhuma conta semeada: era alcançável só criando uma à mão
+  // pelo back-office (POST /admin/auditores), então o painel somente-leitura não podia ser
+  // demonstrado. Continua fora do enum de registro público (routes/auth.ts) de propósito —
+  // uma conta que lê o log de auditoria de todos os tenants não deve ser auto-servível —, e
+  // esta aqui só existe porque todo o bloco de contas demo é pulado em produção por padrão
+  // (ver demoProibidoAqui abaixo).
+  { email: 'auditor@lastro.demo', nome: 'Auditoria Independente', companyName: 'Auditoria Externa', role: 'auditor' },
+];
+
+/** A conta que identifica um banco como sendo de demonstração. Ver seedMissingDemoAccounts. */
+const ANCORA_DEMO = 'investidor@lastro.demo';
+
+/**
+ * Demo accounts (including admin@lastro.demo) use a fixed, publicly-documented password
+ * (see README) — fine for local/dev/staging, a real vulnerability on an internet-facing
+ * production deployment. Refuse to auto-create them there unless someone explicitly opts in
+ * (SEED_DEMO_DATA=true — e.g. a public sales-demo environment that happens to run with
+ * NODE_ENV=production). The real first admin account for a genuine production deployment
+ * should come from `npm run create-admin` instead (see server/src/scripts/createAdmin.ts and
+ * DEPLOY.md), which takes a real, operator-chosen password and is never documented publicly.
+ */
+function demoProibidoAqui(): boolean {
+  return process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_DATA !== 'true';
+}
+
+/**
+ * Cria as contas de demonstração que faltam num banco que JÁ foi semeado.
+ *
+ * `seedIfEmpty()` é tudo-ou-nada: sai na primeira linha se a tabela `users` tiver qualquer
+ * registro. Toda conta acrescentada à lista DEPOIS que alguém já rodou a aplicação uma vez
+ * nunca chega no banco dessa pessoa, e o sintoma é péssimo de diagnosticar: o login responde
+ * "E-mail ou senha incorretos" tanto para senha errada quanto para e-mail inexistente
+ * (routes/auth.ts — deliberado, não confirmar se um e-mail está cadastrado). Foi o que
+ * aconteceu com `auditor@lastro.demo`, acrescentado depois dos outros cinco: em todo banco de
+ * desenvolvimento anterior a ele a conta simplesmente não existe, e a tela diz que a senha
+ * está errada.
+ *
+ * Age só num banco que já é de demonstração, reconhecido pela conta âncora. Num banco real
+ * (que nunca teve a âncora) não cria nada — injetar conta com senha pública documentada é
+ * precisamente o que o guard de produção existe pra impedir. Não semeia dado nenhum: só a
+ * conta que falta.
+ */
+export async function seedMissingDemoAccounts(): Promise<number> {
+  if (demoProibidoAqui()) return 0;
+  if (!getUserByEmail(ANCORA_DEMO)) return 0;
+
+  const faltando = DEMO_ACCOUNTS.filter((c) => !getUserByEmail(c.email));
+  if (faltando.length === 0) return 0;
+
+  const senha = await hashPassword('demo1234');
+  for (const conta of faltando) createUser({ ...conta, passwordHash: senha });
+  logger.info(`[seed] contas de demonstração que faltavam neste banco foram criadas: ${faltando.map((c) => c.email).join(', ')}`);
+  return faltando.length;
+}
+
 export async function seedIfEmpty() {
   const count = (db.prepare('SELECT COUNT(*) as n FROM users').get() as { n: number }).n;
   if (count > 0) return;
 
-  // Demo accounts (including admin@lastro.demo) use a fixed, publicly-documented password
-  // (see README) — fine for local/dev/staging, a real vulnerability on an internet-facing
-  // production deployment with an empty database. Refuse to auto-create them there unless
-  // someone explicitly opts in (SEED_DEMO_DATA=true — e.g. a public sales-demo environment
-  // that happens to run with NODE_ENV=production). The real first admin account for a
-  // genuine production deployment should come from `npm run create-admin` instead (see
-  // server/src/scripts/createAdmin.ts and DEPLOY.md), which takes a real, operator-chosen
-  // password and is never documented publicly.
-  if (process.env.NODE_ENV === 'production' && process.env.SEED_DEMO_DATA !== 'true') {
+  // Ver demoProibidoAqui: senha pública documentada nunca entra sozinha num banco de produção.
+  if (demoProibidoAqui()) {
     logger.warn(
       '[seed] Skipping demo data seed: NODE_ENV=production and SEED_DEMO_DATA is not "true". ' +
         'The database has no users yet — create your own first admin account with `npm run create-admin` (see DEPLOY.md).'
@@ -50,7 +112,10 @@ export async function seedIfEmpty() {
 
   const demoPassword = await hashPassword('demo1234');
 
-  const investidor = createUser({ email: 'investidor@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Kayrós Capital', role: 'investidor' });
+  // Criadas a partir de DEMO_ACCOUNTS pra que a lista seja fonte única — é dela que
+  // seedMissingDemoAccounts() completa um banco de desenvolvimento antigo.
+  const contas = new Map(DEMO_ACCOUNTS.map((c) => [c.email, createUser({ ...c, passwordHash: demoPassword })]));
+  const investidor = contas.get('investidor@lastro.demo')!;
 
   // Uma apólice semeada precisa ter a cobrança REGISTRADA, não só a seguradora apontada. O
   // painel da seguradora soma o que está em insurance_settlements — o único registro do que
@@ -70,17 +135,8 @@ export async function seedIfEmpty() {
       repasseSeguradora: premio * (1 - INSURANCE_COMMISSION_PCT),
     });
   };
-  const cedente = createUser({ email: 'cedente@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Fornecedor Lima Ltda', role: 'cedente' });
-  const sacado = createUser({ email: 'sacado@lastro.demo', passwordHash: demoPassword, nome: 'Marina Costa', companyName: 'Grupo Atlas Varejo', role: 'sacado' });
-  createUser({ email: 'admin@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Lastro', companyName: 'Lastro (plataforma)', role: 'admin' });
-  createUser({ email: 'seguradora@lastro.demo', passwordHash: demoPassword, nome: 'Equipe Too', companyName: 'Too Seguros', role: 'seguradora', insurerKey: 'too' });
-  // O papel 'auditor' existia sem nenhuma conta semeada: era alcançável só criando uma à mão
-  // pelo back-office (POST /admin/auditores), então o painel somente-leitura não podia ser
-  // demonstrado. Continua fora do enum de registro público (routes/auth.ts) de propósito —
-  // uma conta que lê o log de auditoria de todos os tenants não deve ser auto-servível —, e
-  // esta aqui só existe porque todo o bloco de contas demo é pulado em produção por padrão
-  // (ver o guard de NODE_ENV mais abaixo).
-  createUser({ email: 'auditor@lastro.demo', passwordHash: demoPassword, nome: 'Auditoria Independente', companyName: 'Auditoria Externa', role: 'auditor' });
+  const cedente = contas.get('cedente@lastro.demo')!;
+  const sacado = contas.get('sacado@lastro.demo')!;
   approveKyb(investidor.id);
   // Kayrós Capital é um fundo de investimento — sem veículo classificado a conta seria
   // aprovada e mesmo assim incapaz de dar lance (lib/auctionCore.ts).
