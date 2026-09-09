@@ -418,7 +418,9 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
     const loginAuditor = await request(app).post('/api/auth/login').send({ email: auditorEmail, password: 'senhaforte123' });
     const overview = await request(app).get('/api/auditor/overview').set('Authorization', `Bearer ${loginAuditor.body.token}`);
     expect(overview.status).toBe(200);
-    expect(Object.keys(overview.body)).toEqual(['auditLog', 'compliance', 'reconciliation', 'sars', 'disputas']);
+    // A lista é fixada de propósito: um bloco novo no overview tem que passar por aqui, e
+    // não entrar em silêncio. 'otc' entrou quando o auditor ganhou visão do balcão.
+    expect(Object.keys(overview.body)).toEqual(['auditLog', 'compliance', 'reconciliation', 'sars', 'disputas', 'otc']);
     expect(overview.body.disputas.abertas).toBeGreaterThan(0);
     expect(overview.body.disputas.recentes.some((d: { duplicataId: string }) => d.duplicataId === duplicataId)).toBe(true);
   });

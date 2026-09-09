@@ -1869,6 +1869,42 @@ gates que mais importam têm teste que falha quando são removidos (conferido re
 sem o aviso na expiração, `webhook não chegou a tempo`; sem o gate de sandbox, uma chave de teste
 entra no balcão real (`expected 200 to be 409`).
 
+### O auditor passa a enxergar o balcão — e as disputas, que ninguém desenhava
+
+O balcão é a única negociação da plataforma que acontece **fora de um livro público**: preço e
+contraparte combinados diretamente entre duas mesas. Era exatamente o que o auditor não
+enxergava, e é o que mais precisa ser auditável.
+
+Isso não contraria a privacidade do OTC. O sigilo do balcão é contra os outros **participantes
+do mercado** — uma mesa montando posição num sacado não expõe isso a quem negocia contra ela. O
+auditor não participa do mercado: é supervisão somente-leitura, que já enxerga disputas, fila de
+compliance e a trilha inteira. Esconder dele justamente a negociação bilateral esconderia o que
+mais importa auditar.
+
+Cada linha traz as duas partes nomeadas, o valor **negociado ao lado do valor de face** e o
+número de rodadas. O par negociado/face é a comparação que denuncia um preço fora de mercado; as
+rodadas mostram se houve barganha de verdade ou um acerto de uma tacada só. Um KPI novo soma o
+volume que **de fato liquidou** — recusadas, canceladas e expiradas não entram, porque não
+mudaram nada de mãos.
+
+**Achado no caminho:** o servidor já montava o bloco `disputas` no overview desde que a visão
+foi criada, e a interface da tela **não declarava o campo** — então a lista nunca foi desenhada.
+Dado servido e nunca lido é o mesmo que dado ausente para quem usa o painel, e nada quebrava
+para denunciar isso. Agora os dois blocos estão na tela, e há teste de client exigindo que
+estejam. O teste de ciclo completo que fixa a lista de chaves do overview passou a incluir
+`otc`, de propósito: um bloco novo tem que passar por ali, não entrar em silêncio.
+
+Junto foi o texto de onboarding do papel, que listava o que o auditor vê e tinha ficado para
+trás — não mencionava disputas nem o balcão.
+
+Verificado: server **869** testes (5 novos), client **43** (4 novos), sdks 12+12, build e e2e
+13/13. Os dois lados têm teste que falha sem o conserto (conferido revertendo cada um): sem o
+join das contrapartes, `expected '(oculto)' to be 'Mesa Vendedora Aud…'`; sem a seção na tela,
+`Unable to find an element with the text: Disputas de aceite`. Contra servidor de produção real,
+uma auditora criada pelo admin abriu o painel e leu uma negociação de três rodadas entre Kayrós
+Capital e MesaBeta Capital — R$ 55.000 negociados sobre uma duplicata de face R$ 42.000, que é
+precisamente o tipo de coisa que a coluna de face existe para expor.
+
 ## Running locally
 
 ```bash

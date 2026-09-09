@@ -109,3 +109,30 @@ export function expireOtcVencidas(nowIso = new Date().toISOString()): OtcNegocia
   db.prepare("UPDATE otc_negociacoes SET status = 'expirada' WHERE status = 'aberta' AND expira_em <= ?").run(nowIso);
   return vencidas.map((n) => ({ ...n, status: 'expirada' as const }));
 }
+
+/**
+ * Todas as negociações de balcão, com as duas partes nomeadas — só para o papel de auditor
+ * (lib/auditorOverview.ts). Mesmo formato de listAllDisputesForAudit: junta o que a linha
+ * precisa pra ser lida sem consultar mais nada, e exclui sandbox.
+ *
+ * Isto NÃO contradiz a privacidade do balcão. O sigilo do OTC é contra os outros
+ * PARTICIPANTES do mercado — uma mesa montando posição num sacado não expõe isso a quem
+ * negocia contra ela. O auditor não participa do mercado: é um papel somente-leitura de
+ * supervisão, que já enxerga disputas, fila de compliance e a trilha inteira. Esconder dele
+ * exatamente a negociação bilateral, que é onde preço e contraparte são combinados fora do
+ * book, esconderia o que mais importa auditar.
+ */
+export function listAllOtcForAudit() {
+  return db
+    .prepare(
+      `SELECT n.*, d.sacado_nome as sacado_nome, d.valor as valor_face,
+              c.company_name as comprador_nome, v.company_name as vendedor_nome
+       FROM otc_negociacoes n
+       JOIN duplicatas d ON d.id = n.duplicata_id
+       JOIN users c ON c.id = n.comprador_id
+       JOIN users v ON v.id = n.vendedor_id
+       WHERE d.sandbox = 0
+       ORDER BY n.created_at DESC, n.id DESC`
+    )
+    .all() as (OtcNegociacaoRow & { sacado_nome: string; valor_face: number; comprador_nome: string; vendedor_nome: string })[];
+}
