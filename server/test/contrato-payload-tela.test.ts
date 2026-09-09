@@ -40,7 +40,16 @@ function unique() {
 async function conta(role: string, extras: { empresarial?: boolean; credenciar?: boolean } = {}) {
   const res = await request(app)
     .post('/api/auth/register')
-    .send({ nome: 'Contrato', email: `contrato-${unique()}@example.com`, password: 'senha123', companyName: `Contrato ${unique()}`, role });
+    // Uma conta de seguradora precisa dizer QUAL seguradora ela representa (routes/auth.ts) —
+    // sem isso o cadastro é recusado e o painel responde 401.
+    .send({
+      nome: 'Contrato',
+      email: `contrato-${unique()}@example.com`,
+      password: 'senha123',
+      companyName: `Contrato ${unique()}`,
+      role,
+      ...(role === 'seguradora' ? { insurerKey: 'too' } : {}),
+    });
   const token = res.body.token as string;
   if (extras.credenciar) credenciarInvestidor(res.body.user.id);
   if (extras.empresarial) await request(app).post('/api/billing/checkout').set('Authorization', `Bearer ${token}`).send({ plan: 'empresarial' });
@@ -68,6 +77,10 @@ const NAO_LIDAS: Record<string, Record<string, string>> = {
   '/api/profile': {},
   '/api/erp': {},
   '/api/auditor/overview': {},
+  '/api/dashboard': {},
+  '/api/seguradora': {},
+  '/api/compliance': {},
+  '/api/payables': {},
 };
 
 interface Caso {
@@ -83,6 +96,14 @@ const CASOS: Caso[] = [
   { nome: 'conta', rota: '/api/account', pagina: 'app/ContaPage.tsx', token: () => conta('cedente') },
   { nome: 'perfil', rota: '/api/profile', pagina: 'app/PerfilPage.tsx', token: () => conta('cedente') },
   { nome: 'integrações ERP', rota: '/api/erp', pagina: 'app/ErpPage.tsx', token: () => conta('cedente', { empresarial: true }) },
+  // O dashboard muda de forma conforme o papel (lib/dashboardCore.ts monta blocos diferentes
+  // pra quem emite e pra quem investe), então os dois lados entram — um só deixaria metade do
+  // payload sem leitor conhecido.
+  { nome: 'dashboard do investidor', rota: '/api/dashboard', pagina: 'app/DashboardPage.tsx', token: () => conta('investidor', { credenciar: true }) },
+  { nome: 'dashboard do cedente', rota: '/api/dashboard', pagina: 'app/DashboardPage.tsx', token: () => conta('cedente') },
+  { nome: 'painel da seguradora', rota: '/api/seguradora', pagina: 'app/SeguradoraPage.tsx', token: () => conta('seguradora') },
+  { nome: 'compliance', rota: '/api/compliance', pagina: 'app/CompliancePage.tsx', token: () => conta('cedente') },
+  { nome: 'contas a pagar', rota: '/api/payables', pagina: 'app/ContasPagarPage.tsx', token: () => conta('cedente') },
 ];
 
 describe('contrato payload ↔ tela: nada servido pode ficar sem leitor', () => {

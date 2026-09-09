@@ -1944,6 +1944,31 @@ Verificado: server **875** testes (6 novos), client **47** (4 novos), sdks 12+12
 13/13. As duas travas falham quando o conserto é revertido (conferido): removida a menção ao
 campo, `/api/erp serve 1 campo(s) que app/ErpPage.tsx nunca menciona`.
 
+### A trava cobre o resto das telas grandes — e a dívida do PR anterior é paga
+
+A trava de contrato nasceu cobrindo 5 payloads e achou um campo morto na primeira execução. Não
+havia razão para supor que as telas de fora estavam limpas, então entraram as quatro que
+faltavam: `/dashboard` (nos **dois** papéis — `lib/dashboardCore.ts` monta blocos diferentes
+para quem emite e para quem investe, e um só deixaria metade do payload sem leitor conhecido),
+`/seguradora`, `/compliance` e `/payables`. São 9 payloads em 6 papéis agora, e os quatro novos
+passaram limpos.
+
+**A dívida:** no PR anterior eu construí a UI de domínio próprio para a trava passar
+honestamente — e subi essa tela **sem teste nenhum**. O servidor já estava bem coberto
+(`addon-revenue.test.ts` testa gate de plano, domínio inválido, colisão de unicidade e remoção);
+a tela, não. `client/src/pages/app/ErpPage.test.tsx` fecha isso: o formulário só habilita com o
+que enviar, vincular e remover chamam as rotas certas com o corpo certo, a seção não aparece sem
+marca configurada (o servidor recusaria com `brand_required`), e o erro do servidor aparece na
+tela — "este domínio já está vinculado a outra conta", não um "algo deu errado" genérico.
+
+No caminho, uma ambiguidade real de acessibilidade: a página tinha **dois** botões "Remover", o
+da marca e o do domínio. Quem navega por leitor de tela ouve só o nome acessível, sem o contexto
+visual em volta. Agora são `aria-label="Remover marca"` e `"Remover domínio próprio"`.
+
+Verificado: server **880** testes (5 novos), client **52** (5 novos), sdks 12+12, build e e2e
+13/13. O teste de página falha quando a UI é removida (conferido): `Unable to find an element
+with the text: Domínio próprio`.
+
 ## Running locally
 
 ```bash
