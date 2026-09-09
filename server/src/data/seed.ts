@@ -330,7 +330,10 @@ export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'adm
     { title: 'Deposite e configure seu anúncio', body: 'Em Conta & Liquidação, deposite via Pix, TED ou boleto. Em Publicidade, monte seu anúncio — ele entra em análise antes de ir ao ar, e a mensalidade só é cobrada depois de aprovado.' },
   ],
   auditor: [
-    { title: 'Bem-vinda, auditoria', body: 'Você tem acesso somente-leitura à trilha de auditoria, fila de compliance, reconciliação e relatórios regulatórios da plataforma.' },
+    {
+      title: 'Bem-vinda, auditoria',
+      body: 'Você tem acesso somente-leitura à trilha de auditoria, fila de compliance, reconciliação, disputas de aceite, o balcão (OTC) e os relatórios regulatórios da plataforma.',
+    },
     { title: 'Trilha de auditoria', body: 'Todo evento sensível fica em um log encadeado por hash — qualquer alteração retroativa quebra a cadeia de forma detectável.' },
   ],
   seguradora: [
