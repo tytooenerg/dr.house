@@ -4,6 +4,7 @@ import { PageSkeleton } from '../../components/ui/Skeleton';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Toggle } from '../../components/ui/Toggle';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
 
@@ -26,6 +27,10 @@ interface ErpData {
   whitelabelBrand: WhitelabelBrand | null;
   whitelabelPlusEnabled: boolean;
   whitelabelPlusPriceFmt: string;
+  // O servidor já servia este campo e a tela não o lia — o domínio próprio existia inteiro no
+  // backend (POST /erp/whitelabel/domain, com gate de plano, pré-requisito de marca e checagem
+  // de unicidade) e não havia como um cedente chegar nele pelo app.
+  whitelabelCustomDomain: string | null;
   omieConnected: boolean;
   sapConnected: boolean;
   totvsConnected: boolean;
@@ -95,6 +100,9 @@ export function ErpPage() {
   const [savingBrand, setSavingBrand] = useState(false);
 
   const [whitelabelPlusError, setWhitelabelPlusError] = useState('');
+  const [dominio, setDominio] = useState('');
+  const [dominioError, setDominioError] = useState('');
+  const [dominioBusy, setDominioBusy] = useState(false);
 
   const [companyCnpjInput, setCompanyCnpjInput] = useState('');
   const [savingCompanyCnpj, setSavingCompanyCnpj] = useState(false);
@@ -301,6 +309,31 @@ export function ErpPage() {
   };
 
   const removeBrand = () => api.post<ErpData>('/erp/whitelabel/brand/remove').then(setData);
+
+  const vincularDominio = async () => {
+    setDominioError('');
+    setDominioBusy(true);
+    try {
+      setData(await api.post<ErpData>('/erp/whitelabel/domain', { domain: dominio.trim() }));
+      setDominio('');
+    } catch (err) {
+      setDominioError(err instanceof ApiError ? err.message : 'Não foi possível vincular o domínio.');
+    } finally {
+      setDominioBusy(false);
+    }
+  };
+
+  const removerDominio = async () => {
+    setDominioError('');
+    setDominioBusy(true);
+    try {
+      setData(await api.post<ErpData>('/erp/whitelabel/domain/remove'));
+    } catch (err) {
+      setDominioError(err instanceof ApiError ? err.message : 'Não foi possível remover o domínio.');
+    } finally {
+      setDominioBusy(false);
+    }
+  };
 
   const toggleWhitelabelPlus = async (enabled: boolean) => {
     setWhitelabelPlusError('');
@@ -572,6 +605,45 @@ export function ErpPage() {
           </div>
         )}
         {whitelabelPlusError && <div className="text-[11.5px] mt-2" style={{ color: PALETTE.redOnNavy }}>{whitelabelPlusError}</div>}
+
+        {/* Domínio próprio. Depende da marca já configurada (o servidor recusa com
+            brand_required) — por isso mora dentro do mesmo bloco, e não como um card solto. */}
+        {data.whitelabelBrand && (
+          <div className="mt-3.5 pt-3.5 border-t border-navyBorder">
+            <div className="font-bold text-[13px]">Domínio próprio</div>
+            <div className="text-onNavy text-[12.5px] mt-0.5 mb-2.5 max-w-[560px]">
+              Sua marca aparece na tela de login de quem visita este domínio, antes de qualquer autenticação. Aponte um CNAME para a Lastro e vincule
+              o domínio aqui.
+            </div>
+            {data.whitelabelCustomDomain ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="font-mono-num text-[13px] font-bold">{data.whitelabelCustomDomain}</span>
+                <Button size="sm" variant="secondary" disabled={dominioBusy} onClick={removerDominio}>
+                  {dominioBusy ? 'Removendo…' : 'Remover'}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-end gap-2.5 flex-wrap">
+                <div className="min-w-[240px]">
+                  <Input
+                    aria-label="Domínio próprio"
+                    placeholder="antecipa.suaempresa.com.br"
+                    value={dominio}
+                    onChange={(e) => setDominio(e.target.value)}
+                  />
+                </div>
+                <Button size="sm" disabled={dominioBusy || !dominio.trim()} onClick={vincularDominio}>
+                  {dominioBusy ? 'Vinculando…' : 'Vincular domínio'}
+                </Button>
+              </div>
+            )}
+            {dominioError && (
+              <div className="text-[11.5px] mt-2" style={{ color: PALETTE.redOnNavy }}>
+                {dominioError}
+              </div>
+            )}
+          </div>
+        )}
       </NavyCard>
 
       <Card>
