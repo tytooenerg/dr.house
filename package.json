@@ -16,7 +16,8 @@
     "typecheck": "npm run typecheck -w server && npm run typecheck -w client && npm run typecheck -w sdks/node",
     "test": "npm run test -w server && npm run test -w client && npm run test -w sdks/node",
     "test:e2e": "npm run test -w e2e",
-    "loadtest": "node scripts/loadtest/run.mjs"
+    "loadtest": "node scripts/loadtest/run.mjs",
+    "operacao:real": "node scripts/operacao-real/run.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

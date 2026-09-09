@@ -2070,6 +2070,44 @@ que mais importam falham quando o alvo é revertido, conferido um a um: sem o ca
 `Unable to find an element with the text: Disputas de aceite`; sem o `<Gate>`, `Expected
 pattern: /\/app\/dashboard/ · Received string: "http://localhost:4000/app/auditor"`.
 
+### Um teste de operação real — e a fila de compliance que nunca esvaziava
+
+A suíte já encadeava os seis papéis numa operação (`server/test/full-lifecycle-all-roles.test.ts`),
+mas não numa operação **real**: `app` importado in-process, `DB_PATH=':memory:'`, e o leilão
+fechado por `fecharLeiloes()` — o helper que chama `closeDueAuctions()` com um "agora" adiantado
+em 365 dias. Os 19 arquivos que fecham leilão fecham todos assim. Consequência: se
+`startAuctionCloseJob()` sumisse do `index.ts`, **a suíte inteira continuaria verde e nenhum
+leilão fecharia em produção**.
+
+`scripts/operacao-real/run.mjs` roda a operação inteira contra um servidor de produção de
+verdade — `node server/dist/index.js`, arquivo SQLite em disco com as 72 migrações aplicadas do
+zero, admin criado pelo `npm run create-admin` documentado no DEPLOY.md, nenhum seed de demo.
+Cadastro dos cinco papéis auto-cadastráveis, depósito Pix, KYB aprovado pelo admin, emissão,
+aceite do sacado, apólice, dois lances em taxas diferentes, **adjudicação pelo `setInterval` de
+30s do próprio processo**, balcão com contraproposta, pagamento no vencimento, e o caixa
+conferido ao centavo. A única coisa simulada é o relógio: `close_at` e `vencimento` recuados no
+banco, porque não dá pra esperar 6 horas e 90 dias.
+
+Fecha ao centavo: **R$ 50.000** = R$ 47.006,67 (cedente) + R$ 1.240,00 (investidor A) +
+R$ 1.148,58 (investidor B) + R$ 213,20 (seguradora) + R$ 391,55 (plataforma). O leilão fechou
+sozinho em 9-24s; com `--sem-relogio` seguia aberto depois de 75s — o controle negativo, sem o
+qual "esperei e fechou" passaria mesmo se algo diferente do job estivesse fechando.
+
+**O achado:** a fila de revisão de compliance enchia com duplicatas que o próprio motor tinha
+**auto-aprovado**, e elas não saíam nunca. `emitirCore` grava uma linha para toda emissão com
+`reviewed = 0`; `listPendingComplianceReview` devolvia tudo com `reviewed = 0`; e o único jeito
+de marcar revisado (`POST /admin/compliance-queue/:id/decidir`) exige
+`status = 'suspensa_compliance'` — que uma auto-aprovada nunca teve. Nenhum endpoint conseguia
+tirá-la de lá. Na tela do auditor isso apareceu do jeito mais claro possível: "Compliance
+pendente: 1" apontando para a duplicata desta operação, já emitida, aceita, leiloada, vendida no
+balcão e **paga**. Uma fila que só cresce não é fila — é ruído que esconde o único item que
+precisa de um humano. `reviewed = 0` continua correto no registro (ninguém reviu mesmo); o erro
+era tratar "nenhum humano olhou" como "algum humano precisa olhar".
+
+Verificado: a operação completa verde ponta a ponta contra o servidor real, o controle negativo
+falhando como deve, e `test/compliance-fila-humana.test.ts` falhando quando a correção é
+revertida (`expected [ 'DUP-2026-1025-b7ac' ] to not include 'DUP-2026-1025-b7ac'`).
+
 ## Running locally
 
 ```bash
