@@ -1,0 +1,41 @@
+-- Balcão (OTC) do mercado secundário. O book que já existe (resale_listings + resale_bids)
+-- só funciona quando o DONO da posição decide vendê-la: quem quer uma duplicata específica
+-- — pra fechar uma concentração, casar um vencimento — não tem como abordar quem a detém.
+-- E o lance do book é uma via só: o vendedor aceita ou recusa, sem contraproposta.
+--
+-- Aqui a negociação é dirigida a uma contraparte nomeada, sobre uma posição que não precisa
+-- estar anunciada, e vai e volta em rodadas até alguém aceitar ou o prazo vencer. É privada
+-- entre as duas partes — nada disso aparece no book público.
+CREATE TABLE IF NOT EXISTS otc_negociacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  purchase_id INTEGER NOT NULL REFERENCES purchases(id),
+  duplicata_id TEXT NOT NULL REFERENCES duplicatas(id),
+  comprador_id INTEGER NOT NULL REFERENCES users(id),
+  vendedor_id INTEGER NOT NULL REFERENCES users(id),
+  -- Valor da proposta que está em cima da mesa agora (a última rodada).
+  valor REAL NOT NULL,
+  -- De quem é a vez de responder. Quem propôs não pode aceitar a própria proposta.
+  vez_de TEXT NOT NULL CHECK(vez_de IN ('comprador','vendedor')),
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK(status IN ('aberta','aceita','recusada','cancelada','expirada')),
+  -- Prazo obrigatório: uma proposta firme sem validade é uma opção de compra que ninguém
+  -- pagou por ela — a contraparte ficaria presa a um preço indefinidamente.
+  expira_em TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_otc_comprador ON otc_negociacoes(comprador_id, status);
+CREATE INDEX IF NOT EXISTS idx_otc_vendedor ON otc_negociacoes(vendedor_id, status);
+CREATE INDEX IF NOT EXISTS idx_otc_purchase ON otc_negociacoes(purchase_id, status);
+
+-- Cada proposta e contraproposta vira uma linha: o histórico da negociação é o registro do
+-- que cada lado ofereceu e quando, que é exatamente o que se pede numa auditoria de operação
+-- de balcão. Mesma ideia de dispute_events.
+CREATE TABLE IF NOT EXISTS otc_rodadas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  negociacao_id INTEGER NOT NULL REFERENCES otc_negociacoes(id),
+  autor_id INTEGER NOT NULL REFERENCES users(id),
+  papel TEXT NOT NULL CHECK(papel IN ('comprador','vendedor')),
+  valor REAL NOT NULL,
+  nota TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_otc_rodadas_negociacao ON otc_rodadas(negociacao_id);

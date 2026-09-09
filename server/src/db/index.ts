@@ -72,6 +72,8 @@ export function resetDbForTests() {
     DELETE FROM legal_collection_fees;
     DELETE FROM platform_fee_events;
     DELETE FROM legal_documents;
+    DELETE FROM otc_rodadas;
+    DELETE FROM otc_negociacoes;
     DELETE FROM resale_bids;
     DELETE FROM resale_listings;
     DELETE FROM purchases;

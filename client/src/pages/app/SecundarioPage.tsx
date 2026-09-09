@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input, Select } from '../../components/ui/Input';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
+import { Badge } from '../../components/ui/Badge';
 import { useApi } from '../../lib/useApi';
 
 interface ListingView {
@@ -62,12 +63,34 @@ interface MyBlockTradeView {
   createdAt: string;
   itens: BlockTradeItemView[];
 }
+interface OtcRodadaView {
+  papel: 'comprador' | 'vendedor';
+  autor: string;
+  valorFmt: string;
+  nota: string | null;
+  quando: string;
+}
+interface OtcView {
+  id: number;
+  duplicataId: string;
+  sacado: string;
+  valorFaceFmt: string;
+  vencimento: string;
+  meuPapel: 'comprador' | 'vendedor';
+  contraparte: string;
+  valorFmt: string;
+  minhaVez: boolean;
+  status: string;
+  expiraEm: string;
+  rodadas: OtcRodadaView[];
+}
 interface SecundarioData {
   market: ListingView[];
   minhasPosicoes: PositionView[];
   meusAnuncios: MyListingView[];
   meusLances: MyBidView[];
   meusBlockTrades: MyBlockTradeView[];
+  minhasOtc: OtcView[];
 }
 
 const BID_STATUS_LABEL: Record<MyBidView['status'], string> = {
@@ -94,6 +117,11 @@ export function SecundarioPage() {
   const [blockQuantidadeMax, setBlockQuantidadeMax] = useState('');
   const [blockResult, setBlockResult] = useState<{ quantidade: number; valorTotalFmt: string; descontoPct: number } | null>(null);
   const [blockSubmitting, setBlockSubmitting] = useState(false);
+
+  const [otcDuplicata, setOtcDuplicata] = useState('');
+  const [otcValor, setOtcValor] = useState('');
+  const [otcNota, setOtcNota] = useState('');
+  const [otcContra, setOtcContra] = useState<Record<number, string>>({});
 
 
   const { data, error: loadError, reload: load, setData } = useApi<SecundarioData>('/secundario', { fallbackMessage: 'Falha ao carregar o mercado secundário.' });
@@ -389,6 +417,152 @@ export function SecundarioPage() {
               ))}
             </div>
           </>
+        )}
+      </Card>
+
+      {/* Balcão (OTC). O book acima só alcança posições que o dono decidiu anunciar; aqui a
+          proposta vai direto a quem detém a duplicata, esteja ela anunciada ou não, e vai e
+          volta até alguém aceitar. Nada disto aparece pra terceiros. */}
+      <Card className="mt-4">
+        <div className="font-bold text-[15px]">Balcão (OTC)</div>
+        <div className="text-textSecondary text-[12.5px] mt-1 mb-4">
+          Proposta dirigida a quem detém uma duplicata específica — mesmo que ela não esteja anunciada no book acima. A negociação vai e volta em
+          contrapropostas, vale até o prazo que você definir, e só você e a contraparte a enxergam.
+        </div>
+
+        <div className="flex items-end gap-3 flex-wrap mb-2">
+          <div className="min-w-[190px]">
+            <Input aria-label="Duplicata da proposta de balcão" placeholder="Duplicata (ex: DUP-2026-0842)" value={otcDuplicata} onChange={(e) => setOtcDuplicata(e.target.value)} />
+          </div>
+          <div className="min-w-[150px]">
+            <Input aria-label="Valor da sua proposta" placeholder="Sua proposta (R$)" value={otcValor} onChange={(e) => setOtcValor(e.target.value)} />
+          </div>
+          <div className="flex-1 min-w-[190px]">
+            <Input aria-label="Nota da proposta" placeholder="Nota (opcional)" value={otcNota} onChange={(e) => setOtcNota(e.target.value)} />
+          </div>
+          <Button
+            size="sm"
+            disabled={busyKey === 'otc:abrir' || !otcDuplicata.trim() || !otcValor.trim()}
+            onClick={() =>
+              runAction(
+                'otc:abrir',
+                async () => {
+                  const res = await api.post<SecundarioData>('/secundario/otc', {
+                    duplicataId: otcDuplicata.trim(),
+                    valor: otcValor.trim(),
+                    nota: otcNota.trim() || undefined,
+                  });
+                  setOtcDuplicata('');
+                  setOtcValor('');
+                  setOtcNota('');
+                  return res;
+                },
+                'Não foi possível abrir a negociação.'
+              )
+            }
+          >
+            {busyKey === 'otc:abrir' ? 'Enviando…' : 'Enviar proposta'}
+          </Button>
+        </div>
+        <div className="text-textTertiary text-[12px] mb-4">Validade padrão de 48 horas — depois disso a proposta expira sozinha.</div>
+
+        {data.minhasOtc.length === 0 ? (
+          <div className="text-textSecondary text-[12.5px]">Nenhuma negociação de balcão em andamento.</div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {data.minhasOtc.map((n) => (
+              <div key={n.id} className="bg-surface border border-border rounded-lg px-4 py-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                  <div className="font-bold text-[13px]">
+                    {n.sacado} · <span className="font-mono-num">{n.duplicataId}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-textTertiary text-[12px]">
+                      {n.meuPapel === 'comprador' ? 'você compra de' : 'você vende para'} {n.contraparte}
+                    </span>
+                    {n.status !== 'aberta' ? (
+                      <Badge variant={n.status === 'aceita' ? 'success' : 'neutral'}>{n.status}</Badge>
+                    ) : n.minhaVez ? (
+                      <Badge variant="warning">sua vez</Badge>
+                    ) : (
+                      <Badge variant="info">aguardando contraparte</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="text-textSecondary text-[12.5px] mb-2">
+                  Proposta em cima da mesa: <strong className="font-mono-num">{n.valorFmt}</strong> · face {n.valorFaceFmt} · vence {n.vencimento}
+                </div>
+
+                <div className="flex flex-col gap-1 mb-2">
+                  {n.rodadas.map((r, i) => (
+                    <div key={i} className="text-[12px] text-textSecondary">
+                      <span className="font-semibold">{r.autor}</span> ({r.papel}) ofereceu{' '}
+                      <span className="font-mono-num font-bold">{r.valorFmt}</span>
+                      {r.nota ? ` — "${r.nota}"` : ''}
+                    </div>
+                  ))}
+                </div>
+
+                {n.status === 'aberta' && (
+                  <div className="flex items-end gap-2 flex-wrap">
+                    {n.minhaVez && (
+                      <>
+                        <div className="min-w-[150px]">
+                          <Input
+                            aria-label="Valor da contraproposta"
+                            placeholder="Contraproposta (R$)"
+                            value={otcContra[n.id] ?? ''}
+                            onChange={(e) => setOtcContra((p) => ({ ...p, [n.id]: e.target.value }))}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busyKey === `otc:contra:${n.id}` || !(otcContra[n.id] ?? '').trim()}
+                          onClick={() =>
+                            runAction(
+                              `otc:contra:${n.id}`,
+                              () => api.post<SecundarioData>(`/secundario/otc/${n.id}/contraproposta`, { valor: (otcContra[n.id] ?? '').trim() }),
+                              'Não foi possível enviar a contraproposta.'
+                            )
+                          }
+                        >
+                          Contrapropor
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={busyKey === `otc:aceitar:${n.id}`}
+                          onClick={() =>
+                            runAction(
+                              `otc:aceitar:${n.id}`,
+                              () => api.post<SecundarioData>(`/secundario/otc/${n.id}/aceitar`, {}),
+                              'Não foi possível fechar a negociação.'
+                            )
+                          }
+                        >
+                          {busyKey === `otc:aceitar:${n.id}` ? 'Fechando…' : `Aceitar ${n.valorFmt}`}
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busyKey === `otc:encerrar:${n.id}`}
+                      onClick={() =>
+                        runAction(
+                          `otc:encerrar:${n.id}`,
+                          () => api.post<SecundarioData>(`/secundario/otc/${n.id}/encerrar`, {}),
+                          'Não foi possível encerrar a negociação.'
+                        )
+                      }
+                    >
+                      {n.minhaVez ? 'Recusar' : 'Cancelar proposta'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </Card>
     </div>
