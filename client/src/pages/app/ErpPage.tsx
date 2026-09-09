@@ -567,7 +567,7 @@ export function ErpPage() {
               <Button size="sm" variant="secondary" onClick={() => setBrandForm(true)}>
                 Editar
               </Button>
-              <Button size="sm" variant="danger" onClick={removeBrand}>
+              <Button size="sm" variant="danger" aria-label="Remover marca" onClick={removeBrand}>
                 Remover
               </Button>
             </div>
@@ -618,7 +618,7 @@ export function ErpPage() {
             {data.whitelabelCustomDomain ? (
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="font-mono-num text-[13px] font-bold">{data.whitelabelCustomDomain}</span>
-                <Button size="sm" variant="secondary" disabled={dominioBusy} onClick={removerDominio}>
+                <Button size="sm" variant="secondary" aria-label="Remover domínio próprio" disabled={dominioBusy} onClick={removerDominio}>
                   {dominioBusy ? 'Removendo…' : 'Remover'}
                 </Button>
               </div>
