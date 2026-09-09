@@ -1905,6 +1905,45 @@ uma auditora criada pelo admin abriu o painel e leu uma negociação de três ro
 Capital e MesaBeta Capital — R$ 55.000 negociados sobre uma duplicata de face R$ 42.000, que é
 precisamente o tipo de coisa que a coluna de face existe para expor.
 
+### Uma trava contra a família de bug — e o primeiro achado dela
+
+Do #86 ao #93, a mesma forma se repetiu: o servidor calcula e **serve** um dado, e a tela não o
+lê. Dado servido e nunca lido é o mesmo que dado ausente para quem usa o painel, e **nada
+quebra** — nem o typecheck, porque a interface do client simplesmente não declara o campo. Foi
+assim com `disputas` no painel do auditor: o bloco existia desde que a visão foi criada e nunca
+apareceu na tela.
+
+Duas travas, uma para cada metade do problema:
+
+**`server/test/contrato-payload-tela.test.ts`** — para cada payload que alimenta uma tela
+inteira (`/auditor/overview`, `/secundario`, `/account`, `/profile`, `/erp`), toda chave de
+primeiro nível precisa ser mencionada no arquivo da página que a consome. Uma exceção é
+permitida, mas exige motivo escrito, e um segundo teste derruba exceções que não correspondem
+mais a nenhum campo servido — senão a lista de isenções vira o lugar onde os achados morrem.
+
+Ele lê o texto-fonte da página e procura a chave: prova que alguém escreveu o nome do campo
+ali, não que ele é renderizado. É alarme de fumaça, não laudo — o que garante a renderização é o
+teste de página. A vantagem é custar quase nada e cobrir o payload **inteiro**, inclusive o que
+ninguém lembrou de testar.
+
+**`client/src/lib/espelhos-do-servidor.test.ts`** — o client mantém listas copiadas à mão do
+servidor (as seguradoras do cadastro, os eventos de webhook da doc pública), porque a tela
+precisa delas antes de qualquer chamada autenticada. Uma dessas cópias já divergiu na prática. O
+teste **importa a constante real** de `server/src/data/seed.ts` (que não tem um único import, é
+dado puro) e compara valores — nada de casar texto com regex. Também trava as duas pontas do
+menu: toda tab liberada por papel tem item, e nenhum item aponta para tab que ninguém enxerga.
+
+**O primeiro achado, na primeira execução:** `/api/erp` servia `whitelabelCustomDomain` e
+`ErpPage.tsx` não o mencionava. O white-label com domínio próprio estava **inteiro no servidor**
+— `POST /erp/whitelabel/domain` com gate de plano, pré-requisito de marca e checagem de
+unicidade, mais o `/public/brand` resolvendo a marca por domínio — e não havia como um cedente
+chegar nele pelo app. Isentar teria sido escrever "não lido porque a tela não tem UI", que é
+exatamente o que o segundo teste existe para impedir; então a UI foi construída.
+
+Verificado: server **875** testes (6 novos), client **47** (4 novos), sdks 12+12, build e e2e
+13/13. As duas travas falham quando o conserto é revertido (conferido): removida a menção ao
+campo, `/api/erp serve 1 campo(s) que app/ErpPage.tsx nunca menciona`.
+
 ## Running locally
 
 ```bash

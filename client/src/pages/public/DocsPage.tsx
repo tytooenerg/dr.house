@@ -56,8 +56,9 @@ const RATE_LIMITS = [
 
 // Espelha WEBHOOK_EVENTS de server/src/data/seed.ts — a lista que a tela de Desenvolvedores
 // oferece pra assinatura. Todo evento aqui tem emissor real do outro lado; se as duas listas
-// divergirem, esta tela promete uma assinatura que o servidor recusa.
-const WEBHOOK_EVENTS = [
+// divergirem, esta tela promete uma assinatura que o servidor recusa — e é o que
+// lib/espelhos-do-servidor.test.ts trava, importando a lista real do servidor.
+export const WEBHOOK_EVENTS = [
   'duplicata.registrada',
   'leilao.aberto',
   'lance.recebido',
