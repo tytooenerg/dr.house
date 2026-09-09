@@ -18,6 +18,7 @@ import {
 import { executeResaleTrade, parseValor } from './resaleCore.js';
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent } from '../db/audit.js';
+import { deliverWebhookEvent } from './webhookDelivery.js';
 import { fmtBRL, parseFlexibleDate } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
@@ -47,6 +48,28 @@ import type { UserRow } from '../db/types.js';
 /** Teto do prazo de uma proposta firme. Além disso não é proposta, é opção sem prêmio. */
 export const OTC_PRAZO_MAX_HORAS = 168;
 export const OTC_PRAZO_PADRAO_HORAS = 48;
+
+/**
+ * O balcão nasceu só com notificação in-app, e isso o deixava pela metade pra quem ele foi
+ * feito: a mesa institucional opera por API, não olhando a tela. Uma proposta dirigida com
+ * prazo de 48h correndo que só existe se alguém logar não é uma proposta — é uma aposta de
+ * que a contraparte vai entrar no site a tempo.
+ *
+ * Então todo ato do balcão que exige reação da OUTRA ponta também sai por webhook. Entrega em
+ * void, como os demais emissores: a falha do endpoint de um parceiro nunca derruba a operação
+ * que já aconteceu.
+ */
+function avisar(destinatarioId: number, evento: string, neg: OtcNegociacaoRow, extra: Record<string, unknown> = {}) {
+  void deliverWebhookEvent(destinatarioId, evento, {
+    negociacaoId: neg.id,
+    duplicataId: neg.duplicata_id,
+    valor: neg.valor,
+    status: neg.status,
+    vezDe: neg.vez_de,
+    expiraEm: neg.expira_em,
+    ...extra,
+  });
+}
 
 export interface OtcOutcome<T> {
   status: number;
@@ -146,9 +169,21 @@ function view(neg: OtcNegociacaoRow, viewerId: number): OtcView {
   };
 }
 
+/**
+ * Expira o que venceu e avisa as duas pontas. A expiração é preguiçosa (roda na leitura), e
+ * é justamente por isso que o aviso mora aqui: quem integra por webhook não tem como
+ * descobrir sozinho que o relógio virou.
+ */
+function expirarEAvisar() {
+  for (const venc of expireOtcVencidas()) {
+    avisar(venc.comprador_id, 'otc.encerrada', venc, { motivo: 'expirada' });
+    avisar(venc.vendedor_id, 'otc.encerrada', venc, { motivo: 'expirada' });
+  }
+}
+
 /** Só as duas partes veem uma negociação de balcão. Não existe visão pública disto. */
 export function viewMinhasOtc(userId: number): OtcView[] {
-  expireOtcVencidas();
+  expirarEAvisar();
   return listOtcDoUsuario(userId).map((n) => view(n, userId));
 }
 
@@ -207,11 +242,13 @@ export function abrirOtc(
     valor,
     contraparte: ativa.investor_id,
   });
+  // Só pro vendedor: é dele a vez, e é o relógio dele que está correndo.
+  avisar(ativa.investor_id, 'otc.proposta_recebida', neg, { de: user.company_name, nota: input.nota?.trim() || null });
   return { status: 200, body: { negociacaoId: neg.id, negociacoes: viewMinhasOtc(user.id) } };
 }
 
 export function contrapropor(user: UserRow, negociacaoId: number, valorRaw: string, nota?: string): OtcOutcome<{ negociacoes: OtcView[] }> {
-  expireOtcVencidas();
+  expirarEAvisar();
   const neg = getOtcNegociacao(negociacaoId);
   const papel = neg ? papelDe(neg, user.id) : null;
   // 404 e não 403 pra quem não é parte: a existência de uma negociação de balcão alheia já é
@@ -230,11 +267,14 @@ export function contrapropor(user: UserRow, negociacaoId: number, valorRaw: stri
   const outroId = papel === 'comprador' ? neg.vendedor_id : neg.comprador_id;
   addNotification(outroId, `Contraproposta de ${fmtBRL(valor)} na negociação de balcão da duplicata ${neg.duplicata_id}.`, COLORS.BLUE);
   recordAuditEvent(user.id, user.company_name, 'otc.contraproposta', { negociacaoId, duplicataId: neg.duplicata_id, valor });
+  // A negociação já mudou no banco; o payload tem que refletir o valor e a vez NOVOS, não o
+  // estado que `neg` carregava quando foi lido.
+  avisar(outroId, 'otc.contraproposta', getOtcNegociacao(negociacaoId)!, { de: user.company_name, nota: nota?.trim() || null });
   return { status: 200, body: { negociacoes: viewMinhasOtc(user.id) } };
 }
 
 export function aceitarOtc(user: UserRow, negociacaoId: number): OtcOutcome<{ negociacoes: OtcView[] }> {
-  expireOtcVencidas();
+  expirarEAvisar();
   const barrado = credenciado(user, 'fechar negociações de balcão');
   if (barrado) return { status: 403, body: barrado };
 
@@ -282,12 +322,18 @@ export function aceitarOtc(user: UserRow, negociacaoId: number): OtcOutcome<{ ne
     vendedorId: neg.vendedor_id,
     anuncioCancelado: anuncio?.status === 'ativo' ? anuncio.id : null,
   });
+  // Às DUAS pontas, ao contrário dos demais: aqui não é um pedido de reação, é uma
+  // liquidação — cada lado precisa lançar a sua perna, e quem aceitou também precisa do
+  // registro pela mesma via que recebeu o resto da negociação.
+  const fechada = getOtcNegociacao(negociacaoId)!;
+  avisar(neg.vendedor_id, 'otc.aceita', fechada, { papel: 'vendedor', taxaPlataforma: fee, liquido: neg.valor - fee });
+  avisar(neg.comprador_id, 'otc.aceita', fechada, { papel: 'comprador', taxaPlataforma: 0, liquido: neg.valor });
   return { status: 200, body: { negociacoes: viewMinhasOtc(user.id) } };
 }
 
 /** Recusar encerra; cancelar é o mesmo ato visto do lado de quem propôs. */
 export function encerrarOtc(user: UserRow, negociacaoId: number, como: 'recusada' | 'cancelada'): OtcOutcome<{ negociacoes: OtcView[] }> {
-  expireOtcVencidas();
+  expirarEAvisar();
   const neg = getOtcNegociacao(negociacaoId);
   const papel = neg ? papelDe(neg, user.id) : null;
   if (!neg || !papel) return { status: 404, body: { error: 'not_found', message: 'Negociação não encontrada.' } };
@@ -297,5 +343,6 @@ export function encerrarOtc(user: UserRow, negociacaoId: number, como: 'recusada
   const outroId = papel === 'comprador' ? neg.vendedor_id : neg.comprador_id;
   addNotification(outroId, `A negociação de balcão da duplicata ${neg.duplicata_id} foi encerrada pela contraparte.`, COLORS.AMBER);
   recordAuditEvent(user.id, user.company_name, `otc.${como}`, { negociacaoId, duplicataId: neg.duplicata_id });
+  avisar(outroId, 'otc.encerrada', getOtcNegociacao(negociacaoId)!, { motivo: como, por: user.company_name });
   return { status: 200, body: { negociacoes: viewMinhasOtc(user.id) } };
 }

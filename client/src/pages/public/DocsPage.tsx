@@ -55,9 +55,8 @@ const RATE_LIMITS = [
 ];
 
 // Espelha WEBHOOK_EVENTS de server/src/data/seed.ts — a lista que a tela de Desenvolvedores
-// oferece pra assinatura. Os três do leilão faltavam aqui porque, até então, eram anunciados
-// e nunca disparavam; agora têm emissor real (routes/minhas.ts, lib/auctionCore.ts e
-// lib/auctionClose.ts) e as duas listas voltam a dizer a mesma coisa.
+// oferece pra assinatura. Todo evento aqui tem emissor real do outro lado; se as duas listas
+// divergirem, esta tela promete uma assinatura que o servidor recusa.
 const WEBHOOK_EVENTS = [
   'duplicata.registrada',
   'leilao.aberto',
@@ -67,6 +66,10 @@ const WEBHOOK_EVENTS = [
   'sinistro.decidido',
   'rating.alterado',
   'block_trade.executado',
+  'otc.proposta_recebida',
+  'otc.contraproposta',
+  'otc.aceita',
+  'otc.encerrada',
 ];
 
 function CodeBlock({ children }: { children: string }) {

@@ -11,6 +11,8 @@ import type {
   EmitirDuplicataInput,
   EmitirDuplicataResult,
   MarketplaceOffer,
+  AbrirOtcInput,
+  OtcNegociacao,
   PldTriagemInput,
   PldTriagemResult,
   ReportSignalInput,
@@ -124,6 +126,47 @@ export class LastroClient {
    */
   getCashflow(): Promise<{ forecast: unknown; recomendacao: unknown; mode: 'live' }> {
     return this.request('GET', '/cashflow');
+  }
+
+  // --- Balcão (OTC) ---
+
+  /**
+   * Negociações de balcão em que esta conta é parte, dos dois lados da mesa, com o histórico
+   * de rodadas. Não existe visão pública do balcão — uma negociação alheia não aparece aqui.
+   *
+   * Live keys only: o balcão negocia posições reais entre duas contas, e não há contraparte
+   * de mentira em sandbox.
+   */
+  listOtc(): Promise<{ negociacoes: OtcNegociacao[]; mode: 'live' }> {
+    return this.request('GET', '/otc');
+  }
+
+  /**
+   * Abre uma negociação sobre a posição de outra conta. A duplicata NÃO precisa estar
+   * anunciada no book — é esse o ponto do balcão. O prazo é obrigatório (padrão 48h): uma
+   * proposta firme sem validade é uma opção de compra que ninguém pagou por ela.
+   */
+  abrirOtc(input: AbrirOtcInput, opts?: RequestOptions): Promise<{ negociacaoId: number; negociacoes: OtcNegociacao[]; mode: 'live' }> {
+    return this.request('POST', '/otc', input, opts);
+  }
+
+  /** Troca o valor em cima da mesa e passa a vez pro outro lado. Só age quem está com a vez. */
+  contraproporOtc(id: number, valor: number | string, nota?: string, opts?: RequestOptions): Promise<{ negociacoes: OtcNegociacao[]; mode: 'live' }> {
+    return this.request('POST', `/otc/${id}/contraproposta`, { valor, nota }, opts);
+  }
+
+  /**
+   * Aceita a proposta em cima da mesa — isto LIQUIDA: a posição troca de mãos e a taxa de
+   * plataforma é descontada do vendedor. Passe uma `idempotencyKey` em `opts`: um retry de
+   * rede sobre um aceite que já passou não pode comprar duas vezes.
+   */
+  aceitarOtc(id: number, opts?: RequestOptions): Promise<{ negociacoes: OtcNegociacao[]; mode: 'live' }> {
+    return this.request('POST', `/otc/${id}/aceitar`, {}, opts);
+  }
+
+  /** Recusar e cancelar são o mesmo ato, visto de cada lado da mesa. */
+  encerrarOtc(id: number, como: 'recusada' | 'cancelada' = 'recusada', opts?: RequestOptions): Promise<{ negociacoes: OtcNegociacao[]; mode: 'live' }> {
+    return this.request('POST', `/otc/${id}/encerrar`, { como }, opts);
   }
 
   // --- Marketplace ---

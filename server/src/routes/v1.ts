@@ -10,6 +10,7 @@ import { getRegistradora, chooseRegistradora, registrarNaRegistradora, checkDupl
 import { withIdempotency } from '../lib/idempotency.js';
 import { getDuplicata, listMarketplace, listBySacadoNome, listByCedente } from '../db/duplicatas.js';
 import { abrirLeilao } from '../lib/auctionOpen.js';
+import { abrirOtc, contrapropor, aceitarOtc, encerrarOtc, viewMinhasOtc, OTC_PRAZO_MAX_HORAS } from '../lib/otcCore.js';
 import { buildCashflowForecast } from '../lib/cashflowForecast.js';
 import { buildCfoRecommendation } from '../lib/cfoDecisionEngine.js';
 import { getSettings, effectiveOwnerId } from '../db/users.js';
@@ -657,5 +658,129 @@ v1Router.get(
       await chargePerCall(req.apiUser!.id, 'market_index_api', 'Consulta ao Lastro Index via API');
     }
     res.json(index);
+  })
+);
+
+// ---------------------------------------------------------------------------------------
+// Balcão (OTC). O secundário já tinha as duas pontas na API: o book é público e um parceiro
+// consegue lê-lo. A negociação bilateral, não — ela nasceu só com tela, e foi desenhada
+// exatamente pra mesa institucional, que opera por integração. Estas rotas são as mesmas
+// operações de /api/secundario/otc (lib/otcCore.ts é a única regra dos dois caminhos), com o
+// que a v1 exige a mais: escopo de escrita e idempotência.
+//
+// Não há sandbox aqui, e isso não é omissão. Uma negociação de balcão acontece sobre uma
+// POSIÇÃO — a tabela purchases não tem plano de dados de teste, e o marketplace sandbox é um
+// conjunto de ofertas semeadas, sem donos com quem negociar. Fingir um balcão de mentira
+// seria devolver uma contraparte que não existe. Então recusa e diz por quê, como /cashflow.
+function otcSomenteInvestidorLive(req: import('express').Request, res: import('express').Response): boolean {
+  if (req.apiUser!.role !== 'investidor') {
+    res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas investidor operam no balcão.' });
+    return false;
+  }
+  if (req.apiKey!.mode === 'test') {
+    res.status(409).json({
+      error: 'sandbox_indisponivel',
+      message: 'O balcão não tem equivalente em sandbox — ele negocia posições reais entre duas contas. Use uma chave live.',
+    });
+    return false;
+  }
+  return true;
+}
+
+const v1OtcAberturaSchema = z.object({
+  duplicataId: z.string().trim().min(1),
+  valor: z.union([z.string().trim().min(1), z.number()]).transform((v) => String(v)),
+  prazoHoras: z.number().positive().max(OTC_PRAZO_MAX_HORAS).optional(),
+  nota: z.string().trim().max(500).optional(),
+});
+const v1OtcContrapropostaSchema = z.object({
+  valor: z.union([z.string().trim().min(1), z.number()]).transform((v) => String(v)),
+  nota: z.string().trim().max(500).optional(),
+});
+const v1OtcEncerrarSchema = z.object({ como: z.enum(['recusada', 'cancelada']).default('recusada') });
+
+v1Router.get(
+  '/otc',
+  asyncHandler(async (req, res) => {
+    if (!otcSomenteInvestidorLive(req, res)) return;
+    res.json({ negociacoes: viewMinhasOtc(req.apiUser!.id), mode: req.apiKey!.mode });
+  })
+);
+
+v1Router.post(
+  '/otc',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    if (!otcSomenteInvestidorLive(req, res)) return;
+    const parsed = v1OtcAberturaSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const outcome = await withIdempotency(req.apiUser!.id, 'POST /v1/otc', idempotencyHeader(req), req.body ?? {}, async () =>
+      abrirOtc(req.apiUser!, {
+        duplicataId: parsed.data.duplicataId,
+        valorRaw: parsed.data.valor,
+        prazoHoras: parsed.data.prazoHoras,
+        nota: parsed.data.nota,
+      })
+    );
+    res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
+  })
+);
+
+v1Router.post(
+  '/otc/:id/contraproposta',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    if (!otcSomenteInvestidorLive(req, res)) return;
+    const parsed = v1OtcContrapropostaSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const outcome = await withIdempotency(
+      req.apiUser!.id,
+      `POST /v1/otc/${req.params.id}/contraproposta`,
+      idempotencyHeader(req),
+      req.body ?? {},
+      async () => contrapropor(req.apiUser!, Number(req.params.id), parsed.data.valor, parsed.data.nota)
+    );
+    res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
+  })
+);
+
+v1Router.post(
+  '/otc/:id/aceitar',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    if (!otcSomenteInvestidorLive(req, res)) return;
+    // Idempotência importa mais aqui do que em qualquer outra rota do balcão: aceitar
+    // LIQUIDA. Um retry de rede sobre um aceite que já passou não pode comprar duas vezes.
+    const outcome = await withIdempotency(req.apiUser!.id, `POST /v1/otc/${req.params.id}/aceitar`, idempotencyHeader(req), req.body ?? {}, async () =>
+      aceitarOtc(req.apiUser!, Number(req.params.id))
+    );
+    res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
+  })
+);
+
+v1Router.post(
+  '/otc/:id/encerrar',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    if (!otcSomenteInvestidorLive(req, res)) return;
+    const parsed = v1OtcEncerrarSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const outcome = await withIdempotency(
+      req.apiUser!.id,
+      `POST /v1/otc/${req.params.id}/encerrar`,
+      idempotencyHeader(req),
+      req.body ?? {},
+      async () => encerrarOtc(req.apiUser!, Number(req.params.id), parsed.data.como)
+    );
+    res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
   })
 );

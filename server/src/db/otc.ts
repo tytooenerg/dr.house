@@ -96,7 +96,16 @@ export function setOtcStatus(id: number, status: OtcStatus) {
  * por um job: o prazo é o que impede uma proposta firme de virar uma opção eterna, então ele
  * tem que valer no momento em que alguém tenta agir sobre ela, não no próximo tick de um
  * timer.
+ *
+ * Devolve as linhas que expirou, e não uma contagem: quem integra por webhook precisa saber
+ * QUAL negociação morreu pra encerrar a sua ponta da máquina de estados. Um número só serve
+ * pra log.
  */
-export function expireOtcVencidas(nowIso = new Date().toISOString()): number {
-  return db.prepare("UPDATE otc_negociacoes SET status = 'expirada' WHERE status = 'aberta' AND expira_em <= ?").run(nowIso).changes;
+export function expireOtcVencidas(nowIso = new Date().toISOString()): OtcNegociacaoRow[] {
+  const vencidas = db
+    .prepare("SELECT * FROM otc_negociacoes WHERE status = 'aberta' AND expira_em <= ?")
+    .all(nowIso) as OtcNegociacaoRow[];
+  if (vencidas.length === 0) return [];
+  db.prepare("UPDATE otc_negociacoes SET status = 'expirada' WHERE status = 'aberta' AND expira_em <= ?").run(nowIso);
+  return vencidas.map((n) => ({ ...n, status: 'expirada' as const }));
 }

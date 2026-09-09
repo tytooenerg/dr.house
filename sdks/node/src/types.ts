@@ -84,6 +84,42 @@ export interface AbrirLeilaoResult {
   mode: 'live' | 'test';
 }
 
+/** Uma rodada de uma negociação de balcão: quem propôs, quanto, e quando. */
+export interface OtcRodada {
+  papel: 'comprador' | 'vendedor';
+  autor: string;
+  valorFmt: string;
+  nota: string | null;
+  quando: string;
+}
+
+export interface OtcNegociacao {
+  id: number;
+  duplicataId: string;
+  sacado: string;
+  valorFaceFmt: string;
+  vencimento: string;
+  /** O seu lado da mesa nesta negociação. */
+  meuPapel: 'comprador' | 'vendedor';
+  contraparte: string;
+  valor: number;
+  valorFmt: string;
+  /** Se true, a proposta em cima da mesa é da contraparte e cabe a você responder. */
+  minhaVez: boolean;
+  status: 'aberta' | 'aceita' | 'recusada' | 'cancelada' | 'expirada';
+  expiraEm: string;
+  rodadas: OtcRodada[];
+}
+
+export interface AbrirOtcInput {
+  duplicataId: string;
+  /** Proposta em reais. */
+  valor: number | string;
+  /** Validade da proposta em horas. Padrão 48, teto 168. */
+  prazoHoras?: number;
+  nota?: string;
+}
+
 export interface MarketplaceOffer {
   id: string;
   sacado: string;

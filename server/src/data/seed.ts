@@ -257,12 +257,19 @@ export const EXTRATO_RAW = [
   { data: '28/06/2026', descricao: 'Depósito para liquidação futura', valor: 50000.0 },
 ];
 
-// leilao.aberto/lance.recebido/leilao.encerrado predate the rest of this list and are not
-// currently fired by anything real — kept for backward compatibility with any partner
-// already registered on them, not removed silently. The three below (added for "webhooks
-// v2") are wired to real trigger points: see lib/seguradoraCore.ts (sinistro.decidido),
-// lib/blockTrade.ts (block_trade.executado), and routes/v1.ts POST /sacados/:cnpj/sinais
-// (rating.alterado).
+// Todo evento desta lista tem emissor real. Os três do leilão foram anunciados por um tempo
+// sem disparar nada, e o comentário que registrava isso sobreviveu ao conserto — agora
+// disparam de lib/auctionOpen.ts (leilao.aberto), lib/auctionCore.ts (lance.recebido) e
+// lib/auctionClose.ts (leilao.encerrado). Os demais: lib/seguradoraCore.ts
+// (sinistro.decidido), lib/blockTrade.ts (block_trade.executado), routes/v1.ts POST
+// /sacados/:cnpj/sinais (rating.alterado) e lib/otcCore.ts (os quatro otc.*).
+//
+// Os do balcão fecham a assimetria que o OTC tinha ao nascer: a negociação bilateral existia
+// só pela tela, e ela foi feita justamente pra mesa que opera por API. Uma proposta dirigida
+// com prazo correndo precisa alcançar quem tem que responder.
+//
+// O espelho desta lista vive em client/src/pages/public/DocsPage.tsx — as duas precisam
+// dizer a mesma coisa.
 export const WEBHOOK_EVENTS = [
   'duplicata.registrada',
   'leilao.aberto',
@@ -272,6 +279,10 @@ export const WEBHOOK_EVENTS = [
   'sinistro.decidido',
   'block_trade.executado',
   'rating.alterado',
+  'otc.proposta_recebida',
+  'otc.contraproposta',
+  'otc.aceita',
+  'otc.encerrada',
 ];
 
 export const CHAT_SUGGESTIONS = ['O que é deságio?', 'Sou obrigado a aceitar a duplicata?', 'Como funciona o leilão?'];

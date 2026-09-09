@@ -1825,6 +1825,50 @@ anunciada** de MesaAlfa → MesaGama (terceiro) não vê nada e leva 404 ao tent
 R$ 7.000 sobre face de R$ 60.000, e o extrato do vendedor mostra R$ 52.814,50 líquidos da taxa
 de plataforma.
 
+### O balcão ganha porta automatizada — webhooks e `/api/v1`
+
+O OTC nasceu completo pela tela e mudo por fora. Isso o deixava pela metade justamente para
+quem ele foi desenhado: a mesa institucional opera por integração, não olhando o site. Uma
+proposta dirigida com prazo de 48 horas correndo que só existe se a contraparte logar não é uma
+proposta firme — é uma aposta de que ela vai entrar no site a tempo. É a mesma porta que o
+leilão já teve fechada, deixada aberta no balcão.
+
+**Quatro eventos de webhook**, cada um para quem precisa reagir:
+
+| Evento | Vai para | Quando |
+|---|---|---|
+| `otc.proposta_recebida` | o dono da posição | alguém abre uma negociação sobre ela |
+| `otc.contraproposta` | o outro lado da mesa | a vez alterna |
+| `otc.aceita` | **as duas pontas** | liquidou: cada lado precisa lançar a sua perna |
+| `otc.encerrada` | a contraparte | recusa, cancelamento ou o prazo virando |
+
+O caso da expiração exigiu mudar `expireOtcVencidas()` para devolver as linhas que expirou, e
+não uma contagem: a expiração é preguiçosa (roda na leitura), e quem integra por webhook não
+tem como descobrir sozinho que o relógio virou. Uma contagem só serve para log.
+
+**Cinco rotas em `/api/v1`** — `GET /otc`, `POST /otc`, `/otc/{id}/contraproposta`,
+`/otc/{id}/aceitar` e `/otc/{id}/encerrar` — com o que a v1 exige a mais que a tela: escopo de
+escrita e idempotência. O aceite é o que mais precisa dela: aceitar **liquida**, e um retry de
+rede sobre um aceite que já passou não pode comprar duas vezes. Nos dois SDKs (`abrirOtc` /
+`abrir_otc` e companhia) e no `openapi.json`.
+
+Não há sandbox aqui, e isso não é omissão: uma negociação de balcão acontece sobre uma
+**posição**, e `purchases` não tem plano de dados de teste — o marketplace sandbox é um conjunto
+de ofertas semeadas, sem donos com quem negociar. Uma chave de teste recebe
+`409 sandbox_indisponivel` e a explicação, em vez de uma contraparte inventada. Mesma disciplina
+de `/cashflow`.
+
+No caminho, um comentário que mentia sobre o próprio sistema: `data/seed.ts` ainda afirmava que
+`leilao.aberto` / `lance.recebido` / `leilao.encerrado` "are not currently fired by anything
+real". São disparados desde que o leilão real entrou — `lib/auctionOpen.ts`,
+`lib/auctionCore.ts` e `lib/auctionClose.ts`. O espelho no client já tinha sido corrigido; o
+servidor é que ficou para trás.
+
+Verificado: server **864** testes (10 novos), client 39, sdks 12+12, build e e2e 13/13. Os dois
+gates que mais importam têm teste que falha quando são removidos (conferido revertendo cada um):
+sem o aviso na expiração, `webhook não chegou a tempo`; sem o gate de sandbox, uma chave de teste
+entra no balcão real (`expected 200 to be 409`).
+
 ## Running locally
 
 ```bash
