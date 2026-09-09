@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 // after the SDK has started.
 import { startTracing } from './lib/tracing.js';
 import { app } from './app.js';
-import { seedIfEmpty } from './db/seed.js';
+import { seedIfEmpty, seedMissingDemoAccounts } from './db/seed.js';
 import { backfillDuplicataSetor } from './db/duplicatas.js';
 import { backfillInvestorVeiculo } from './db/users.js';
 import { attachWebSocketServer } from './ws.js';
@@ -39,6 +39,9 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 async function main() {
   await startTracing();
   await seedIfEmpty();
+  // Bancos de desenvolvimento anteriores a uma conta de demo acrescentada depois não têm
+  // como recebê-la: seedIfEmpty sai na primeira linha quando já existe qualquer usuário.
+  await seedMissingDemoAccounts();
   const backfilled = backfillDuplicataSetor();
   if (backfilled > 0) logger.info(`[duplicatas] classificou setor de ${backfilled} duplicata(s) existente(s) sem essa coluna preenchida`);
   const veiculos = backfillInvestorVeiculo();
