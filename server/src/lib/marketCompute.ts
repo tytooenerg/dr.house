@@ -65,6 +65,55 @@ export function reserveRateFor(d: DuplicataRow): { taxaAm: number; doCedente: bo
   return { taxaAm: doCedente ? d.reserva_taxa_am! : effectiveMonthlyRatePct(d), doCedente };
 }
 
+/** Quanto falta pro leilão fechar, em segundos e no formato que as duas telas mostram. */
+export function auctionCountdown(closeAtIso: string | null): { remainingSec: number; countdown: string } {
+  const closeAt = closeAtIso ? new Date(closeAtIso).getTime() : Date.now();
+  const remainingSec = Math.max(0, Math.round((closeAt - Date.now()) / 1000));
+  return { remainingSec, countdown: `${Math.floor(remainingSec / 3600)}h ${String(Math.floor((remainingSec % 3600) / 60)).padStart(2, '0')}min` };
+}
+
+/** Um lance na escada, sem nenhuma decisão de cor ou rótulo de tela. */
+export interface LanceNaEscada {
+  id: number;
+  empresa: string;
+  /** Banco, FIDC, fundo ou factoring — regimes diferentes, e quem vende tem direito de saber. */
+  veiculo: string;
+  taxaAm: number;
+  taxaFmt: string;
+  precoFmt: string;
+  quando: string;
+  isMine: boolean;
+  isMelhor: boolean;
+}
+
+/**
+ * A escada de lances de um leilão, na ordem de vitória, para QUALQUER tela que precise dela.
+ *
+ * Lances REAIS. Antes daqui saíam concorrentes fabricados: BID_TEMPLATES/EXTRA_BIDDERS
+ * (data/seed.ts) davam oito nomes inventados — incluindo instituições reais como "Itaú BBA
+ * Recebíveis" e "BTG Pactual Crédito" — revelados num cronômetro, com taxas geradas por
+ * fórmula, num leilão que nem sequer existia. Agora é o que está na tabela auction_bids, e
+ * uma lista vazia é uma lista vazia.
+ *
+ * Existe como função exportada, e não inline em buildOfferView, porque há dois leitores com
+ * o mesmo direito à informação e desenhos diferentes: o investidor, no card do marketplace,
+ * e o CEDENTE, na linha de "Minhas Duplicatas" — o dono da duplicata que está sendo
+ * disputada. A ordem e a formatação da taxa não podem divergir entre as duas telas.
+ */
+export function viewAuctionLadder(duplicataId: string, viewerId: number | null = null): LanceNaEscada[] {
+  return listActiveAuctionBids(duplicataId).map((b, i) => ({
+    id: b.id,
+    empresa: b.bidder_company_name,
+    veiculo: VEICULO_LABEL[b.bidder_veiculo] ?? 'Não informado',
+    taxaAm: b.taxa_am,
+    taxaFmt: b.taxa_am.toFixed(2).replace('.', ',') + '%',
+    precoFmt: fmtBRL(b.preco),
+    quando: b.created_at,
+    isMine: viewerId !== null && b.bidder_id === viewerId,
+    isMelhor: i === 0,
+  }));
+}
+
 export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) {
   const score = d.score ?? 60;
   const sc = scoreColorFor(score);
@@ -77,33 +126,25 @@ export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) 
   const aceiteBadge = ACEITE_BADGE[aceiteStatus];
   const bought = isPurchased(d.id);
 
-  // Lances REAIS. Antes daqui saíam concorrentes fabricados: BID_TEMPLATES/EXTRA_BIDDERS
-  // (data/seed.ts) davam oito nomes inventados — incluindo instituições reais como "Itaú
-  // BBA Recebíveis" e "BTG Pactual Crédito" — revelados num cronômetro, com taxas geradas
-  // por fórmula, num leilão que nem sequer existia. Agora é o que está na tabela
-  // auction_bids, e uma lista vazia é uma lista vazia.
   const bidRows = listActiveAuctionBids(d.id);
-  const bids = bidRows.map((b, i) => ({
+  const escada = viewAuctionLadder(d.id, viewerId);
+  const bids = escada.map((b, i) => ({
     id: b.id,
-    name: b.bidder_company_name,
-    // Sob qual veículo este lance compraria — o cedente tem o direito de saber se quem está
-    // financiando é um banco, um FIDC, um fundo ou uma factoring: são regimes diferentes.
-    veiculo: VEICULO_LABEL[b.bidder_veiculo] ?? 'Não informado',
-    initials: b.bidder_company_name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase(),
-    tipo: b.bidder_id === viewerId ? 'Seu lance' : 'Investidor',
-    avatarBg: b.bidder_id === viewerId ? COLORS.BLUE : COLORS.NAVY,
-    taxa: b.taxa_am.toFixed(2).replace('.', ',') + '%',
+    name: b.empresa,
+    veiculo: b.veiculo,
+    initials: b.empresa.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase(),
+    tipo: b.isMine ? 'Seu lance' : 'Investidor',
+    avatarBg: b.isMine ? COLORS.BLUE : COLORS.NAVY,
+    taxa: b.taxaFmt,
     rateColor: i === 0 ? COLORS.GREEN : COLORS.NAVY,
     borderColor: i === 0 ? COLORS.GREEN : '#E4E8EE',
-    tag: i === 0 ? 'Melhor lance' : 'Lance ativo',
+    tag: b.isMelhor ? 'Melhor lance' : 'Lance ativo',
     tagBg: i === 0 ? '#EAF3EE' : '#F0F2F5',
     tagColor: i === 0 ? COLORS.GREEN : '#5B6472',
-    isMine: b.bidder_id === viewerId,
+    isMine: b.isMine,
   }));
 
-  const closeAt = d.close_at ? new Date(d.close_at).getTime() : Date.now();
-  const remainingSec = Math.max(0, Math.round((closeAt - Date.now()) / 1000));
-  const countdown = `${Math.floor(remainingSec / 3600)}h ${String(Math.floor((remainingSec % 3600) / 60)).padStart(2, '0')}min`;
+  const { remainingSec, countdown } = auctionCountdown(d.close_at);
   // O prazo agora decide de verdade quem leva a duplicata (lib/auctionClose.ts), então a
   // oferta precisa carregar o estado real do leilão — antes `canBuy` só olhava o aceite e
   // prometia "Comprar" em duplicata cujo leilão o backend já tinha encerrado.

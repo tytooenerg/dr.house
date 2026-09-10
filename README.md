@@ -2108,6 +2108,44 @@ Verificado: a operação completa verde ponta a ponta contra o servidor real, o 
 falhando como deve, e `test/compliance-fila-humana.test.ts` falhando quando a correção é
 revertida (`expected [ 'DUP-2026-1025-b7ac' ] to not include 'DUP-2026-1025-b7ac'`).
 
+### O leilão que o dono da duplicata não via
+
+A disputa é o produto: vários financiadores competindo por um recebível, menor deságio ganha —
+o mesmo desenho que a Monkey chama de leilão reverso. Ela era desenhada em detalhe no card do
+**marketplace**: nome do financiador, veículo, taxa, "Melhor lance", contagem regressiva. O
+**cedente**, dono da duplicata sendo disputada, recebia de `GET /api/minhas` apenas
+`status: 'No mercado'`. Abria o leilão e esperava no escuro até fechar.
+
+O comentário do veículo em `lib/marketCompute.ts` afirmava o direito com todas as letras — *"o
+cedente tem o direito de saber se quem está financiando é um banco, um FIDC, um fundo ou uma
+factoring: são regimes diferentes"* — e o cedente era exatamente o leitor que não recebia. Havia
+ainda um `viewAuctionBids` em `lib/auctionCore.ts` que montava essa escada e **nunca foi chamado
+por ninguém**: máquina pronta e desligada.
+
+Agora a escada tem uma forma só (`viewAuctionLadder`, em `lib/marketCompute.ts`) e dois leitores:
+o card do investidor e a linha do cedente, que ganhou uma faixa de largura inteira com quantos
+disputam, a melhor taxa, **o que ela paga em reais**, o tempo restante e quem está lançando sob
+qual veículo. O `viewAuctionBids` morto saiu — trazê-lo de volta exigiria `marketCompute` importar
+`auctionCore`, o ciclo que `auctionGate.ts` existe pra quebrar. A simulação de antes de abrir
+deixou de ser só uma taxa e virou o número que o cedente de fato quer: *nessa taxa você receberia
+R$ X*.
+
+**A trava não teria pego isto.** `contrato-payload-tela.test.ts` olhava só o primeiro nível do
+payload, e `/api/minhas` serve `{ duplicatas: [...] }` — uma chave só, com o campo órfão dentro
+de cada item. Estendida um nível pra dentro das listas, ela achou na hora mais três: a marca
+`emRisco` de cada apólice, que o painel da seguradora nunca desenhou embora o KPI de Exposição da
+mesma tela contasse por ela; `aguardandoAceite`, que dizia por que uma duplicata aprovada não
+podia ser leiloada enquanto a tela mostrava só "Aprovada" e a ausência do botão; e `btnBg`/
+`btnColor`, dois hex que a API decidia e ninguém lia — sobra de antes de a cor virar fonte única.
+Os três primeiros viraram tela; os dois hex saíram do payload.
+
+E o próprio fixture da trava passava por vacuidade: um cedente recém-cadastrado tem lista vazia, e
+lista vazia não tem item com campo órfão. O caso agora emite uma duplicata antes de olhar.
+
+Verificado: server **890**, client **126** (6 do teste de página novo), build, e2e 17/17 — e a
+prova no navegador contra um servidor de produção real, com dois lances de verdade (1,90% FIDC e
+2,50% factoring), conferindo que os números da tela são os mesmos que o servidor devolveu.
+
 ## Running locally
 
 ```bash

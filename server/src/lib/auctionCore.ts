@@ -32,15 +32,6 @@ export interface AuctionOutcome<T> {
   body: T | { error: string; message?: string };
 }
 
-export interface BidView {
-  id: number;
-  empresa: string;
-  taxaFmt: string;
-  precoFmt: string;
-  quando: string;
-  isMine: boolean;
-}
-
 // Taxa de reserva: o pior deságio que o CEDENTE aceita. Quando ele informa uma ao disparar o
 // leilão (reserva_taxa_am, migração 0069), é ela que vale; sem isso cai na banda de mercado
 // (lib/dynamicPricing.ts), que é sugestão e não decisão — antes disso a plataforma arbitrava
@@ -137,18 +128,11 @@ export function fmtTaxa(taxaAm: number): string {
   return taxaAm.toFixed(2).replace('.', ',') + '%';
 }
 
-// Lances reais de uma duplicata, na ordem de vitória. Substitui getLiveExtraBids, que
-// fabricava concorrentes a partir de BID_TEMPLATES/EXTRA_BIDDERS.
-export function viewAuctionBids(duplicataId: string, viewerId: number | null): BidView[] {
-  return listActiveAuctionBids(duplicataId).map((b) => ({
-    id: b.id,
-    empresa: b.bidder_company_name,
-    taxaFmt: fmtTaxa(b.taxa_am),
-    precoFmt: fmtBRL(b.preco),
-    quando: b.created_at,
-    isMine: viewerId !== null && b.bidder_id === viewerId,
-  }));
-}
+// A escada de lances de uma duplicata vive em lib/marketCompute.ts's viewAuctionLadder — e
+// não aqui. Havia uma segunda cópia neste arquivo (`viewAuctionBids`) que NUNCA foi chamada
+// por ninguém: máquina pronta e desligada, enquanto a tela do cedente ficava sem os lances.
+// Trazer a escada pra cá exigiria marketCompute importar auctionCore, e é justamente o ciclo
+// de import que auctionGate.ts existe pra quebrar (ver o comentário de reserveRateFor).
 
 // Leilões abertos onde este investidor ainda pode lançar — usado pela Automação de Lances,
 // pelas cestas e pelo Fundo Confirming, que antes compravam instantaneamente.
