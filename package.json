@@ -17,7 +17,8 @@
     "test": "npm run test -w server && npm run test -w client && npm run test -w sdks/node",
     "test:e2e": "npm run test -w e2e",
     "loadtest": "node scripts/loadtest/run.mjs",
-    "operacao:real": "node scripts/operacao-real/run.mjs"
+    "operacao:real": "node scripts/operacao-real/run.mjs",
+    "preflight": "npm run preflight -w server"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

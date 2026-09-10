@@ -56,6 +56,10 @@ async function conta(role: string, extras: { empresarial?: boolean; credenciar?:
   return token;
 }
 
+async function adminLogin() {
+  return (await request(app).post('/api/auth/login').send({ email: 'admin@lastro.demo', password: 'demo1234' })).body.token as string;
+}
+
 async function auditorLogin() {
   const admin = (await request(app).post('/api/auth/login').send({ email: 'admin@lastro.demo', password: 'demo1234' })).body.token;
   const email = `auditor-contrato-${unique()}@example.com`;
@@ -102,6 +106,7 @@ const NAO_LIDAS: Record<string, Record<string, string>> = {
   '/api/compliance': {},
   '/api/payables': {},
   '/api/minhas': {},
+  '/api/admin/preflight': {},
 };
 
 
@@ -153,6 +158,7 @@ const CASOS: Caso[] = [
   // A rota que motivou a extensão desta trava pra dentro das listas: o leilão da própria
   // duplicata era servido aqui e a tela do cedente não o lia.
   { nome: 'minhas duplicatas', rota: '/api/minhas', pagina: 'app/MinhasPage.tsx', token: cedenteComDuplicata },
+  { nome: 'preflight do admin', rota: '/api/admin/preflight', pagina: 'app/admin/PreflightPanel.tsx', token: adminLogin },
 ];
 
 describe('contrato payload ↔ tela: nada servido pode ficar sem leitor', () => {

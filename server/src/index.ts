@@ -33,6 +33,7 @@ import { startComplianceCalendarReminderJob } from './lib/complianceCalendarRemi
 import { startDailyBriefingJob } from './lib/dailyBriefing.js';
 import { startMonthlyRegulatoryReportsJob } from './lib/monthlyRegulatoryReportsJob.js';
 import { logger } from './lib/logger.js';
+import { resumoDeBoot } from './lib/preflight.js';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
@@ -46,6 +47,10 @@ async function main() {
   if (backfilled > 0) logger.info(`[duplicatas] classificou setor de ${backfilled} duplicata(s) existente(s) sem essa coluna preenchida`);
   const veiculos = backfillInvestorVeiculo();
   if (veiculos > 0) logger.info(`[investidores] veículo classificado a partir do KYB antigo em ${veiculos} conta(s)`);
+  // Uma linha só, depois das quinze que cada módulo escreve por conta própria: em que modo
+  // esta instância subiu e se ela move dinheiro de verdade. Ver lib/preflight.ts.
+  logger.info(resumoDeBoot());
+
   const server = createServer(app);
   attachWebSocketServer(server);
   startHealthMonitor();

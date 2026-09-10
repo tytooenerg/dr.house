@@ -40,6 +40,7 @@ const AuditoresPanel = lazy(() => import('./admin/AuditoresPanel').then((m) => (
 const TedPendentesPanel = lazy(() => import('./admin/TedPendentesPanel').then((m) => ({ default: m.TedPendentesPanel })));
 const BackupsPanel = lazy(() => import('./admin/BackupsPanel').then((m) => ({ default: m.BackupsPanel })));
 const AddonRevenuePanel = lazy(() => import('./admin/AddonRevenuePanel').then((m) => ({ default: m.AddonRevenuePanel })));
+const PreflightPanel = lazy(() => import('./admin/PreflightPanel').then((m) => ({ default: m.PreflightPanel })));
 
 export function AdminPage() {
   const { t } = useLang();
@@ -78,6 +79,9 @@ export function AdminPage() {
   else if (tab === 'auditoria')
     panel = (
       <>
+        {/* Primeiro da aba: é a pergunta mais urgente que um back-office pode fazer sobre a
+            própria instância — se o dinheiro que entra é real. */}
+        <PreflightPanel />
         <AuditTrailPanel />
         <AuditoresPanel />
         <TedPendentesPanel />

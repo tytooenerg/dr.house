@@ -23,9 +23,53 @@ import { createTedDeposit, listTedDepositsByUser, recordTedPayout } from '../db/
 import { stablecoinEnabled, lastroStaticWalletConfigured, stablecoinAsset, stablecoinNetwork, emitirInstrucaoStablecoin, enviarStablecoin } from '../lib/stablecoinRail.js';
 import { createStablecoinDeposit, listStablecoinDepositsByUser, recordStablecoinPayout } from '../db/stablecoin.js';
 import { randomUUID } from 'node:crypto';
+import { modoDemonstracao, trilhosDeDinheiro } from '../lib/preflight.js';
 
 export const accountRouter = Router();
 accountRouter.use(requireAuth);
+
+/**
+ * O trinco: numa instância de produção, dinheiro só entra e sai por trilho REAL.
+ *
+ * A disciplina "real-when-configured" já rotulava o modo simulado — mas rótulo não impede nada.
+ * Com NODE_ENV=production e PIX_PSP_* em branco, um cliente real abria Conta & Liquidação,
+ * pedia um depósito, recebia uma cobrança simulada e via o saldo aparecer na tela. Ele acha que
+ * depositou. Nenhuma tela dizia o contrário no momento em que importava, e o único lugar onde a
+ * verdade existia era uma linha no log de subida do servidor.
+ *
+ * Aqui a instância passa a recusar, em vez de fingir. Cada trilho responde por si: Pix faltando
+ * não bloqueia TED. E `modoDemonstracao()` (lib/preflight.ts) mantém aberto o ambiente que É
+ * uma demonstração — inclusive o `webServer` do e2e, que roda com NODE_ENV=production.
+ *
+ * Middleware, e não um `if` em cada handler: são sete rotas de dinheiro hoje, e a oitava que
+ * alguém acrescentar amanhã nasce protegida sem precisar lembrar.
+ */
+const TRILHO_DA_ROTA: { prefixo: RegExp; chave: string }[] = [
+  { prefixo: /^\/(deposit|withdraw)\/boleto/, chave: 'boleto' },
+  { prefixo: /^\/(deposit|withdraw)\/ted/, chave: 'ted' },
+  { prefixo: /^\/(deposit|withdraw)\/stablecoin/, chave: 'stablecoin' },
+  // O que sobra em /deposit e /withdraw é Pix, inclusive os confirm-simulado — confirmar um
+  // depósito de mentira em produção é exatamente o que não pode acontecer.
+  { prefixo: /^\/(deposit|withdraw)/, chave: 'pix' },
+];
+
+accountRouter.use(['/deposit', '/withdraw'], (req, res, next) => {
+  if (modoDemonstracao()) return next();
+  // req.url aqui já vem sem o prefixo do router, mas COM o do mount ('/deposit/...').
+  const caminho = req.baseUrl.replace(/^\/api\/account/, '') + req.path;
+  const trilho = TRILHO_DA_ROTA.find((t) => t.prefixo.test(caminho));
+  if (!trilho) return next();
+  const status = trilhosDeDinheiro().find((t) => t.chave === trilho.chave);
+  if (!status || status.real) return next();
+  res.status(503).json({
+    error: 'trilho_simulado',
+    message:
+      `${status.nome} está em modo simulado nesta instância, e ela está em produção — nenhum dinheiro real se moveria. ` +
+      `Configure ${status.envs.join(', ')} com um PSP real antes de operar com clientes.`,
+    trilho: status.chave,
+    envs: status.envs,
+  });
+});
 
 function extratoView(userId: number) {
   const rows = listLedger(userId);
