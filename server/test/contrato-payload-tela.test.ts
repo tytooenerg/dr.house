@@ -63,6 +63,26 @@ async function auditorLogin() {
   return (await request(app).post('/api/auth/login').send({ email, password: 'senhaforte123' })).body.token as string;
 }
 
+
+/**
+ * Um cedente que JÁ TEM uma duplicata — e não um recém-cadastrado.
+ *
+ * `GET /api/minhas` de uma conta nova devolve `{ duplicatas: [] }`, e a checagem de
+ * `duplicatas[].*` passa por vacuidade justamente no caso pra que ela foi criada. Uma lista
+ * vazia não tem item, e um item que não existe não tem campo órfão.
+ */
+async function cedenteComDuplicata() {
+  const token = await conta('cedente');
+  for (let i = 0; i < 5; i++) {
+    const res = await request(app)
+      .post('/api/emitir/submit')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ sacado: `Sacado ${unique()}`, cnpj: '44.333.222/0001-11', valor: '25.000', vencimento: '2026-12-20', seguro: false, nfAnexada: true, batchValores: [] });
+    if (res.status === 200) break;
+  }
+  return token;
+}
+
 /**
  * Chaves que a tela legitimamente NÃO lê. Cada exceção precisa de motivo escrito: sem isso a
  * lista vira o lugar onde os achados vão morrer, que é o oposto do que este teste existe pra
@@ -81,7 +101,33 @@ const NAO_LIDAS: Record<string, Record<string, string>> = {
   '/api/seguradora': {},
   '/api/compliance': {},
   '/api/payables': {},
+  '/api/minhas': {},
 };
+
+
+/**
+ * As chaves que o payload serve, incluindo UM nível dentro de listas de objetos.
+ *
+ * A primeira versão desta trava olhava só o primeiro nível — e o bug que ela existe pra pegar
+ * voltou a acontecer logo abaixo dele: `GET /api/minhas` serve `{ duplicatas: [...] }`, uma
+ * chave só, e o campo que a tela do cedente não lia (o leilão da própria duplicata) morava
+ * dentro de cada item. Olhar `duplicatas[].leilao` é o que faz a trava alcançar a forma real
+ * dos payloads de lista, que é a maioria deles.
+ *
+ * Um nível, e não recursão completa: mais fundo que isso a lista vira ruído (objetos de
+ * formatação, mapas de cor) e o teste deixa de ser barato.
+ */
+function chavesServidas(body: Record<string, unknown>): string[] {
+  const chaves: string[] = [];
+  for (const [chave, valor] of Object.entries(body)) {
+    chaves.push(chave);
+    const primeiro = Array.isArray(valor) ? valor[0] : null;
+    if (primeiro && typeof primeiro === 'object' && !Array.isArray(primeiro)) {
+      for (const sub of Object.keys(primeiro as Record<string, unknown>)) chaves.push(`${chave}[].${sub}`);
+    }
+  }
+  return chaves;
+}
 
 interface Caso {
   nome: string;
@@ -104,6 +150,9 @@ const CASOS: Caso[] = [
   { nome: 'painel da seguradora', rota: '/api/seguradora', pagina: 'app/SeguradoraPage.tsx', token: () => conta('seguradora') },
   { nome: 'compliance', rota: '/api/compliance', pagina: 'app/CompliancePage.tsx', token: () => conta('cedente') },
   { nome: 'contas a pagar', rota: '/api/payables', pagina: 'app/ContasPagarPage.tsx', token: () => conta('cedente') },
+  // A rota que motivou a extensão desta trava pra dentro das listas: o leilão da própria
+  // duplicata era servido aqui e a tela do cedente não o lia.
+  { nome: 'minhas duplicatas', rota: '/api/minhas', pagina: 'app/MinhasPage.tsx', token: cedenteComDuplicata },
 ];
 
 describe('contrato payload ↔ tela: nada servido pode ficar sem leitor', () => {
@@ -113,7 +162,7 @@ describe('contrato payload ↔ tela: nada servido pode ficar sem leitor', () => 
 
     const fonte = lerPagina(caso.pagina);
     const isentas = NAO_LIDAS[caso.rota] ?? {};
-    const orfas = Object.keys(res.body).filter((chave) => !(chave in isentas) && !fonte.includes(chave));
+    const orfas = chavesServidas(res.body).filter((chave) => !(chave in isentas) && !fonte.includes(chave.split('[].').pop()!));
 
     // A mensagem tem que dizer o que fazer, não só que falhou: quem esbarrar nisto daqui a
     // seis meses precisa saber se o certo é desenhar o campo ou justificar a exceção.

@@ -21,6 +21,10 @@ interface Apolice {
   premioFmt: string;
   status: string;
   sinistroStatus: string;
+  // O KPI de Exposição desta mesma tela conta as apólices em risco (lib/insurerExposure.ts);
+  // o servidor mandava a marca por apólice desde sempre e a lista não a declarava, então o
+  // total dizia "N apólices em risco" e não havia como saber QUAIS.
+  emRisco: boolean;
 }
 interface Sinistro {
   id: string;
@@ -298,8 +302,13 @@ export function SeguradoraPage() {
             <div role="cell" className="font-mono-num">{a.valorFmt}</div>
             <div role="cell" className="text-textSecondary">{a.vencimento}</div>
             <div role="cell" className="font-mono-num text-green font-bold">{a.premioFmt}</div>
-            <div role="cell" className="text-[11.5px] font-bold">
+            <div role="cell" className="text-[11.5px] font-bold flex items-center gap-1.5 flex-wrap">
               {a.sinistroStatus === 'none' ? 'Sem sinistro' : a.sinistroStatus === 'aprovado' ? 'Indenizada' : 'Negada'}
+              {a.emRisco && (
+                <span className="px-1.5 py-0.5 rounded bg-amberBg text-amber text-[11px] font-bold" title="O risco coberto ainda está em aberto — esta apólice entra na exposição">
+                  Em risco
+                </span>
+              )}
             </div>
           </div>
         ))}

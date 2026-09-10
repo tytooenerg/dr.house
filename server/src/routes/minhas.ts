@@ -6,6 +6,7 @@ import { effectiveOwnerId } from '../db/users.js';
 import { aceiteConfirmado } from '../lib/aceiteCore.js';
 import { fmtBRL } from '../lib/format.js';
 import { estimateRateBand } from '../lib/dynamicPricing.js';
+import { auctionCountdown, computePurchasePrice, viewAuctionLadder } from '../lib/marketCompute.js';
 import { abrirLeilao } from '../lib/auctionOpen.js';
 import { ratingFromScore } from '../lib/riscoCore.js';
 import { COLORS } from '../data/seed.js';
@@ -28,7 +29,39 @@ const STATUS_META: Record<string, { bg: string; color: string; label: string }> 
 function view(d: ReturnType<typeof getDuplicata>) {
   if (!d) return null;
   const meta = STATUS_META[d.status] ?? { bg: '#F0F2F5', color: '#5B6472', label: d.status };
+
+  // O leilão que o dono da duplicata não via.
+  //
+  // A disputa é o produto: vários financiadores competindo, menor deságio ganha. Ela era
+  // desenhada em detalhe no card do MARKETPLACE — nome, veículo, taxa, "Melhor lance",
+  // contagem regressiva — e o cedente, dono da duplicata sendo disputada, recebia daqui só
+  // `status: 'No mercado'`. Abria o leilão e esperava no escuro até fechar. O comentário do
+  // veículo em lib/marketCompute.ts afirma o direito com todas as letras ("o cedente tem o
+  // direito de saber se quem está financiando é um banco, um FIDC, um fundo ou uma
+  // factoring") — e era exatamente esse o leitor que não recebia.
+  //
+  // Mesma escada, mesma ordem de vitória, mesma formatação: viewAuctionLadder.
+  const emLeilao = d.status === 'no_mercado';
+  const lances = emLeilao ? viewAuctionLadder(d.id) : [];
+  const leilao = emLeilao
+    ? {
+        totalLances: lances.length,
+        melhorTaxaFmt: lances[0]?.taxaFmt ?? null,
+        melhorPrecoFmt: lances[0]?.precoFmt ?? null,
+        fechaEm: auctionCountdown(d.close_at).countdown,
+        fechaEmSec: auctionCountdown(d.close_at).remainingSec,
+        lances,
+      }
+    : null;
+
+  // A simulação de antes de abrir: o que a banda de mercado de hoje pagaria por esta
+  // duplicata. `reservaSugeridaAm` já vinha e só virava uma frase de ajuda; em reais ela
+  // vira a resposta da pergunta que o cedente de fato faz ("quanto eu recebo?").
+  const bandaAm = estimateRateBand(ratingFromScore(d.score ?? 60)).mid;
+
   return {
+    leilao,
+    precoEstimadoFmt: fmtBRL(computePurchasePrice(d, bandaAm).precoCompra),
     id: d.id,
     sacado: d.sacado_nome,
     valorFmt: fmtBRL(d.valor),
@@ -40,7 +73,7 @@ function view(d: ReturnType<typeof getDuplicata>) {
     lastroFmt: d.lastro_pct + '%',
     // Banda de mercado de HOJE pro rating deste sacado — sugestão pro cedente escolher a
     // reserva com referência, não um número que a plataforma impõe por ele.
-    reservaSugeridaAm: estimateRateBand(ratingFromScore(d.score ?? 60)).mid,
+    reservaSugeridaAm: bandaAm,
     reservaTaxaAm: d.reserva_taxa_am,
     lastroColor: d.lastro_pct === 100 ? COLORS.GREEN : d.lastro_pct >= 60 ? COLORS.AMBER : COLORS.RED,
     canDisparar: d.lastro_pct === 100 && d.status === 'aprovada' && aceiteConfirmado(d.id),
