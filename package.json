@@ -21,6 +21,6 @@
     "preflight": "npm run preflight -w server"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^10.0.5"
   }
 }
