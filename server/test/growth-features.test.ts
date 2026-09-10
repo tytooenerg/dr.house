@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -123,7 +124,7 @@ describe('referral program', () => {
         sacadoNome: 'Sacado X',
         sacadoCnpj: '',
         valor: 1000,
-        vencimento: '2026-12-31',
+        vencimento: vencimentoFuturo(),
         emissao: new Date().toLocaleDateString('pt-BR'),
         status: 'aprovada',
         lastroPct: 100,
@@ -136,7 +137,7 @@ describe('referral program', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${referrer.token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       lastStatus = res.status;
       expect(lastStatus === 200 || lastStatus === 502).toBe(true);
     }
@@ -159,7 +160,7 @@ describe('public endpoints', () => {
   });
 
   it('simulates a rate with no auth, reusing the real emitirCore rate model', async () => {
-    const res = await request(app).post('/api/public/simular').send({ sacado: 'Grupo Atlas Varejo', valor: '50.000', vencimento: '2026-12-31' });
+    const res = await request(app).post('/api/public/simular').send({ sacado: 'Grupo Atlas Varejo', valor: '50.000', vencimento: vencimentoFuturo() });
     expect(res.status).toBe(200);
     expect(res.body.taxaEstimadaFmt).toMatch(/%/);
     expect(res.body.sacadoRecognized).toBe(true);

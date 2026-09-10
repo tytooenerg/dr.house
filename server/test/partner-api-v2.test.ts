@@ -3,6 +3,7 @@ import request from 'supertest';
 import http from 'node:http';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -52,7 +53,7 @@ describe('sandbox (test-mode) API keys', () => {
       res = await request(app)
         .post('/api/v1/duplicatas')
         .set('Authorization', `Bearer ${gen.rawKey}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false });
     }
     expect(res.status).toBe(200);
     expect(res.body.mode).toBe('test');
@@ -78,7 +79,7 @@ describe('API key scopes', () => {
     const emit = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${gen.rawKey}`)
-      .send({ sacado: 'Grupo Atlas Varejo', valor: '5.000', vencimento: '2026-12-31' });
+      .send({ sacado: 'Grupo Atlas Varejo', valor: '5.000', vencimento: vencimentoFuturo() });
     expect(emit.status).toBe(403);
     expect(emit.body.error).toBe('forbidden');
   });
@@ -104,7 +105,7 @@ describe('Idempotency-Key on mutating v1 endpoints', () => {
     const { token } = await registerEmpresarialCedente();
     const gen = await generateKey(token);
     const idKey = `idem-${unique()}`;
-    const body = { sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false };
+    const body = { sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false };
 
     let first = { status: 0, body: {} as { duplicataId?: string } };
     for (let attempt = 0; attempt < 8 && first.status !== 200; attempt++) {
@@ -139,7 +140,7 @@ describe('Idempotency-Key on mutating v1 endpoints', () => {
   it('runs the operation normally (twice) when no Idempotency-Key header is sent', async () => {
     const { token } = await registerEmpresarialCedente();
     const gen = await generateKey(token);
-    const body = { sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false };
+    const body = { sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false };
 
     let first = { status: 0, body: {} as { duplicataId?: string } };
     for (let attempt = 0; attempt < 8 && first.status !== 200; attempt++) {
@@ -180,7 +181,7 @@ describe('webhook delivery log + retry', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(200);
@@ -215,7 +216,7 @@ describe('webhook delivery log + retry', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Metalúrgica Serrana S.A.', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: 'Metalúrgica Serrana S.A.', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(200);

@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -39,7 +40,7 @@ describe('Contas a Pagar', () => {
     const create = await request(app)
       .post('/api/payables')
       .set('Authorization', `Bearer ${token}`)
-      .send({ descricao: 'Aluguel do escritório', fornecedor: 'Imobiliária X', categoria: 'aluguel', valor: 5000, vencimento: '2026-12-01' });
+      .send({ descricao: 'Aluguel do escritório', fornecedor: 'Imobiliária X', categoria: 'aluguel', valor: 5000, vencimento: vencimentoFuturo() });
     expect(create.status).toBe(201);
     expect(create.body.status).toBe('pendente');
     expect(create.body.valorFmt).toContain('5.000');
@@ -55,7 +56,7 @@ describe('Contas a Pagar', () => {
     const res = await request(app)
       .post('/api/payables')
       .set('Authorization', `Bearer ${token}`)
-      .send({ descricao: '', valor: -10, vencimento: '2026-12-01' });
+      .send({ descricao: '', valor: -10, vencimento: vencimentoFuturo() });
     expect(res.status).toBe(400);
   });
 
@@ -77,7 +78,7 @@ describe('Contas a Pagar', () => {
     const create = await request(app)
       .post('/api/payables')
       .set('Authorization', `Bearer ${token}`)
-      .send({ descricao: 'Fornecedor A', valor: 800, vencimento: '2026-12-01' });
+      .send({ descricao: 'Fornecedor A', valor: 800, vencimento: vencimentoFuturo() });
     const id = create.body.id;
 
     const pay = await request(app).post(`/api/payables/${id}/pagar`).set('Authorization', `Bearer ${token}`);
@@ -94,7 +95,7 @@ describe('Contas a Pagar', () => {
     const create = await request(app)
       .post('/api/payables')
       .set('Authorization', `Bearer ${token}`)
-      .send({ descricao: 'Cancelável', valor: 300, vencimento: '2026-12-01' });
+      .send({ descricao: 'Cancelável', valor: 300, vencimento: vencimentoFuturo() });
     const id = create.body.id;
 
     const cancel = await request(app).post(`/api/payables/${id}/cancelar`).set('Authorization', `Bearer ${token}`);
@@ -113,7 +114,7 @@ describe('Contas a Pagar', () => {
     const create = await request(app)
       .post('/api/payables')
       .set('Authorization', `Bearer ${owner.token}`)
-      .send({ descricao: 'Privado', valor: 100, vencimento: '2026-12-01' });
+      .send({ descricao: 'Privado', valor: 100, vencimento: vencimentoFuturo() });
     const id = create.body.id;
 
     const res = await request(app).post(`/api/payables/${id}/pagar`).set('Authorization', `Bearer ${other.token}`);
@@ -125,8 +126,8 @@ describe('Contas a Pagar — importação em lote (CSV)', () => {
   it('imports every valid row through the exact same path as a manual entry', async () => {
     const { token } = await registerCedente();
     const rows = [
-      { descricao: 'Aluguel', fornecedor: 'Imobiliária X', categoria: 'aluguel', valor: '5000', vencimento: '2026-12-01', recorrente: true },
-      { descricao: 'Fornecedor A', categoria: 'fornecedores', valor: '1.250,50', vencimento: '2026-11-15', recorrente: false },
+      { descricao: 'Aluguel', fornecedor: 'Imobiliária X', categoria: 'aluguel', valor: '5000', vencimento: vencimentoFuturo(), recorrente: true },
+      { descricao: 'Fornecedor A', categoria: 'fornecedores', valor: '1.250,50', vencimento: vencimentoFuturo(), recorrente: false },
     ];
     const res = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows });
     expect(res.status).toBe(200);
@@ -146,9 +147,9 @@ describe('Contas a Pagar — importação em lote (CSV)', () => {
   it('reports per-row failures without failing the whole batch', async () => {
     const { token } = await registerCedente();
     const rows = [
-      { descricao: 'Válida', valor: '300', vencimento: '2026-12-01' },
-      { descricao: '', valor: '300', vencimento: '2026-12-01' }, // invalid: empty descricao
-      { descricao: 'Valor inválido', valor: '0', vencimento: '2026-12-01' }, // invalid: non-positive valor
+      { descricao: 'Válida', valor: '300', vencimento: vencimentoFuturo() },
+      { descricao: '', valor: '300', vencimento: vencimentoFuturo() }, // invalid: empty descricao
+      { descricao: 'Valor inválido', valor: '0', vencimento: vencimentoFuturo() }, // invalid: non-positive valor
     ];
     const res = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows });
     expect(res.status).toBe(200);
@@ -163,7 +164,7 @@ describe('Contas a Pagar — importação em lote (CSV)', () => {
     const empty = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows: [] });
     expect(empty.status).toBe(400);
 
-    const tooMany = Array.from({ length: 201 }, (_, i) => ({ descricao: `Linha ${i}`, valor: '10', vencimento: '2026-12-01' }));
+    const tooMany = Array.from({ length: 201 }, (_, i) => ({ descricao: `Linha ${i}`, valor: '10', vencimento: vencimentoFuturo() }));
     const over = await request(app).post('/api/payables/lote').set('Authorization', `Bearer ${token}`).send({ rows: tooMany });
     expect(over.status).toBe(400);
   });

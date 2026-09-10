@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { upsertErpPayables, listByCedente } from '../src/db/payables.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -23,7 +24,7 @@ async function registerCedente() {
 describe('Contas a Pagar via ERP (feature "Contas a Pagar via ERP")', () => {
   it('upsertErpPayables cria uma conta a pagar de verdade, visível em Contas a Pagar', async () => {
     const { token, userId } = await registerCedente();
-    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-1', fornecedor: 'Fornecedor Omie Ltda', numeroDocumento: 'NF-100', valor: 8000, vencimento: '2026-12-01' }]);
+    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-1', fornecedor: 'Fornecedor Omie Ltda', numeroDocumento: 'NF-100', valor: 8000, vencimento: vencimentoFuturo() }]);
 
     const overview = await request(app).get('/api/payables').set('Authorization', `Bearer ${token}`);
     expect(overview.status).toBe(200);
@@ -34,35 +35,39 @@ describe('Contas a Pagar via ERP (feature "Contas a Pagar via ERP")', () => {
 
   it('re-sincronizar o mesmo external_id atualiza a linha existente, em vez de duplicar', async () => {
     const { userId } = await registerCedente();
-    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-2', fornecedor: 'Fornecedor A', numeroDocumento: 'NF-1', valor: 1000, vencimento: '2026-12-01' }]);
-    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-2', fornecedor: 'Fornecedor A', numeroDocumento: 'NF-1', valor: 1500, vencimento: '2026-12-15' }]);
+    // A segunda sincronização muda valor E vencimento — a asserção compara com o MESMO valor
+    // que foi enviado, e não com um literal que precisaria ser atualizado a cada mudança.
+    const vencimentoOriginal = vencimentoFuturo(60);
+    const vencimentoAtualizado = vencimentoFuturo(90);
+    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-2', fornecedor: 'Fornecedor A', numeroDocumento: 'NF-1', valor: 1000, vencimento: vencimentoOriginal }]);
+    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-2', fornecedor: 'Fornecedor A', numeroDocumento: 'NF-1', valor: 1500, vencimento: vencimentoAtualizado }]);
 
     const rows = listByCedente(userId);
     expect(rows).toHaveLength(1);
     expect(rows[0].valor).toBe(1500);
-    expect(rows[0].vencimento).toBe('2026-12-15');
+    expect(rows[0].vencimento).toBe(vencimentoAtualizado);
   });
 
   it('external_ids diferentes da mesma fonte criam linhas separadas', async () => {
     const { userId } = await registerCedente();
     upsertErpPayables(userId, 'sap', [
-      { externalId: 'sap-1', fornecedor: 'Fornecedor SAP 1', numeroDocumento: 'DOC1', valor: 500, vencimento: '2026-12-01' },
-      { externalId: 'sap-2', fornecedor: 'Fornecedor SAP 2', numeroDocumento: 'DOC2', valor: 700, vencimento: '2026-12-01' },
+      { externalId: 'sap-1', fornecedor: 'Fornecedor SAP 1', numeroDocumento: 'DOC1', valor: 500, vencimento: vencimentoFuturo() },
+      { externalId: 'sap-2', fornecedor: 'Fornecedor SAP 2', numeroDocumento: 'DOC2', valor: 700, vencimento: vencimentoFuturo() },
     ]);
     expect(listByCedente(userId)).toHaveLength(2);
   });
 
   it('mesmo external_id em fontes diferentes (omie vs sap) não colide — linhas independentes', async () => {
     const { userId } = await registerCedente();
-    upsertErpPayables(userId, 'omie', [{ externalId: 'dup-id', fornecedor: 'Fornecedor Omie', numeroDocumento: 'A', valor: 100, vencimento: '2026-12-01' }]);
-    upsertErpPayables(userId, 'sap', [{ externalId: 'dup-id', fornecedor: 'Fornecedor SAP', numeroDocumento: 'B', valor: 200, vencimento: '2026-12-01' }]);
+    upsertErpPayables(userId, 'omie', [{ externalId: 'dup-id', fornecedor: 'Fornecedor Omie', numeroDocumento: 'A', valor: 100, vencimento: vencimentoFuturo() }]);
+    upsertErpPayables(userId, 'sap', [{ externalId: 'dup-id', fornecedor: 'Fornecedor SAP', numeroDocumento: 'B', valor: 200, vencimento: vencimentoFuturo() }]);
     expect(listByCedente(userId)).toHaveLength(2);
   });
 
   it('uma conta a pagar sincronizada do ERP entra na projeção do AI CFO como qualquer outra', async () => {
     const { token, userId } = await registerCedente();
     await request(app).post('/api/billing/checkout').set('Authorization', `Bearer ${token}`).send({ plan: 'pro' });
-    upsertErpPayables(userId, 'totvs', [{ externalId: 'totvs-1', fornecedor: 'Fornecedor TOTVS', numeroDocumento: 'F1', valor: 3000, vencimento: '2026-12-01' }]);
+    upsertErpPayables(userId, 'totvs', [{ externalId: 'totvs-1', fornecedor: 'Fornecedor TOTVS', numeroDocumento: 'F1', valor: 3000, vencimento: vencimentoFuturo() }]);
 
     const forecast = await request(app).get('/api/cashflow/forecast').set('Authorization', `Bearer ${token}`);
     expect(forecast.status).toBe(200);
@@ -71,7 +76,7 @@ describe('Contas a Pagar via ERP (feature "Contas a Pagar via ERP")', () => {
 
   it('uma conta a pagar sincronizada pode ser marcada como paga pelo fluxo normal', async () => {
     const { token, userId } = await registerCedente();
-    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-pay', fornecedor: 'Fornecedor a Pagar', numeroDocumento: 'X', valor: 400, vencimento: '2026-12-01' }]);
+    upsertErpPayables(userId, 'omie', [{ externalId: 'omie-pay', fornecedor: 'Fornecedor a Pagar', numeroDocumento: 'X', valor: 400, vencimento: vencimentoFuturo() }]);
     const overview = await request(app).get('/api/payables').set('Authorization', `Bearer ${token}`);
     const id = overview.body.items[0].id;
 

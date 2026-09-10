@@ -10,6 +10,7 @@ import { buildSeguradoraPayload } from '../src/lib/seguradoraCore.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { getUserByEmail } from '../src/db/users.js';
 import { fmtBRL } from '../src/lib/format.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // A Lastro distribui as apólices, então é a única parte que enxerga o livro inteiro
 // distribuído. Até aqui não enxergava: uma seguradora acumulava exposição ilimitada num
@@ -36,7 +37,7 @@ async function emitir(token: string, valor: string, sacado = 'Grupo Atlas Varejo
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado, cnpj, valor, vencimento: '2027-12-31', seguro: false, nfAnexada: true });
+      .send({ sacado, cnpj, valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
     if (res.status === 200) return res.body.duplicataId as string;
   }
   throw new Error('não consegui emitir');

@@ -10,6 +10,7 @@ import { setPlatformSetting } from '../src/db/platformSettings.js';
 import { buildResumoFiscalCedente } from '../src/lib/fiscalCedente.js';
 import { fiscalAgent } from '../src/lib/agents/fiscal.js';
 import { darLance, fecharLeiloes } from './helpers/auction.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // A camada fiscal do cedente — o lado da mesa que não existia. O que havia (informe de
 // rendimentos, DARF) olha o investidor e a plataforma; quem antecipa não tinha nada, e o IOF
@@ -47,7 +48,7 @@ async function operacaoNegociada(cedenteId: number, investidorToken: string, val
     sacadoNome: `Sacado Fiscal ${unique()} Ltda`,
     sacadoCnpj: '',
     valor,
-    vencimento: '2027-06-30',
+    vencimento: vencimentoFuturo(),
     emissao: '10/08/2026',
     status: 'aprovada',
     lastroPct: 100,

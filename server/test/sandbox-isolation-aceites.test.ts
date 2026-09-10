@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -52,7 +53,7 @@ describe('Sandbox isolation extended to aceites and disputes', () => {
     const created = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${testKey}`)
-      .send({ sacado: sacadoNome, cnpj: '12.345.678/0001-90', valor: '8000', vencimento: '2026-12-01' });
+      .send({ sacado: sacadoNome, cnpj: '12.345.678/0001-90', valor: '8000', vencimento: vencimentoFuturo() });
     expect(created.status).toBe(200);
 
     const viaTestKey = await request(app).get('/api/v1/aceites').set('Authorization', `Bearer ${testKey}`);
@@ -76,7 +77,7 @@ describe('Sandbox isolation extended to aceites and disputes', () => {
     const created = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${testKey}`)
-      .send({ sacado: sacadoNome, cnpj: '22.333.444/0001-55', valor: '4000', vencimento: '2026-12-01' });
+      .send({ sacado: sacadoNome, cnpj: '22.333.444/0001-55', valor: '4000', vencimento: vencimentoFuturo() });
     expect(created.status).toBe(200);
 
     const { token: sacadoToken } = await registerSacado(sacadoNome);

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // A família de bug que apareceu do #86 ao #93 tem uma forma recorrente: o servidor calcula e
 // SERVE um dado, e a tela não o lê. Dado servido e nunca lido é o mesmo que dado ausente pra
@@ -81,7 +82,7 @@ async function cedenteComDuplicata() {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: `Sacado ${unique()}`, cnpj: '44.333.222/0001-11', valor: '25.000', vencimento: '2026-12-20', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado ${unique()}`, cnpj: '44.333.222/0001-11', valor: '25.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) break;
   }
   return token;

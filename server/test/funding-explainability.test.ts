@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -40,7 +41,7 @@ describe('Funding explainability — "Por que essa oferta?"', () => {
       sacadoNome: 'Grupo Atlas Varejo', // seeded score 84 → rating AA
       sacadoCnpj: '12.345.678/0001-90',
       valor: 30000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'no_mercado',
       lastroPct: 100,

@@ -6,6 +6,7 @@ import { createDuplicata, createPurchase } from '../src/db/duplicatas.js';
 import { db } from '../src/db/index.js';
 import { aliquotaForDias, buildIncomeTaxStatement } from '../src/lib/incomeTaxStatement.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -79,7 +80,7 @@ describe('Informe de rendimentos — real per-operation IR estimate', () => {
       sacadoNome: 'IR Test Sacado 2',
       sacadoCnpj: '',
       valor: 5000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,

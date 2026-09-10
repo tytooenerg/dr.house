@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -89,7 +90,7 @@ describe('seguradora role', () => {
       sacado: sacadoCompany,
       cnpj: '33.222.111/0001-77',
       valor: '20.000',
-      vencimento: '2026-09-10', // ainda no futuro no momento da contratação do seguro
+      vencimento: vencimentoFuturo(), // futuro DE VERDADE: relativo a hoje, não uma data fixa que caduca
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -147,7 +148,7 @@ describe('seguradora role', () => {
       sacado: sacadoCompany,
       cnpj: '33.222.111/0001-77',
       valor: '15.000',
-      vencimento: '2026-09-10',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],

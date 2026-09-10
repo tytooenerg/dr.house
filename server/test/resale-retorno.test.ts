@@ -9,6 +9,7 @@ import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { fmtBRLSigned } from '../src/lib/format.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achado ao simular o mercado secundário de ponta a ponta: revender uma posição antes do
 // vencimento nunca atualizava purchases.retorno da linha original do vendedor — ela
@@ -53,7 +54,7 @@ async function emitirEComprar(valor: string, buyer: { token: string }) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Revenda Ret ${unique()} Ltda`, cnpj: '55.444.333/0001-22', valor, vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Revenda Ret ${unique()} Ltda`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

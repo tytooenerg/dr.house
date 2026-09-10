@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 function unique(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -25,7 +26,7 @@ describe('Aceite → Disputa flow across cedente and sacado accounts', () => {
       const emit = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: sacadoCompany, cnpj: '11.111.111/0001-11', valor: '20.000', vencimento: '2026-11-01', seguro: false, nfAnexada: false, batchValores: [] });
+        .send({ sacado: sacadoCompany, cnpj: '11.111.111/0001-11', valor: '20.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] });
       emitStatus = emit.status;
     }
     expect(emitStatus).toBe(200);

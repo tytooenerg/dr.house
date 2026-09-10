@@ -7,6 +7,7 @@ import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // lib/revenue.ts's getRealPlatformFees usava recomputar platformFee(purchases.valor) do
 // zero pra cada linha de `purchases` — o que não tinha como saber que a taxa de uma
@@ -59,7 +60,7 @@ async function emitirELeiloar(cedenteToken: string, valor: string) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Revenue ${unique()} Ltda`, cnpj: '44.333.222/0001-11', valor, vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Revenue ${unique()} Ltda`, cnpj: '44.333.222/0001-11', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

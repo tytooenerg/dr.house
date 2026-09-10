@@ -8,6 +8,7 @@ import { listInsuranceQuotes } from '../src/lib/insuranceQuotes.js';
 import { buildDashboard } from '../src/lib/dashboardCore.js';
 import { getUserByEmail } from '../src/db/users.js';
 import { listAllDuplicatas } from '../src/db/duplicatas.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achados da varredura pelos seis papéis, bloco do cedente: três números que a tela dizia e
 // o sistema não cumpria.
@@ -49,11 +50,11 @@ describe('o número dentro do anel descreve o anel', () => {
 });
 
 describe('o prêmio do seguro na emissão', () => {
-  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '84.500', vencimento: '2027-12-31', nfAnexada: true, nfeChave: '', batchValores: [] };
+  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '84.500', vencimento: vencimentoFuturo(), nfAnexada: true, nfeChave: '', batchValores: [] };
 
   it('mostra a faixa real das cotações desta duplicata, não um percentual fixo', () => {
     const preview = computeEmitirPreview({ ...base, seguro: true });
-    const cotacoes = listInsuranceQuotes({ score: 84, valor: 84500, vencimento: '2027-12-31' });
+    const cotacoes = listInsuranceQuotes({ score: 84, valor: 84500, vencimento: vencimentoFuturo() });
     const menor = 84500 * (cotacoes[0].premioPct / 100);
     const maior = 84500 * (cotacoes[cotacoes.length - 1].premioPct / 100);
 
@@ -104,7 +105,7 @@ describe('o prêmio do seguro na emissão', () => {
 });
 
 describe('a registradora anunciada é a que será usada', () => {
-  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', vencimento: '2027-12-31', seguro: false, nfAnexada: true, nfeChave: '', batchValores: [] };
+  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, nfeChave: '', batchValores: [] };
 
   it('nomeia UMA registradora, a que chooseRegistradora escolhe para este valor', () => {
     const preview = computeEmitirPreview({ ...base, valor: '84.500' });

@@ -10,6 +10,7 @@ import { db } from '../src/db/index.js';
 import { WEBHOOK_EVENTS } from '../src/data/seed.js';
 import { arrematar } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // O balcão nasceu completo pela TELA e mudo por fora. Isso o deixava pela metade justamente
 // pra quem ele foi desenhado: a mesa institucional opera por integração, não olhando o site.
@@ -55,7 +56,7 @@ async function posicaoDe(dono: { token: string }, valor = '30.000') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${ced.body.token}`)
-      .send({ sacado: `Sacado OTC API ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: '2027-12-31', seguro: false, nfAnexada: true });
+      .send({ sacado: `Sacado OTC API ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

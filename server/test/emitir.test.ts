@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 async function registerCedente() {
   const email = `cedente-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
@@ -79,7 +80,7 @@ describe('POST /api/emitir/submit', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Cliente Teste', cnpj: '00.000.000/0001-00', valor: '10.000', vencimento: '2026-10-01', seguro: false, nfAnexada: false, batchValores: [] });
+        .send({ sacado: 'Cliente Teste', cnpj: '00.000.000/0001-00', valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] });
       lastStatus = res.status;
       if (res.status === 200) {
         expect(res.body.registro).toMatch(/^ESC-2026-\d{6}$/);

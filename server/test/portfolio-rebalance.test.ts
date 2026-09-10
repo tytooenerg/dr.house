@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata, createPurchase } from '../src/db/duplicatas.js';
 import { db } from '../src/db/index.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -39,7 +40,7 @@ function buyPosition(investorId: number, rating: keyof typeof SACADO_BY_RATING, 
     sacadoNome: SACADO_BY_RATING[rating],
     sacadoCnpj: '',
     valor,
-    vencimento: '2026-12-31',
+    vencimento: vencimentoFuturo(),
     emissao: '10/08/2026',
     status: 'aprovada',
     lastroPct: 100,
@@ -63,7 +64,7 @@ function buyPositionWithScore(investorId: number, sacadoName: string, score: num
     sacadoNome: sacadoName,
     sacadoCnpj: '',
     valor,
-    vencimento: '2026-12-31',
+    vencimento: vencimentoFuturo(),
     emissao: '10/08/2026',
     status: 'aprovada',
     lastroPct: 100,

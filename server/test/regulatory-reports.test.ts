@@ -7,6 +7,7 @@ import { createDuplicata, createPurchase } from '../src/db/duplicatas.js';
 import { createSuspiciousActivityReport } from '../src/db/suspiciousActivity.js';
 import { buildCvmPeriodStats } from '../src/lib/regulatoryReports.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -46,7 +47,7 @@ describe('CVM period report — real aggregates from real data', () => {
       sacadoNome: 'CVM Test Sacado',
       sacadoCnpj: '',
       valor: 50000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,

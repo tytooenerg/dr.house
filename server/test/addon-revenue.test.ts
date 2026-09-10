@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -185,7 +186,7 @@ describe('Feature — Registro API (compliance-as-a-service)', () => {
     const admin = await adminToken();
     const before = await addonSummary(admin, 'registro_api');
 
-    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
+    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: vencimentoFuturo() });
     expect(res.status).toBe(200);
     expect(res.body.registro).toBeTypeOf('string');
     expect(res.body.registradora).toBeTypeOf('string');
@@ -205,7 +206,7 @@ describe('Feature — Registro API (compliance-as-a-service)', () => {
 
     const admin = await adminToken();
     const before = await addonSummary(admin, 'registro_api');
-    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: '2026-09-10' });
+    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: vencimentoFuturo() });
     expect(res.status).toBe(200);
     const after = await addonSummary(admin, 'registro_api');
     expect(after.count).toBe(before.count);

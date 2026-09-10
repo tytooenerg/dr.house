@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { arrematar } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // O balcão é a única negociação da plataforma que acontece FORA de um livro público: preço e
 // contraparte combinados diretamente entre duas mesas. Era exatamente o que o auditor não
@@ -58,7 +59,7 @@ async function posicaoDe(dono: { token: string }, valor = '30.000') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${ced.body.token}`)
-      .send({ sacado: `Sacado Aud ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: '2027-12-31', seguro: false, nfAnexada: true });
+      .send({ sacado: `Sacado Aud ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

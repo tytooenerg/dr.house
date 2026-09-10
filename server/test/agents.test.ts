@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { AGENTS } from '../src/lib/agents/index.js';
 import { createPendingAction, getPendingAction, createAgentRun } from '../src/db/agents.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -125,7 +126,7 @@ describe('agentic AI layer — self-service scoping (cedente/investidor)', () =>
       runId,
       agentId: 'emissao',
       toolName: 'emitir_duplicata',
-      input: { sacado: 'Teste Ltda', valor: '1.000,00', vencimento: '2030-01-01' },
+      input: { sacado: 'Teste Ltda', valor: '1.000,00', vencimento: vencimentoFuturo() },
     });
 
     // Another cedente cannot touch it.

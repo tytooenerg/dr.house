@@ -3,6 +3,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
 import { createUser } from '../src/db/users.js';
 import { detectConcentracaoAnomala, detectAutorrelacionamento, runFraudAnomalyScan } from '../src/lib/fraudAnomalyDetection.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -30,7 +31,7 @@ describe('fraud anomaly detection — concentração', () => {
         sacadoNome,
         sacadoCnpj: '11.111.111/0001-11',
         valor: 40_000,
-        vencimento: '2030-01-01',
+        vencimento: vencimentoFuturo(),
         emissao: '01/01/2026',
         status: 'aprovada',
         lastroPct: 90,
@@ -55,7 +56,7 @@ describe('fraud anomaly detection — concentração', () => {
         sacadoNome: `Sacado Diverso ${i} ${unique()}`,
         sacadoCnpj: `22.222.222/000${i}-22`,
         valor: 40_000,
-        vencimento: '2030-01-01',
+        vencimento: vencimentoFuturo(),
         emissao: '01/01/2026',
         status: 'aprovada',
         lastroPct: 90,
@@ -79,7 +80,7 @@ describe('fraud anomaly detection — autorrelacionamento', () => {
       sacadoNome: nome,
       sacadoCnpj: '33.333.333/0001-33',
       valor: 10_000,
-      vencimento: '2030-01-01',
+      vencimento: vencimentoFuturo(),
       emissao: '01/01/2026',
       status: 'aprovada',
       lastroPct: 90,
@@ -99,7 +100,7 @@ describe('fraud anomaly detection — autorrelacionamento', () => {
       sacadoNome: `Comprador ${unique()}`,
       sacadoCnpj: '44.444.444/0001-44',
       valor: 10_000,
-      vencimento: '2030-01-01',
+      vencimento: vencimentoFuturo(),
       emissao: '01/01/2026',
       status: 'aprovada',
       lastroPct: 90,

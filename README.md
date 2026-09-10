@@ -4,6 +4,50 @@ Marketplace/infraestrutura de duplicatas escriturais que conecta **Empresa Ceden
 
 This repo is a full-stack recreation of the original high-fidelity HTML/JS design handoff (`design_handoff_lastro/`), rebuilt as a real, multi-tenant React + TypeScript SPA backed by an Express + SQLite API — with production-grade security, observability, an admin back-office, and a three-tier test suite (unit, component, E2E).
 
+### A suíte amanheceu vermelha sem ninguém tocar em nada
+
+Eu ia editar o README e a suíte, que estava verde há minutos, apresentou **3 falhas** — todas em
+testes de sinistro creditando o cedente. Não era regressão nem flake: era o **calendário**.
+
+Os testes emitiam com `vencimento: '2026-09-10'` sob o comentário *"ainda no futuro no momento da
+contratação do seguro"*. A data não mudou; o mundo é que andou até ela. Em 10/09/2026 o
+underwriting passou a recusar (`409 already_overdue`) uma duplicata que vence hoje, e três testes
+de dinheiro caíram junto.
+
+O projeto já tinha aprendido essa lição — `db/seed.ts` tem um `daysFromNow()` com o comentário
+*"a fixed future date eventually becomes a fixed past one"* — mas a disciplina nunca chegou aos
+testes. A varredura mostrou o tamanho: **144 datas fixas no futuro**, incluindo 37 em 2026-12-01,
+12 em 2026-12-20 e 65 em 2026-12-31. Todas iam cair juntas em dezembro.
+
+`test/helpers/datas.ts` traz `vencimentoFuturo()` — relativo a hoje, nunca caduca — e as 144
+ocorrências em 63 arquivos foram convertidas. As datas no **passado** ficaram literais de
+propósito: 2020 é vencido hoje e continuará vencido para sempre; só o futuro caduca.
+
+E a trava, `test/datas-que-caducam.test.ts`, não conserta — **avisa antes de doer**: uma data
+literal de vencimento no futuro precisa estar a mais de 60 dias de distância. Quem escrever uma
+data curta é avisado na hora, com arquivo, linha e quantos dias faltam. O que torna esta classe
+pior que um bug comum é o silêncio: a suíte fica verde por meses, um dia amanhece vermelha, e um
+deploy legítimo trava por causa do relógio — no pior momento possível, que é quando alguém está
+com pressa para subir.
+
+A conversão em massa achou mais um: `erp-payables.test.ts` mandava a data por variável e
+comparava o resultado com o literal antigo. Agora compara com o mesmo valor que enviou.
+
+Verificado: server **905**, client 127, build, e2e 17/17 — e os três testes originais passando
+por terem virado data relativa, não por terem sido afrouxados.
+
+## Por onde começar
+
+Este README é longo porque o histórico de mudanças vive nele. Os três destinos, em ordem:
+
+| Você quer | Vá para |
+|---|---|
+| **Ver rodando na sua máquina**, hoje | [**Running locally**](#running-locally) — `npm install && npm run dev`, sobe em segundos, com contas de demonstração prontas |
+| **Colocar no ar** num servidor, com domínio e HTTPS | [**`DEPLOY.md`**](DEPLOY.md) — VPS, DNS, `.env`, `docker compose`, primeira conta admin, backups |
+| **Abrir para clientes de verdade** | [`DEPLOY.md` §9](DEPLOY.md) (o preflight, que recusa dinheiro simulado em produção) e [§10](DEPLOY.md) (o que nenhuma variável de ambiente resolve: registradora, autorização regulatória, jurídico) |
+
+Os três são caminhos diferentes, não etapas de um só: dá para ficar no primeiro por meses.
+
 ## Stack
 
 - **client/** — React 18 + TypeScript + Vite + React Router + Tailwind CSS

@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -38,7 +39,7 @@ async function submitEmitir(token: string) {
         sacado: 'Grupo Atlas Varejo',
         cnpj: '12.345.678/0001-90',
         valor: '10.000',
-        vencimento: '2026-11-01',
+        vencimento: vencimentoFuturo(),
         seguro: false,
         nfAnexada: true,
         batchValores: [],

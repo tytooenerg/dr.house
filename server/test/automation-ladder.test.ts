@@ -11,6 +11,7 @@ import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { currentFloor, nextStepAt, armLadder, getLadderBand } from '../src/lib/autoBidLadder.js';
 import type { LadderConfig } from '../src/db/types.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achado corrigido (pedido do usuário): "taxa máxima a oferecer" era um teto de risco
 // vestigial — o preço sempre foi calculado pelo servidor, o investidor nunca propunha nada
@@ -175,7 +176,7 @@ describe('Automação de Lances — compra na classe rearma a escada', () => {
       sacadoNome: `Sacado Escada ${unique()} Ltda`,
       sacadoCnpj: '',
       valor: 20000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,
