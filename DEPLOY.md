@@ -192,7 +192,41 @@ O Compose recria só o que mudou; `redis` e `caddy` normalmente nem reiniciam. M
 banco (`server/src/db/migrations/`) rodam automaticamente no boot do `app` — não é preciso
 nenhum passo manual.
 
-## 9. Coisas que valem revisão antes de tráfego real de dinheiro
+## 9. Antes de abrir para clientes: o preflight
+
+A plataforma segue a disciplina "real-when-configured" — toda integração externa funciona de
+verdade quando a credencial existe e cai num modo simulado **rotulado** quando não existe. Isso
+vale inclusive para os trilhos que movem dinheiro. Consequência: **uma instância em produção sem
+PSP configurado aceitaria um depósito e criaria um saldo que não existe.**
+
+Duas coisas cuidam disso agora.
+
+**O trinco.** Com `NODE_ENV=production` e um trilho de dinheiro simulado, as rotas de depósito e
+saque daquele trilho respondem `503 trilho_simulado` nomeando as variáveis que faltam, em vez de
+fingir. Cada trilho responde por si — Pix faltando não bloqueia TED. A exceção é a instância que
+é uma demonstração de propósito (`SEED_DEMO_DATA=true`, a mesma válvula que o seed de contas demo
+já usa), onde dinheiro simulado é o comportamento desejado.
+
+**O relatório.** Rode antes de abrir para clientes — ele lê a configuração do próprio processo,
+então precisa das mesmas variáveis com que o servidor sobe:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm app node server/dist/scripts/preflight.js
+```
+
+Ou, fora do Docker: `NODE_ENV=production npm run preflight`.
+
+Ele imprime, trilho a trilho e integração a integração, o que está real e o que está simulado,
+com as variáveis que faltam em cada — e **sai com código 1** se estiver em produção sem nenhum
+trilho de dinheiro real, então dá pra encadear num deploy (`npm run preflight && docker compose
+up -d`) e o deploy para sozinho. O mesmo relatório está no back-office, em **Auditoria →
+Prontidão para produção**, e um resumo de uma linha vai para o log a cada boot.
+
+O que o preflight **não** cobre, e nenhuma variável de ambiente resolve: o contrato com uma
+registradora autorizada (Res. BCB nº 339/2023), a autorização regulatória para manter saldo de
+terceiros, e o jurídico do produto. Ver a seção seguinte.
+
+## 10. Coisas que valem revisão antes de tráfego real de dinheiro
 
 Isto não é uma lista de bugs — é honestidade sobre o que este ambiente de desenvolvimento
 não consegue validar por conta própria, listado também em mais detalhe na seção "Known

@@ -2146,6 +2146,47 @@ Verificado: server **890**, client **126** (6 do teste de página novo), build, 
 prova no navegador contra um servidor de produção real, com dois lances de verdade (1,90% FIDC e
 2,50% factoring), conferindo que os números da tela são os mesmos que o servidor devolveu.
 
+### O preflight e o trinco: produção não aceita mais depósito num trilho de mentira
+
+A disciplina "real-when-configured" rotula honestamente cada modo simulado, e o servidor escreve
+quinze linhas na subida dizendo o que está e o que não está configurado. Duas coisas faltavam.
+
+**Ninguém juntava essas quinze linhas.** `/api/health` devolve `{ok:true}`; as flags moram
+espalhadas em dezenove módulos (`pixEnabled`, `boletoEnabled`, `tedEnabled`, `bureauEnabled`,
+`esignatureEnabled`, `backupEnabled`…) e a única forma de saber em que modo a instância está era
+ler o log de boot — que, quando o admin precisa da resposta, já rolou pra fora de qualquer
+terminal semanas atrás.
+
+**E o rótulo não impedia nada.** Com `NODE_ENV=production` e `PIX_PSP_*` em branco, um cliente
+real abria Conta & Liquidação, pedia um depósito, recebia uma cobrança **simulada** e via o saldo
+aparecer na tela. Ele acha que depositou.
+
+`lib/preflight.ts` passa a ser a leitura única — importando as flags dos próprios módulos, nunca
+redeclarando o que é "configurado", porque um preflight que diverge do trilho que move o dinheiro
+é pior que preflight nenhum. Em cima dela: um **trinco** em `routes/account.ts` que, fora do modo
+demonstração, recusa depósito e saque no trilho simulado com `503` nomeando as variáveis que
+faltam — middleware nas rotas de dinheiro, e não um `if` em cada handler, pra que a oitava rota
+que alguém acrescentar amanhã nasça protegida. Cada trilho responde por si: Pix faltando não
+bloqueia TED.
+
+O modo demonstração reusa a válvula que `db/seed.ts` já documentou (`SEED_DEMO_DATA=true`) em vez
+de inventar outra — é o mesmo ambiente que precisa das contas de demo e o mesmo `webServer` do
+e2e, que roda com `NODE_ENV=production`.
+
+O relatório sai em três lugares: `npm run preflight` (sai com código 1 em produção sem trilho
+real, então trava um deploy encadeado), o painel **Auditoria → Prontidão para produção** no
+back-office, e uma linha de resumo no boot.
+
+Verificado num servidor de produção real: o boot logou `[preflight] ATENÇÃO: produção sem nenhum
+trilho de dinheiro real — depósito e saque estão BLOQUEADOS`, um cedente recém-cadastrado tentou
+depositar e levou `503 trilho_simulado` com as quatro variáveis do Pix listadas, e o painel do
+admin mostrou tudo pela tela. Server **903**, client 127, build, e2e 17/17 — o e2e passando é a
+prova de que a válvula de demonstração funciona, já que aquele servidor roda em produção.
+
+O que isto **não** faz: autorizar você a operar. Contrato com registradora autorizada, a
+autorização regulatória para manter saldo de terceiros e o jurídico do produto continuam fora do
+alcance de qualquer variável de ambiente — ver `DEPLOY.md` §9 e §10.
+
 ## Running locally
 
 ```bash

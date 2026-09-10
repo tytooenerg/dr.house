@@ -38,6 +38,7 @@ import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } 
 import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordRecovery } from '../lib/legalCollectionFee.js';
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
 import { runBackup, listBackups, backupEnabled } from '../lib/backup.js';
+import { prontidao } from '../lib/preflight.js';
 import { listPendingTedDeposits, getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { listPendingStablecoinDeposits, getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
 import {
@@ -256,6 +257,16 @@ adminRouter.post(
 // lib/complianceEngine.ts) instead of letting reach the marketplace automatically. Always
 // a human decides here: liberar (back to 'aprovada', cedente can then disparar leilão
 // normally) or rejeitar (terminal, cedente is notified) — never an automatic block.
+// Preflight: uma leitura só de "esta instância está apta a mover dinheiro de verdade?".
+//
+// A informação sempre existiu, espalhada por dezenove módulos e escrita no log de subida do
+// servidor. Log de boot não é lugar de responder isso pra quem opera a plataforma: quando o
+// admin precisa saber se um depósito de cliente é real, o servidor está no ar há semanas e
+// aquelas linhas já rolaram pra fora de qualquer terminal.
+adminRouter.get('/preflight', (_req, res) => {
+  res.json(prontidao());
+});
+
 adminRouter.get('/compliance-queue', (_req, res) => {
   const pending = listPendingComplianceReview().map((r) => ({
     duplicataId: r.duplicata_id,
