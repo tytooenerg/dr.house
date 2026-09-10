@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata, setComplianceScore, setSinistroStatus, getDuplicata } from '../src/db/duplicatas.js';
 import { trainModel, getModel, predictDefaultProbability, extractFeatures, MIN_TRAINING_SAMPLES } from '../src/lib/mlScoring.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -39,7 +40,7 @@ describe('ml scoring — real training on labeled data', () => {
         sacadoNome: 'Sacado Teste',
         sacadoCnpj: '',
         valor: bad ? 500_000 : 20_000,
-        vencimento: '2030-01-01',
+        vencimento: vencimentoFuturo(),
         emissao: '01/01/2026',
         status: bad ? 'aprovada' : 'aprovada',
         lastroPct: bad ? 20 : 95,

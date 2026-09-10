@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -83,7 +84,7 @@ describe('Compliance AI Engine — admin-configurable suspend threshold', () => 
 
     // Baseline: a clean, first-time emission does not suspend at the default threshold.
     const cedenteBaseline = await registerCedente(`Fornecedora Baseline ${unique()} Ltda`);
-    const baseline = await submitEmitir(cedenteBaseline, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '3.000', vencimento: '2026-12-05' });
+    const baseline = await submitEmitir(cedenteBaseline, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '3.000', vencimento: vencimentoFuturo() });
     expect(baseline.complianceSuspensa).toBe(false);
 
     // Lower the threshold below what even a clean emission scores (score do sacado
@@ -97,7 +98,7 @@ describe('Compliance AI Engine — admin-configurable suspend threshold', () => 
     expect(getAfter.body.threshold).toBe(1);
 
     const cedenteLowered = await registerCedente(`Fornecedora Threshold Baixo ${unique()} Ltda`);
-    const lowered = await submitEmitir(cedenteLowered, { sacado: 'Empresa Nunca Vista', cnpj: '11.222.333/0001-44', valor: '4.000', vencimento: '2026-12-06' });
+    const lowered = await submitEmitir(cedenteLowered, { sacado: 'Empresa Nunca Vista', cnpj: '11.222.333/0001-44', valor: '4.000', vencimento: vencimentoFuturo() });
     expect(lowered.complianceSuspensa).toBe(true);
 
     // Restore the default so it doesn't leak into any other assumption within this file.

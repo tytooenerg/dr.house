@@ -3,6 +3,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata, createPurchase } from '../src/db/duplicatas.js';
 import { createUser } from '../src/db/users.js';
 import { computeLiquiditySignal, computeLiquiditySignalForRating, estimateRateBand, BASE_RATE_BANDS } from '../src/lib/dynamicPricing.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -35,7 +36,7 @@ describe('dynamic pricing — liquidity signal', () => {
       sacadoNome: 'Sacado DP',
       sacadoCnpj: '55.555.555/0001-55',
       valor: 10_000,
-      vencimento: '2030-01-01',
+      vencimento: vencimentoFuturo(),
       emissao: '01/01/2026',
       status: 'aprovada',
       lastroPct: 90,
@@ -66,7 +67,7 @@ describe('dynamic pricing — rating-scoped liquidity signal (funding explainabi
         sacadoNome: 'Grupo Atlas Varejo',
         sacadoCnpj: '12.345.678/0001-90',
         valor: 30_000,
-        vencimento: '2030-01-01',
+        vencimento: vencimentoFuturo(),
         emissao: '01/01/2026',
         status: 'aprovada',
         lastroPct: 90,

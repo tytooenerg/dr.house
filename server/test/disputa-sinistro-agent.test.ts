@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { disputaSinistroAgent } from '../src/lib/agents/disputaSinistro.js';
 import { getDispute } from '../src/db/disputes.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Cobre a ligação do agente disputa_sinistro com a fila real de arbitragem do admin
 // (DisputasPanel.tsx embute SelfServiceAgentCard com agentId="disputa_sinistro") — o
@@ -48,7 +49,7 @@ async function criarDisputaAberta() {
     const emit = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: sacadoCompany, cnpj: '55.555.555/0001-55', valor: '12.000', vencimento: '2026-12-01', seguro: false, nfAnexada: false, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '55.555.555/0001-55', valor: '12.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] });
     emitStatus = emit.status;
   }
   expect(emitStatus).toBe(200);

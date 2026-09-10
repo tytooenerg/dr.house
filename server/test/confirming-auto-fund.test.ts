@@ -10,6 +10,7 @@ import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achado corrigido (mudança de modelo de negócio): o financiamento automático do Programa
 // Confirming costumava pular o leilão inteiramente na emissão (a suíte antiga cobria esse
@@ -51,7 +52,7 @@ async function emitirComRetry(token: string, body: Record<string, unknown>) {
 // Checklist de lastro precisa bater 100% (nfAnexada + os demais campos) pra dispararLeilao
 // funcionar — mesmo gate que já existe pra uma duplicata chegar em 'aprovada'.
 function formCompleto(sacado: string, valor: string) {
-  return { sacado, cnpj: '99.999.999/0001-99', valor, vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] };
+  return { sacado, cnpj: '99.999.999/0001-99', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] };
 }
 
 async function criarProgramaEMatricular(sacadoToken: string, cedenteUserId: number, limite = '500.000') {

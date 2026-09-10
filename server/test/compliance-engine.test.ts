@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -58,7 +59,7 @@ async function submitEmitir(token: string, overrides: Partial<{ sacado: string; 
 describe('Compliance AI Engine', () => {
   it('does not suspend a clean, first-time emission', async () => {
     const token = await registerCedente(`Fornecedora Idônea ${unique()} Ltda`);
-    const result = await submitEmitir(token, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '5.000', vencimento: '2026-12-01' });
+    const result = await submitEmitir(token, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '5.000', vencimento: vencimentoFuturo() });
     expect(result.complianceSuspensa).toBe(false);
   });
 

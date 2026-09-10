@@ -9,6 +9,7 @@ import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { fmtBRLSigned } from '../src/lib/format.js';
 import { fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // lib/cestasCore.ts's investInBasket reusa computePurchasePrice/settlePurchase/
 // createPurchase exatamente como routes/market.ts faz — nenhum bug financeiro achado
@@ -70,7 +71,7 @@ async function emitirDuplicata(cedenteToken: string, sacadoCompany: string, valo
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: sacadoCompany, cnpj: '66.555.444/0001-33', valor, vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '66.555.444/0001-33', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

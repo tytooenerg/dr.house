@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -71,7 +72,7 @@ describe('Sandbox data isolation — test-mode keys get a real, separate dataset
       const res = await request(app)
         .post('/api/v1/duplicatas')
         .set('Authorization', `Bearer ${liveKey}`)
-        .send({ sacado: 'Comércio Real Ltda', cnpj: '11.222.333/0001-44', valor: '10000', vencimento: '2026-12-01' });
+        .send({ sacado: 'Comércio Real Ltda', cnpj: '11.222.333/0001-44', valor: '10000', vencimento: vencimentoFuturo() });
       if (res.status === 200) {
         liveId = res.body.duplicataId as string;
         break;
@@ -84,7 +85,7 @@ describe('Sandbox data isolation — test-mode keys get a real, separate dataset
     const sandboxCreate = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${testKey}`)
-      .send({ sacado: 'Comércio Fake Ltda', cnpj: '99.888.777/0001-66', valor: '5000', vencimento: '2026-12-01' });
+      .send({ sacado: 'Comércio Fake Ltda', cnpj: '99.888.777/0001-66', valor: '5000', vencimento: vencimentoFuturo() });
     expect(sandboxCreate.status).toBe(200);
     const sandboxId = sandboxCreate.body.duplicataId as string;
     expect(sandboxCreate.body.registro).toMatch(/^SANDBOX-/);
@@ -108,7 +109,7 @@ describe('Sandbox data isolation — test-mode keys get a real, separate dataset
     const res = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${testKey}`)
-      .send({ sacado: 'Comércio Sandbox Extra Ltda', cnpj: '22.333.444/0001-55', valor: '7000', vencimento: '2026-12-01' });
+      .send({ sacado: 'Comércio Sandbox Extra Ltda', cnpj: '22.333.444/0001-55', valor: '7000', vencimento: vencimentoFuturo() });
     expect(res.status).toBe(200);
     // registro clearly reads as fake sandbox data — no real registradora network call was
     // made (registradora here is just the smart-routing choice that *would* apply, never

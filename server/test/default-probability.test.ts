@@ -3,6 +3,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata, setSinistroStatus } from '../src/db/duplicatas.js';
 import { trainModel } from '../src/lib/mlScoring.js';
 import { estimateDefaultProbability, ASSUMED_PD_BY_RATING } from '../src/lib/defaultProbability.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -20,7 +21,7 @@ describe('estimateDefaultProbability — single source of truth for PD, shared b
       sacadoNome: `Sacado PD Assumida ${unique()}`,
       sacadoCnpj: '',
       valor: 10000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,
@@ -54,7 +55,7 @@ describe('estimateDefaultProbability — single source of truth for PD, shared b
         sacadoNome: `Sacado PD Bom ${unique()}`,
         sacadoCnpj: '',
         valor: 20000,
-        vencimento: '2026-12-31',
+        vencimento: vencimentoFuturo(),
         emissao: '10/08/2026',
         status: 'aprovada',
         lastroPct: 100,
@@ -70,7 +71,7 @@ describe('estimateDefaultProbability — single source of truth for PD, shared b
       sacadoNome: `Sacado PD Pós-Treino ${unique()}`,
       sacadoCnpj: '',
       valor: 15000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,

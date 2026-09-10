@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 function unique() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -32,7 +33,7 @@ describe('NF-e chave duplicidade prevention', () => {
   it('blocks a second duplicata backed by an NF-e chave already used by another', async () => {
     const token = await registerCedente();
     const chave = '1'.repeat(44);
-    const base = { sacado: 'Cliente Chave', cnpj: '11.222.333/0001-81', valor: '15.000', vencimento: '2026-11-01', seguro: false, nfAnexada: false, batchValores: [] };
+    const base = { sacado: 'Cliente Chave', cnpj: '11.222.333/0001-81', valor: '15.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] };
 
     const first = await emitir(token, { ...base, nfeChave: chave });
     expect(first.status).toBe(200);
@@ -55,7 +56,7 @@ describe('NF-e chave duplicidade prevention', () => {
 describe('POST /api/compliance/dup-check', () => {
   it('flags possible duplicidade when the same sacado/valor/vencimento is registered by two different cedentes', async () => {
     const cnpj = '22.333.444/0001-55';
-    const shared = { sacado: 'Sacado Compartilhado', cnpj, valor: '77.777', vencimento: '2026-12-15', seguro: false, nfAnexada: false, batchValores: [] };
+    const shared = { sacado: 'Sacado Compartilhado', cnpj, valor: '77.777', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] };
 
     const tokenA = await registerCedente();
     const tokenB = await registerCedente();
@@ -117,7 +118,7 @@ describe('PLD/FT demo screening at KYB submission', () => {
 describe('Aceite legal SLA', () => {
   it('sets a ~15-day deadline on the aceite created by emitting a duplicata', async () => {
     const token = await registerCedente();
-    const res = await emitir(token, { sacado: 'Sacado SLA', cnpj: '33.444.555/0001-66', valor: '9.000', vencimento: '2026-12-01', seguro: false, nfAnexada: false, batchValores: [] });
+    const res = await emitir(token, { sacado: 'Sacado SLA', cnpj: '33.444.555/0001-66', valor: '9.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] });
     expect(res.status).toBe(200);
 
     const aceites = await request(app).get('/api/aceites').set('Authorization', `Bearer ${token}`);

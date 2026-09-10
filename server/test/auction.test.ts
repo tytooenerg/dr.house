@@ -10,6 +10,7 @@ import { reserveRate } from '../src/lib/auctionCore.js';
 import { closeDueAuctions } from '../src/lib/auctionClose.js';
 import { fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // O leilão primário de verdade. Antes desta suíte não existia nenhuma: o "leilão" era
 // BID_TEMPLATES/EXTRA_BIDDERS (data/seed.ts) desenhando concorrentes fabricados sobre um
@@ -39,7 +40,7 @@ function duplicataEmLeilao(valor = 30000, prazoMs = 3600_000) {
     sacadoNome: `Sacado Leilão ${unique()} Ltda`,
     sacadoCnpj: '',
     valor,
-    vencimento: '2026-12-31',
+    vencimento: vencimentoFuturo(),
     emissao: '10/08/2026',
     status: 'aprovada',
     lastroPct: 100,

@@ -3,6 +3,7 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -112,7 +113,7 @@ describe('plan gating', () => {
         sacadoNome: 'Sacado X',
         sacadoCnpj: '',
         valor: 1000,
-        vencimento: '2026-12-31',
+        vencimento: vencimentoFuturo(),
         emissao: new Date().toLocaleDateString('pt-BR'),
         status: 'aprovada',
         lastroPct: 100,
@@ -124,7 +125,7 @@ describe('plan gating', () => {
     const blocked = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
     expect(blocked.status).toBe(402);
     expect(blocked.body.error).toBe('plan_required');
 
@@ -135,7 +136,7 @@ describe('plan gating', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       lastStatus = res.status;
       expect(lastStatus === 200 || lastStatus === 502).toBe(true);
     }

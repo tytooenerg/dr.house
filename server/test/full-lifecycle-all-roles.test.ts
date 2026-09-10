@@ -7,6 +7,7 @@ import { getDuplicata } from '../src/db/duplicatas.js';
 import { applyTacitAcceptance } from '../src/lib/aceiteCore.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Simulação de uma operação real de duplicata escritural jogando o papel de TODOS os 6
 // papéis da plataforma (cedente, investidor, sacado, seguradora, admin, auditor) numa
@@ -86,7 +87,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
       sacado: sacadoCompany,
       cnpj: '44.333.222/0001-11',
       valor: '50.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -200,7 +201,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       sacado: sacadoCompany,
       cnpj: '55.666.777/0001-88',
       valor: '30.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -249,7 +250,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       sacado: sacadoCompany,
       cnpj: '77.888.999/0001-00',
       valor: '12.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -279,7 +280,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       sacado: sacadoCompany,
       cnpj: '66.777.888/0001-99',
       valor: '25.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -350,7 +351,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       sacado: sacadoCompany,
       cnpj: '88.999.000/0001-11',
       valor: '9.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -396,7 +397,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       sacado: sacadoCompany,
       cnpj: '99.000.111/0001-22',
       valor: '7.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -440,7 +441,7 @@ describe('Verificações de regressão (não são achados — comportamento já 
       sacado: sacadoCompany,
       cnpj: '10.111.222/0001-33',
       valor: '6.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],
@@ -477,7 +478,7 @@ describe('Verificações de regressão (não são achados — comportamento já 
       sacado: sacadoCompany,
       cnpj: '11.222.333/0001-44',
       valor: '8.000',
-      vencimento: '2026-12-20',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: true,
       batchValores: [],

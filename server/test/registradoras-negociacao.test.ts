@@ -7,6 +7,7 @@ import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import * as registradoras from '../src/lib/registradoras.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achado corrigido (auditoria de conformidade — Resolução BCB nº 540/2025): o sacador
 // deve informar a registradora sobre atos de negociação da duplicata, não só registrar a
@@ -51,7 +52,7 @@ describe('informarNegociacao é chamada nos pontos reais de negociação, não s
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: `Sacado Negoc ${unique()} Ltda`, cnpj: '22.333.444/0001-55', valor: '35.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+        .send({ sacado: `Sacado Negoc ${unique()} Ltda`, cnpj: '22.333.444/0001-55', valor: '35.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).toBeTruthy();

@@ -6,6 +6,7 @@ import { createDuplicata } from '../src/db/duplicatas.js';
 import { ensureAceite } from '../src/db/aceites.js';
 import { createDispute } from '../src/db/disputes.js';
 import { getFundBalance } from '../src/db/creditLineFund.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -43,7 +44,7 @@ function seedRecentDuplicatas(cedenteId: number, count: number, valorEach: numbe
       sacadoNome,
       sacadoCnpj: '',
       valor: valorEach,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,
@@ -87,7 +88,7 @@ describe('Credit line — eligibility from real 90-day emission history', () => 
       sacadoNome: 'Sacado Disputa Crédito',
       sacadoCnpj: '',
       valor: 30000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,

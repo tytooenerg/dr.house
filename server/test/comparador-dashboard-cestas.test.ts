@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // comparador.ts, dashboard.ts e cestas.ts tinham cobertura de teste fraca ou nula pra
 // lógica de negócio real: comparador só era tocado pelo gating de plano em billing.test.ts
@@ -142,12 +143,12 @@ describe('Dashboard — KPIs reais por papel (lib/dashboardCore.ts)', () => {
     let emit = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Dashboard ${unique()}`, cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Dashboard ${unique()}`, cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     for (let attempt = 0; attempt < 5 && emit.status !== 200; attempt++) {
       emit = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: `Sacado Dashboard ${unique()}`, cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+        .send({ sacado: `Sacado Dashboard ${unique()}`, cnpj: '33.222.111/0001-77', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     }
     expect(emit.status).toBe(200);
 
@@ -166,12 +167,12 @@ describe('Dashboard — KPIs reais por papel (lib/dashboardCore.ts)', () => {
     let emit = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${a}`)
-      .send({ sacado: `Sacado Isolado ${unique()}`, cnpj: '33.222.111/0001-77', valor: '7.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Isolado ${unique()}`, cnpj: '33.222.111/0001-77', valor: '7.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     for (let attempt = 0; attempt < 5 && emit.status !== 200; attempt++) {
       emit = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${a}`)
-        .send({ sacado: `Sacado Isolado ${unique()}`, cnpj: '33.222.111/0001-77', valor: '7.000', vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] });
+        .send({ sacado: `Sacado Isolado ${unique()}`, cnpj: '33.222.111/0001-77', valor: '7.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     }
     expect(emit.status).toBe(200);
 

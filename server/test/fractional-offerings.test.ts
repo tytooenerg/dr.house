@@ -8,6 +8,7 @@ import { FRACTIONAL_MIN_VALOR, FRACTIONAL_TOTAL_TOKENS } from '../src/lib/fracti
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -37,7 +38,7 @@ function makeLargeDuplicata(valor = 300000) {
     sacadoNome: 'Fractional Test Sacado',
     sacadoCnpj: '',
     valor,
-    vencimento: '2026-12-31',
+    vencimento: vencimentoFuturo(),
     emissao: '10/08/2026',
     status: 'aprovada',
     lastroPct: 100,
@@ -192,7 +193,7 @@ describe('Fractional offerings — pagamento no vencimento distribuído entre os
       sacadoNome: sacadoCompany,
       sacadoCnpj: '',
       valor: 300000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,
@@ -247,7 +248,7 @@ describe('Fractional offerings — pagamento no vencimento distribuído entre os
       sacadoNome: sacadoCompany,
       sacadoCnpj: '',
       valor: 200000,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,

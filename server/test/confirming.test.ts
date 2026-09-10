@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { listAuditLog } from '../src/db/audit.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 function unique(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -118,7 +119,7 @@ describe('Programa Confirming — matrícula de cedentes', () => {
       sacado: sacadoCompany,
       cnpj: '22.222.222/0001-22',
       valor: '30.000',
-      vencimento: '2026-12-01',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: false,
       batchValores: [],
@@ -147,7 +148,7 @@ describe('Programa Confirming — matrícula de cedentes', () => {
       sacado: sacadoCompany,
       cnpj: '33.333.333/0001-33',
       valor: '50.000',
-      vencimento: '2026-12-01',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: false,
       batchValores: [],
@@ -157,7 +158,7 @@ describe('Programa Confirming — matrícula de cedentes', () => {
       sacado: sacadoCompany,
       cnpj: '44.444.444/0001-44',
       valor: '5.000',
-      vencimento: '2026-12-01',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: false,
       batchValores: [],
@@ -195,7 +196,7 @@ describe('Programa Confirming — matrícula de cedentes', () => {
       sacado: sacadoCompany,
       cnpj: '33.333.333/0001-33',
       valor: '15.000',
-      vencimento: '2026-12-01',
+      vencimento: vencimentoFuturo(),
       seguro: false,
       nfAnexada: false,
       batchValores: [],

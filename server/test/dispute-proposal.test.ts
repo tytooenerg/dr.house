@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { db } from '../src/db/index.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
 import { checkCollectionEligibility } from '../src/lib/legalCollection.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achado corrigido: POST /disputas/:id/resolve costumava deixar o próprio cedente
 // encerrar sozinho qualquer disputa aberta contra ele — sem confirmação do sacado, sem
@@ -29,7 +30,7 @@ async function emitirEContestar(cedenteToken: string, sacadoToken: string, sacad
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: sacadoCompany, cnpj: '55.444.333/0001-22', valor: '25.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '55.444.333/0001-22', valor: '25.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

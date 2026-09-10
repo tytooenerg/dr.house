@@ -33,7 +33,7 @@ async function emitDuplicata(token: string) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: 'Cliente Teste', cnpj: '00.000.000/0001-00', valor: '10.000', vencimento: '2026-10-01', seguro: false, nfAnexada: false, batchValores: [] });
+      .send({ sacado: 'Cliente Teste', cnpj: '00.000.000/0001-00', valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] });
     if (res.status === 200) return res.body.duplicataId as string;
     expect(res.status).toBe(502);
   }
@@ -52,6 +52,7 @@ async function runSuporte(token: string, input: string) {
 // agents.test.ts's pending-action tests do, to verify the ownership logic itself rather
 // than depend on the simulated mode happening to invoke a particular tool.
 import { suporteAgent } from '../src/lib/agents/suporte.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 function getTool(name: string) {
   const tool = suporteAgent.tools.find((t) => t.name === name);

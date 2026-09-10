@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { computeInsurerQuotePct, listInsuranceQuotes } from '../src/lib/insuranceQuotes.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
 import { garantirLeilao } from './helpers/auction.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -42,7 +43,7 @@ async function ofertaPropria(valor = '84.500') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${ced.body.token}`)
-      .send({ sacado: `Sacado Quotes ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: '2027-12-31', seguro: false, nfAnexada: true });
+      .send({ sacado: `Sacado Quotes ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();
@@ -52,14 +53,14 @@ async function ofertaPropria(valor = '84.500') {
 
 describe('Insurance quotes — real per-insurer differentiation', () => {
   it("Too Seguros quotes tighter for a high-score sacado than a low-score one — it isn't a flat rate", () => {
-    const highScore = computeInsurerQuotePct('too', { score: 90, valor: 50000, vencimento: '2026-12-31' });
-    const lowScore = computeInsurerQuotePct('too', { score: 40, valor: 50000, vencimento: '2026-12-31' });
+    const highScore = computeInsurerQuotePct('too', { score: 90, valor: 50000, vencimento: vencimentoFuturo() });
+    const lowScore = computeInsurerQuotePct('too', { score: 40, valor: 50000, vencimento: vencimentoFuturo() });
     expect(highScore).toBeLessThan(lowScore);
   });
 
   it('Pottencial surcharges a large ticket relative to a small one', () => {
-    const small = computeInsurerQuotePct('pottencial', { score: 70, valor: 20000, vencimento: '2026-12-31' });
-    const large = computeInsurerQuotePct('pottencial', { score: 70, valor: 200000, vencimento: '2026-12-31' });
+    const small = computeInsurerQuotePct('pottencial', { score: 70, valor: 20000, vencimento: vencimentoFuturo() });
+    const large = computeInsurerQuotePct('pottencial', { score: 70, valor: 200000, vencimento: vencimentoFuturo() });
     expect(large).toBeGreaterThan(small);
   });
 
@@ -72,7 +73,7 @@ describe('Insurance quotes — real per-insurer differentiation', () => {
   });
 
   it('listInsuranceQuotes sorts cheapest first and flags exactly one as recommended', () => {
-    const quotes = listInsuranceQuotes({ score: 84, valor: 84500, vencimento: '2026-12-31' });
+    const quotes = listInsuranceQuotes({ score: 84, valor: 84500, vencimento: vencimentoFuturo() });
     expect(quotes).toHaveLength(3);
     expect(quotes[0].premioPct).toBeLessThanOrEqual(quotes[1].premioPct);
     expect(quotes[1].premioPct).toBeLessThanOrEqual(quotes[2].premioPct);

@@ -6,6 +6,7 @@ import { db } from '../src/db/index.js';
 import { getInvestorQuotas, getTotalQuotas } from '../src/db/creditLineFund.js';
 import { getCotaPrice } from '../src/lib/creditLineFund.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -39,7 +40,7 @@ function seedRecentDuplicatas(cedenteId: number, count: number, valorEach: numbe
       sacadoNome: 'Sacado Genérico Cota',
       sacadoCnpj: '',
       valor: valorEach,
-      vencimento: '2026-12-31',
+      vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',
       status: 'aprovada',
       lastroPct: 100,

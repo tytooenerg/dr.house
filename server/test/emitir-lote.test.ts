@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 function unique() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -26,9 +27,9 @@ describe('POST /api/emitir/lote — real batch emission, each row via the same s
   it('emits every valid row for real and reports per-row success', async () => {
     const token = await registerCedente();
     const rows = [
-      { sacado: `Sacado Lote A ${unique()}`, cnpj: '', valor: '15.000', vencimento: '2026-12-31', seguro: false },
-      { sacado: `Sacado Lote B ${unique()}`, cnpj: '', valor: '22.500', vencimento: '2026-12-31', seguro: false },
-      { sacado: `Sacado Lote C ${unique()}`, cnpj: '', valor: '9.000', vencimento: '2026-12-31', seguro: false },
+      { sacado: `Sacado Lote A ${unique()}`, cnpj: '', valor: '15.000', vencimento: vencimentoFuturo(), seguro: false },
+      { sacado: `Sacado Lote B ${unique()}`, cnpj: '', valor: '22.500', vencimento: vencimentoFuturo(), seguro: false },
+      { sacado: `Sacado Lote C ${unique()}`, cnpj: '', valor: '9.000', vencimento: vencimentoFuturo(), seguro: false },
     ];
     const res = await request(app).post('/api/emitir/lote').set('Authorization', `Bearer ${token}`).send({ rows });
     expect(res.status).toBe(200);
@@ -56,7 +57,7 @@ describe('POST /api/emitir/lote — real batch emission, each row via the same s
   it('reports per-row failures without failing the whole batch (mixed valid/invalid rows)', async () => {
     const token = await registerCedente();
     const rows = [
-      { sacado: `Sacado Lote Válido ${unique()}`, cnpj: '', valor: '12.000', vencimento: '2026-12-31', seguro: false },
+      { sacado: `Sacado Lote Válido ${unique()}`, cnpj: '', valor: '12.000', vencimento: vencimentoFuturo(), seguro: false },
       { sacado: '', cnpj: '', valor: '', vencimento: '' }, // invalid — missing required fields
     ];
     const res = await request(app).post('/api/emitir/lote').set('Authorization', `Bearer ${token}`).send({ rows });
@@ -82,7 +83,7 @@ describe('POST /api/emitir/lote — real batch emission, each row via the same s
     const empty = await request(app).post('/api/emitir/lote').set('Authorization', `Bearer ${token}`).send({ rows: [] });
     expect(empty.status).toBe(400);
 
-    const tooMany = Array.from({ length: 201 }, (_, i) => ({ sacado: `Sacado ${i}`, cnpj: '', valor: '1000', vencimento: '2026-12-31', seguro: false }));
+    const tooMany = Array.from({ length: 201 }, (_, i) => ({ sacado: `Sacado ${i}`, cnpj: '', valor: '1000', vencimento: vencimentoFuturo(), seguro: false }));
     const overLimit = await request(app).post('/api/emitir/lote').set('Authorization', `Bearer ${token}`).send({ rows: tooMany });
     expect(overLimit.status).toBe(400);
   });
@@ -92,7 +93,7 @@ describe('POST /api/emitir/lote — real batch emission, each row via the same s
     const res = await request(app)
       .post('/api/emitir/lote')
       .set('Authorization', `Bearer ${token}`)
-      .send({ rows: [{ sacado: 'X', cnpj: '', valor: '1000', vencimento: '2026-12-31', seguro: false }] });
+      .send({ rows: [{ sacado: 'X', cnpj: '', valor: '1000', vencimento: vencimentoFuturo(), seguro: false }] });
     expect(res.status).toBe(403);
   });
 });

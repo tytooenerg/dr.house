@@ -4,6 +4,7 @@ import { createUser } from '../src/db/users.js';
 import { createDuplicata, setComplianceScore, setSinistroStatus } from '../src/db/duplicatas.js';
 import { trainModel, predictDefaultProbability, MIN_NEURAL_NET_SAMPLES } from '../src/lib/mlScoring.js';
 import type { DuplicataRow } from '../src/db/types.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -30,7 +31,7 @@ describe('ML scoring — neural net upgrade, gated by real data volume', () => {
         sacadoNome: 'Sacado MLP Small',
         sacadoCnpj: '',
         valor: 20000,
-        vencimento: '2026-12-31',
+        vencimento: vencimentoFuturo(),
         emissao: '10/08/2026',
         status: 'aprovada',
         lastroPct: 100,
@@ -59,7 +60,7 @@ describe('ML scoring — neural net upgrade, gated by real data volume', () => {
         sacadoNome: 'Sacado MLP Big',
         sacadoCnpj: '',
         valor: 15000 + i,
-        vencimento: '2026-12-31',
+        vencimento: vencimentoFuturo(),
         emissao: '10/08/2026',
         status: 'aprovada',
         lastroPct: 100,

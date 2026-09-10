@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -61,7 +62,7 @@ describe('partner API (api key auth)', () => {
       const res = await request(app)
         .post('/api/v1/duplicatas')
         .set('Authorization', `Bearer ${rawKey}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false });
       lastStatus = res.status;
       if (res.status === 200) duplicataId = res.body.duplicataId;
       else expect(res.status).toBe(502);
@@ -85,7 +86,7 @@ describe('partner API (api key auth)', () => {
     const res = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${rawKey}`)
-      .send({ sacado: 'Grupo Atlas Varejo', valor: '5.000', vencimento: '2026-12-31' });
+      .send({ sacado: 'Grupo Atlas Varejo', valor: '5.000', vencimento: vencimentoFuturo() });
     expect(res.status).toBe(403);
   });
 
@@ -137,7 +138,7 @@ describe('real webhook delivery', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(200);
@@ -163,7 +164,7 @@ describe('partner API — aceites', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: sacadoNome, cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: sacadoNome, cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).not.toBe('');
@@ -193,7 +194,7 @@ describe('partner API — aceites', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).not.toBe('');

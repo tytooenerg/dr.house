@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -42,7 +43,7 @@ async function emitDuplicata(token: string, sacado: string, valor = '10.000') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado, cnpj: '00.000.000/0001-00', valor, vencimento: '2026-10-01', seguro: false, nfAnexada: false, batchValores: [] });
+      .send({ sacado, cnpj: '00.000.000/0001-00', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: false, batchValores: [] });
     lastStatus = res.status;
     if (lastStatus !== 200) expect(lastStatus).toBe(502);
   }
@@ -55,7 +56,7 @@ async function emitViaTestKey(rawKey: string, sacado: string, valor = '10.000') 
     const res = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${rawKey}`)
-      .send({ sacado, cnpj: '00.000.000/0001-00', valor, vencimento: '2026-10-01' });
+      .send({ sacado, cnpj: '00.000.000/0001-00', valor, vencimento: vencimentoFuturo() });
     lastStatus = res.status;
     if (lastStatus !== 200) expect(lastStatus).toBe(502);
   }

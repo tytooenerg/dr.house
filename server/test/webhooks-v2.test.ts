@@ -10,6 +10,7 @@ import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
 import { ensureAceite, setAceiteStatus } from '../src/db/aceites.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Duplicata pronta pra ir a leilão pelo caminho real: lastro 100% e aceite confirmado, que é
 // o que routes/minhas.ts exige antes de aceitar o disparo.
@@ -20,7 +21,7 @@ function criarDuplicataAprovada(cedenteId: number): string {
     sacadoNome: `Sacado WH2 ${unique()} Ltda`,
     sacadoCnpj: '',
     valor: 25000,
-    vencimento: '2026-12-31',
+    vencimento: vencimentoFuturo(),
     emissao: '10/08/2026',
     status: 'aprovada',
     lastroPct: 100,
@@ -116,7 +117,7 @@ describe('Webhooks v2 — secret rotation', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(200);
@@ -166,7 +167,7 @@ describe('Webhooks v2 — sinistro.decidido', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedente.token}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-90', valor: '20.000', vencimento: '2026-09-10', seguro: true, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-90', valor: '20.000', vencimento: vencimentoFuturo(), seguro: true, nfAnexada: true });
       emitStatus = res.status;
       if (res.status === 200) duplicataId = res.body.duplicataId as string;
     }
@@ -260,7 +261,7 @@ describe('Webhooks v2 — rating.alterado', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '10.000', vencimento: '2026-12-31', seguro: false });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '10.000', vencimento: vencimentoFuturo(), seguro: false });
       emitStatus = res.status;
     }
     expect(emitStatus).toBe(200);

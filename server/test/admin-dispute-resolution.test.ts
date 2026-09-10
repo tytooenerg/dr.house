@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // POST /admin/disputes/:id/resolve (routes/admin.ts) — o admin arbitrando uma disputa real
 // entre cedente e sacado — nunca tinha um teste direto: só a ferramenta equivalente do
@@ -39,7 +40,7 @@ async function emitirEContestar(cedenteToken: string, sacadoToken: string, sacad
       // cnpj precisa vir preenchido pra fechar 100% do checklist de lastro (ver
       // lib/emitirCore.ts's items) — sem isso a duplicata fica 'pendente_analise' em vez de
       // 'aprovada', e nunca chegaria a um estado onde reportPayment aceitaria.
-      .send({ sacado: sacadoCompany, cnpj: '99.888.777/0001-66', valor, vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '99.888.777/0001-66', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

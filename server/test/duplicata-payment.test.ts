@@ -11,6 +11,7 @@ import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { runFundoAutoBuyTick } from '../src/lib/confirmingFundoAutoBuy.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Nenhuma parte da plataforma modelava "sacado pagou no vencimento, caminho feliz" antes
 // desta feature — nem o marketplace normal, nem a linha de crédito, nem o Confirming. Self-
@@ -45,7 +46,7 @@ function formCompleto(sacado: string, valor: string) {
   // nfAnexada: true — precisa de checklist 100% (status 'aprovada' na hora) pra poder
   // disparar leilão ou reportar pagamento direto; sem isso a duplicata fica
   // 'pendente_analise'.
-  return { sacado, cnpj: '33.222.111/0001-77', valor, vencimento: '2026-12-01', seguro: false, nfAnexada: true, batchValores: [] };
+  return { sacado, cnpj: '33.222.111/0001-77', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] };
 }
 
 async function extratoOf(token: string) {

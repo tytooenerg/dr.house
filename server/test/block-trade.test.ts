@@ -10,6 +10,7 @@ import { getDuplicata } from '../src/db/duplicatas.js';
 import { getAceiteByDuplicata, setAceiteStatus } from '../src/db/aceites.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 function parseBRL(s: string): number {
   return Number(s.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
@@ -58,7 +59,7 @@ async function sellerWithListing(askingValor: string, faceValor = '20.000') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Block ${unique()} Ltda`, cnpj: '77.666.555/0001-44', valor: faceValor, vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Block ${unique()} Ltda`, cnpj: '77.666.555/0001-44', valor: faceValor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   // Achado corrigido (usuário): dispararLeilao agora exige aceite confirmado — direto no

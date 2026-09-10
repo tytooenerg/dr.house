@@ -4,6 +4,7 @@ import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
 import { applyTacitAcceptance } from '../src/lib/aceiteCore.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achado corrigido: a UI (AceitePage.tsx) e o texto de compliance (data/seed.ts's
 // FINANCIADOR_REQS: "sacado tem até... 15 para aceitar — sem isso, a validade plena
@@ -32,7 +33,7 @@ async function emitirParaSacado(cedenteToken: string, sacadoCompany: string) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: sacadoCompany, cnpj: '33.222.111/0001-55', valor: '18.000', vencimento: '2026-12-31', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '33.222.111/0001-55', valor: '18.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

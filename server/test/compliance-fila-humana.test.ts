@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // Achado do teste de operação real (scripts/operacao-real): a fila de revisão de compliance
 // enchia com duplicatas que o próprio motor tinha AUTO-APROVADO, e elas não saíam nunca.
@@ -45,7 +46,7 @@ async function emitir(token: string, over: Partial<{ sacado: string; cnpj: strin
         sacado: over.sacado ?? `Sacado ${unico()}`,
         cnpj: over.cnpj ?? '44.333.222/0001-11',
         valor: over.valor ?? '10.000',
-        vencimento: '2026-12-20',
+        vencimento: vencimentoFuturo(),
         seguro: false,
         nfAnexada: true,
         batchValores: [],

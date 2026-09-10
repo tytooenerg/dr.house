@@ -6,6 +6,7 @@ import { db } from '../src/db/index.js';
 import { createDuplicata, backfillDuplicataSetor, getDuplicata } from '../src/db/duplicatas.js';
 import { arrematar, darLance, fecharLeiloes } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -96,7 +97,7 @@ describe('backfillDuplicataSetor', () => {
       sacadoNome: 'Grupo Atlas Varejo',
       sacadoCnpj: '',
       valor: 10000,
-      vencimento: '2026-12-01',
+      vencimento: vencimentoFuturo(),
       emissao: '2026-01-01',
       status: 'aprovada',
       lastroPct: 100,

@@ -6,6 +6,7 @@ import { getFundoBalance, getFundoInvestorQuotas, getFundoTotalQuotas } from '..
 import { fundoFinanciarCompra, fundoRetornoDePagamento, getFundoCotaPrice } from '../src/lib/confirmingFundo.js';
 import { listAuditLog } from '../src/db/audit.js';
 import { createDuplicata } from '../src/db/duplicatas.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 beforeAll(async () => {
   await seedIfEmpty();
@@ -41,7 +42,7 @@ function criarDuplicataDeTeste(valor: number): string {
     sacadoNome: 'Sacado Genérico Confirming',
     sacadoCnpj: '',
     valor,
-    vencimento: '2026-12-31',
+    vencimento: vencimentoFuturo(),
     emissao: '10/08/2026',
     status: 'vendida',
     lastroPct: 100,

@@ -5,6 +5,7 @@ import { seedIfEmpty } from '../src/db/seed.js';
 import { db } from '../src/db/index.js';
 import { darLance } from './helpers/auction.js';
 import { credenciarInvestidor } from './helpers/investidor.js';
+import { vencimentoFuturo } from './helpers/datas.js';
 
 // A disputa é o produto: vários financiadores competindo por uma duplicata, menor deságio
 // ganha. Ela era desenhada em detalhe no card do MARKETPLACE — nome do financiador, veículo,
@@ -34,12 +35,12 @@ async function cedenteComDuplicataEmLeilao() {
   let emit = await request(app)
     .post('/api/emitir/submit')
     .set('Authorization', `Bearer ${token}`)
-    .send({ sacado: unico('Sacado'), cnpj: '44.333.222/0001-11', valor: '40.000', vencimento: '2026-12-20', seguro: false, nfAnexada: true, batchValores: [] });
+    .send({ sacado: unico('Sacado'), cnpj: '44.333.222/0001-11', valor: '40.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
   for (let i = 0; i < 5 && emit.status !== 200; i++) {
     emit = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: unico('Sacado'), cnpj: '44.333.222/0001-11', valor: '40.000', vencimento: '2026-12-20', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: unico('Sacado'), cnpj: '44.333.222/0001-11', valor: '40.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
   }
   expect(emit.status).toBe(200);
   const duplicataId = emit.body.duplicataId as string;
