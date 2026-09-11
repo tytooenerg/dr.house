@@ -58,10 +58,28 @@ export function computeEmitirPreview(form: EmitirForm) {
   // capital is actually chasing offers right now.
   const { mid: taxaMid, signal } = estimateRateBand(matched?.rating ?? 'A');
 
+  // Os dois primeiros itens abaixo passaram a checar o dígito verificador oficial
+  // (lib/cnpjLookup.ts, lib/nfeStatus.ts) em vez de só "o campo não está vazio" — o
+  // formulário aceitava qualquer CNPJ/chave de 44 dígitos com formato certo e nunca
+  // conferia se eram matematicamente possíveis, deixando o checklist de lastro chegar a
+  // 100% com dado inventado. É por isso que este item some do 100% quando o dígito não
+  // bate, mesmo com o campo preenchido — o que ele mede agora é "existe" e não "foi
+  // digitado". A situação REAL desses dois (CNPJ ativo na Receita Federal, NF-e
+  // autorizada na SEFAZ) exige uma consulta de rede e por isso fica fora daqui: esta
+  // função roda de forma síncrona a cada preview digitado (POST /emitir/preview) e não
+  // pode depender de round-trip externo por tecla. A consulta real acontece à parte, na
+  // emissão (submitEmitir), e vira alerta de compliance visível pro back-office — nunca
+  // um ponto no checklist, porque um provedor externo fora do ar não pode fazer o lastro
+  // de uma duplicata "piorar" sozinho.
+  const cnpjDigits = form.cnpj.replace(/\D/g, '');
+  const nfeChaveDigits = form.nfeChave.replace(/\D/g, '');
   const items = [
-    { label: 'Dados do sacado e CNPJ', done: !!(form.sacado && form.cnpj) },
+    { label: 'Dados do sacado e CNPJ', done: !!(form.sacado && cnpjDigits) && cnpjChecksumValido(cnpjDigits) },
     { label: 'Valor e vencimento definidos', done: !!(form.valor && form.vencimento) },
-    { label: 'NF-e anexada e vinculada', done: form.nfAnexada },
+    // A chave da NF-e é opcional no formulário (nem todo cedente a informa) — quando
+    // ausente, o item continua valendo só pela flag de anexo; quando presente, agora
+    // também precisa bater o dígito verificador.
+    { label: 'NF-e anexada e vinculada', done: form.nfAnexada && (!nfeChaveDigits || chaveNfeChecksumValida(nfeChaveDigits)) },
     { label: 'Comprovante de entrega ou aceite do serviço', done: form.nfAnexada },
     { label: 'Histórico de pagamento do sacado consultado', done: !!form.sacado },
   ];

@@ -241,13 +241,13 @@ describe('partner API — score by CNPJ', () => {
   it('returns the score for a known sacado CNPJ', async () => {
     const { token } = await registerEmpresarialCedente();
     const key = await generateKey(token);
-    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Grupo Atlas Varejo');
     expect(res.body.rating).toBe('AA');
 
     // works with an unformatted (digits-only) CNPJ too
-    const res2 = await request(app).get('/api/v1/sacados/12345678000190/score').set('Authorization', `Bearer ${key}`);
+    const res2 = await request(app).get('/api/v1/sacados/12345678000195/score').set('Authorization', `Bearer ${key}`);
     expect(res2.status).toBe(200);
     expect(res2.body.name).toBe('Grupo Atlas Varejo');
   });

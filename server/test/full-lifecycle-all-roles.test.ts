@@ -69,7 +69,7 @@ async function seguradoraLogin() {
 async function registrarInvestidorAprovado(companyName: string) {
   const admin = await adminLogin();
   const investidor = await register('investidor', companyName);
-  await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${investidor.token}`).send({ cnpj: '12.345.678/0001-90', tipo: 'fidc', pl: '2.000.000' });
+  await request(app).post('/api/auth/kyb').set('Authorization', `Bearer ${investidor.token}`).send({ cnpj: '12.345.678/0001-95', tipo: 'fidc', pl: '2.000.000' });
   const approve = await request(app).post(`/api/admin/kyb/${investidor.userId}/approve`).set('Authorization', `Bearer ${admin}`);
   expect(approve.status).toBe(200);
   return investidor;
@@ -85,7 +85,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
     // 1. CEDENTE emite.
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '44.333.222/0001-11',
+      cnpj: '44.333.222/0001-00',
       valor: '50.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
@@ -199,7 +199,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
 
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '55.666.777/0001-88',
+      cnpj: '55.666.777/0001-81',
       valor: '30.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
@@ -248,7 +248,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
 
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '77.888.999/0001-00',
+      cnpj: '77.888.999/0001-81',
       valor: '12.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
@@ -278,7 +278,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
 
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '66.777.888/0001-99',
+      cnpj: '66.777.888/0001-81',
       valor: '25.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
@@ -349,7 +349,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
 
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '88.999.000/0001-11',
+      cnpj: '88.999.000/0001-98',
       valor: '9.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
@@ -395,7 +395,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
 
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '99.000.111/0001-22',
+      cnpj: '99.000.111/0001-65',
       valor: '7.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
@@ -439,7 +439,7 @@ describe('Verificações de regressão (não são achados — comportamento já 
 
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '10.111.222/0001-33',
+      cnpj: '10.111.222/0001-35',
       valor: '6.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
@@ -476,7 +476,7 @@ describe('Verificações de regressão (não são achados — comportamento já 
 
     const emit = await emitirComRetry(cedente.token, {
       sacado: sacadoCompany,
-      cnpj: '11.222.333/0001-44',
+      cnpj: '11.222.333/0001-81',
       valor: '8.000',
       vencimento: vencimentoFuturo(),
       seguro: false,

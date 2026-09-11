@@ -40,7 +40,7 @@ async function emitirEContestar(cedenteToken: string, sacadoToken: string, sacad
       // cnpj precisa vir preenchido pra fechar 100% do checklist de lastro (ver
       // lib/emitirCore.ts's items) — sem isso a duplicata fica 'pendente_analise' em vez de
       // 'aprovada', e nunca chegaria a um estado onde reportPayment aceitaria.
-      .send({ sacado: sacadoCompany, cnpj: '99.888.777/0001-66', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '99.888.777/0001-00', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

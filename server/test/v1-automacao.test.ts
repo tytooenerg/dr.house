@@ -45,7 +45,7 @@ async function emitirPelaApi(key: string, valor = '5.000') {
     const res = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${key}`)
-      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '58.442.111/0001-27', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '11.444.777/0001-61', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
     if (res.status === 200) return res.body.duplicataId as string;
   }
   throw new Error('não consegui emitir pela API depois de 8 tentativas');

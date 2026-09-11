@@ -28,9 +28,14 @@ export interface Sacado {
   factors: SacadoFactor[];
 }
 
+// Os 4 CNPJs abaixo passaram a ter dígito verificador oficial válido (lib/cnpjLookup.ts) —
+// eram inventados (ex.: '12.345.678/0001-90') e nunca precisaram bater no cálculo real da
+// Receita Federal até o checklist de lastro (lib/emitirCore.ts) passar a checar isso de
+// verdade. findSacadoByCnpj (lib/riscoCore.ts) casa por CNPJ exato, então qualquer teste
+// que precise do rating de um destes sacados via CNPJ precisa usar o valor atualizado.
 export const SACADOS: Record<string, Sacado> = {
   'Grupo Atlas Varejo': {
-    cnpj: '12.345.678/0001-90',
+    cnpj: '12.345.678/0001-95',
     score: 84,
     rating: 'AA',
     trend: 'up',
@@ -45,7 +50,7 @@ export const SACADOS: Record<string, Sacado> = {
     ],
   },
   'Metalúrgica Serrana S.A.': {
-    cnpj: '23.456.789/0001-11',
+    cnpj: '23.456.789/0001-95',
     score: 61,
     rating: 'B',
     trend: 'down',
@@ -60,7 +65,7 @@ export const SACADOS: Record<string, Sacado> = {
     ],
   },
   'Construtora Vale Norte': {
-    cnpj: '34.567.890/0001-22',
+    cnpj: '34.567.890/0001-30',
     score: 38,
     rating: 'C',
     trend: 'down',
@@ -75,7 +80,7 @@ export const SACADOS: Record<string, Sacado> = {
     ],
   },
   'Distribuidora Bom Preço': {
-    cnpj: '45.678.901/0001-33',
+    cnpj: '45.678.901/0001-75',
     score: 76,
     rating: 'A',
     trend: 'stable',

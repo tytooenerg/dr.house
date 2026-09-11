@@ -65,7 +65,7 @@ export const openApiSpec = {
                 required: ['sacado', 'valor', 'vencimento'],
                 properties: {
                   sacado: { type: 'string', example: 'Grupo Atlas Varejo' },
-                  cnpj: { type: 'string', example: '12.345.678/0001-90' },
+                  cnpj: { type: 'string', example: '12.345.678/0001-95' },
                   valor: { type: 'string', example: '84.500,00' },
                   vencimento: { type: 'string', example: '2026-08-12' },
                   seguro: { type: 'boolean', default: false },
@@ -196,7 +196,7 @@ export const openApiSpec = {
         summary: 'Consultar score de crédito e rating de um sacado pelo CNPJ',
         description:
           'Combina o histórico interno da Lastro (se o CNPJ já transacionou na plataforma) com sinais de rede reportados por parceiros — funciona mesmo para um CNPJ que nunca transacionou diretamente na Lastro, desde que algum parceiro já tenha reportado um sinal sobre ele. A resposta traz `fonte` (interno/rede/combinado) e `sinaisDeRede`.',
-        parameters: [{ name: 'cnpj', in: 'path', required: true, schema: { type: 'string' }, example: '12.345.678/0001-90' }],
+        parameters: [{ name: 'cnpj', in: 'path', required: true, schema: { type: 'string' }, example: '12.345.678/0001-95' }],
         responses: { '200': { description: 'Score, rating, fatores, sinais de IA e sinais de rede.' }, '404': { description: 'Nenhum histórico (interno ou de rede) para este CNPJ.' } },
       },
     },
@@ -205,7 +205,7 @@ export const openApiSpec = {
         summary: 'Reportar um sinal de comportamento de pagamento para um CNPJ (rede compartilhada de risco)',
         description:
           'Qualquer parceiro (banco, FIDC, ERP…) pode contribuir uma observação sobre um sacado — pagamento pontual, atraso, protesto ou contestação — que passa a alimentar o score de rede de todos os parceiros, não só de quem reportou. Requer chave com escopo leitura e escrita.',
-        parameters: [{ name: 'cnpj', in: 'path', required: true, schema: { type: 'string' }, example: '12.345.678/0001-90' }],
+        parameters: [{ name: 'cnpj', in: 'path', required: true, schema: { type: 'string' }, example: '12.345.678/0001-95' }],
         requestBody: {
           required: true,
           content: {
@@ -268,7 +268,7 @@ export const openApiSpec = {
                 required: ['referenciaExterna', 'sacadoCnpj', 'valor', 'vencimento'],
                 properties: {
                   referenciaExterna: { type: 'string', example: 'nf-90210' },
-                  sacadoCnpj: { type: 'string', example: '12.345.678/0001-90' },
+                  sacadoCnpj: { type: 'string', example: '12.345.678/0001-95' },
                   valor: { type: 'number', example: 84500.0 },
                   vencimento: { type: 'string', example: '2026-08-12' },
                 },
@@ -290,7 +290,7 @@ export const openApiSpec = {
           'Mesmo provedor real-when-configured que o motor de compliance interno já consulta (JUDICIAL_RECORDS_API_URL/KEY) — sem equivalente público gratuito no Brasil, então retorna 503 honesto (nunca cobra, nunca fabrica um resultado limpo) quando não configurado. Disponível em qualquer chave `platform` sem custo adicional, ou vendido avulso por chamada a uma chave dedicada `judicial_records_api`.',
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { type: 'object', required: ['cnpj'], properties: { cnpj: { type: 'string', example: '12.345.678/0001-90' } } } } },
+          content: { 'application/json': { schema: { type: 'object', required: ['cnpj'], properties: { cnpj: { type: 'string', example: '12.345.678/0001-95' } } } } },
         },
         responses: {
           '200': { description: '`processCount`, `hasExecutions`, `hasBankruptcyOrRecovery`, `hasProtests`, `fonte`.' },

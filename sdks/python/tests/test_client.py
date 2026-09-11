@@ -23,7 +23,7 @@ def test_emits_a_duplicata_fetches_it_back_and_lists_marketplace(base_url):
     api_key = register_and_generate_key(internal_url(base_url), "cedente", unique())
     client = LastroClient(api_key, base_url=base_url)
 
-    emitted = client.emitir_duplicata(sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-90", valor="10.000,00", vencimento="2026-12-01")
+    emitted = client.emitir_duplicata(sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-95", valor="10.000,00", vencimento="2026-12-01")
     assert emitted["duplicataId"]
     assert emitted["mode"] == "test"
 
@@ -39,8 +39,8 @@ def test_lists_the_accounts_own_duplicatas_paginated_and_filtered(base_url):
     api_key = register_and_generate_key(internal_url(base_url), "cedente", unique())
     client = LastroClient(api_key, base_url=base_url)
 
-    a = client.emitir_duplicata(sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-90", valor="10.000,00", vencimento="2026-12-01")
-    b = client.emitir_duplicata(sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-90", valor="20.000,00", vencimento="2026-12-02")
+    a = client.emitir_duplicata(sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-95", valor="10.000,00", vencimento="2026-12-01")
+    b = client.emitir_duplicata(sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-95", valor="20.000,00", vencimento="2026-12-02")
 
     page = client.list_duplicatas()
     ids = [d["id"] for d in page["duplicatas"]]
@@ -64,7 +64,7 @@ def test_abrir_leilao_refuses_before_the_sacado_accepts(base_url):
     client = LastroClient(api_key, base_url=base_url)
 
     emitida = client.emitir_duplicata(
-        sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-90", valor="10.000,00", vencimento="2027-12-01", nf_anexada=True
+        sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-95", valor="10.000,00", vencimento="2027-12-01", nf_anexada=True
     )
     with pytest.raises(LastroApiError) as exc_info:
         client.abrir_leilao(emitida["duplicataId"], taxa_maxima=2.5, duracao_horas=24)
@@ -112,7 +112,7 @@ def test_raises_lastro_api_error_401_on_invalid_key(base_url):
 def test_scores_a_cnpj_and_reflects_a_reported_signal(base_url):
     api_key = register_and_generate_key(internal_url(base_url), "cedente", unique())
     client = LastroClient(api_key, base_url=base_url)
-    cnpj = "12.345.678/0001-90"
+    cnpj = "12.345.678/0001-95"
 
     before = client.get_score(cnpj)
     assert isinstance(before["score"], (int, float))

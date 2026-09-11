@@ -34,7 +34,7 @@ describe('POST /api/emitir/preview', () => {
     const res = await request(app)
       .post('/api/emitir/preview')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '50.000', vencimento: '2026-09-01', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '50.000', vencimento: '2026-09-01', seguro: false, nfAnexada: true, batchValores: [] });
     expect(res.status).toBe(200);
     expect(res.body.lastroChecklist.pct).toBe(100);
     // "Grupo Atlas Varejo" is a known sacado in the static risk dataset.

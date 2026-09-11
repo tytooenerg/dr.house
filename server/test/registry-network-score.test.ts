@@ -69,7 +69,7 @@ describe('shared network risk-score', () => {
   it('returns fonte "interno" for a known sacado CNPJ with no network signals', async () => {
     const { token } = await registerEmpresarialCedente();
     const key = await generateKey(token);
-    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     expect(res.status).toBe(200);
     expect(res.body.fonte).toBe('interno');
     expect(res.body.sinaisDeRede).toBeNull();
@@ -104,7 +104,7 @@ describe('shared network risk-score', () => {
   it('blends internal and network data, shifting the score down after protesto signals', async () => {
     const { token } = await registerEmpresarialCedente();
     const key = await generateKey(token, { scope: 'read_write' });
-    const cnpj = '12345678000190'; // Grupo Atlas Varejo, internal score 84
+    const cnpj = '12345678000195'; // Grupo Atlas Varejo, internal score 84
 
     const before = await request(app).get(`/api/v1/sacados/${cnpj}/score`).set('Authorization', `Bearer ${key}`);
     expect(before.body.fonte).toBe('interno');
@@ -135,7 +135,7 @@ describe('shared network risk-score', () => {
 describe('real aceite outcomes auto-seed the network signal pool', () => {
   it('feeds a pagamento_pontual signal into the network when a sacado confirms on time', async () => {
     const { token: cedenteToken } = await registerEmpresarialCedente();
-    const cnpj = '23456789000111'; // Metalúrgica Serrana S.A.
+    const cnpj = '23456789000195'; // Metalúrgica Serrana S.A.
 
     let duplicataId = '';
     for (let attempt = 0; attempt < 8 && !duplicataId; attempt++) {

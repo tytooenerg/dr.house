@@ -50,7 +50,7 @@ describe('o número dentro do anel descreve o anel', () => {
 });
 
 describe('o prêmio do seguro na emissão', () => {
-  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '84.500', vencimento: vencimentoFuturo(), nfAnexada: true, nfeChave: '', batchValores: [] };
+  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '84.500', vencimento: vencimentoFuturo(), nfAnexada: true, nfeChave: '', batchValores: [] };
 
   it('mostra a faixa real das cotações desta duplicata, não um percentual fixo', () => {
     const preview = computeEmitirPreview({ ...base, seguro: true });
@@ -105,7 +105,7 @@ describe('o prêmio do seguro na emissão', () => {
 });
 
 describe('a registradora anunciada é a que será usada', () => {
-  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, nfeChave: '', batchValores: [] };
+  const base = { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, nfeChave: '', batchValores: [] };
 
   it('nomeia UMA registradora, a que chooseRegistradora escolhe para este valor', () => {
     const preview = computeEmitirPreview({ ...base, valor: '84.500' });

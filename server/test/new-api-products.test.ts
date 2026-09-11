@@ -44,13 +44,13 @@ describe('Feature — Judicial Records API', () => {
 
     const admin = await adminToken();
     const before = await addonSummary(admin, 'judicial_records_api');
-    const res = await request(app).post('/api/v1/judicial/consulta').set('Authorization', `Bearer ${key}`).send({ cnpj: '12.345.678/0001-90' });
+    const res = await request(app).post('/api/v1/judicial/consulta').set('Authorization', `Bearer ${key}`).send({ cnpj: '12.345.678/0001-95' });
     expect(res.status).toBe(503);
     const after = await addonSummary(admin, 'judicial_records_api');
     expect(after.count).toBe(before.count);
 
     // A key scoped to this product can't reach an unrelated v1 route.
-    const scoreAttempt = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    const scoreAttempt = await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     expect(scoreAttempt.status).toBe(403);
   });
 });

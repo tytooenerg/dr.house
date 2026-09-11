@@ -37,7 +37,7 @@ async function submitEmitir(token: string, overrides: Partial<{ sacado: string; 
       .set('Authorization', `Bearer ${token}`)
       .send({
         sacado: overrides.sacado ?? 'Grupo Atlas Varejo',
-        cnpj: overrides.cnpj ?? '12.345.678/0001-90',
+        cnpj: overrides.cnpj ?? '12.345.678/0001-95',
         valor: overrides.valor ?? '10.000',
         vencimento: overrides.vencimento ?? '2026-11-01',
         seguro: false,
@@ -84,7 +84,7 @@ describe('Compliance AI Engine — admin-configurable suspend threshold', () => 
 
     // Baseline: a clean, first-time emission does not suspend at the default threshold.
     const cedenteBaseline = await registerCedente(`Fornecedora Baseline ${unique()} Ltda`);
-    const baseline = await submitEmitir(cedenteBaseline, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '3.000', vencimento: vencimentoFuturo() });
+    const baseline = await submitEmitir(cedenteBaseline, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '3.000', vencimento: vencimentoFuturo() });
     expect(baseline.complianceSuspensa).toBe(false);
 
     // Lower the threshold below what even a clean emission scores (score do sacado

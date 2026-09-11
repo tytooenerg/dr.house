@@ -69,9 +69,12 @@ describe('lastro real da NF-e, na emissão', () => {
     expect(alert!.severity).toBe('atencao');
     expect(alert!.message).toContain('dígito verificador');
 
+    // Nunca bloqueia: a emissão em si não falha (200, ver emitir() acima). Mas desde que o
+    // checklist de lastro passou a exigir o dígito verificador de verdade, este item conta
+    // como pendente — a duplicata fica em 'Pendente análise', não 'Aprovada'.
     const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${token}`);
     const own = (minhas.body.duplicatas as { id: string; status: string }[]).find((d) => d.id === duplicataId);
-    expect(own!.status).toBe('Aprovada');
+    expect(own!.status).toBe('Pendente análise');
   });
 
   it('chave que bate no dígito verificador oficial não gera alerta nenhum', async () => {

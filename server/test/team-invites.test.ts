@@ -37,7 +37,7 @@ async function submitEmitir(token: string) {
       .set('Authorization', `Bearer ${token}`)
       .send({
         sacado: 'Grupo Atlas Varejo',
-        cnpj: '12.345.678/0001-90',
+        cnpj: '12.345.678/0001-95',
         valor: '10.000',
         vencimento: vencimentoFuturo(),
         seguro: false,
