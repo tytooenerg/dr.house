@@ -336,7 +336,7 @@ export interface AceiteRow {
   created_at: string;
 }
 
-export type ComplianceAlertType = 'nfe_duplicidade' | 'valor_anomalo' | 'pld_screening';
+export type ComplianceAlertType = 'nfe_duplicidade' | 'valor_anomalo' | 'pld_screening' | 'cnpj_invalido' | 'cnpj_situacao_irregular';
 export type ComplianceAlertSeverity = 'info' | 'atencao' | 'critico';
 
 export interface ComplianceAlertRow {
