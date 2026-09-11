@@ -38,7 +38,7 @@ async function submitEmitir(token: string, overrides: Partial<{ vencimento: stri
       .set('Authorization', `Bearer ${token}`)
       .send({
         sacado: 'Grupo Atlas Varejo',
-        cnpj: '12.345.678/0001-90',
+        cnpj: '12.345.678/0001-95',
         valor: overrides.valor ?? '8.000',
         vencimento: overrides.vencimento ?? '2020-01-10',
         seguro: false,
@@ -151,7 +151,7 @@ describe('Monitor regulatório (IA)', () => {
 
 describe('Verificação de histórico judicial (real-when-configured)', () => {
   it('returns null when JUDICIAL_RECORDS_API_URL/KEY is not configured', async () => {
-    const result = await screenJudicialRecords('12.345.678/0001-90');
+    const result = await screenJudicialRecords('12.345.678/0001-95');
     expect(result).toBeNull();
   });
 });

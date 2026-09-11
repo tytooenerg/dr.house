@@ -53,7 +53,7 @@ describe('Sandbox isolation extended to aceites and disputes', () => {
     const created = await request(app)
       .post('/api/v1/duplicatas')
       .set('Authorization', `Bearer ${testKey}`)
-      .send({ sacado: sacadoNome, cnpj: '12.345.678/0001-90', valor: '8000', vencimento: vencimentoFuturo() });
+      .send({ sacado: sacadoNome, cnpj: '12.345.678/0001-95', valor: '8000', vencimento: vencimentoFuturo() });
     expect(created.status).toBe(200);
 
     const viaTestKey = await request(app).get('/api/v1/aceites').set('Authorization', `Bearer ${testKey}`);

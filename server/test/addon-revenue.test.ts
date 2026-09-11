@@ -101,7 +101,7 @@ describe('Feature 1 — API usage overage billing', () => {
 
     // Any authenticated v1 call increments usage — hit a cheap read endpoint a few times.
     for (let i = 0; i < 3; i++) {
-      await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+      await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     }
 
     const before = await addonSummary(admin, 'api_overage');
@@ -133,7 +133,7 @@ describe('Feature 2 — Score API standalone product', () => {
     const admin = await adminToken();
     const before = await addonSummary(admin, 'score_api');
 
-    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     expect(res.status).toBe(200);
 
     const after = await addonSummary(admin, 'score_api');
@@ -150,7 +150,7 @@ describe('Feature 2 — Score API standalone product', () => {
 
     const admin = await adminToken();
     const before = await addonSummary(admin, 'score_api');
-    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    const res = await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     expect(res.status).toBe(200);
     const after = await addonSummary(admin, 'score_api');
     expect(after.count).toBe(before.count);
@@ -173,7 +173,7 @@ describe('Feature 3 — PLD/KYC screening as a service', () => {
     const after = await addonSummary(admin, 'pld_screening_api');
     expect(after.count).toBe(before.count + 1);
 
-    const forbidden = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    const forbidden = await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     expect(forbidden.status).toBe(403);
   });
 });
@@ -186,7 +186,7 @@ describe('Feature — Registro API (compliance-as-a-service)', () => {
     const admin = await adminToken();
     const before = await addonSummary(admin, 'registro_api');
 
-    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: vencimentoFuturo() });
+    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-95', valor: 15000, vencimento: vencimentoFuturo() });
     expect(res.status).toBe(200);
     expect(res.body.registro).toBeTypeOf('string');
     expect(res.body.registradora).toBeTypeOf('string');
@@ -196,7 +196,7 @@ describe('Feature — Registro API (compliance-as-a-service)', () => {
     expect(after.count).toBe(before.count + 1);
 
     // A narrow product key can't reach any other v1 endpoint.
-    const forbidden = await request(app).get('/api/v1/sacados/12.345.678%2F0001-90/score').set('Authorization', `Bearer ${key}`);
+    const forbidden = await request(app).get('/api/v1/sacados/12.345.678%2F0001-95/score').set('Authorization', `Bearer ${key}`);
     expect(forbidden.status).toBe(403);
   });
 
@@ -206,7 +206,7 @@ describe('Feature — Registro API (compliance-as-a-service)', () => {
 
     const admin = await adminToken();
     const before = await addonSummary(admin, 'registro_api');
-    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-90', valor: 15000, vencimento: vencimentoFuturo() });
+    const res = await postRegistroWithRetry(key, { referenciaExterna: `ext-${unique()}`, sacadoCnpj: '12.345.678/0001-95', valor: 15000, vencimento: vencimentoFuturo() });
     expect(res.status).toBe(200);
     const after = await addonSummary(admin, 'registro_api');
     expect(after.count).toBe(before.count);

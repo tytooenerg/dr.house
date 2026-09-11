@@ -80,7 +80,7 @@ describe('LastroClient — real end-to-end against the live server', () => {
     const apiKey = await registerAndGenerateKey('cedente');
     const client = new LastroClient({ apiKey, baseUrl });
 
-    const emitted = await client.emitirDuplicata({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '10.000,00', vencimento: '2026-12-01' });
+    const emitted = await client.emitirDuplicata({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '10.000,00', vencimento: '2026-12-01' });
     expect(emitted.duplicataId).toBeTruthy();
     expect(emitted.mode).toBe('test');
 
@@ -96,8 +96,8 @@ describe('LastroClient — real end-to-end against the live server', () => {
     const apiKey = await registerAndGenerateKey('cedente');
     const client = new LastroClient({ apiKey, baseUrl });
 
-    const a = await client.emitirDuplicata({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '10.000,00', vencimento: '2026-12-01' });
-    const b = await client.emitirDuplicata({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '20.000,00', vencimento: '2026-12-02' });
+    const a = await client.emitirDuplicata({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '10.000,00', vencimento: '2026-12-01' });
+    const b = await client.emitirDuplicata({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '20.000,00', vencimento: '2026-12-02' });
 
     const page = await client.listDuplicatas();
     const ids = page.duplicatas.map((d) => d.id);
@@ -122,7 +122,7 @@ describe('LastroClient — real end-to-end against the live server', () => {
     // ainda não é negociável, e é isso que a primeira chamada prova.
     const emitida = await client.emitirDuplicata({
       sacado: 'Grupo Atlas Varejo',
-      cnpj: '12.345.678/0001-90',
+      cnpj: '12.345.678/0001-95',
       valor: '10.000,00',
       vencimento: '2027-12-01',
       nfAnexada: true,
@@ -189,7 +189,7 @@ describe('LastroClient — real end-to-end against the live server', () => {
   it('scores a CNPJ, and a reported signal is reflected in a follow-up score lookup', async () => {
     const apiKey = await registerAndGenerateKey('cedente');
     const client = new LastroClient({ apiKey, baseUrl });
-    const cnpj = '12.345.678/0001-90';
+    const cnpj = '12.345.678/0001-95';
 
     const before = await client.getScore(cnpj);
     expect(typeof before.score).toBe('number');

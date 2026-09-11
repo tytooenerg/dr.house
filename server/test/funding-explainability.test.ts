@@ -39,7 +39,7 @@ describe('Funding explainability — "Por que essa oferta?"', () => {
       cedenteId: null,
       cedenteNome: 'Cedente Explicação',
       sacadoNome: 'Grupo Atlas Varejo', // seeded score 84 → rating AA
-      sacadoCnpj: '12.345.678/0001-90',
+      sacadoCnpj: '12.345.678/0001-95',
       valor: 30000,
       vencimento: vencimentoFuturo(),
       emissao: '10/08/2026',

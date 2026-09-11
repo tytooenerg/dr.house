@@ -35,12 +35,12 @@ async function cedenteComDuplicataEmLeilao() {
   let emit = await request(app)
     .post('/api/emitir/submit')
     .set('Authorization', `Bearer ${token}`)
-    .send({ sacado: unico('Sacado'), cnpj: '44.333.222/0001-11', valor: '40.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+    .send({ sacado: unico('Sacado'), cnpj: '11.444.777/0001-61', valor: '40.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
   for (let i = 0; i < 5 && emit.status !== 200; i++) {
     emit = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: unico('Sacado'), cnpj: '44.333.222/0001-11', valor: '40.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: unico('Sacado'), cnpj: '11.444.777/0001-61', valor: '40.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
   }
   expect(emit.status).toBe(200);
   const duplicataId = emit.body.duplicataId as string;

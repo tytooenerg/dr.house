@@ -17,7 +17,7 @@ async function register(role: 'cedente' | 'sacado' | 'investidor', companyName: 
 // Grupo Atlas Varejo tem um perfil interno seedado (data/seed.ts SACADOS), score 84 →
 // rating AA — a única forma determinística de dar a buildBlendedRiscoViewSync um sinal
 // real sem depender de sinais de rede. Usado só pelo CNPJ, não pelo nome da conta.
-const CNPJ_COM_HISTORICO = '12.345.678/0001-90';
+const CNPJ_COM_HISTORICO = '12.345.678/0001-95';
 const CNPJ_SEM_HISTORICO = '00.000.000/0001-00';
 
 // /api/emitir/submit passa por lib/registradoras.ts, que simula ~12% de indisponibilidade

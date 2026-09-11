@@ -137,7 +137,7 @@ export function defaultSettings(): UserSettings {
     kycDocsAttempts: 0,
     playgroundEndpoint: 'emitir',
     playgroundParams: {
-      sacado_cnpj: '12.345.678/0001-90', valor: '84500.00', vencimento: '2026-08-12', seguro: 'true',
+      sacado_cnpj: '12.345.678/0001-95', valor: '84500.00', vencimento: '2026-08-12', seguro: 'true',
       duplicata_id: 'dup_9f2a', leilao_id: 'dup_9f2a', taxa: '1.8', cnpj: '58.442.111/0001-27',
       url: 'https://webhook.seusistema.com.br/lastro', evento: 'duplicata.registrada',
     },
@@ -336,7 +336,14 @@ export interface AceiteRow {
   created_at: string;
 }
 
-export type ComplianceAlertType = 'nfe_duplicidade' | 'valor_anomalo' | 'pld_screening' | 'cnpj_invalido' | 'cnpj_situacao_irregular';
+export type ComplianceAlertType =
+  | 'nfe_duplicidade'
+  | 'valor_anomalo'
+  | 'pld_screening'
+  | 'cnpj_invalido'
+  | 'cnpj_situacao_irregular'
+  | 'nfe_chave_invalida'
+  | 'nfe_situacao_irregular';
 export type ComplianceAlertSeverity = 'info' | 'atencao' | 'critico';
 
 export interface ComplianceAlertRow {

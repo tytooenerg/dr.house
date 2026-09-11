@@ -22,7 +22,7 @@ async function loginAdmin() {
   return { token: res.body.token as string };
 }
 
-const CNPJ_COM_HISTORICO = '12.345.678/0001-90';
+const CNPJ_COM_HISTORICO = '12.345.678/0001-95';
 
 describe('GET /api/admin/confirming — oversight do Programa Confirming', () => {
   it('lists a program the sacado just created, with its own enrollment count and fund overview', async () => {

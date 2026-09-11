@@ -65,7 +65,7 @@ describe('dynamic pricing — rating-scoped liquidity signal (funding explainabi
         cedenteId: cedente.id,
         cedenteNome: cedente.company_name,
         sacadoNome: 'Grupo Atlas Varejo',
-        sacadoCnpj: '12.345.678/0001-90',
+        sacadoCnpj: '12.345.678/0001-95',
         valor: 30_000,
         vencimento: vencimentoFuturo(),
         emissao: '01/01/2026',

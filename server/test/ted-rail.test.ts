@@ -105,7 +105,7 @@ describe('TED withdrawal', () => {
     const conta = await request(app)
       .post('/api/account/kyc/bank-ted')
       .set('Authorization', `Bearer ${token}`)
-      .send({ banco: 'Banco Teste', agencia: '0001', conta: '12345-6', tipoConta: 'corrente', titularNome: 'Empresa Teste', titularCnpj: '12.345.678/0001-90' });
+      .send({ banco: 'Banco Teste', agencia: '0001', conta: '12345-6', tipoConta: 'corrente', titularNome: 'Empresa Teste', titularCnpj: '12.345.678/0001-95' });
     expect(conta.status).toBe(200);
     expect(conta.body.tedContaBancaria.banco).toBe('Banco Teste');
 

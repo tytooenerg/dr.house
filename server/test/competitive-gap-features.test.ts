@@ -34,13 +34,13 @@ async function demoEmpresarialCedenteToken() {
 
 describe('Real-when-configured adapters return null/unavailable when unconfigured', () => {
   it('Open Finance', async () => {
-    expect(await consultarFluxoDeCaixa('12.345.678/0001-90')).toBeNull();
+    expect(await consultarFluxoDeCaixa('12.345.678/0001-95')).toBeNull();
   });
   it('biometric KYC', async () => {
     expect(await verificarProvaDeVida(Buffer.from('fake'), 'image/jpeg')).toBeNull();
   });
   it('judicial records', async () => {
-    expect(await screenJudicialRecords('12.345.678/0001-90')).toBeNull();
+    expect(await screenJudicialRecords('12.345.678/0001-95')).toBeNull();
   });
   it('SAP/TOTVS connection tests fail gracefully against an unreachable host', async () => {
     const sap = await testSapConnection('http://127.0.0.1:1', 'SBODEMO', 'user', 'pass');

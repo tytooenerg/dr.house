@@ -40,7 +40,7 @@ async function submitEmitir(token: string, overrides: Partial<{ sacado: string; 
       .set('Authorization', `Bearer ${token}`)
       .send({
         sacado: overrides.sacado ?? 'Grupo Atlas Varejo',
-        cnpj: overrides.cnpj ?? '12.345.678/0001-90',
+        cnpj: overrides.cnpj ?? '12.345.678/0001-95',
         valor: overrides.valor ?? '10.000',
         vencimento: overrides.vencimento ?? '2026-11-01',
         seguro: false,
@@ -59,13 +59,13 @@ async function submitEmitir(token: string, overrides: Partial<{ sacado: string; 
 describe('Compliance AI Engine', () => {
   it('does not suspend a clean, first-time emission', async () => {
     const token = await registerCedente(`Fornecedora Idônea ${unique()} Ltda`);
-    const result = await submitEmitir(token, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '5.000', vencimento: vencimentoFuturo() });
+    const result = await submitEmitir(token, { sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '5.000', vencimento: vencimentoFuturo() });
     expect(result.complianceSuspensa).toBe(false);
   });
 
   it('suspends and routes to the admin queue when duplicidade + PLD flag + a low sacado rating combine past the threshold', async () => {
     const sacado = 'Construtora Vale Norte'; // rating C in the static risk dataset
-    const cnpj = '34.567.890/0001-22';
+    const cnpj = '34.567.890/0001-30';
     const valor = '77.000';
     const vencimento = '2026-12-15';
 

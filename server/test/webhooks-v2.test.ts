@@ -167,7 +167,7 @@ describe('Webhooks v2 — sinistro.decidido', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedente.token}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-90', valor: '20.000', vencimento: vencimentoFuturo(), seguro: true, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-95', valor: '20.000', vencimento: vencimentoFuturo(), seguro: true, nfAnexada: true });
       emitStatus = res.status;
       if (res.status === 200) duplicataId = res.body.duplicataId as string;
     }
@@ -261,7 +261,7 @@ describe('Webhooks v2 — rating.alterado', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-90', valor: '10.000', vencimento: vencimentoFuturo(), seguro: false });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '10.000', vencimento: vencimentoFuturo(), seguro: false });
       emitStatus = res.status;
     }
     expect(emitStatus).toBe(200);
@@ -285,7 +285,7 @@ describe('Webhooks v2 — rating.alterado', () => {
     let lastRating = '';
     for (let i = 0; i < 3; i++) {
       const res = await request(app)
-        .post('/api/v1/sacados/12.345.678%2F0001-90/sinais')
+        .post('/api/v1/sacados/12.345.678%2F0001-95/sinais')
         .set('Authorization', `Bearer ${reporterKey}`)
         .send({ tipo: 'protesto', nota: `webhook v2 test ${i}` });
       expect(res.status).toBe(200);

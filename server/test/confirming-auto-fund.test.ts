@@ -37,7 +37,7 @@ async function register(role: 'cedente' | 'sacado' | 'investidor', companyName: 
 // Grupo Atlas Varejo tem perfil interno seedado (score 84 → rating AA) — a única forma
 // determinística de dar ao programa uma taxa real sem depender de sinais de rede. Usado só
 // pelo CNPJ na criação do programa, não pelo nome da conta sacado.
-const CNPJ_COM_HISTORICO = '12.345.678/0001-90';
+const CNPJ_COM_HISTORICO = '12.345.678/0001-95';
 
 // /api/emitir/submit passa pelo registro simulado (~12% de indisponibilidade de
 // propósito) — retry até 5x, mesmo padrão de aceites-disputas.test.ts.
@@ -52,7 +52,7 @@ async function emitirComRetry(token: string, body: Record<string, unknown>) {
 // Checklist de lastro precisa bater 100% (nfAnexada + os demais campos) pra dispararLeilao
 // funcionar — mesmo gate que já existe pra uma duplicata chegar em 'aprovada'.
 function formCompleto(sacado: string, valor: string) {
-  return { sacado, cnpj: '99.999.999/0001-99', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] };
+  return { sacado, cnpj: '99.999.999/0001-91', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] };
 }
 
 async function criarProgramaEMatricular(sacadoToken: string, cedenteUserId: number, limite = '500.000') {

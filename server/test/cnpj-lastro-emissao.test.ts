@@ -65,10 +65,14 @@ describe('lastro real do CNPJ do sacado, na emissão', () => {
     expect(cnpjAlert!.severity).toBe('atencao');
     expect(cnpjAlert!.message).toContain('dígito verificador');
 
-    // Nunca bloqueia: a duplicata segue seu fluxo normal (aprovada, no lastro completo).
+    // Nunca bloqueia: a emissão em si não falha (200, ver emitir() acima). Mas desde que o
+    // checklist de lastro passou a exigir o dígito verificador de verdade, este item conta
+    // como pendente — a duplicata fica em 'Pendente análise', não 'Aprovada', até o cedente
+    // corrigir o CNPJ. Isso é o ponto do PR seguinte desta sequência: refletir a verificação
+    // real no próprio checklist, não só num alerta à parte.
     const minhas = await request(app).get('/api/minhas').set('Authorization', `Bearer ${token}`);
     const own = (minhas.body.duplicatas as { id: string; status: string }[]).find((d) => d.id === duplicataId);
-    expect(own!.status).toBe('Aprovada');
+    expect(own!.status).toBe('Pendente análise');
   });
 
   it('CNPJ que bate no dígito verificador oficial não gera alerta nenhum', async () => {

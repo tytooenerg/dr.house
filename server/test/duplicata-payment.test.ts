@@ -46,7 +46,7 @@ function formCompleto(sacado: string, valor: string) {
   // nfAnexada: true — precisa de checklist 100% (status 'aprovada' na hora) pra poder
   // disparar leilão ou reportar pagamento direto; sem isso a duplicata fica
   // 'pendente_analise'.
-  return { sacado, cnpj: '33.222.111/0001-77', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] };
+  return { sacado, cnpj: '33.222.111/0001-00', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] };
 }
 
 async function extratoOf(token: string) {
@@ -148,7 +148,7 @@ describe('Reportar pagamento no vencimento — caminho feliz por tipo de credor'
 
     // CNPJ com histórico real seedado (data/seed.ts SACADOS) — necessário pra
     // buildBlendedRiscoViewSync calcular uma taxa (mesmo CNPJ usado em confirming.test.ts).
-    const CNPJ_COM_HISTORICO = '12.345.678/0001-90';
+    const CNPJ_COM_HISTORICO = '12.345.678/0001-95';
     await request(app).post('/api/confirming/criar').set('Authorization', `Bearer ${sacadoToken}`).send({ cnpj: CNPJ_COM_HISTORICO, limite: '500.000' });
     await request(app).post('/api/confirming/membros').set('Authorization', `Bearer ${sacadoToken}`).send({ cedenteUserId });
     await request(app).post('/api/confirming-fundo/contribuir').set('Authorization', `Bearer ${fundoInvestorToken}`).send({ valor: 50000 });

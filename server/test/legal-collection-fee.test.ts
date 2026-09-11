@@ -47,7 +47,7 @@ async function submitEmitir(token: string, overrides: Partial<{ vencimento: stri
       .set('Authorization', `Bearer ${token}`)
       .send({
         sacado: overrides.sacado ?? 'Grupo Atlas Varejo',
-        cnpj: overrides.cnpj ?? '12.345.678/0001-90',
+        cnpj: overrides.cnpj ?? '12.345.678/0001-95',
         valor: overrides.valor ?? '10.000',
         vencimento: overrides.vencimento ?? '2020-01-10',
         seguro: false,
@@ -115,7 +115,7 @@ describe('Fee de sucesso — cobrança jurídica', () => {
     const admin = await adminToken();
     const investor = await investorToken();
     const cedente = await registerCedente(`Fornecedora Vendida ${unique()} Ltda`);
-    const emitted = await submitEmitir(cedente, { vencimento: '2020-03-20', sacado: 'Metalúrgica Serrana S.A.', cnpj: '23.456.789/0001-01' });
+    const emitted = await submitEmitir(cedente, { vencimento: '2020-03-20', sacado: 'Metalúrgica Serrana S.A.', cnpj: '11.222.333/0001-81' });
 
     const aceite = getAceiteByDuplicata(emitted.duplicataId)!;
     setAceiteStatus(aceite.id, 'aceita');
@@ -156,7 +156,7 @@ describe('Fee de sucesso — cobrança jurídica', () => {
     const emitted = await submitEmitir(cedente, {
       vencimento: '2020-05-10',
       sacado: `Comércio Rio Preto ${unique()} Ltda`,
-      cnpj: '34.567.890/0001-12',
+      cnpj: '11.222.333/0001-81',
       valor: '200.000',
     });
 
@@ -190,7 +190,7 @@ describe('Fee de sucesso — cobrança jurídica', () => {
 
     // CNPJ com histórico real seedado (data/seed.ts SACADOS) — necessário pra
     // buildBlendedRiscoViewSync calcular uma taxa (mesmo CNPJ usado em duplicata-payment.test.ts).
-    const CNPJ_COM_HISTORICO = '12.345.678/0001-90';
+    const CNPJ_COM_HISTORICO = '12.345.678/0001-95';
     await request(app).post('/api/confirming/criar').set('Authorization', `Bearer ${sacadoToken}`).send({ cnpj: CNPJ_COM_HISTORICO, limite: '500.000' });
     await request(app).post('/api/confirming/membros').set('Authorization', `Bearer ${sacadoToken}`).send({ cedenteUserId });
     const fundoInvestorToken = await investorToken();
