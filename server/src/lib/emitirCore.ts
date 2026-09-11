@@ -12,6 +12,7 @@ import { BASICO_MONTHLY_EMIT_LIMIT, planAtLeast } from './billing.js';
 import { listInsuranceQuotes } from './insuranceQuotes.js';
 import { platformFee } from './settlement.js';
 import { chooseRegistradora, registrarNaRegistradora } from './registradoras.js';
+import { cnpjChecksumValido, consultarCnpj } from './cnpjLookup.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
@@ -260,6 +261,39 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
     vencimento: form.vencimento,
     registradora: registradora.key,
   });
+
+  // Lastro real do CNPJ do sacado (lib/cnpjLookup.ts) — o dado mais básico que um
+  // banco/FIDC confere antes de financiar um recebível: existe uma empresa de verdade
+  // atrás desse CNPJ, e ela não está baixada/suspensa? Eixo separado da Compliance AI
+  // Engine abaixo (aquela mede fraude/PLD/duplicidade; isto mede se o CNPJ em si é real) —
+  // por isso vira um alerta de compliance visível pro back-office (já entra em
+  // computeFraudFlags, lib/fraudDetection.ts), não um ponto na pontuação de suspensão:
+  // ainda não temos como saber, só pelo CNPJ não bater no dígito verificador, se foi erro
+  // de digitação do cedente ou fraude — cabe a um humano decidir, não a um bloqueio
+  // automático. Nunca lança: um CNPJ com formato errado não pode derrubar a emissão.
+  if (form.cnpj) {
+    const digits = form.cnpj.replace(/\D/g, '');
+    if (digits && !cnpjChecksumValido(digits)) {
+      createComplianceAlert({
+        type: 'cnpj_invalido',
+        severity: 'atencao',
+        message: `CNPJ do sacado (${form.cnpj}) não passa no dígito verificador oficial da Receita Federal — pode ser erro de digitação ou CNPJ inexistente.`,
+        userId: user.id,
+        duplicataId: duplicata.id,
+      });
+    } else if (digits) {
+      const info = await consultarCnpj(digits);
+      if (info && !info.ativo) {
+        createComplianceAlert({
+          type: 'cnpj_situacao_irregular',
+          severity: 'critico',
+          message: `CNPJ do sacado (${form.cnpj}) está com situação cadastral "${info.situacao}" na Receita Federal — não ATIVA.`,
+          userId: user.id,
+          duplicataId: duplicata.id,
+        });
+      }
+    }
+  }
 
   // Compliance AI Engine — real, deterministic 0-100 score combining duplicidade, PLD,
   // valor anômalo and score do sacado (see lib/complianceEngine.ts). A score at/above the
