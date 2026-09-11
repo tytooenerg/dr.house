@@ -11,6 +11,8 @@ import { claudeEnabled } from './claude.js';
 import { twilioEnabled } from './smsNotifier.js';
 import { sentryEnabled } from './sentry.js';
 import { REGISTRADORAS, registradoraConfigured } from './registradoras.js';
+import { cnpjLookupEnabled } from './cnpjLookup.js';
+import { nfeStatusEnabled } from './nfeStatus.js';
 
 // Este arquivo responde a uma pergunta que nenhum outro respondia: **este servidor está apto a
 // mover dinheiro de verdade?**
@@ -82,6 +84,20 @@ export function integracoes(): ItemDePreflight[] {
     { chave: 'sentry', nome: 'Monitoramento de erros', real: sentryEnabled, envs: ['SENTRY_DSN'], semEle: 'erros de produção só aparecem no log local' },
     { chave: 'claude', nome: 'IA (Claude)', real: claudeEnabled, envs: ['ANTHROPIC_API_KEY'], semEle: 'os recursos assistidos por IA usam fallback estático, rotulado' },
     { chave: 'twilio', nome: 'WhatsApp/SMS', real: twilioEnabled, envs: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'], semEle: 'mensagens são apenas logadas' },
+    {
+      chave: 'cnpjLookup',
+      nome: 'Situação real do CNPJ (Receita Federal)',
+      real: cnpjLookupEnabled,
+      envs: ['CNPJ_LOOKUP_LIVE'],
+      semEle: 'só o dígito verificador do CNPJ é checado — sem consulta à situação cadastral real',
+    },
+    {
+      chave: 'nfeStatus',
+      nome: 'Situação real da NF-e (SEFAZ)',
+      real: nfeStatusEnabled,
+      envs: ['NFE_STATUS_API_URL', 'NFE_STATUS_API_KEY'],
+      semEle: 'só o dígito verificador da chave de acesso é checado — sem consulta à situação real na SEFAZ',
+    },
   ];
 }
 
