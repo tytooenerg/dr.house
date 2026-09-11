@@ -13,6 +13,7 @@ import { listInsuranceQuotes } from './insuranceQuotes.js';
 import { platformFee } from './settlement.js';
 import { chooseRegistradora, registrarNaRegistradora } from './registradoras.js';
 import { cnpjChecksumValido, consultarCnpj } from './cnpjLookup.js';
+import { chaveNfeChecksumValida, consultarSituacaoNfe } from './nfeStatus.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
@@ -288,6 +289,35 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
           type: 'cnpj_situacao_irregular',
           severity: 'critico',
           message: `CNPJ do sacado (${form.cnpj}) está com situação cadastral "${info.situacao}" na Receita Federal — não ATIVA.`,
+          userId: user.id,
+          duplicataId: duplicata.id,
+        });
+      }
+    }
+  }
+
+  // Segundo pilar do lastro real: a NF-e anexada existe e está autorizada de verdade
+  // junto à SEFAZ, ou foi cancelada/denegada depois de vinculada aqui? (lib/nfeStatus.ts)
+  // Mesma postura do bloco de CNPJ acima: eixo separado da Compliance AI Engine, alerta
+  // não-bloqueante — o dígito verificador da chave pega erro de digitação/chave inventada
+  // sem depender de rede; a situação real exige um provedor configurado
+  // (NFE_STATUS_API_URL/KEY).
+  if (nfeChave) {
+    if (!chaveNfeChecksumValida(nfeChave)) {
+      createComplianceAlert({
+        type: 'nfe_chave_invalida',
+        severity: 'atencao',
+        message: `Chave de acesso da NF-e (${nfeChave}) não passa no dígito verificador oficial — pode ser erro de digitação ou chave inventada.`,
+        userId: user.id,
+        duplicataId: duplicata.id,
+      });
+    } else {
+      const status = await consultarSituacaoNfe(nfeChave);
+      if (status && status.situacao !== 'autorizada') {
+        createComplianceAlert({
+          type: 'nfe_situacao_irregular',
+          severity: 'critico',
+          message: `NF-e (${nfeChave}) está com situação "${status.situacao}" na SEFAZ${status.motivo ? ` (${status.motivo})` : ''} — não autorizada.`,
           userId: user.id,
           duplicataId: duplicata.id,
         });
