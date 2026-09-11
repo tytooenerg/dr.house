@@ -164,4 +164,14 @@ describe('preflight: uma leitura só do que é real e do que é simulado', () =>
       expect(i.semEle.length, `${i.chave} não diz o que acontece sem ele`).toBeGreaterThan(10);
     }
   });
+
+  // Achado corrigido: lib/cnpjLookup.ts e lib/nfeStatus.ts (lastro real de CNPJ/NF-e) foram
+  // ao ar com sua própria linha de log de boot, mas nunca entraram nesta lista — exatamente
+  // o "máquina pronta, ninguém olha" que este arquivo existe pra evitar. O admin olhando
+  // /admin/preflight não tinha como saber que essas duas consultas seguiam simuladas.
+  it('as duas integrações de lastro real (CNPJ e NF-e) aparecem na lista de prontidão', () => {
+    const chaves = prontidao().integracoes.map((i) => i.chave);
+    expect(chaves).toContain('cnpjLookup');
+    expect(chaves).toContain('nfeStatus');
+  });
 });

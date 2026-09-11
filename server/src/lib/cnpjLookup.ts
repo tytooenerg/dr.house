@@ -15,7 +15,8 @@ import { logger } from './logger.js';
 //    comercial pago, aqui o dado é gratuito e público — como a lista OFAC de
 //    lib/sanctionsFeed.ts. CNPJ_LOOKUP_LIVE existe só pra manter dev/CI rápidos e
 //    independentes de rede, não por custo ou por falta de acesso.
-const liveEnabled = process.env.CNPJ_LOOKUP_LIVE === 'true';
+export const cnpjLookupEnabled = process.env.CNPJ_LOOKUP_LIVE === 'true';
+const liveEnabled = cnpjLookupEnabled;
 const API_URL = process.env.CNPJ_LOOKUP_API_URL || 'https://brasilapi.com.br/api/cnpj/v1';
 
 if (liveEnabled) logger.info('[cnpj] CNPJ_LOOKUP_LIVE ativo — situação cadastral real será consultada na Receita Federal (via BrasilAPI)');
