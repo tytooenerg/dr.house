@@ -82,7 +82,7 @@ function CodeBlock({ children }: { children: string }) {
 }
 
 const SAMPLES = {
-  curl: `curl -X POST https://api.lastro.com.br/v1/duplicatas \\
+  curl: `curl -X POST https://api.lastrox.com.br/v1/duplicatas \\
   -H "Authorization: Bearer lastro_test_..." \\
   -H "Content-Type: application/json" \\
   -H "Idempotency-Key: minha-chave-unica-001" \\

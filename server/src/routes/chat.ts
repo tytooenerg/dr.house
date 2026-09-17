@@ -67,7 +67,7 @@ chatRouter.post(
       return;
     }
 
-    const canned = CHAT_ANSWERS[question] || 'Ainda não tenho uma resposta pronta para essa pergunta — mas nossa equipe de suporte pode ajudar em suporte@lastro.com.br.';
+    const canned = CHAT_ANSWERS[question] || 'Ainda não tenho uma resposta pronta para essa pergunta — mas nossa equipe de suporte pode ajudar em suporte@lastrox.com.br.';
     res.json({ question, answer: canned, source: 'canned' });
   })
 );
