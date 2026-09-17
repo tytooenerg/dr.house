@@ -19,10 +19,10 @@ const PRIVACIDADE = [
 ];
 
 const CONTATOS = [
-  { title: 'Comercial e parcerias', desc: 'Bancos, FIDCs e fundos interessados em integrar o marketplace.', email: 'comercial@lastro.com.br' },
-  { title: 'Suporte técnico', desc: 'Dúvidas sobre integração de API ou uso da plataforma.', email: 'suporte@lastro.com.br' },
-  { title: 'Compliance e privacidade', desc: 'Solicitações de dados (LGPD) e questões regulatórias.', email: 'compliance@lastro.com.br' },
-  { title: 'Imprensa e investidores', desc: 'Pauta, entrevistas e relações com investidores.', email: 'contato@lastro.com.br' },
+  { title: 'Comercial e parcerias', desc: 'Bancos, FIDCs e fundos interessados em integrar o marketplace.', email: 'comercial@lastrox.com.br' },
+  { title: 'Suporte técnico', desc: 'Dúvidas sobre integração de API ou uso da plataforma.', email: 'suporte@lastrox.com.br' },
+  { title: 'Compliance e privacidade', desc: 'Solicitações de dados (LGPD) e questões regulatórias.', email: 'compliance@lastrox.com.br' },
+  { title: 'Imprensa e investidores', desc: 'Pauta, entrevistas e relações com investidores.', email: 'contato@lastrox.com.br' },
 ];
 
 export function LegalPage() {

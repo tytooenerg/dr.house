@@ -11,7 +11,7 @@ sem HTTPS/hardening, para rodar rápido na sua máquina).
 
 - Um VPS com Docker e Docker Compose instalados (qualquer provedor — o importante é ter um
   IP público fixo). 2 vCPU / 2-4 GB RAM já é confortável para começar.
-- Um domínio (ou subdomínio) real que você controla, ex. `app.suaempresa.com.br`.
+- Um domínio (ou subdomínio) real que você controla, ex. `app.lastrox.com.br`.
 - Portas **80** e **443** liberadas no firewall do servidor — o Caddy precisa delas para o
   desafio HTTPS automático (Let's Encrypt) e para servir tráfego.
 
@@ -21,10 +21,10 @@ Aponte um registro **A** (e **AAAA**, se o servidor tiver IPv6) do seu domínio 
 público do servidor:
 
 ```
-app.suaempresa.com.br.   A   <IP do servidor>
+app.lastrox.com.br.   A   <IP do servidor>
 ```
 
-Confirme que já propagou antes de continuar (`dig +short app.suaempresa.com.br` deve
+Confirme que já propagou antes de continuar (`dig +short app.lastrox.com.br` deve
 devolver o IP do servidor) — o Caddy só consegue emitir o certificado HTTPS depois que o
 DNS já resolve para ele.
 
@@ -59,8 +59,8 @@ fallback inseguro em produção):
 JWT_SECRET=$(openssl rand -hex 32)
 
 # URL pública real da aplicação — a mesma que você apontou no DNS, com https://
-APP_URL=https://app.suaempresa.com.br
-CORS_ORIGINS=https://app.suaempresa.com.br
+APP_URL=https://app.lastrox.com.br
+CORS_ORIGINS=https://app.lastrox.com.br
 
 # Senha do Redis interno (cache + relay do WebSocket) — nunca published para a internet,
 # mas ainda assim exige senha (ver docker-compose.prod.yml).
@@ -101,7 +101,7 @@ Espere a linha `Lastro API listening on http://localhost:4000`. Depois confirme 
 servidor:
 
 ```bash
-curl -s https://app.suaempresa.com.br/api/health
+curl -s https://app.lastrox.com.br/api/health
 # {"ok":true,"service":"lastro-api"}
 ```
 
@@ -144,14 +144,14 @@ crie sua própria conta admin com uma senha de verdade:
 
 ```bash
 docker compose -f docker-compose.prod.yml exec \
-  -e ADMIN_EMAIL=voce@suaempresa.com.br \
+  -e ADMIN_EMAIL=voce@lastrox.com.br \
   -e ADMIN_PASSWORD='escolha-uma-senha-forte-de-verdade' \
   -e ADMIN_NOME='Sua Equipe' \
   app node server/dist/scripts/createAdmin.js
 ```
 
 Isso cria a conta e imprime confirmação. Faça login normalmente em
-`https://app.suaempresa.com.br/login` com esse e-mail/senha — a role `admin` te leva direto
+`https://app.lastrox.com.br/login` com esse e-mail/senha — a role `admin` te leva direto
 para o back-office (fila de KYB, disputas, trilha de auditoria, governança de agentes IA,
 etc.).
 

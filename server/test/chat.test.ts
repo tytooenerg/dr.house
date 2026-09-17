@@ -62,7 +62,7 @@ describe('AI assistant (chat)', () => {
       .send({ question: `Pergunta totalmente fora do roteiro ${unique()}` });
     expect(res.status).toBe(200);
     expect(res.body.source).toBe('canned');
-    expect(res.body.answer).toMatch(/suporte@lastro\.com\.br/);
+    expect(res.body.answer).toMatch(/suporte@lastrox\.com\.br/);
   });
 
   it('never crashes for a cedente asking a cashflow-shaped question — the AI CFO grounding path must degrade gracefully without a real LLM', async () => {

@@ -56,7 +56,7 @@ export class LastroClient {
       throw new Error('LastroClient requires a real apiKey (from Desenvolvedores in the Lastro app).');
     }
     this.apiKey = options.apiKey;
-    this.baseUrl = (options.baseUrl ?? 'https://api.lastro.com.br/v1').replace(/\/$/, '');
+    this.baseUrl = (options.baseUrl ?? 'https://api.lastrox.com.br/v1').replace(/\/$/, '');
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 15_000;
   }

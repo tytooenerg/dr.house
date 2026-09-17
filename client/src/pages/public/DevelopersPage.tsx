@@ -78,7 +78,7 @@ export function DevelopersPage() {
               <span key={i} className="rounded-full" style={{ width: 10, height: 10, background: PALETTE.slate }} />
             ))}
           </div>
-          <pre className="font-mono-num text-[13px] leading-loose text-blueSoft whitespace-pre">{`curl https://api.lastro.com.br/v1/duplicatas \\
+          <pre className="font-mono-num text-[13px] leading-loose text-blueSoft whitespace-pre">{`curl https://api.lastrox.com.br/v1/duplicatas \\
   -H "Authorization: Bearer sk_live_..." \\
   -d sacado_cnpj="12.345.678/0001-90" \\
   -d valor="84500.00" \\

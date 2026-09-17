@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from .errors import LastroApiError, LastroNetworkError
 
-DEFAULT_BASE_URL = "https://api.lastro.com.br/v1"
+DEFAULT_BASE_URL = "https://api.lastrox.com.br/v1"
 
 
 class LastroClient:
