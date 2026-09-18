@@ -13,6 +13,8 @@
     "db:migrate": "tsx src/scripts/migrate.ts",
     "seed:demo": "tsx src/scripts/seed-investor-demo.ts",
     "create-admin": "tsx src/scripts/createAdmin.ts",
+    "list-admins": "tsx src/scripts/listAdmins.ts",
+    "reset-admin-credentials": "tsx src/scripts/resetAdminCredentials.ts",
     "preflight": "tsx src/scripts/preflight.ts"
   },
   "dependencies": {

@@ -158,6 +158,33 @@ etc.).
 Esse é o único jeito de conseguir uma conta admin em produção: o autocadastro público
 (`/auth/register`) nunca permite `role=admin` por design (ver `server/src/routes/auth.ts`).
 
+### Corrigindo e-mail/senha de uma conta admin existente
+
+Se você rodou o comando acima copiando os valores de exemplo ao pé da letra (ex.: ficou com
+a conta `voce@lastrox.com.br` / `escolha-uma-senha-forte-de-verdade` de verdade em
+produção) ou simplesmente perdeu a senha, não existe reset por e-mail — corrija direto com
+os scripts abaixo, sempre via `docker compose exec -e VAR=valor` (nunca cole um script
+multilinha direto no shell do servidor; isso quebra por erro de sintaxe do bash).
+
+Primeiro, descubra o `id` da conta certa (isso não muda nada, só lista):
+
+```bash
+docker compose -f docker-compose.prod.yml exec app node server/dist/scripts/listAdmins.js
+```
+
+Depois, troque e-mail e senha com o `id` encontrado:
+
+```bash
+docker compose -f docker-compose.prod.yml exec \
+  -e ADMIN_USER_ID=<id> \
+  -e ADMIN_NEW_EMAIL=seu-email-real@dominio.com \
+  -e ADMIN_NEW_PASSWORD='sua-senha-forte-de-verdade' \
+  app node server/dist/scripts/resetAdminCredentials.js
+```
+
+A senha antiga para de funcionar imediatamente. Se a conta tiver 2FA/TOTP ativado, o
+próximo login ainda vai pedir o código normalmente — trocar a senha não desativa o 2FA.
+
 ### E as demais contas de demonstração?
 
 Sacado, cedente, investidor e seguradora *são* auto-cadastráveis normalmente pela tela de

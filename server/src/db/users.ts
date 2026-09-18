@@ -177,6 +177,13 @@ export function updateProfile(userId: number, patch: { nome?: string; telefone?:
   return getUserById(userId)!;
 }
 
+// Usado só por lib/resetAdminCredentials.ts (CLI de recuperação de conta admin) — troca
+// e-mail e hash de senha juntos, sem tocar em nome/telefone/etc. como updateProfile faz.
+export function updateCredentials(userId: number, email: string, passwordHash: string) {
+  db.prepare('UPDATE users SET email = ?, password_hash = ? WHERE id = ?').run(email, passwordHash, userId);
+  return getUserById(userId)!;
+}
+
 // LGPD right-to-erasure: scrubs personal identifiers (email/nome/telefone/password) and
 // marks the account deleted, but keeps the row and its id so financial/audit records that
 // reference it (duplicatas, audit_log, etc.) stay intact for legal/compliance retention.
