@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../lib/api';
 import { AiTag } from '../components/ui/Badge';
 import { PALETTE } from '../lib/palette';
@@ -15,6 +15,7 @@ export function AiChat() {
     { from: 'bot', text: 'Oi! Posso ajudar a entender deságio, aceite, ou como emitir sua primeira duplicata. O que você quer saber?' },
   ]);
   const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,6 +43,14 @@ export function AiChat() {
     const res = await api.post<{ answer: string }>('/chat/ask', { question });
     setMessages((m) => [...m, { from: 'bot', text: res.answer }]);
     setAsking(false);
+  };
+
+  const submitDraft = (e: FormEvent) => {
+    e.preventDefault();
+    const question = draft.trim();
+    if (!question || asking) return;
+    setDraft('');
+    ask(question);
   };
 
   return (
@@ -75,6 +84,24 @@ export function AiChat() {
                 </button>
               ))}
           </div>
+          <form onSubmit={submitDraft} className="flex gap-2 border-t border-border p-3">
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={asking}
+              placeholder="Digite sua pergunta…"
+              aria-label="Sua pergunta"
+              className="flex-1 border border-border rounded-lg px-3 py-2 text-[12.5px] outline-none disabled:opacity-60"
+            />
+            <button
+              type="submit"
+              disabled={asking || !draft.trim()}
+              className="bg-blue text-white rounded-lg px-3 py-2 text-[12.5px] font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Enviar
+            </button>
+          </form>
         </div>
       )}
       <button
