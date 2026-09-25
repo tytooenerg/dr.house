@@ -274,8 +274,12 @@ authRouter.post(
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
-function googleRedirectUri(req: import('express').Request): string {
-  return process.env.GOOGLE_OAUTH_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+// Built from APP_URL, not req.protocol/req.get('host') — behind the Caddy reverse proxy
+// (see DEPLOY.md) the app only ever sees plain HTTP internally, so req.protocol resolves to
+// 'http' without an explicit trust-proxy setup, producing a redirect_uri that mismatches the
+// https:// one registered in Google Cloud Console (error 400: redirect_uri_mismatch).
+function googleRedirectUri(): string {
+  return process.env.GOOGLE_OAUTH_REDIRECT_URI || `${APP_URL}/api/auth/google/callback`;
 }
 
 // Public — lets the client decide whether to show "Continuar com Google" at all, since
@@ -291,7 +295,7 @@ authRouter.get('/google/start', (req, res) => {
   }
   const referralCode = typeof req.query.ref === 'string' ? req.query.ref : undefined;
   const state = signGoogleOAuthState(referralCode);
-  res.redirect(302, buildGoogleAuthUrl(state, googleRedirectUri(req)));
+  res.redirect(302, buildGoogleAuthUrl(state, googleRedirectUri()));
 });
 
 authRouter.get(
@@ -310,7 +314,7 @@ authRouter.get(
     }
     let profile;
     try {
-      profile = await exchangeCodeForProfile(code, googleRedirectUri(req));
+      profile = await exchangeCodeForProfile(code, googleRedirectUri());
     } catch (err) {
       logger.error({ err }, '[google-oauth] falha ao trocar código pelo perfil');
       res.redirect(302, `${APP_URL}/?googleError=falha_google`);
