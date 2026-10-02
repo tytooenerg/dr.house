@@ -407,8 +407,11 @@ authRouter.post(
   })
 );
 
-function samlAcsUrl(req: import('express').Request): string {
-  return process.env.SAML_SP_ACS_URL || `${req.protocol}://${req.get('host')}/api/auth/saml/acs`;
+// Same fix as googleRedirectUri() above: built from APP_URL, not req.protocol/req.get('host'),
+// which resolves to 'http' behind the Caddy reverse proxy without an explicit trust-proxy
+// setup and would send the IdP a Location/ACS URL that mismatches what's registered there.
+function samlAcsUrl(): string {
+  return process.env.SAML_SP_ACS_URL || `${APP_URL}/api/auth/saml/acs`;
 }
 
 // Public — same reasoning as /google/config: lets the client decide whether to show
@@ -425,7 +428,7 @@ authRouter.get('/saml/login', (req, res) => {
   }
   const referralCode = typeof req.query.ref === 'string' ? req.query.ref : undefined;
   const relayState = signSamlRelayState(referralCode);
-  const url = buildLoginRequestUrl(samlAcsUrl(req), relayState);
+  const url = buildLoginRequestUrl(samlAcsUrl(), relayState);
   if (!url) {
     res.status(500).json({ error: 'saml_misconfigured', message: 'Não foi possível montar a requisição de login SAML.' });
     return;
@@ -452,7 +455,7 @@ authRouter.post(
     }
     let profile;
     try {
-      profile = await validateAssertion(samlAcsUrl(req), req.body);
+      profile = await validateAssertion(samlAcsUrl(), req.body);
     } catch (err) {
       logger.error({ err }, '[saml-sso] falha ao validar a resposta SAML');
       res.redirect(302, `${APP_URL}/?samlError=falha_saml`);
