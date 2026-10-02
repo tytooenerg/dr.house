@@ -35,7 +35,13 @@ export function ModalOverlay({ children, maxWidth = 440, onClose }: { children: 
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[100] p-6" style={{ background: 'rgba(11,31,58,0.55)' }}>
-      <div ref={contentRef} role="dialog" aria-modal="true" className="w-full bg-white rounded-2xl p-9" style={{ maxWidth }}>
+      <div
+        ref={contentRef}
+        role="dialog"
+        aria-modal="true"
+        className="w-full bg-white rounded-2xl p-9 max-h-[85vh] overflow-y-auto"
+        style={{ maxWidth }}
+      >
         {children}
       </div>
     </div>
