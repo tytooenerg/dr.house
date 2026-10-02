@@ -184,6 +184,13 @@ export function updateCredentials(userId: number, email: string, passwordHash: s
   return getUserById(userId)!;
 }
 
+// Self-service "esqueci minha senha" (routes/auth.ts POST /reset-password) — troca só o
+// hash, sem mexer no e-mail. Funciona pra qualquer role, inclusive admin.
+export function updatePasswordHash(userId: number, passwordHash: string) {
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, userId);
+  return getUserById(userId)!;
+}
+
 // LGPD right-to-erasure: scrubs personal identifiers (email/nome/telefone/password) and
 // marks the account deleted, but keeps the row and its id so financial/audit records that
 // reference it (duplicatas, audit_log, etc.) stay intact for legal/compliance retention.

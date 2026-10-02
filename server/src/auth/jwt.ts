@@ -164,6 +164,41 @@ export function verifySamlSignupToken(token: string): SamlSignupTokenPayload | n
   }
 }
 
+const PASSWORD_RESET_TYPE = 'password_reset';
+
+// Stateless — no separate DB table/column to track issued or used reset tokens. The token
+// binds to a short hash of the password_hash in force when it was issued; once the holder
+// actually resets the password, password_hash changes and every other outstanding reset
+// link for that account (e.g. from clicking "esqueci minha senha" twice) stops verifying
+// for free, the same way a used recovery code can't be replayed — without needing a
+// separate "used" flag anywhere.
+export function signPasswordResetToken(userId: number, currentPasswordHash: string): string {
+  const bind = crypto.createHash('sha256').update(currentPasswordHash).digest('hex').slice(0, 16);
+  return jwt.sign({ typ: PASSWORD_RESET_TYPE, sub: userId, bind }, SECRET, { expiresIn: '30m' });
+}
+
+// Unverified peek at the token's claimed user id, used ONLY to know whose current
+// password_hash to bind-check against in verifyPasswordResetToken below — this alone
+// proves nothing (the signature isn't checked), so it must never be treated as
+// authentication by itself.
+export function peekPasswordResetTokenUserId(token: string): number | null {
+  const decoded = jwt.decode(token) as Record<string, unknown> | null;
+  if (!decoded || decoded.typ !== PASSWORD_RESET_TYPE || typeof decoded.sub !== 'number') return null;
+  return decoded.sub;
+}
+
+export function verifyPasswordResetToken(token: string, currentPasswordHash: string): number | null {
+  try {
+    const decoded = jwt.verify(token, SECRET) as Record<string, unknown>;
+    if (decoded.typ !== PASSWORD_RESET_TYPE || typeof decoded.sub !== 'number') return null;
+    const bind = crypto.createHash('sha256').update(currentPasswordHash).digest('hex').slice(0, 16);
+    if (decoded.bind !== bind) return null;
+    return decoded.sub;
+  } catch {
+    return null;
+  }
+}
+
 export function generateRefreshToken(): string {
   return crypto.randomBytes(48).toString('hex');
 }

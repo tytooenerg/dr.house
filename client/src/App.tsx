@@ -18,6 +18,7 @@ const TeamInviteAcceptPage = lazy(() => import('./pages/auth/TeamInviteAcceptPag
 const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage').then((m) => ({ default: m.OAuthCallbackPage })));
 const CompleteGoogleSignupPage = lazy(() => import('./pages/auth/CompleteGoogleSignupPage').then((m) => ({ default: m.CompleteGoogleSignupPage })));
 const CompleteSamlSignupPage = lazy(() => import('./pages/auth/CompleteSamlSignupPage').then((m) => ({ default: m.CompleteSamlSignupPage })));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })));
 const DashboardPage = lazy(() => import('./pages/app/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const MarketplacePage = lazy(() => import('./pages/app/MarketplacePage').then((m) => ({ default: m.MarketplacePage })));
 const AutomacaoPage = lazy(() => import('./pages/app/AutomacaoPage').then((m) => ({ default: m.AutomacaoPage })));
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
           <Route path="/completar-cadastro-google" element={<CompleteGoogleSignupPage />} />
           <Route path="/completar-cadastro-saml" element={<CompleteSamlSignupPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/developers" element={<DevelopersPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/precos" element={<PrecosPage />} />

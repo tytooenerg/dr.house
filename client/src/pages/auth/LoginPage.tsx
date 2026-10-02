@@ -55,16 +55,18 @@ export function RoleShape({ shape }: { shape: 'circle' | 'square' | 'diamond' | 
 }
 
 export function LoginPage() {
-  const { user, loading, login, verifyTwoFactor, register, authError } = useSession();
+  const { user, loading, login, verifyTwoFactor, requestPasswordReset, register, authError } = useSession();
   const navigate = useNavigate();
   const initialParams = new URLSearchParams(window.location.search);
-  const [mode, setMode] = useState<'login' | 'register'>(initialParams.get('mode') === 'register' ? 'register' : 'login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialParams.get('mode') === 'register' ? 'register' : 'login');
   const [submitting, setSubmitting] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -135,6 +137,19 @@ export function LoginPage() {
     try {
       const result = await login(loginEmail, loginPassword);
       if (result.twoFactorRequired && result.challengeToken) setChallengeToken(result.challengeToken);
+    } catch {
+      // authError is surfaced below
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await requestPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
     } catch {
       // authError is surfaced below
     } finally {
@@ -317,6 +332,17 @@ export function LoginPage() {
                 <Input type="password" required autoComplete="current-password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="••••••••" />
               </Field>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setForgotEmail(loginEmail);
+                setForgotSent(false);
+                setMode('forgot');
+              }}
+              className="bg-transparent border-none text-blue text-[12.5px] font-bold cursor-pointer -mt-3 mb-4 p-0"
+            >
+              Esqueci minha senha
+            </button>
             {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
             <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting}>
               {submitting ? 'Entrando…' : 'Entrar'}
@@ -325,6 +351,35 @@ export function LoginPage() {
               <b>Contas de demonstração</b> (senha <code>demo1234</code>):<br />
               investidor@lastro.demo · cedente@lastro.demo · sacado@lastro.demo · seguradora@lastro.demo
             </div>
+          </form>
+        ) : mode === 'forgot' ? (
+          <form onSubmit={handleForgotPassword}>
+            <div className="text-xl font-extrabold mb-1">Esqueci minha senha</div>
+            <div className="text-textSecondary text-[13px] mb-6">Digite seu e-mail e enviaremos um link para definir uma senha nova.</div>
+            {forgotSent ? (
+              <Notice variant="success" className="mb-4">
+                Se esse e-mail existir na nossa base, enviamos um link de redefinição — confira também a caixa de spam.
+              </Notice>
+            ) : (
+              <>
+                <div className="mb-5">
+                  <Field label="E-mail">
+                    <Input type="email" required autoFocus autoComplete="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="voce@empresa.com.br" />
+                  </Field>
+                </div>
+                {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
+                <Button type="submit" className="w-full" disabled={submitting || !forgotEmail.trim()}>
+                  {submitting ? 'Enviando…' : 'Enviar link de redefinição'}
+                </Button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className="mt-4 w-full text-center text-textSecondary text-[12.5px] font-semibold bg-transparent border-none cursor-pointer"
+            >
+              Voltar para o login
+            </button>
           </form>
         ) : (
           <form onSubmit={handleRegister}>

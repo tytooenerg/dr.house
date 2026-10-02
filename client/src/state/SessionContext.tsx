@@ -49,6 +49,8 @@ interface SessionContextValue {
   completeGoogleSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   completeSamlSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   logout: () => void;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<{ twoFactorRequired: boolean; challengeToken?: string }>;
   submitKyb: (form: {
     cnpj: string;
     tipo: string;
@@ -113,6 +115,33 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Código inválido.');
+      throw err;
+    }
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setAuthError(null);
+    try {
+      await api.post('/auth/forgot-password', { email });
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível enviar o link de redefinição.');
+      throw err;
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token?: string; refreshToken?: string; user?: SessionUser; twoFactorRequired?: boolean; challengeToken?: string }>(
+        '/auth/reset-password',
+        { token, newPassword }
+      );
+      if (data.twoFactorRequired) return { twoFactorRequired: true, challengeToken: data.challengeToken };
+      setSessionTokens(data.token!, data.refreshToken!);
+      setUser(data.user!);
+      return { twoFactorRequired: false };
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível redefinir a senha.');
       throw err;
     }
   }, []);
@@ -196,6 +225,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     authError,
     login,
     verifyTwoFactor,
+    requestPasswordReset,
+    resetPassword,
     register,
     acceptTeamInvite,
     loginWithTokens,

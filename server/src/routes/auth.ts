@@ -15,6 +15,7 @@ import {
   setVeiculo,
   updateSettings,
   approveKyb,
+  updatePasswordHash,
 } from '../db/users.js';
 import { acceptTeamInvite, findTeamInviteByToken } from '../db/misc.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
@@ -32,7 +33,11 @@ import {
   verifySamlRelayState,
   signSamlSignupToken,
   verifySamlSignupToken,
+  signPasswordResetToken,
+  peekPasswordResetTokenUserId,
+  verifyPasswordResetToken,
 } from '../auth/jwt.js';
+import { sendEmail } from '../lib/mailer.js';
 import { googleOAuthEnabled, buildGoogleAuthUrl, exchangeCodeForProfile } from '../lib/googleOAuth.js';
 import { samlSsoEnabled, buildLoginRequestUrl, validateAssertion } from '../lib/samlSso.js';
 import express from 'express';
@@ -273,6 +278,74 @@ authRouter.post(
 );
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+
+const forgotPasswordSchema = z.object({ email: z.string().trim().email('E-mail inválido.') });
+
+// Never reveals whether the e-mail exists — the response is the same either way, so this
+// can't be used to enumerate registered accounts. Works for any role, including admin
+// (previously the only self-service gap: an admin locked out had no option besides a
+// human with server access running scripts/resetAdminCredentials.ts).
+authRouter.post(
+  '/forgot-password',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const user = getUserByEmail(parsed.data.email.trim().toLowerCase());
+    if (user) {
+      const token = signPasswordResetToken(user.id, user.password_hash);
+      const link = `${APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+      await sendEmail(
+        user.email,
+        'Lastro — redefinir sua senha',
+        `Olá, ${user.nome}.\n\nRecebemos um pedido para redefinir a senha da sua conta Lastro. Se foi você, clique no link abaixo (válido por 30 minutos):\n\n${link}\n\nSe não foi você, ignore este e-mail — sua senha continua a mesma.`
+      );
+      recordAuditEvent(user.id, user.company_name, 'user.password_reset_requested', {});
+    }
+    res.json({ ok: true, message: 'Se esse e-mail existir na nossa base, enviamos um link de redefinição.' });
+  })
+);
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(10, 'Link inválido.'),
+  newPassword: z.string().min(6, 'A senha precisa ter ao menos 6 caracteres.'),
+});
+
+authRouter.post(
+  '/reset-password',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    // peekPasswordResetTokenUserId is unverified — only used to know whose current
+    // password_hash to bind-check against. verifyPasswordResetToken does the real,
+    // signature-checked validation right after.
+    const peekedUserId = peekPasswordResetTokenUserId(parsed.data.token);
+    const candidate = peekedUserId ? getUserById(peekedUserId) : null;
+    const userId = candidate ? verifyPasswordResetToken(parsed.data.token, candidate.password_hash) : null;
+    if (!userId || !candidate) {
+      res.status(400).json({ error: 'invalid_token', message: 'Link inválido ou expirado. Peça um novo link de redefinição.' });
+      return;
+    }
+    const passwordHash = await hashPassword(parsed.data.newPassword);
+    const updated = updatePasswordHash(userId, passwordHash);
+    recordAuditEvent(userId, updated.company_name, 'user.password_reset_completed', {});
+
+    // Same 2FA gate as a normal login — resetting the password never bypasses it.
+    if (updated.totp_enabled) {
+      res.json({ twoFactorRequired: true, challengeToken: signChallengeToken(updated.id) });
+      return;
+    }
+    const { accessToken, refreshToken } = issueTokens(updated);
+    res.json({ token: accessToken, refreshToken, user: publicUser(updated) });
+  })
+);
 
 // Built from APP_URL, not req.protocol/req.get('host') — behind the Caddy reverse proxy
 // (see DEPLOY.md) the app only ever sees plain HTTP internally, so req.protocol resolves to
