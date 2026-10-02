@@ -359,7 +359,7 @@ export function LoginPage() {
 
             {role === 'seguradora' && (
               <div className="mb-4">
-                <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">Qual seguradora sua conta representa?</div>
+                <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">Qual seguradora sua conta representa? (obrigatório)</div>
                 <div className="flex flex-col gap-2">
                   {INSURER_OPTIONS.map((ins) => (
                     <button

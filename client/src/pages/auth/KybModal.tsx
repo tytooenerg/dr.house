@@ -3,7 +3,7 @@ import { ModalOverlay } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Field, Input } from '../../components/ui/Input';
 import { useSession } from '../../state/SessionContext';
-import { uploadFile } from '../../lib/api';
+import { uploadFile, ApiError } from '../../lib/api';
 import { PALETTE } from '../../lib/palette';
 
 export function KybModal() {
@@ -19,6 +19,7 @@ export function KybModal() {
   const [docUploaded, setDocUploaded] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
@@ -41,8 +42,11 @@ export function KybModal() {
       return;
     }
     setSubmitting(true);
+    setSubmitError('');
     try {
       await submitKyb({ cnpj, tipo, pl, naoResidente, paisDomicilio, taxIdEstrangeiro, representanteLegal });
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : 'Não foi possível concluir o credenciamento.');
     } finally {
       setSubmitting(false);
     }
@@ -157,6 +161,8 @@ export function KybModal() {
             </div>
           </div>
         )}
+
+        {submitError && <div className="text-red text-[12.5px] font-semibold mt-3">{submitError}</div>}
 
         <div className="flex justify-between items-center mt-4">
           {step > 0 ? (

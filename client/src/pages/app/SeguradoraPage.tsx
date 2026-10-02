@@ -64,8 +64,10 @@ interface SeguradoraData {
 export function SeguradoraPage() {
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [decideErrorById, setDecideErrorById] = useState<Record<string, string>>({});
   const [aiById, setAiById] = useState<Record<string, { assessment: string; reasoning: string } | null>>({});
   const [loadingAiId, setLoadingAiId] = useState<string | null>(null);
+  const [aiErrorById, setAiErrorById] = useState<Record<string, string>>({});
 
   const { data, error: loadError, reload: load, setData } = useApi<SeguradoraData>('/seguradora', { fallbackMessage: 'Falha ao carregar o painel da seguradora.' });
   const [limiteTotal, setLimiteTotal] = useState('');
@@ -102,9 +104,12 @@ export function SeguradoraPage() {
     const note = noteById[id]?.trim();
     if (!note) return;
     setBusyId(id);
+    setDecideErrorById((prev) => ({ ...prev, [id]: '' }));
     try {
       const updated = await api.post<SeguradoraData>(`/seguradora/sinistro/${id}/decidir`, { decision, note });
       setData(updated);
+    } catch (err) {
+      setDecideErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível registrar a decisão.' }));
     } finally {
       setBusyId(null);
     }
@@ -112,9 +117,12 @@ export function SeguradoraPage() {
 
   const generateAiTriagem = async (id: string) => {
     setLoadingAiId(id);
+    setAiErrorById((prev) => ({ ...prev, [id]: '' }));
     try {
       const res = await api.get<{ assessment: { assessment: string; reasoning: string } | null }>(`/seguradora/sinistro/${id}/ai-triagem`);
       setAiById((prev) => ({ ...prev, [id]: res.assessment }));
+    } catch (err) {
+      setAiErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível gerar a triagem.' }));
     } finally {
       setLoadingAiId(null);
     }
@@ -246,9 +254,12 @@ export function SeguradoraPage() {
               <Badge variant="warning" size="lg">Sinistro aberto</Badge>
             </div>
             {aiById[s.id] === undefined ? (
-              <Button size="sm" variant="secondary" className="mb-3" disabled={loadingAiId === s.id} onClick={() => generateAiTriagem(s.id)}>
-                {loadingAiId === s.id ? 'Analisando…' : 'Gerar triagem da IA (sugestão, não decide sozinha)'}
-              </Button>
+              <>
+                <Button size="sm" variant="secondary" className="mb-3" disabled={loadingAiId === s.id} onClick={() => generateAiTriagem(s.id)}>
+                  {loadingAiId === s.id ? 'Analisando…' : 'Gerar triagem da IA (sugestão, não decide sozinha)'}
+                </Button>
+                {aiErrorById[s.id] && <div className="text-red text-[12.5px] font-semibold mb-3">{aiErrorById[s.id]}</div>}
+              </>
             ) : aiById[s.id] ? (
               <div className="rounded-[10px] px-4 py-3.5 mb-3 bg-chip text-[13px]">
                 <div className="font-bold text-blue mb-1">
@@ -262,16 +273,27 @@ export function SeguradoraPage() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <input aria-label="Nota da decisão"
                 className="flex-1 min-w-[220px] px-3 py-2 rounded-md border border-inputBorder text-[13px]"
-                placeholder="Nota da decisão"
+                placeholder="Nota da decisão (obrigatória)"
                 value={noteById[s.id] ?? ''}
                 onChange={(e) => setNoteById((prev) => ({ ...prev, [s.id]: e.target.value }))}
               />
-              <Button size="sm" variant="success" disabled={busyId === s.id} onClick={() => decide(s.id, 'aprovado')}>
+              <Button
+                size="sm"
+                variant="success"
+                disabled={busyId === s.id || !(noteById[s.id] ?? '').trim()}
+                onClick={() => decide(s.id, 'aprovado')}
+              >
                 Aprovar e indenizar
               </Button>
-              <Button size="sm" variant="danger" disabled={busyId === s.id} onClick={() => decide(s.id, 'negado')}>
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busyId === s.id || !(noteById[s.id] ?? '').trim()}
+                onClick={() => decide(s.id, 'negado')}
+              >
                 Negar sinistro
               </Button>
+              {decideErrorById[s.id] && <div className="w-full text-red text-[12.5px] font-semibold">{decideErrorById[s.id]}</div>}
             </div>
           </div>
         ))}
