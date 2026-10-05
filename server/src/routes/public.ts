@@ -233,6 +233,7 @@ publicRouter.post('/simular', simulateLimiter, (req, res) => {
     valor: parsed.data.valor,
     vencimento: parsed.data.vencimento,
     seguro: false,
+    tipoDocumento: 'produto',
     nfAnexada: false,
     nfeChave: '',
     comprovanteEntregaAnexado: false,

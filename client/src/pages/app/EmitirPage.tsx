@@ -11,6 +11,8 @@ import { PALETTE } from '../../lib/palette';
 import { Badge } from '../../components/ui/Badge';
 import { Notice } from '../../components/ui/Notice';
 
+type TipoDocumento = 'produto' | 'servico';
+
 interface EmitForm {
   sacado: string;
   cnpj: string;
@@ -202,6 +204,11 @@ export function EmitirPage() {
   const { t } = useLang();
   const [form, setForm] = useState<EmitForm>(EMPTY_FORM);
   const [batchRows, setBatchRows] = useState<BatchRow[]>([]);
+  // 'produto' (NF-e) é o padrão histórico — mercadoria tem chave de acesso nacional de 44
+  // dígitos. 'servico' (NFS-e) não tem padrão nacional de chave nem de consulta de
+  // situação (cada município tem a sua própria), então o campo de chave muda de "exige 44
+  // dígitos" pra "código de verificação livre, opcional" — ver server/src/lib/emitirCore.ts.
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('produto');
   const [nfAnexada, setNfAnexada] = useState(false);
   const [comprovanteEntregaAnexado, setComprovanteEntregaAnexado] = useState(false);
   const [pedidoCompraAnexado, setPedidoCompraAnexado] = useState(false);
@@ -227,19 +234,19 @@ export function EmitirPage() {
   useEffect(() => {
     const t = setTimeout(() => {
       api
-        .post<Preview>('/emitir/preview', { ...form, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchValores: batchRows.map((r) => r.valor) })
+        .post<Preview>('/emitir/preview', { ...form, tipoDocumento, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchValores: batchRows.map((r) => r.valor) })
         .then(setPreview)
         .catch(() => {});
     }, 250);
     return () => clearTimeout(t);
-  }, [form, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchRows]);
+  }, [form, tipoDocumento, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchRows]);
 
   const setField = (field: keyof EmitForm, value: string | boolean) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleNfFile = async (file: File) => {
     setUploading(true);
     try {
-      const { extracted } = await uploadFile('nfe', file);
+      const { extracted } = await uploadFile(tipoDocumento === 'servico' ? 'nfse' : 'nfe', file);
       setNfAnexada(true);
       if (extracted) {
         setForm((f) => ({
@@ -282,6 +289,15 @@ export function EmitirPage() {
     }
   };
 
+  // Trocar o tipo depois de já ter anexado um arquivo deixaria "NF-e anexada ✓" aceso pra
+  // um documento do tipo errado — a chave/código também deixa de fazer sentido no formato
+  // antigo, então limpa os dois junto com a troca.
+  const trocarTipoDocumento = (tipo: TipoDocumento) => {
+    setTipoDocumento(tipo);
+    setNfAnexada(false);
+    setField('nfeChave', '');
+  };
+
   const addBatchRow = () => setBatchRows((rows) => [...rows, { id: 'b' + Math.random().toString(16).slice(2, 8), valor: '' }]);
   const updateBatchRow = (id: string, valor: string) => setBatchRows((rows) => rows.map((r) => (r.id === id ? { ...r, valor } : r)));
   const removeBatchRow = (id: string) => setBatchRows((rows) => rows.filter((r) => r.id !== id));
@@ -296,6 +312,7 @@ export function EmitirPage() {
     try {
       const data = await api.post<{ registro: string; seguro: boolean; registradora: string }>('/emitir/submit', {
         ...form,
+        tipoDocumento,
         nfAnexada,
         comprovanteEntregaAnexado,
         pedidoCompraAnexado,
@@ -313,6 +330,7 @@ export function EmitirPage() {
     setResult(null);
     setForm(EMPTY_FORM);
     setBatchRows([]);
+    setTipoDocumento('produto');
     setNfAnexada(false);
     setComprovanteEntregaAnexado(false);
     setPedidoCompraAnexado(false);
@@ -360,15 +378,37 @@ export function EmitirPage() {
 
       <div className="grid gap-4 items-start" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
         <Card className="p-7 flex flex-col gap-4">
+          <div className="flex gap-2 p-1 rounded-xl bg-surface">
+            {([
+              ['produto', 'Mercadoria (NF-e)'],
+              ['servico', 'Serviço (NFS-e)'],
+            ] as [TipoDocumento, string][]).map(([tipo, label]) => (
+              <button
+                key={tipo}
+                type="button"
+                onClick={() => trocarTipoDocumento(tipo)}
+                className="flex-1 py-2 rounded-lg text-[12.5px] font-bold cursor-pointer border-none"
+                style={tipoDocumento === tipo ? { background: 'white', color: PALETTE.navy, boxShadow: '0 1px 2px rgba(0,0,0,0.08)' } : { background: 'transparent', color: PALETTE.textSecondary }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <Field label="Empresa sacada">
             <Input placeholder="ex: Grupo Atlas Varejo" value={form.sacado} onChange={(e) => setField('sacado', e.target.value)} />
           </Field>
           <Field label="CNPJ do sacado">
             <Input placeholder="00.000.000/0001-00" value={form.cnpj} onChange={(e) => setField('cnpj', e.target.value)} />
           </Field>
-          <Field label="Chave de acesso da NF-e (opcional — 44 dígitos)">
-            <Input placeholder="Previne duplicidade: a mesma nota não pode lastrear duas duplicatas" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
-          </Field>
+          {tipoDocumento === 'produto' ? (
+            <Field label="Chave de acesso da NF-e (opcional — 44 dígitos)">
+              <Input placeholder="Previne duplicidade: a mesma nota não pode lastrear duas duplicatas" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
+            </Field>
+          ) : (
+            <Field label="Código de verificação da NFS-e (opcional)">
+              <Input placeholder="Não existe dígito verificador nacional pra NFS-e — cada município tem o seu" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
+            </Field>
+          )}
           <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <Field label="Valor (R$)">
               <Input placeholder="50.000" value={form.valor} onChange={(e) => setField('valor', e.target.value)} />
@@ -389,9 +429,19 @@ export function EmitirPage() {
             }}
           />
           <button type="button" onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
-            <div className="font-bold text-[13px]">{nfAnexada ? 'NF-e anexada ✓' : uploading ? 'Enviando…' : 'Anexar NF-e (XML, PDF ou imagem)'}</div>
+            <div className="font-bold text-[13px]">
+              {nfAnexada
+                ? `${tipoDocumento === 'servico' ? 'NFS-e' : 'NF-e'} anexada ✓`
+                : uploading
+                  ? 'Enviando…'
+                  : `Anexar ${tipoDocumento === 'servico' ? 'NFS-e' : 'NF-e'} (XML, PDF ou imagem)`}
+            </div>
             <div className="text-textSecondary text-[12.5px] mt-1">
-              {nfAnexada ? 'Sacado, CNPJ, valor e vencimento extraídos automaticamente por IA' : 'Lastro fiscal necessário para registro escritural — clique para enviar o arquivo'}
+              {nfAnexada
+                ? tipoDocumento === 'servico'
+                  ? 'Tomador do serviço, CNPJ e valor extraídos automaticamente por IA — confira o vencimento, que a NFS-e raramente informa'
+                  : 'Sacado, CNPJ, valor e vencimento extraídos automaticamente por IA'
+                : 'Lastro fiscal necessário para registro escritural — clique para enviar o arquivo'}
             </div>
           </button>
 

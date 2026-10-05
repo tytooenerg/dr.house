@@ -69,6 +69,13 @@ export const openApiSpec = {
                   valor: { type: 'string', example: '84.500,00' },
                   vencimento: { type: 'string', example: '2026-08-12' },
                   seguro: { type: 'boolean', default: false },
+                  tipoDocumento: {
+                    type: 'string',
+                    enum: ['produto', 'servico'],
+                    default: 'produto',
+                    description:
+                      "'produto' (NF-e, chave de acesso nacional de 44 dígitos) ou 'servico' (NFS-e — não existe chave/dígito verificador nacional; cada município emite a sua).",
+                  },
                 },
               },
             },

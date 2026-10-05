@@ -8,6 +8,7 @@ import { addUpload } from '../db/misc.js';
 import { getDuplicata } from '../db/duplicatas.js';
 import { markKybDone, updateSettings, effectiveOwnerId } from '../db/users.js';
 import { extractNfeFields } from '../lib/nfeExtraction.js';
+import { extractNfseFields } from '../lib/nfseExtraction.js';
 import { analyzeContract } from '../lib/contractAnalysis.js';
 import { recordContractAnalysis } from '../db/contractAnalyses.js';
 import { verificarProvaDeVida } from '../lib/biometricKyc.js';
@@ -78,11 +79,18 @@ uploadsRouter.post(
 
     if (kind === 'kyb_doc') markKybDone(req.user!.id);
 
-    // Real NF-e data extraction via Claude (lib/nfeExtraction.ts) — reads the actual
-    // uploaded file instead of always returning the same hardcoded sample. Returns null
-    // (not a fabricated guess) when ANTHROPIC_API_KEY isn't set or extraction fails, so
-    // the cedente just fills the form manually as before.
-    const extracted = kind === 'nfe' ? await extractNfeFields(req.file.path, req.file.mimetype, req.user!.id) : null;
+    // Real NF-e/NFS-e data extraction via Claude (lib/nfeExtraction.ts,
+    // lib/nfseExtraction.ts) — reads the actual uploaded file instead of always returning
+    // the same hardcoded sample. Returns null (not a fabricated guess) when
+    // ANTHROPIC_API_KEY isn't set or extraction fails, so the cedente just fills the form
+    // manually as before. Separate extractors, não um if/else no mesmo prompt — NFS-e não
+    // segue o layout nacional da NF-e (ver lib/nfseExtraction.ts).
+    const extracted =
+      kind === 'nfe'
+        ? await extractNfeFields(req.file.path, req.file.mimetype, req.user!.id)
+        : kind === 'nfse'
+          ? await extractNfseFields(req.file.path, req.file.mimetype, req.user!.id)
+          : null;
 
     // Real contract clause analysis (lib/contractAnalysis.ts) — replaces the static
     // CONTRACT_FLAGS demo copy on Compliance's "Leitura de contratos" card. Persisted so

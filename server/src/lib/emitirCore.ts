@@ -27,6 +27,15 @@ export const emitirFormSchema = z.object({
   valor: z.string().trim(),
   vencimento: z.string().trim(),
   seguro: z.boolean().optional().default(false),
+  // 'produto': duplicata lastreada em mercadoria, com NF-e — chave de acesso nacional de 44
+  // dígitos, dígito verificador oficial (lib/nfeStatus.ts) e, quando configurado, consulta
+  // real de situação junto à SEFAZ. 'servico': lastreada em NFS-e — ao contrário da NF-e,
+  // não existe padrão nacional de chave/dígito verificador nem API de situação única: cada
+  // município emite e verifica a sua própria nota, por sistema próprio. Não dá pra fingir
+  // uma validação nacional que não existe (mesmo caso do SISCOAF em lib/regulatoryReports.ts)
+  // — pra NFS-e, nfeChave vira um código de verificação opcional em texto livre, sem
+  // checksum nem consulta de situação.
+  tipoDocumento: z.enum(['produto', 'servico']).optional().default('produto'),
   nfAnexada: z.boolean().optional().default(false),
   nfeChave: z.string().trim().optional().default(''),
   comprovanteEntregaAnexado: z.boolean().optional().default(false),
@@ -80,8 +89,12 @@ export function computeEmitirPreview(form: EmitirForm) {
     { label: 'Valor e vencimento definidos', done: !!(form.valor && form.vencimento) },
     // A chave da NF-e é opcional no formulário (nem todo cedente a informa) — quando
     // ausente, o item continua valendo só pela flag de anexo; quando presente, agora
-    // também precisa bater o dígito verificador.
-    { label: 'NF-e anexada e vinculada', done: form.nfAnexada && (!nfeChaveDigits || chaveNfeChecksumValida(nfeChaveDigits)) },
+    // também precisa bater o dígito verificador. Pra NFS-e (tipoDocumento='servico') não
+    // existe dígito verificador nacional pra checar — o item vale só pelo anexo mesmo.
+    {
+      label: form.tipoDocumento === 'servico' ? 'NFS-e anexada e vinculada' : 'NF-e anexada e vinculada',
+      done: form.nfAnexada && (form.tipoDocumento === 'servico' || !nfeChaveDigits || chaveNfeChecksumValida(nfeChaveDigits)),
+    },
     // Eram o mesmo flag do NF-e até aqui (form.nfAnexada) — anexar a nota marcava "entrega
     // comprovada" sozinho, sem nenhum comprovante de entrega/execução ter sido enviado, e
     // inflava preApprovedLimit embaixo com um documento que nunca existiu. Agora cada um
@@ -156,8 +169,13 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
   if (!form.sacado || !form.valor || !form.vencimento) {
     return { status: 400, body: { error: 'validation_error', message: 'Preencha empresa sacada, valor e vencimento antes de enviar.' } };
   }
-  const nfeChave = form.nfeChave.replace(/\D/g, '');
-  if (nfeChave && !NFE_CHAVE_RE.test(nfeChave)) {
+  // NF-e tem uma chave de acesso nacional, só numérica, de 44 dígitos — formato fixo, dá pra
+  // exigir e validar. NFS-e não: cada município emite o seu próprio código de verificação,
+  // sem padrão nacional de formato (alfanumérico, tamanho variável) — exigir 44 dígitos
+  // bloquearia toda emissão de serviço real. Por isso só a de produto passa pelo filtro de
+  // dígitos + regex; a de serviço fica como texto livre, com um teto de tamanho sensato.
+  const nfeChave = form.tipoDocumento === 'servico' ? form.nfeChave.trim().slice(0, 60) : form.nfeChave.replace(/\D/g, '');
+  if (form.tipoDocumento === 'produto' && nfeChave && !NFE_CHAVE_RE.test(nfeChave)) {
     return { status: 400, body: { error: 'validation_error', message: 'Chave de acesso da NF-e inválida — deve ter 44 dígitos.' } };
   }
   // Prevents the same NF-e from backing two different duplicatas inside Lastro's own
@@ -327,8 +345,11 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
   // Mesma postura do bloco de CNPJ acima: eixo separado da Compliance AI Engine, alerta
   // não-bloqueante — o dígito verificador da chave pega erro de digitação/chave inventada
   // sem depender de rede; a situação real exige um provedor configurado
-  // (NFE_STATUS_API_URL/KEY).
-  if (nfeChave) {
+  // (NFE_STATUS_API_URL/KEY). Só roda pra 'produto': NFS-e não tem dígito verificador
+  // nacional nem uma API de situação única pra consultar — cada município tem a sua, e
+  // inventar uma validação nacional que não existe seria o mesmo erro que o SISCOAF nos
+  // ensinou a não repetir (lib/regulatoryReports.ts).
+  if (form.tipoDocumento === 'produto' && nfeChave) {
     if (!chaveNfeChecksumValida(nfeChave)) {
       createComplianceAlert({
         type: 'nfe_chave_invalida',

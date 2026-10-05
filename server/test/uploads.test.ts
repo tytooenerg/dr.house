@@ -90,6 +90,18 @@ describe('file uploads (POST /api/uploads)', () => {
     expect(res.body.extracted).toBeNull();
   });
 
+  it('an nfse upload with ANTHROPIC_API_KEY unconfigured stores the upload and honestly returns extracted: null instead of a fabricated guess', async () => {
+    const token = await registerAndLogin();
+    const res = await request(app)
+      .post('/api/uploads')
+      .set('Authorization', `Bearer ${token}`)
+      .field('kind', 'nfse')
+      .attach('file', MINIMAL_PDF, { filename: 'nfse.pdf', contentType: 'application/pdf' });
+    expect(res.status).toBe(201);
+    expect(res.body.upload.kind).toBe('nfse');
+    expect(res.body.extracted).toBeNull();
+  });
+
   it('a contrato_cessao upload with ANTHROPIC_API_KEY unconfigured returns analysis: null and records nothing to review', async () => {
     const token = await registerAndLogin();
     const res = await request(app)
