@@ -33,7 +33,7 @@ async function emitirParaSacado(cedenteToken: string, sacadoCompany: string) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: sacadoCompany, cnpj: '33.222.111/0001-55', valor: '18.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '33.222.111/0001-55', valor: '18.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

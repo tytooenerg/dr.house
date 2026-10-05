@@ -235,6 +235,8 @@ publicRouter.post('/simular', simulateLimiter, (req, res) => {
     seguro: false,
     nfAnexada: false,
     nfeChave: '',
+    comprovanteEntregaAnexado: false,
+    pedidoCompraAnexado: false,
     batchValores: [],
   });
   res.json({

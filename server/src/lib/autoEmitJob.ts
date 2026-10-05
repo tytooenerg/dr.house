@@ -65,6 +65,11 @@ export async function runAutoEmitForUser(user: UserRow): Promise<{ emitidas: num
       seguro: false,
       nfAnexada: true,
       nfeChave: '',
+      // O conector de ERP não traz comprovante de entrega/execução nem pedido de compra —
+      // marcar como true aqui repetiria o mesmo problema que o checklist tinha antes
+      // (um documento "feito" sem nunca ter sido enviado de verdade).
+      comprovanteEntregaAnexado: false,
+      pedidoCompraAnexado: false,
       batchValores: [],
     };
     try {

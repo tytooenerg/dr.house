@@ -34,7 +34,17 @@ describe('POST /api/emitir/preview', () => {
     const res = await request(app)
       .post('/api/emitir/preview')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '50.000', vencimento: '2026-09-01', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({
+        sacado: 'Grupo Atlas Varejo',
+        cnpj: '12.345.678/0001-95',
+        valor: '50.000',
+        vencimento: '2026-09-01',
+        seguro: false,
+        nfAnexada: true,
+        comprovanteEntregaAnexado: true,
+        pedidoCompraAnexado: true,
+        batchValores: [],
+      });
     expect(res.status).toBe(200);
     expect(res.body.lastroChecklist.pct).toBe(100);
     // "Grupo Atlas Varejo" is a known sacado in the static risk dataset.
@@ -44,6 +54,22 @@ describe('POST /api/emitir/preview', () => {
   it('requires auth', async () => {
     const res = await request(app).post('/api/emitir/preview').send({ sacado: 'X', valor: '1', vencimento: '2026-01-01' });
     expect(res.status).toBe(401);
+  });
+
+  // Regressão: "Comprovante de entrega ou execução do serviço" e "Pedido de compra ou
+  // contrato comercial" usavam só a flag do NF-e (nfAnexada) — anexar a nota marcava os
+  // dois como feitos sem nenhum comprovante de entrega ou pedido de compra ter sido
+  // enviado de verdade.
+  it('does not mark comprovante de entrega / pedido de compra as done just because the NF-e was attached', async () => {
+    const res = await request(app)
+      .post('/api/emitir/preview')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '12.345.678/0001-95', valor: '50.000', vencimento: '2026-09-01', seguro: false, nfAnexada: true, batchValores: [] });
+    expect(res.status).toBe(200);
+    expect(res.body.lastroChecklist.pct).toBeLessThan(100);
+    const items: { label: string; done: boolean }[] = res.body.lastroChecklist.items;
+    expect(items.find((i) => i.label.includes('Comprovante de entrega'))?.done).toBe(false);
+    expect(items.find((i) => i.label.includes('Pedido de compra'))?.done).toBe(false);
   });
 });
 

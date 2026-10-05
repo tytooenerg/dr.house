@@ -48,7 +48,7 @@ async function emitirELeiloar(valor: string) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Preco Pago ${unique()} Ltda`, cnpj: '77.666.555/0001-44', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Preco Pago ${unique()} Ltda`, cnpj: '77.666.555/0001-44', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

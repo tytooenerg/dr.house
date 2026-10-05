@@ -34,7 +34,7 @@ async function emitir(token: string, nfeChave: string) {
     valor: '10.000',
     vencimento: vencimentoFuturo(),
     seguro: false,
-    nfAnexada: true,
+    nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
     nfeChave,
     batchValores: [],
   };

@@ -125,7 +125,7 @@ describe('plan gating', () => {
     const blocked = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+      .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
     expect(blocked.status).toBe(402);
     expect(blocked.body.error).toBe('plan_required');
 
@@ -136,7 +136,7 @@ describe('plan gating', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       lastStatus = res.status;
       expect(lastStatus === 200 || lastStatus === 502).toBe(true);
     }

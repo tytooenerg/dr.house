@@ -75,7 +75,7 @@ async function submitEmitir(token: string, sacado: string) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado, cnpj: '', valor: '5.000', vencimento: '2020-01-10', seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado, cnpj: '', valor: '5.000', vencimento: '2020-01-10', seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     lastStatus = res.status;
     body = res.body;
     if (res.status === 200) break;

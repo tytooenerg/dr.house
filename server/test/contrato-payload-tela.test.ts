@@ -82,7 +82,7 @@ async function cedenteComDuplicata() {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: `Sacado ${unique()}`, cnpj: '44.333.222/0001-11', valor: '25.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado ${unique()}`, cnpj: '44.333.222/0001-11', valor: '25.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     if (res.status === 200) break;
   }
   return token;

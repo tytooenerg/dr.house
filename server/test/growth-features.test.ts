@@ -137,7 +137,7 @@ describe('referral program', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${referrer.token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '1.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       lastStatus = res.status;
       expect(lastStatus === 200 || lastStatus === 502).toBe(true);
     }

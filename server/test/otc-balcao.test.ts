@@ -44,7 +44,7 @@ async function posicaoDe(dono: { token: string }, valor = '30.000') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${ced.body.token}`)
-      .send({ sacado: `Sacado OTC ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+      .send({ sacado: `Sacado OTC ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

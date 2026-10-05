@@ -89,7 +89,7 @@ describe('Operação completa — 6 papéis numa única cadeia real', () => {
       valor: '50.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     expect(emit.status).toBe(200);
@@ -203,7 +203,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       valor: '30.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
@@ -252,7 +252,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       valor: '12.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
@@ -282,7 +282,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       valor: '25.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
@@ -353,7 +353,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       valor: '9.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
@@ -399,7 +399,7 @@ describe('Achados corrigidos (validados pela mesma simulação)', () => {
       valor: '7.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
@@ -443,7 +443,7 @@ describe('Verificações de regressão (não são achados — comportamento já 
       valor: '6.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
@@ -480,7 +480,7 @@ describe('Verificações de regressão (não são achados — comportamento já 
       valor: '8.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;

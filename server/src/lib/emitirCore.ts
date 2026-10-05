@@ -29,6 +29,8 @@ export const emitirFormSchema = z.object({
   seguro: z.boolean().optional().default(false),
   nfAnexada: z.boolean().optional().default(false),
   nfeChave: z.string().trim().optional().default(''),
+  comprovanteEntregaAnexado: z.boolean().optional().default(false),
+  pedidoCompraAnexado: z.boolean().optional().default(false),
   batchValores: z.array(z.string()).optional().default([]),
 });
 
@@ -80,7 +82,13 @@ export function computeEmitirPreview(form: EmitirForm) {
     // ausente, o item continua valendo só pela flag de anexo; quando presente, agora
     // também precisa bater o dígito verificador.
     { label: 'NF-e anexada e vinculada', done: form.nfAnexada && (!nfeChaveDigits || chaveNfeChecksumValida(nfeChaveDigits)) },
-    { label: 'Comprovante de entrega ou aceite do serviço', done: form.nfAnexada },
+    // Eram o mesmo flag do NF-e até aqui (form.nfAnexada) — anexar a nota marcava "entrega
+    // comprovada" sozinho, sem nenhum comprovante de entrega/execução ter sido enviado, e
+    // inflava preApprovedLimit embaixo com um documento que nunca existiu. Agora cada um
+    // exige seu próprio upload real (EmitirPage.tsx envia kind='comprovante_entrega' e
+    // kind='pedido_compra' via uploadFile).
+    { label: 'Comprovante de entrega ou execução do serviço anexado', done: form.comprovanteEntregaAnexado },
+    { label: 'Pedido de compra ou contrato comercial anexado', done: form.pedidoCompraAnexado },
     { label: 'Histórico de pagamento do sacado consultado', done: !!form.sacado },
   ];
   const doneCount = items.filter((i) => i.done).length;

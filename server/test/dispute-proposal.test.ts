@@ -30,7 +30,7 @@ async function emitirEContestar(cedenteToken: string, sacadoToken: string, sacad
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: sacadoCompany, cnpj: '55.444.333/0001-22', valor: '25.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: sacadoCompany, cnpj: '55.444.333/0001-22', valor: '25.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

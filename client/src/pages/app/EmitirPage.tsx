@@ -203,13 +203,19 @@ export function EmitirPage() {
   const [form, setForm] = useState<EmitForm>(EMPTY_FORM);
   const [batchRows, setBatchRows] = useState<BatchRow[]>([]);
   const [nfAnexada, setNfAnexada] = useState(false);
+  const [comprovanteEntregaAnexado, setComprovanteEntregaAnexado] = useState(false);
+  const [pedidoCompraAnexado, setPedidoCompraAnexado] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingComprovante, setUploadingComprovante] = useState(false);
+  const [uploadingPedido, setUploadingPedido] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ registro: string; seguro: boolean; registradora: string } | null>(null);
   const [matriculas, setMatriculas] = useState<MinhaMatricula[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const comprovanteFileRef = useRef<HTMLInputElement>(null);
+  const pedidoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api
@@ -221,12 +227,12 @@ export function EmitirPage() {
   useEffect(() => {
     const t = setTimeout(() => {
       api
-        .post<Preview>('/emitir/preview', { ...form, nfAnexada, batchValores: batchRows.map((r) => r.valor) })
+        .post<Preview>('/emitir/preview', { ...form, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchValores: batchRows.map((r) => r.valor) })
         .then(setPreview)
         .catch(() => {});
     }, 250);
     return () => clearTimeout(t);
-  }, [form, nfAnexada, batchRows]);
+  }, [form, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchRows]);
 
   const setField = (field: keyof EmitForm, value: string | boolean) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -252,6 +258,30 @@ export function EmitirPage() {
     }
   };
 
+  const handleComprovanteFile = async (file: File) => {
+    setUploadingComprovante(true);
+    try {
+      await uploadFile('comprovante_entrega', file);
+      setComprovanteEntregaAnexado(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao enviar o arquivo.');
+    } finally {
+      setUploadingComprovante(false);
+    }
+  };
+
+  const handlePedidoFile = async (file: File) => {
+    setUploadingPedido(true);
+    try {
+      await uploadFile('pedido_compra', file);
+      setPedidoCompraAnexado(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao enviar o arquivo.');
+    } finally {
+      setUploadingPedido(false);
+    }
+  };
+
   const addBatchRow = () => setBatchRows((rows) => [...rows, { id: 'b' + Math.random().toString(16).slice(2, 8), valor: '' }]);
   const updateBatchRow = (id: string, valor: string) => setBatchRows((rows) => rows.map((r) => (r.id === id ? { ...r, valor } : r)));
   const removeBatchRow = (id: string) => setBatchRows((rows) => rows.filter((r) => r.id !== id));
@@ -267,6 +297,8 @@ export function EmitirPage() {
       const data = await api.post<{ registro: string; seguro: boolean; registradora: string }>('/emitir/submit', {
         ...form,
         nfAnexada,
+        comprovanteEntregaAnexado,
+        pedidoCompraAnexado,
         batchValores: batchRows.map((r) => r.valor),
       });
       setResult(data);
@@ -282,6 +314,8 @@ export function EmitirPage() {
     setForm(EMPTY_FORM);
     setBatchRows([]);
     setNfAnexada(false);
+    setComprovanteEntregaAnexado(false);
+    setPedidoCompraAnexado(false);
   };
 
   if (result) {
@@ -358,6 +392,44 @@ export function EmitirPage() {
             <div className="font-bold text-[13px]">{nfAnexada ? 'NF-e anexada ✓' : uploading ? 'Enviando…' : 'Anexar NF-e (XML, PDF ou imagem)'}</div>
             <div className="text-textSecondary text-[12.5px] mt-1">
               {nfAnexada ? 'Sacado, CNPJ, valor e vencimento extraídos automaticamente por IA' : 'Lastro fiscal necessário para registro escritural — clique para enviar o arquivo'}
+            </div>
+          </button>
+
+          <input
+            ref={comprovanteFileRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleComprovanteFile(f);
+            }}
+          />
+          <button type="button" onClick={() => comprovanteFileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
+            <div className="font-bold text-[13px]">
+              {comprovanteEntregaAnexado ? 'Comprovante de entrega anexado ✓' : uploadingComprovante ? 'Enviando…' : 'Anexar comprovante de entrega ou execução do serviço'}
+            </div>
+            <div className="text-textSecondary text-[12.5px] mt-1">
+              {comprovanteEntregaAnexado ? 'Evidência de que a mercadoria ou serviço foi efetivamente entregue ao sacado' : 'Canhoto de entrega, romaneio assinado, protocolo de recebimento ou similar'}
+            </div>
+          </button>
+
+          <input
+            ref={pedidoFileRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handlePedidoFile(f);
+            }}
+          />
+          <button type="button" onClick={() => pedidoFileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
+            <div className="font-bold text-[13px]">
+              {pedidoCompraAnexado ? 'Pedido de compra anexado ✓' : uploadingPedido ? 'Enviando…' : 'Anexar pedido de compra ou contrato comercial'}
+            </div>
+            <div className="text-textSecondary text-[12.5px] mt-1">
+              {pedidoCompraAnexado ? 'Evidência da relação comercial que originou esta duplicata' : 'Pedido de compra, ordem de serviço ou contrato assinado com o sacado'}
             </div>
           </button>
 
