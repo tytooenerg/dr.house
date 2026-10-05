@@ -49,6 +49,7 @@ import { INSURERS, VEICULOS, VEICULO_KEYS, VEICULO_DISCLAIMER, ONBOARDING_STEPS,
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { runPldScreening } from '../lib/pldScreening.js';
 import { cedenteKybDocsComplete } from '../lib/cedenteKyb.js';
+import { isFeatureEnabled } from '../lib/featureFlags.js';
 import { runAgent } from '../lib/agentRuntime.js';
 import { onboardingAgent } from '../lib/agents/onboarding.js';
 import { claudeEnabled } from '../lib/claude.js';
@@ -56,7 +57,6 @@ import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { generateTotpSecret, verifyTotp, otpauthUrl, generateRecoveryCode } from '../lib/totp.js';
 import { setTotpSecret, enableTotp, disableTotp, storeRecoveryCodes, consumeRecoveryCode, countRemainingRecoveryCodes } from '../db/twoFactor.js';
 import { logger } from '../lib/logger.js';
-import { isFeatureEnabled } from '../lib/featureFlags.js';
 import type { UserRow } from '../db/types.js';
 
 // Shared by all three registration entry points (email/senha, Google, SAML) — an admin
@@ -124,6 +124,11 @@ function publicUser(user: UserRow) {
     kybRejectReason: user.kyb_reject_reason,
     needsKyb: user.role === 'investidor' && (user.kyb_status === 'none' || user.kyb_status === 'rejected'),
     kybPending: user.role === 'investidor' && user.kyb_status === 'pending',
+    // O cliente usa isto (não kybStatus puro) pra decidir se mostra o bloqueio de emissão —
+    // sem o flag, TODO cedente novo tem kyb_status='none' por padrão da coluna (nunca foi
+    // aprovado automaticamente), e sem este campo o EmitirPage travaria a emissão de
+    // qualquer cedente novo mesmo com o flag desligado.
+    cedenteKybRequired: user.role === 'cedente' && isFeatureEnabled('cedente_kyb_required', { userId: user.id }),
     showOnboarding: !onboardingSeen,
     onboardingSteps: steps,
     sessionLabel:

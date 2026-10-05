@@ -511,7 +511,7 @@ export function EmitirPage() {
         />
       </div>
 
-      {user && user.kybStatus !== 'approved' && (
+      {user && user.cedenteKybRequired && user.kybStatus !== 'approved' && (
         <div className="mb-4">
           <CedenteKybGate />
         </div>
@@ -661,10 +661,10 @@ export function EmitirPage() {
             <Toggle on={form.seguro} onClick={() => setField('seguro', !form.seguro)} />
           </div>
 
-          <Button disabled={submitting || !!(user && user.kybStatus !== 'approved')} onClick={submit} className="py-3.5">
+          <Button disabled={submitting || !!(user && user.cedenteKybRequired && user.kybStatus !== 'approved')} onClick={submit} className="py-3.5">
             {submitting
               ? 'Registrando na registradora…'
-              : user && user.kybStatus !== 'approved'
+              : user && user.cedenteKybRequired && user.kybStatus !== 'approved'
                 ? 'Complete o credenciamento acima para emitir'
                 : 'Emitir e registrar duplicata escritural'}
           </Button>

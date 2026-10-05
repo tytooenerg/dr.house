@@ -66,6 +66,30 @@ describe('KYB documental do cedente (feature flag cedente_kyb_required)', () => 
     expect(res.status).not.toBe(403);
   });
 
+  // Regressão: o client (EmitirPage.tsx) decidia se mostrava o bloqueio olhando só
+  // kybStatus !== 'approved' — verdade pra QUALQUER cedente novo, já que kyb_status nasce
+  // 'none' por padrão da coluna, flag ligado ou não. Isso travava a emissão de todo
+  // cedente novo na tela mesmo com o flag desligado, embora o servidor aceitasse a
+  // chamada. cedenteKybRequired (publicUser, routes/auth.ts) já embute o estado do flag
+  // pra evitar esse exato erro.
+  it('desligado por padrão: cedenteKybRequired vem false pra um cedente novo, mesmo com kybStatus none', async () => {
+    const { token } = await registerCedente();
+    const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(me.body.user.kybStatus).toBe('none');
+    expect(me.body.user.cedenteKybRequired).toBe(false);
+  });
+
+  it('ligado: cedenteKybRequired vem true pra um cedente novo', async () => {
+    await setCedenteKybFlag(true);
+    try {
+      const { token } = await registerCedente();
+      const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+      expect(me.body.user.cedenteKybRequired).toBe(true);
+    } finally {
+      await setCedenteKybFlag(false);
+    }
+  });
+
   it('ligado: bloqueia a emissão de um cedente novo que ainda não completou o credenciamento', async () => {
     await setCedenteKybFlag(true);
     try {

@@ -26,6 +26,11 @@ export interface SessionUser {
   kybRejectReason: string;
   needsKyb: boolean;
   kybPending: boolean;
+  // Diferente de kybStatus puro: isto já embute se o feature flag
+  // 'cedente_kyb_required' está realmente ligado (server/src/routes/auth.ts) — sem checar
+  // isto, qualquer cedente novo (kybStatus='none' por padrão) ficaria bloqueado mesmo com
+  // o flag desligado.
+  cedenteKybRequired: boolean;
   showOnboarding: boolean;
   onboardingSteps: OnboardingStep[];
   sessionLabel: string;
