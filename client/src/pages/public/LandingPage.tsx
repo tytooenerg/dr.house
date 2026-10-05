@@ -80,7 +80,7 @@ const PROBLEMAS = [
 
 const PASSOS = [
   { n: '1', t: 'Emissão', d: 'A empresa cadastra a duplicata; a NF-e é lida automaticamente.' },
-  { n: '2', t: 'Registro', d: 'Roteamento automático para a registradora certa — B3, CERC, Núclea ou Grafeno.' },
+  { n: '2', t: 'Registro', d: 'Roteamento automático para a registradora certa — B3, CERC ou Núclea (Grafeno, quando homologada).' },
   { n: '3', t: 'Leilão', d: 'Investidores dão lances; o menor deságio vence.' },
   { n: '4', t: 'Aceite', d: 'O sacado confirma eletronicamente, com prazo legal monitorado.' },
   { n: '5', t: 'Liquidação', d: 'Pix ou TED credita o cedente — sem esperar o vencimento.' },
@@ -95,7 +95,7 @@ const PERFIS = [
 
 const PILARES = [
   { t: 'Compliance com IA', d: 'Score de risco 0–100 combinando histórico interno, rede compartilhada, bureau de crédito e Open Finance — com revisão humana acima do limiar.' },
-  { t: 'Multi-registradora', d: 'Roteamento automático entre B3, CERC, Núclea e Grafeno pelo melhor custo e confiabilidade.' },
+  { t: 'Multi-registradora', d: 'Roteamento automático entre B3, CERC e Núclea pelo melhor custo e confiabilidade — Grafeno entra quando homologada.' },
   { t: 'PLD/KYC real', d: 'Triagem contra listas OFAC e ONU, KYC biométrico e monitoramento de atividade suspeita.' },
   { t: 'Conectores de ERP', d: 'Integrações reais com SAP, TOTVS e Omie para emitir direto do seu sistema.' },
 ];
@@ -148,7 +148,7 @@ export function LandingPage() {
           <div className="flex flex-col gap-2.5">
             {[
               ['Empresa (cedente)', 'Emite e antecipa a duplicata'],
-              ['Registradora (B3/CERC/Núclea/Grafeno)', 'Registro eletrônico obrigatório'],
+              ['Registradora (B3/CERC/Núclea)', 'Registro eletrônico obrigatório'],
               ['Leilão de investidores', 'Precificação por deságio'],
               ['Sacado & seguradora', 'Aceite e proteção de crédito'],
             ].map(([label, desc], i) => (
@@ -168,7 +168,10 @@ export function LandingPage() {
         <div className="max-w-[1360px] mx-auto flex items-center justify-between flex-wrap gap-5">
           <div className="text-[12.5px] font-bold text-textTertiary uppercase tracking-wide">Lei 13.775/2018 tornou a duplicata escritural obrigatória via registradora</div>
           <div className="flex gap-8 font-mono-num text-[13px] font-semibold text-onNavyDim flex-wrap">
-            {['B3', 'CERC', 'Núclea', 'Grafeno (SPC)'].map((n) => (
+            {/* Só as 3 autorizadas pelo BCB no primeiro ciclo (Resolução nº 339/2023) — Grafeno
+                está em homologação, não confirmada, e não pertence a uma barra de confiança
+                regulatória como esta. */}
+            {['B3', 'CERC', 'Núclea'].map((n) => (
               <div key={n}>{n}</div>
             ))}
           </div>

@@ -1,7 +1,12 @@
 import { logger } from './logger.js';
 
-// The Banco Central authorized four registradoras for the duplicata escritural
-// (Resolução BCB nº 339/2023): B3, CERC, Núclea and Grafeno (SPC). Today most
+// The Banco Central's first cycle (Resolução BCB nº 339/2023) authorized three
+// registradoras for the duplicata escritural: B3, CERC and Núclea. Grafeno (SPC) is in
+// homologação, not yet confirmed authorized as of 2026-10 — keep it in this abstraction
+// (REGISTRADORA_GRAFENO_API_URL/KEY stay real-when-configured, same as the other three),
+// but never present it to a cedente/API partner as equally authorized today; any
+// user-facing copy that lists these must caveat Grafeno separately (see
+// client/src/pages/public/DevelopersPage.tsx's own comment on this). Today most
 // integrations hardcode a single one; this is the abstraction layer a cedente/API
 // partner shouldn't have to think about — Lastro picks the best route per operation.
 export const REGISTRADORAS = [
