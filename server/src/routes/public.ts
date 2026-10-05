@@ -13,7 +13,7 @@ import { parseWebhookTedRecebido } from '../lib/tedRail.js';
 import { getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { parseWebhookStablecoinRecebido } from '../lib/stablecoinRail.js';
 import { getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
-import { getUserByWhitelabelDomain } from '../db/users.js';
+import { getUserByWhitelabelDomain, getUserByEmail } from '../db/users.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
@@ -35,8 +35,13 @@ export const publicRouter = Router();
 publicRouter.get('/brand', (req, res) => {
   const host = (req.get('host') || '').toLowerCase().split(':')[0];
   const owner = host ? getUserByWhitelabelDomain(host) : undefined;
+  // Also tells LoginPage whether to show the "contas de demonstração" hint — that block is
+  // only true/useful on an environment that actually has seeded demo data (SEED_DEMO_DATA,
+  // see db/seed.ts); showing it unconditionally on a real customer-facing deployment
+  // publicly advertised a login/password (demo1234) that doesn't even work there.
+  const demoAccountsAvailable = !!getUserByEmail('cedente@lastro.demo');
   if (!owner || !owner.whitelabel_plus_enabled) {
-    res.json({ brand: null });
+    res.json({ brand: null, demoAccountsAvailable });
     return;
   }
   let brand: { nome: string; corPrimaria: string; logoUrl: string } | null = null;
@@ -45,7 +50,7 @@ publicRouter.get('/brand', (req, res) => {
   } catch {
     brand = null;
   }
-  res.json({ brand });
+  res.json({ brand, demoAccountsAvailable });
 });
 
 // Rate limiter shared by the four payment-rail webhook targets below. Their real

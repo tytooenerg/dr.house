@@ -88,6 +88,7 @@ export function LoginPage() {
   // login. { brand: null } é a resposta normal (não um erro) para todo domínio padrão da
   // Lastro — a maioria das visitas nunca vai bater num domínio com marca configurada.
   const [brand, setBrand] = useState<{ nome: string; corPrimaria: string; logoUrl: string } | null>(null);
+  const [demoAccountsAvailable, setDemoAccountsAvailable] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -111,9 +112,10 @@ export function LoginPage() {
 
   useEffect(() => {
     api
-      .get<{ brand: { nome: string; corPrimaria: string; logoUrl: string } | null }>('/public/brand')
+      .get<{ brand: { nome: string; corPrimaria: string; logoUrl: string } | null; demoAccountsAvailable: boolean }>('/public/brand')
       .then((d) => {
         setBrand(d.brand);
+        setDemoAccountsAvailable(d.demoAccountsAvailable);
         if (d.brand?.nome) document.title = d.brand.nome;
       })
       .catch(() => setBrand(null));
@@ -347,10 +349,12 @@ export function LoginPage() {
             <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting}>
               {submitting ? 'Entrando…' : 'Entrar'}
             </Button>
-            <div className="mt-5 p-3.5 rounded-lg bg-bg text-[12.5px] text-textSecondary leading-relaxed">
-              <b>Contas de demonstração</b> (senha <code>demo1234</code>):<br />
-              investidor@lastro.demo · cedente@lastro.demo · sacado@lastro.demo · seguradora@lastro.demo
-            </div>
+            {demoAccountsAvailable && (
+              <div className="mt-5 p-3.5 rounded-lg bg-bg text-[12.5px] text-textSecondary leading-relaxed">
+                <b>Contas de demonstração</b> (senha <code>demo1234</code>):<br />
+                investidor@lastro.demo · cedente@lastro.demo · sacado@lastro.demo · seguradora@lastro.demo
+              </div>
+            )}
           </form>
         ) : mode === 'forgot' ? (
           <form onSubmit={handleForgotPassword}>
