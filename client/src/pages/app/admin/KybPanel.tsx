@@ -11,8 +11,12 @@ interface PendingKyb {
   nome: string;
   email: string;
   companyName: string;
+  role: 'investidor' | 'cedente';
   kybForm: { cnpj?: string; tipo?: string; pl?: string; paisDomicilio?: string; taxIdEstrangeiro?: string; representanteLegal?: string };
   naoResidente: boolean;
+  // Só preenchido pra role='cedente' — os três documentos exigidos (lib/cedenteKyb.ts),
+  // em vez do formulário de veículo/PL que só faz sentido pra quem compra crédito.
+  cedenteDocs: { cnpj: string | null; contratoSocial: string | null; representante: string | null } | null;
   submittedAt: string;
   pldStatus: 'clear' | 'flagged';
   pldMatchNote: string;
@@ -120,6 +124,9 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
+              <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md" style={{ background: PALETTE.hairline, color: PALETTE.textSecondary }}>
+                {p.role === 'cedente' ? 'Cedente' : 'Investidor'}
+              </span>
               {p.naoResidente && (
                 <span className="text-[11.5px] font-bold px-3 py-1.5 rounded-md" style={{ background: PALETTE.chip, color: PALETTE.blue }}>
                   Investidor não residente
@@ -134,7 +141,26 @@ export function KybPanel({ onCount }: { onCount?: (n: number) => void }) {
               <div className="mt-0.5">{p.pldMatchNote}</div>
             </div>
           )}
-          {p.naoResidente ? (
+          {p.role === 'cedente' ? (
+            <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+              <div className="text-[13px]">
+                <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">CNPJ</div>
+                {p.kybForm.cnpj || '—'}
+              </div>
+              <div className="text-[13px]">
+                <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Cartão CNPJ</div>
+                {p.cedenteDocs?.cnpj ?? '— não enviado'}
+              </div>
+              <div className="text-[13px]">
+                <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Contrato social</div>
+                {p.cedenteDocs?.contratoSocial ?? '— não enviado'}
+              </div>
+              <div className="text-[13px]">
+                <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">Doc. do representante</div>
+                {p.cedenteDocs?.representante ?? '— não enviado'}
+              </div>
+            </div>
+          ) : p.naoResidente ? (
             <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               <div className="text-[13px]">
                 <div className="text-textTertiary text-[11.5px] uppercase font-bold mb-1">País de domicílio</div>

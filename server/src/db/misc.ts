@@ -227,3 +227,14 @@ export function getUploadForDuplicata(duplicataId: string, kind: string): Upload
     | UploadRow
     | undefined;
 }
+
+// Documento de conta (não ligado a uma duplicata) mais recente de um tipo — usado pelo KYB
+// documental do cedente (lib/cedenteKyb.ts), onde os três documentos exigidos são sobre a
+// EMPRESA, não sobre uma operação específica.
+export function getLatestUploadOfKind(userId: number, kind: string): UploadRow | undefined {
+  return db.prepare('SELECT * FROM uploads WHERE user_id = ? AND kind = ? ORDER BY created_at DESC LIMIT 1').get(userId, kind) as UploadRow | undefined;
+}
+
+export function hasUploadOfKind(userId: number, kind: string): boolean {
+  return !!db.prepare('SELECT 1 FROM uploads WHERE user_id = ? AND kind = ? LIMIT 1').get(userId, kind);
+}

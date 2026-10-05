@@ -14,6 +14,7 @@ import { platformFee } from './settlement.js';
 import { chooseRegistradora, registrarNaRegistradora } from './registradoras.js';
 import { cnpjChecksumValido, consultarCnpj } from './cnpjLookup.js';
 import { chaveNfeChecksumValida, consultarSituacaoNfe } from './nfeStatus.js';
+import { isFeatureEnabled } from './featureFlags.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
@@ -153,6 +154,7 @@ export type EmitirOutcome =
     }
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 402; body: { error: 'plan_required'; requiredPlan: 'pro'; message: string } }
+  | { status: 403; body: { error: 'kyb_required'; message: string } }
   | { status: 409; body: { error: 'nfe_duplicidade'; message: string } }
   | { status: 502; body: { error: 'cerc_unavailable'; message: string } };
 
@@ -166,6 +168,23 @@ const NFE_CHAVE_RE = /^\d{44}$/;
 // register fake data against a real registry, and the resulting duplicata is tagged
 // sandbox=1, invisible to every live/internal read (db/duplicatas.ts).
 export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sandbox?: boolean } = {}): Promise<EmitirOutcome> {
+  // KYB documental do cedente (lib/cedenteKyb.ts) — quem recebe o dinheiro antecipado
+  // precisa provar que a empresa existe de verdade antes de poder emitir, mesmo gate que o
+  // investidor já tinha pra dar lance (lib/auctionCore.ts), agora espelhado aqui. Contas já
+  // existentes antes desta mudança foram aprovadas de uma vez (migração 0076) — isto só
+  // bloqueia conta nova que ainda não completou o credenciamento. Atrás do feature flag
+  // 'cedente_kyb_required' (desligado por padrão — lib/featureFlags.ts): a exigência só
+  // passa a valer de verdade quando um admin liga o flag em /admin (por isso nenhum dos
+  // ~50 arquivos de teste que registram um cedente e emitem na hora precisou mudar).
+  if (user.role === 'cedente' && isFeatureEnabled('cedente_kyb_required', { userId: user.id }) && user.kyb_status !== 'approved') {
+    return {
+      status: 403,
+      body: {
+        error: 'kyb_required',
+        message: 'Complete o credenciamento documental (CNPJ, contrato social e documento do representante legal) antes de emitir uma duplicata.',
+      },
+    };
+  }
   if (!form.sacado || !form.valor || !form.vencimento) {
     return { status: 400, body: { error: 'validation_error', message: 'Preencha empresa sacada, valor e vencimento antes de enviar.' } };
   }

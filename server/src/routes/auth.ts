@@ -48,6 +48,7 @@ import { recordAuditEvent } from '../db/audit.js';
 import { INSURERS, VEICULOS, VEICULO_KEYS, VEICULO_DISCLAIMER, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { runPldScreening } from '../lib/pldScreening.js';
+import { cedenteKybDocsComplete } from '../lib/cedenteKyb.js';
 import { runAgent } from '../lib/agentRuntime.js';
 import { onboardingAgent } from '../lib/agents/onboarding.js';
 import { claudeEnabled } from '../lib/claude.js';
@@ -691,6 +692,44 @@ authRouter.post(
         subjectId: String(userId),
       }).catch((err) => logger.warn({ err, userId }, '[onboarding-agent] falha na pré-triagem automática'));
     }
+
+    const refreshed = getUserById(userId)!;
+    res.json({ user: publicUser(refreshed) });
+  })
+);
+
+const cedenteKybSchema = z.object({ cnpj: z.string().trim().min(1, 'Informe o CNPJ da empresa.') });
+
+// KYB documental do cedente — mesma máquina de estado do investidor acima (kyb_status:
+// none → pending → approved/rejected, fila em GET/POST /admin/kyb), mas sem o formulário
+// de veículo/PL/patrimônio que só faz sentido pra quem compra crédito. O que conta como
+// "pronto pra enviar" aqui é diferente: três documentos (lib/cedenteKyb.ts), não um só.
+authRouter.post(
+  '/kyb/cedente',
+  requireAuth,
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    if (req.user!.role !== 'cedente') {
+      res.status(403).json({ error: 'forbidden', message: 'Este credenciamento é só para contas cedente.' });
+      return;
+    }
+    const parsed = cedenteKybSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const userId = req.user!.id;
+    if (!cedenteKybDocsComplete(userId)) {
+      res.status(400).json({
+        error: 'documentos_pendentes',
+        message: 'Envie o CNPJ, o contrato social e o documento do representante legal antes de enviar para análise.',
+      });
+      return;
+    }
+    updateKybForm(userId, 'cnpj', parsed.data.cnpj);
+    submitKybForReview(userId);
+    recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj, role: 'cedente' });
+    await runPldScreening(userId, req.user!.company_name, parsed.data.cnpj);
 
     const refreshed = getUserById(userId)!;
     res.json({ user: publicUser(refreshed) });

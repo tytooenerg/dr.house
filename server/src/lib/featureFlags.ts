@@ -50,6 +50,13 @@ export const FEATURE_FLAG_DEFS: FeatureFlagDef[] = [
     description: 'Liga/desliga o carrossel de publicidade da landing page (GET /public/advertisements) sem afetar a fila de moderação nem a cobrança dos anunciantes — útil pra tirar um anúncio problemático do ar imediatamente, sem depender de reprovar/desativar cada um.',
     defaultEnabled: true,
   },
+  {
+    key: 'cedente_kyb_required',
+    label: 'KYB documental do cedente',
+    description:
+      'Exige CNPJ, contrato social e documento do representante legal (credenciamento aprovado por um admin em /admin/kyb) antes de uma conta cedente poder emitir duplicata. Contas cedente já aprovadas (toda conta cadastrada antes de este flag existir, ver migração 0076) continuam emitindo normalmente mesmo com o flag ligado — isto só passa a afetar quem ainda não completou o credenciamento. Desligado por padrão: ativar aqui é o que faz a exigência valer para novos cadastros.',
+    defaultEnabled: false,
+  },
 ];
 
 const DEF_BY_KEY = new Map(FEATURE_FLAG_DEFS.map((d) => [d.key, d]));

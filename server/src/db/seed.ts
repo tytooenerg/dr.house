@@ -138,6 +138,10 @@ export async function seedIfEmpty() {
   const cedente = contas.get('cedente@lastro.demo')!;
   const sacado = contas.get('sacado@lastro.demo')!;
   approveKyb(investidor.id);
+  // KYB documental do cedente (lib/cedenteKyb.ts) bloqueia emissão pra conta nova — mas a
+  // conta demo já existia antes dessa exigência existir, mesmo raciocínio da migração 0076
+  // que aprova de uma vez todo cedente já cadastrado em produção.
+  approveKyb(cedente.id);
   // Kayrós Capital é um fundo de investimento — sem veículo classificado a conta seria
   // aprovada e mesmo assim incapaz de dar lance (lib/auctionCore.ts).
   setVeiculo(investidor.id, 'fundo');

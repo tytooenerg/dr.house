@@ -60,6 +60,7 @@ interface SessionContextValue {
     taxIdEstrangeiro?: string;
     representanteLegal?: string;
   }) => Promise<void>;
+  submitCedenteKyb: (form: { cnpj: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -214,6 +215,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }, []);
 
+  const submitCedenteKyb = useCallback(async (form: { cnpj: string }) => {
+    const data = await api.post<{ user: SessionUser }>('/auth/kyb/cedente', form);
+    setUser(data.user);
+  }, []);
+
   const completeOnboarding = useCallback(async () => {
     await api.post('/auth/onboarding/complete');
     setUser((u) => (u ? { ...u, showOnboarding: false } : u));
@@ -234,6 +240,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     completeSamlSignup,
     logout,
     submitKyb,
+    submitCedenteKyb,
     completeOnboarding,
     refresh,
   };

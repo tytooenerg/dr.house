@@ -8,7 +8,8 @@ import { screenAdvertisement } from '../lib/adCopilot.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
-import { addNotification, addLedgerEntry } from '../db/misc.js';
+import { addNotification, addLedgerEntry, getLatestUploadOfKind } from '../db/misc.js';
+import { CEDENTE_KYB_KINDS } from '../lib/cedenteKyb.js';
 import { recordAuditEvent, listAuditLog, verifyAuditChain } from '../db/audit.js';
 import { COLORS, VEICULO_KEYS, VEICULO_LABEL, type VeiculoKey } from '../data/seed.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
@@ -112,10 +113,22 @@ adminRouter.get('/kyb', (_req, res) => {
       nome: u.nome,
       email: u.email,
       companyName: u.company_name,
+      role: u.role as 'investidor' | 'cedente',
       kybForm,
       veiculo: u.veiculo,
       veiculoLabel: VEICULO_LABEL[u.veiculo] ?? 'Não informado',
       naoResidente: !!kybForm.naoResidente,
+      // Cedente não passa pelo formulário de veículo/PL do investidor — o que ele envia são
+      // três documentos (lib/cedenteKyb.ts). null pra investidor, pra não confundir as duas
+      // telas no client.
+      cedenteDocs:
+        u.role === 'cedente'
+          ? {
+              cnpj: getLatestUploadOfKind(u.id, CEDENTE_KYB_KINDS[0])?.filename ?? null,
+              contratoSocial: getLatestUploadOfKind(u.id, CEDENTE_KYB_KINDS[1])?.filename ?? null,
+              representante: getLatestUploadOfKind(u.id, CEDENTE_KYB_KINDS[2])?.filename ?? null,
+            }
+          : null,
       submittedAt: fmtRelative(u.created_at),
       pldStatus: u.pld_status,
       pldMatchNote: u.pld_match_note,

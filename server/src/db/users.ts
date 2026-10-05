@@ -263,8 +263,11 @@ export function rejectKyb(userId: number, reason: string) {
   db.prepare("UPDATE users SET kyb_status = 'rejected', kyb_done = 0, kyb_reject_reason = ? WHERE id = ?").run(reason, userId);
 }
 
+// Inclui 'cedente' desde que o KYB documental passou a valer pra quem emite duplicata,
+// não só pra quem financia — mesma fila, mesmo botão de aprovar/rejeitar em
+// GET/POST /admin/kyb, o que muda é só o que cada um precisa enviar (ver lib/cedenteKyb.ts).
 export function listPendingKyb(): UserRow[] {
-  return db.prepare("SELECT * FROM users WHERE role = 'investidor' AND kyb_status = 'pending' ORDER BY created_at ASC").all() as UserRow[];
+  return db.prepare("SELECT * FROM users WHERE role IN ('investidor','cedente') AND kyb_status = 'pending' ORDER BY created_at ASC").all() as UserRow[];
 }
 
 // Used by the back-office's auditor-account management (routes/admin.ts) — 'auditor' is

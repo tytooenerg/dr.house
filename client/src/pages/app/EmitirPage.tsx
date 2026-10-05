@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
+import { useSession } from '../../state/SessionContext';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
 import { Badge } from '../../components/ui/Badge';
@@ -194,6 +195,139 @@ function LoteEmissaoCard() {
   );
 }
 
+// Até aqui só o investidor passava por credenciamento documental (KybModal.tsx, tela
+// cheia, bloqueante). O cedente — quem recebe o dinheiro antecipado — nunca precisou
+// provar que a empresa existe de verdade. Em vez de repetir o modal bloqueante (que
+// travaria o app inteiro pra uma conta que já usa a plataforma há meses), isto só aparece
+// aqui, no ponto exato que passa a exigir o credenciamento: emitir uma duplicata nova.
+// Contas cedente já existentes antes desta mudança foram aprovadas de uma vez (migração
+// 0076) e nunca veem este card.
+function CedenteKybGate() {
+  const { user, submitCedenteKyb } = useSession();
+  const [cnpjDocAnexado, setCnpjDocAnexado] = useState(false);
+  const [contratoSocialAnexado, setContratoSocialAnexado] = useState(false);
+  const [representanteAnexado, setRepresentanteAnexado] = useState(false);
+  const [uploadingKind, setUploadingKind] = useState<string | null>(null);
+  const [cnpjTexto, setCnpjTexto] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const cnpjFileRef = useRef<HTMLInputElement>(null);
+  const contratoFileRef = useRef<HTMLInputElement>(null);
+  const representanteFileRef = useRef<HTMLInputElement>(null);
+
+  if (!user) return null;
+
+  if (user.kybStatus === 'pending') {
+    return (
+      <Card className="p-6">
+        <div className="font-bold text-[15px] mb-1">Credenciamento documental em análise</div>
+        <div className="text-textSecondary text-[13px]">
+          Enviamos seus documentos para análise — você poderá emitir duplicatas assim que forem aprovados (normalmente em até 2 dias úteis).
+        </div>
+      </Card>
+    );
+  }
+
+  const handleFile = async (kind: string, mark: (v: boolean) => void, file: File) => {
+    setUploadingKind(kind);
+    setError('');
+    try {
+      await uploadFile(kind, file);
+      mark(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao enviar o arquivo.');
+    } finally {
+      setUploadingKind(null);
+    }
+  };
+
+  const enviar = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await submitCedenteKyb({ cnpj: cnpjTexto });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível enviar para análise.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const tudoAnexado = cnpjDocAnexado && contratoSocialAnexado && representanteAnexado;
+
+  return (
+    <Card className="p-6">
+      <div className="font-bold text-[15px] mb-1">Credenciamento documental necessário para emitir</div>
+      <div className="text-textSecondary text-[13px] mb-4">
+        Antes da primeira duplicata, precisamos confirmar que a empresa por trás da operação existe de verdade — envie os três documentos abaixo.
+      </div>
+      {user.kybStatus === 'rejected' && user.kybRejectReason && (
+        <Notice variant="danger" className="text-sm mb-3">
+          Credenciamento anterior rejeitado: {user.kybRejectReason}. Envie os documentos novamente.
+        </Notice>
+      )}
+      <Field label="CNPJ da empresa">
+        <Input placeholder="00.000.000/0001-00" value={cnpjTexto} onChange={(e) => setCnpjTexto(e.target.value)} />
+      </Field>
+      <div className="grid gap-3 mt-3 mb-4" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <input
+          ref={cnpjFileRef}
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile('kyb_cedente_cnpj', setCnpjDocAnexado, f);
+          }}
+        />
+        <button type="button" onClick={() => cnpjFileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-4 text-center cursor-pointer bg-transparent">
+          <div className="font-bold text-[12.5px]">{cnpjDocAnexado ? 'Cartão CNPJ ✓' : uploadingKind === 'kyb_cedente_cnpj' ? 'Enviando…' : 'Cartão CNPJ'}</div>
+        </button>
+
+        <input
+          ref={contratoFileRef}
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile('kyb_cedente_contrato_social', setContratoSocialAnexado, f);
+          }}
+        />
+        <button type="button" onClick={() => contratoFileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-4 text-center cursor-pointer bg-transparent">
+          <div className="font-bold text-[12.5px]">
+            {contratoSocialAnexado ? 'Contrato social ✓' : uploadingKind === 'kyb_cedente_contrato_social' ? 'Enviando…' : 'Contrato social'}
+          </div>
+        </button>
+
+        <input
+          ref={representanteFileRef}
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile('kyb_cedente_representante', setRepresentanteAnexado, f);
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => representanteFileRef.current?.click()}
+          className="border-2 border-dashed border-borderStrong rounded-xl p-4 text-center cursor-pointer bg-transparent"
+        >
+          <div className="font-bold text-[12.5px]">
+            {representanteAnexado ? 'Doc. do representante ✓' : uploadingKind === 'kyb_cedente_representante' ? 'Enviando…' : 'Doc. do representante legal'}
+          </div>
+        </button>
+      </div>
+      <Button disabled={!tudoAnexado || !cnpjTexto.trim() || submitting} onClick={enviar}>
+        {submitting ? 'Enviando…' : 'Enviar para análise'}
+      </Button>
+      {error && <Notice variant="danger" className="text-sm mt-3">{error}</Notice>}
+    </Card>
+  );
+}
+
 function fmtBRL(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
@@ -202,6 +336,7 @@ const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', 
 
 export function EmitirPage() {
   const { t } = useLang();
+  const { user } = useSession();
   const [form, setForm] = useState<EmitForm>(EMPTY_FORM);
   const [batchRows, setBatchRows] = useState<BatchRow[]>([]);
   // 'produto' (NF-e) é o padrão histórico — mercadoria tem chave de acesso nacional de 44
@@ -376,6 +511,12 @@ export function EmitirPage() {
         />
       </div>
 
+      {user && user.kybStatus !== 'approved' && (
+        <div className="mb-4">
+          <CedenteKybGate />
+        </div>
+      )}
+
       <div className="grid gap-4 items-start" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
         <Card className="p-7 flex flex-col gap-4">
           <div className="flex gap-2 p-1 rounded-xl bg-surface">
@@ -520,8 +661,12 @@ export function EmitirPage() {
             <Toggle on={form.seguro} onClick={() => setField('seguro', !form.seguro)} />
           </div>
 
-          <Button disabled={submitting} onClick={submit} className="py-3.5">
-            {submitting ? 'Registrando na registradora…' : 'Emitir e registrar duplicata escritural'}
+          <Button disabled={submitting || !!(user && user.kybStatus !== 'approved')} onClick={submit} className="py-3.5">
+            {submitting
+              ? 'Registrando na registradora…'
+              : user && user.kybStatus !== 'approved'
+                ? 'Complete o credenciamento acima para emitir'
+                : 'Emitir e registrar duplicata escritural'}
           </Button>
           {error && <Notice variant="danger" className="text-sm">{error}</Notice>}
         </Card>
