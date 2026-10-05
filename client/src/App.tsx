@@ -1,10 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { SessionProvider } from './state/SessionContext';
 import { AppShell } from './layout/AppShell';
 import { Gate } from './components/Gate';
 import { PageSkeleton } from './components/ui/Skeleton';
 import { LoginPage } from './pages/auth/LoginPage';
+import { lazyWithReload as lazy } from './lib/lazyWithReload';
 
 // Every route below LoginPage is lazy-loaded — before this change, the whole app (every
 // role's every screen, public marketing pages included) shipped as one 507kB JS chunk on
@@ -13,7 +14,9 @@ import { LoginPage } from './pages/auth/LoginPage';
 // it's the one screen almost every real visit hits first; everything else loads on demand,
 // keyed by the actual route, with `PageSkeleton` (already used for in-page loading states —
 // see DashboardPage) as the one shared Suspense fallback so a lazy chunk load never flashes
-// a blank screen.
+// a blank screen. `lazy` here is lib/lazyWithReload.ts, not React's own — a tab left open
+// across a deploy gets a stale chunk filename on its next navigation, and this retries once
+// via a full reload instead of showing "Failed to fetch dynamically imported module".
 const TeamInviteAcceptPage = lazy(() => import('./pages/auth/TeamInviteAcceptPage').then((m) => ({ default: m.TeamInviteAcceptPage })));
 const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage').then((m) => ({ default: m.OAuthCallbackPage })));
 const CompleteGoogleSignupPage = lazy(() => import('./pages/auth/CompleteGoogleSignupPage').then((m) => ({ default: m.CompleteGoogleSignupPage })));
