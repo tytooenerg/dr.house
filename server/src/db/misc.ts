@@ -199,13 +199,31 @@ export function listAutomationActivity(userId: number) {
 }
 
 // --- uploads ---
-export function addUpload(userId: number, kind: string, filename: string, filepath: string) {
-  const info = db.prepare('INSERT INTO uploads (user_id, kind, filename, path) VALUES (?, ?, ?, ?)').run(userId, kind, filename, filepath);
-  return db.prepare('SELECT * FROM uploads WHERE id = ?').get(Number(info.lastInsertRowid)) as {
-    id: number;
-    kind: string;
-    filename: string;
-    path: string;
-    created_at: string;
-  };
+export interface UploadRow {
+  id: number;
+  kind: string;
+  filename: string;
+  path: string;
+  duplicata_id: string | null;
+  created_at: string;
+}
+
+// duplicataId é opcional e segue null pra todo upload que nunca foi sobre uma duplicata
+// específica (kyb_doc, selfie_liveness, contratos genéricos lidos na tela de Compliance) —
+// só a rota chamadora (routes/uploads.ts) decide quando ele existe, depois de confirmar que
+// a duplicata pertence a quem está enviando.
+export function addUpload(userId: number, kind: string, filename: string, filepath: string, duplicataId: string | null = null): UploadRow {
+  const info = db
+    .prepare('INSERT INTO uploads (user_id, kind, filename, path, duplicata_id) VALUES (?, ?, ?, ?, ?)')
+    .run(userId, kind, filename, filepath, duplicataId);
+  return db.prepare('SELECT * FROM uploads WHERE id = ?').get(Number(info.lastInsertRowid)) as UploadRow;
+}
+
+// O documento mais recente de um certo tipo anexado a UMA duplicata específica — usado por
+// routes/minhas.ts para mostrar, por exemplo, se o instrumento de cessão desta duplicata já
+// foi enviado, sem precisar que o cedente lembre onde guardou o arquivo.
+export function getUploadForDuplicata(duplicataId: string, kind: string): UploadRow | undefined {
+  return db.prepare('SELECT * FROM uploads WHERE duplicata_id = ? AND kind = ? ORDER BY created_at DESC LIMIT 1').get(duplicataId, kind) as
+    | UploadRow
+    | undefined;
 }

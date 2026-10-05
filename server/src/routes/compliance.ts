@@ -11,10 +11,7 @@ import { computeFraudFlags } from '../lib/fraudDetection.js';
 import { computeProvisioning } from '../lib/provisioning.js';
 import { fmtBRL, parseBRLNumber, fmtRelative } from '../lib/format.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
-import { getLatestContractAnalysis } from '../db/contractAnalyses.js';
-import { COLORS } from '../data/seed.js';
-
-const SEVERITY_COLOR: Record<'ok' | 'atencao' | 'critico', string> = { ok: COLORS.GREEN, atencao: COLORS.AMBER, critico: COLORS.RED };
+import { getLatestContractAnalysis, SEVERITY_COLOR } from '../db/contractAnalyses.js';
 
 // Real analysis (lib/contractAnalysis.ts, triggered from POST /api/uploads with
 // kind=contrato_cessao) when the cedente has uploaded a contract; the static demo copy

@@ -5,7 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requireAuth } from '../auth/middleware.js';
 import { addUpload } from '../db/misc.js';
-import { markKybDone, updateSettings } from '../db/users.js';
+import { getDuplicata } from '../db/duplicatas.js';
+import { markKybDone, updateSettings, effectiveOwnerId } from '../db/users.js';
 import { extractNfeFields } from '../lib/nfeExtraction.js';
 import { analyzeContract } from '../lib/contractAnalysis.js';
 import { recordContractAnalysis } from '../db/contractAnalyses.js';
@@ -57,7 +58,23 @@ uploadsRouter.post(
       return;
     }
     const kind = typeof req.body.kind === 'string' ? req.body.kind : 'outro';
-    const record = addUpload(req.user!.id, kind, req.file.originalname, req.file.filename);
+
+    // Vincula o upload a uma duplicata específica quando informado — essencial pro
+    // instrumento de cessão (kind='contrato_cessao'), que sem isso ficava só preso à conta
+    // de quem enviou, sem registro de qual operação ele realmente comprova. Checa posse
+    // (effectiveOwnerId, mesma regra de lib/auctionOpen.ts) pra uma conta nunca conseguir
+    // anexar documento à duplicata de outra.
+    let duplicataId: string | null = null;
+    if (typeof req.body.duplicataId === 'string' && req.body.duplicataId.trim()) {
+      const d = getDuplicata(req.body.duplicataId.trim());
+      if (!d || d.cedente_id !== effectiveOwnerId(req.user!)) {
+        res.status(404).json({ error: 'duplicata_not_found', message: 'Duplicata não encontrada ou não pertence a esta conta.' });
+        return;
+      }
+      duplicataId = d.id;
+    }
+
+    const record = addUpload(req.user!.id, kind, req.file.originalname, req.file.filename, duplicataId);
 
     if (kind === 'kyb_doc') markKybDone(req.user!.id);
 
@@ -90,6 +107,11 @@ uploadsRouter.post(
       }
     }
 
-    res.status(201).json({ upload: { id: record.id, filename: record.filename, kind: record.kind, createdAt: record.created_at }, extracted, analysis, biometria });
+    res.status(201).json({
+      upload: { id: record.id, filename: record.filename, kind: record.kind, duplicataId: record.duplicata_id, createdAt: record.created_at },
+      extracted,
+      analysis,
+      biometria,
+    });
   })
 );

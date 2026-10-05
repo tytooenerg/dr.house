@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { listByCedente, getDuplicata } from '../db/duplicatas.js';
 import { effectiveOwnerId } from '../db/users.js';
+import { getUploadForDuplicata } from '../db/misc.js';
+import { getContractAnalysisByUploadId, SEVERITY_COLOR } from '../db/contractAnalyses.js';
 import { aceiteConfirmado } from '../lib/aceiteCore.js';
 import { fmtBRL } from '../lib/format.js';
 import { estimateRateBand } from '../lib/dynamicPricing.js';
@@ -59,6 +61,13 @@ function view(d: ReturnType<typeof getDuplicata>) {
   // vira a resposta da pergunta que o cedente de fato faz ("quanto eu recebo?").
   const bandaAm = estimateRateBand(ratingFromScore(d.score ?? 60)).mid;
 
+  // O instrumento de cessão desta duplicata específica — antes só existia como um upload
+  // isolado (tela de Compliance, kind='contrato_cessao') sem nenhuma ligação visível com
+  // qual operação ele comprova. getUploadForDuplicata filtra pelo duplicata_id que
+  // routes/uploads.ts grava quando o cedente anexa pelo botão desta tela.
+  const cessaoUpload = getUploadForDuplicata(d.id, 'contrato_cessao');
+  const cessaoAnalysis = cessaoUpload ? getContractAnalysisByUploadId(cessaoUpload.id) : null;
+
   return {
     leilao,
     precoEstimadoFmt: fmtBRL(computePurchasePrice(d, bandaAm).precoCompra),
@@ -78,6 +87,9 @@ function view(d: ReturnType<typeof getDuplicata>) {
     lastroColor: d.lastro_pct === 100 ? COLORS.GREEN : d.lastro_pct >= 60 ? COLORS.AMBER : COLORS.RED,
     canDisparar: d.lastro_pct === 100 && d.status === 'aprovada' && aceiteConfirmado(d.id),
     aguardandoAceite: d.status === 'aprovada' && !aceiteConfirmado(d.id),
+    contratoCessaoAnexado: !!cessaoUpload,
+    contratoCessaoFilename: cessaoUpload?.filename ?? null,
+    contratoCessaoFlags: cessaoAnalysis ? cessaoAnalysis.flags.map((f) => ({ text: f.text, color: SEVERITY_COLOR[f.severity] })) : null,
   };
 }
 

@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useState } from 'react';
-import { api, ApiError } from '../../lib/api';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { api, ApiError, uploadFile } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { Notice } from '../../components/ui/Notice';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '../../components/ui/Table';
@@ -47,6 +48,11 @@ interface Duplicata {
     fechaEmSec: number;
     lances: LanceNaEscada[];
   } | null;
+  // O instrumento de cessão desta duplicata — antes só existia como um upload isolado na
+  // tela de Compliance, sem nenhum jeito de saber depois qual operação ele comprovava.
+  contratoCessaoAnexado: boolean;
+  contratoCessaoFilename: string | null;
+  contratoCessaoFlags: { text: string; color: string }[] | null;
 }
 
 const COLS = '1.2fr 0.8fr 0.7fr 0.7fr 0.7fr 1.2fr';
@@ -89,6 +95,35 @@ export function MinhasPage() {
   const [dispararErro, setDispararErro] = useState('');
   const [enviando, setEnviando] = useState(false);
 
+  // Anexar o instrumento de cessão a UMA duplicata — um único input de arquivo
+  // compartilhado por todas as linhas da tabela, mirado na duplicata certa via
+  // cessaoTargetId no momento do clique (mesmo padrão de "um ref, vários disparadores" que
+  // o resto da tela não precisava até agora, por não ter upload por linha).
+  const [cessaoTargetId, setCessaoTargetId] = useState<string | null>(null);
+  const [cessaoUploading, setCessaoUploading] = useState(false);
+  const [cessaoError, setCessaoError] = useState('');
+  const cessaoFileRef = useRef<HTMLInputElement>(null);
+
+  const anexarCessao = (id: string) => {
+    setCessaoError('');
+    setCessaoTargetId(id);
+    cessaoFileRef.current?.click();
+  };
+
+  const handleCessaoFile = async (file: File) => {
+    if (!cessaoTargetId) return;
+    setCessaoUploading(true);
+    try {
+      await uploadFile('contrato_cessao', file, cessaoTargetId);
+      await load();
+    } catch (err) {
+      setCessaoError(err instanceof ApiError ? err.message : 'Falha ao enviar o instrumento de cessão.');
+    } finally {
+      setCessaoUploading(false);
+      setCessaoTargetId(null);
+    }
+  };
+
   const abrirReserva = (d: Duplicata) => {
     setDispararErro('');
     setReservaPara(d.id);
@@ -130,6 +165,19 @@ export function MinhasPage() {
         <div className="text-textSecondary text-[13px] mt-1.5">{t('minhas.dropzoneHint', 'ou clique para selecionar um arquivo do seu computador')}</div>
       </div>
 
+      <input
+        ref={cessaoFileRef}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleCessaoFile(f);
+          e.target.value = '';
+        }}
+      />
+      {cessaoError && <Notice variant="danger" className="text-sm mb-3">{cessaoError}</Notice>}
+
       {loadError && <ErrorState message={loadError} onRetry={load} />}
 
       {!loadError && (
@@ -156,12 +204,40 @@ export function MinhasPage() {
             <TableCell className="font-bold text-[13px]">
               <span style={{ color: d.lastroColor }}>{d.lastroFmt}</span>
             </TableCell>
-            <TableCell className="flex items-center gap-2">
+            <TableCell className="flex items-center gap-2 flex-wrap">
               <span className="inline-block text-[11.5px] font-bold px-2.5 py-1 rounded-md" style={{ background: d.statusBg, color: d.statusColor }}>
                 {d.status}
               </span>
+              {d.contratoCessaoAnexado ? (
+                <span className="text-[11.5px] font-semibold text-green" title={d.contratoCessaoFilename ?? undefined}>
+                  ✓ Instrumento de cessão anexado
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={cessaoUploading && cessaoTargetId === d.id}
+                  onClick={() => anexarCessao(d.id)}
+                  className="bg-transparent border-none text-blue text-[11.5px] font-bold cursor-pointer underline p-0"
+                >
+                  {cessaoUploading && cessaoTargetId === d.id ? 'Enviando…' : 'Anexar instrumento de cessão'}
+                </button>
+              )}
               {d.aguardandoAceite && (
                 <span className="text-[11.5px] font-semibold text-amber">Aguardando o aceite do sacado para poder leiloar</span>
+              )}
+              {/* Mesmo visual de "pontinho colorido + texto" que a leitura de contratos usa na
+                  tela de Compliance (CompliancePage.tsx) — aqui é a análise real via IA do
+                  instrumento de cessão desta duplicata específica, não de um contrato genérico
+                  sem ligação com nenhuma operação. */}
+              {d.contratoCessaoAnexado && d.contratoCessaoFlags && d.contratoCessaoFlags.length > 0 && (
+                <div className="w-full flex flex-wrap gap-3 mt-1">
+                  {d.contratoCessaoFlags.map((f, i) => (
+                    <span key={i} className="flex items-center gap-1.5 text-[11px] text-textSecondary">
+                      <span className="rounded-full flex-shrink-0" style={{ width: 6, height: 6, background: f.color }} />
+                      {f.text}
+                    </span>
+                  ))}
+                </div>
               )}
               {d.canDisparar && reservaPara !== d.id && (
                 <button type="button" onClick={() => abrirReserva(d)} className="px-2.5 py-1.5 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer">

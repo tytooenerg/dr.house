@@ -128,9 +128,10 @@ export async function downloadFile(path: string, filename: string): Promise<void
 
 export async function uploadFile(
   kind: string,
-  file: File
+  file: File,
+  duplicataId?: string
 ): Promise<{
-  upload: { id: number; filename: string };
+  upload: { id: number; filename: string; duplicataId: string | null };
   extracted: Record<string, string> | null;
   analysis: { text: string; severity: 'ok' | 'atencao' | 'critico' }[] | null;
   biometria: { passed: boolean; confidence: number } | null;
@@ -138,6 +139,7 @@ export async function uploadFile(
   const token = getToken();
   const form = new FormData();
   form.append('kind', kind);
+  if (duplicataId) form.append('duplicataId', duplicataId);
   form.append('file', file);
   const res = await fetch(BASE + '/uploads', {
     method: 'POST',
