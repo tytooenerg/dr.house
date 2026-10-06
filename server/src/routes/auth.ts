@@ -353,6 +353,11 @@ authRouter.post(
     }
     const passwordHash = await hashPassword(parsed.data.newPassword);
     const updated = updatePasswordHash(userId, passwordHash);
+    // Mesmo padrão de account.ts's /delete: uma ação que troca a credencial precisa
+    // invalidar sessões já abertas. Sem isto, um refresh token roubado antes do reset
+    // (o motivo mais comum de alguém usar "esqueci minha senha" por suspeita de invasão)
+    // continuaria renovando access tokens por até 30 dias — o reset não resolveria nada.
+    revokeAllRefreshTokensForUser(userId);
     recordAuditEvent(userId, updated.company_name, 'user.password_reset_completed', {});
 
     // Same 2FA gate as a normal login — resetting the password never bypasses it.
