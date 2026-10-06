@@ -31,6 +31,7 @@ export interface SessionUser {
   // isto, qualquer cedente novo (kybStatus='none' por padrão) ficaria bloqueado mesmo com
   // o flag desligado.
   cedenteKybRequired: boolean;
+  cedenteKybDocsStatus: { cnpj: boolean; contratoSocial: boolean; representante: boolean } | null;
   showOnboarding: boolean;
   onboardingSteps: OnboardingStep[];
   sessionLabel: string;

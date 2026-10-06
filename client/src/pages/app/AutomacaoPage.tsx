@@ -31,6 +31,7 @@ interface AutomationData {
   sectorDiversification: { varejo: number; industria: number; construcao: number; servicos: number };
   autoBidActivity: { text: string; color: string; time: string }[];
   marketMakerEnabled: boolean;
+  marketMakerGloballyEnabled: boolean;
   marketMakerMaxExposicao: string;
   marketMakerMinScore: string;
 }
@@ -258,8 +259,15 @@ export function AutomacaoPage() {
             <Toggle on={data.marketMakerEnabled} onClick={toggleMarketMaker} size="lg" />
             <div className="font-bold text-[15px]">Market Maker (fornecer liquidez)</div>
           </div>
-          <div className="text-[12.5px] font-semibold" style={{ color: data.marketMakerEnabled ? PALETTE.green : PALETTE.textTertiary }}>
-            {data.marketMakerEnabled ? 'Ativo — dando lances em anúncios sem liquidez a cada 6h' : 'Desligado'}
+          <div
+            className="text-[12.5px] font-semibold"
+            style={{ color: !data.marketMakerEnabled ? PALETTE.textTertiary : data.marketMakerGloballyEnabled ? PALETTE.green : PALETTE.amber }}
+          >
+            {!data.marketMakerEnabled
+              ? 'Desligado'
+              : data.marketMakerGloballyEnabled
+                ? 'Ativo — dando lances em anúncios sem liquidez a cada 6h'
+                : 'Pausado pela plataforma — sua configuração está ligada, mas o agente está temporariamente desativado para todas as contas'}
           </div>
         </div>
         <div className="text-textSecondary text-[12.5px] mb-4">

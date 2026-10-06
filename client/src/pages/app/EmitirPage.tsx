@@ -204,9 +204,13 @@ function LoteEmissaoCard() {
 // 0076) e nunca veem este card.
 function CedenteKybGate() {
   const { user, submitCedenteKyb } = useSession();
-  const [cnpjDocAnexado, setCnpjDocAnexado] = useState(false);
-  const [contratoSocialAnexado, setContratoSocialAnexado] = useState(false);
-  const [representanteAnexado, setRepresentanteAnexado] = useState(false);
+  // Começa a partir do que o servidor já tem guardado (user.cedenteKybDocsStatus) — sem
+  // isso, um cedente que já enviou 2 dos 3 documentos numa sessão anterior veria os três
+  // como "não enviado" de novo ao recarregar a página, e reenviaria à toa um documento
+  // que já existe.
+  const [cnpjDocAnexado, setCnpjDocAnexado] = useState(!!user?.cedenteKybDocsStatus?.cnpj);
+  const [contratoSocialAnexado, setContratoSocialAnexado] = useState(!!user?.cedenteKybDocsStatus?.contratoSocial);
+  const [representanteAnexado, setRepresentanteAnexado] = useState(!!user?.cedenteKybDocsStatus?.representante);
   const [uploadingKind, setUploadingKind] = useState<string | null>(null);
   const [cnpjTexto, setCnpjTexto] = useState('');
   const [submitting, setSubmitting] = useState(false);

@@ -59,6 +59,12 @@ async function uploadKybDoc(token: string, kind: string, filename: string) {
   return request(app).post('/api/uploads').set('Authorization', `Bearer ${token}`).field('kind', kind).attach('file', MINIMAL_PDF, { filename, contentType: 'application/pdf' });
 }
 
+async function generateSandboxKey(token: string) {
+  const res = await request(app).post('/api/dev/keys/generate').set('Authorization', `Bearer ${token}`).send({ mode: 'test' });
+  expect(res.status).toBe(200);
+  return res.body.rawKey as string;
+}
+
 describe('KYB documental do cedente (feature flag cedente_kyb_required)', () => {
   it('desligado por padrão: um cedente novo, sem nenhum documento, emite normalmente', async () => {
     const { token } = await registerCedente();
@@ -156,5 +162,42 @@ describe('KYB documental do cedente (feature flag cedente_kyb_required)', () => 
     } finally {
       await setCedenteKybFlag(false);
     }
+  });
+
+  // Regressão: o gate rodava incondicionalmente, inclusive pra chamadas em modo sandbox
+  // (chave de teste da API pública) — justamente o caminho que existe pra um parceiro
+  // validar a integração ANTES de ter credenciamento de verdade. Nunca toca o plano de
+  // dados real (sandbox=1) nem a registradora de verdade.
+  it('ligado: uma chamada em modo sandbox (API pública) não é bloqueada mesmo sem KYB', async () => {
+    await setCedenteKybFlag(true);
+    try {
+      const { token } = await registerCedente();
+      const rawKey = await generateSandboxKey(token);
+      const res = await request(app)
+        .post('/api/v1/duplicatas')
+        .set('Authorization', `Bearer ${rawKey}`)
+        .send({ sacado: `Sacado Sandbox ${unique()}`, valor: '5.000', vencimento: vencimentoFuturo() });
+      expect(res.status).not.toBe(403);
+    } finally {
+      await setCedenteKybFlag(false);
+    }
+  });
+
+  // Regressão: o publicUser (GET /auth/me) não expunha o que já tinha sido enviado, então
+  // EmitirPage.tsx sempre começava do zero visualmente e um cedente que já tinha enviado
+  // 2 dos 3 documentos numa sessão anterior reenviaria à toa.
+  it('cedenteKybDocsStatus reflete exatamente os documentos já enviados', async () => {
+    const { token } = await registerCedente();
+    let me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(me.body.user.cedenteKybDocsStatus).toEqual({ cnpj: false, contratoSocial: false, representante: false });
+
+    await uploadKybDoc(token, 'kyb_cedente_cnpj', 'cnpj.pdf');
+    me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(me.body.user.cedenteKybDocsStatus).toEqual({ cnpj: true, contratoSocial: false, representante: false });
+
+    await uploadKybDoc(token, 'kyb_cedente_contrato_social', 'contrato.pdf');
+    await uploadKybDoc(token, 'kyb_cedente_representante', 'representante.pdf');
+    me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(me.body.user.cedenteKybDocsStatus).toEqual({ cnpj: true, contratoSocial: true, representante: true });
   });
 });

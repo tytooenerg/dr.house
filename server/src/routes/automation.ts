@@ -13,6 +13,7 @@ import { ratingFromScore, sectorFor } from '../lib/riscoCore.js';
 import { currentFloor, nextStepAt, armLadder, getLadderBand } from '../lib/autoBidLadder.js';
 import type { UserRow, UserSettings, LadderConfig } from '../db/types.js';
 import type { Rating } from '../data/seed.js';
+import { isFeatureEnabled } from '../lib/featureFlags.js';
 
 const RATINGS: Rating[] = ['AA', 'A', 'B', 'C'];
 
@@ -194,6 +195,11 @@ function buildAutomationPayload(userId: number, settings: UserSettings) {
     sectorDiversification: settings.sectorDiversification,
     autoBidActivity: listAutomationActivity(userId).map((a) => ({ text: a.text, color: a.color, time: fmtRelative(a.created_at) })),
     marketMakerEnabled: settings.marketMakerEnabled,
+    // Kill switch GLOBAL (lib/marketMakerAgentJob.ts's scan vira no-op quando desligado),
+    // separado do toggle POR CONTA acima — sem isto, a tela mostrava "Ativo" com base só
+    // no toggle da conta mesmo quando um admin pausou o agente pra todo mundo durante uma
+    // instabilidade, deixando o investidor acreditar que ainda está dando lances.
+    marketMakerGloballyEnabled: isFeatureEnabled('market_maker_agent'),
     marketMakerMaxExposicao: settings.marketMakerMaxExposicao,
     marketMakerMinScore: settings.marketMakerMinScore,
   };

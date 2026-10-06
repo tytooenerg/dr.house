@@ -17,7 +17,7 @@ import {
   approveKyb,
   updatePasswordHash,
 } from '../db/users.js';
-import { acceptTeamInvite, findTeamInviteByToken } from '../db/misc.js';
+import { acceptTeamInvite, findTeamInviteByToken, hasUploadOfKind } from '../db/misc.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import {
   generateRefreshToken,
@@ -48,7 +48,7 @@ import { recordAuditEvent } from '../db/audit.js';
 import { INSURERS, VEICULOS, VEICULO_KEYS, VEICULO_DISCLAIMER, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { runPldScreening } from '../lib/pldScreening.js';
-import { cedenteKybDocsComplete } from '../lib/cedenteKyb.js';
+import { cedenteKybDocsComplete, CEDENTE_KYB_KINDS } from '../lib/cedenteKyb.js';
 import { isFeatureEnabled } from '../lib/featureFlags.js';
 import { runAgent } from '../lib/agentRuntime.js';
 import { onboardingAgent } from '../lib/agents/onboarding.js';
@@ -129,6 +129,18 @@ function publicUser(user: UserRow) {
     // aprovado automaticamente), e sem este campo o EmitirPage travaria a emissão de
     // qualquer cedente novo mesmo com o flag desligado.
     cedenteKybRequired: user.role === 'cedente' && isFeatureEnabled('cedente_kyb_required', { userId: user.id }),
+    // Pra CedenteKybGate (EmitirPage.tsx) não começar sempre do zero visualmente — sem
+    // isto, um cedente que já enviou 2 dos 3 documentos numa sessão anterior via ao
+    // recarregar a página com os 3 botões "não enviado", e reenviaria à toa um documento
+    // que o servidor já tem guardado.
+    cedenteKybDocsStatus:
+      user.role === 'cedente'
+        ? {
+            cnpj: hasUploadOfKind(user.id, CEDENTE_KYB_KINDS[0]),
+            contratoSocial: hasUploadOfKind(user.id, CEDENTE_KYB_KINDS[1]),
+            representante: hasUploadOfKind(user.id, CEDENTE_KYB_KINDS[2]),
+          }
+        : null,
     showOnboarding: !onboardingSeen,
     onboardingSteps: steps,
     sessionLabel:
@@ -735,6 +747,18 @@ authRouter.post(
     submitKybForReview(userId);
     recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj, role: 'cedente' });
     await runPldScreening(userId, req.user!.company_name, parsed.data.cnpj);
+
+    // Mesma pré-triagem fire-and-forget que o KYB do investidor já dispara (acima) — sem
+    // isso, buildAiTriage (routes/admin.ts) nunca encontra um run pra nenhuma entrada de
+    // cedente na fila, e o card de recomendação da IA no KybPanel.tsx simplesmente nunca
+    // aparece pra esse papel, sem nenhum aviso de que é esperado.
+    if (claudeEnabled) {
+      void runAgent(onboardingAgent, {
+        input: `Uma empresa (cedente) acabou de submeter o KYB para análise (userId=${userId}). Investigue sanções/PEP e histórico judicial e recomende aprovar ou rejeitar, com evidências concretas.`,
+        subjectType: 'user',
+        subjectId: String(userId),
+      }).catch((err) => logger.warn({ err, userId }, '[onboarding-agent] falha na pré-triagem automática'));
+    }
 
     const refreshed = getUserById(userId)!;
     res.json({ user: publicUser(refreshed) });

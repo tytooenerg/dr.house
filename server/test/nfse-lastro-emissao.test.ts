@@ -132,4 +132,66 @@ describe('checklist de lastro — NFS-e (tipoDocumento=servico)', () => {
     // Não é 400 por causa da chave curta (seria, para tipoDocumento='produto').
     expect(res.status).not.toBe(400);
   });
+
+  // Regressão: a chave de NF-e é normalizada pra só dígitos antes da checagem de
+  // duplicidade (nunca importa maiúscula/minúscula, porque só tem números). O código de
+  // NFS-e é texto livre — sem normalizar caixa/espaços, "rps-123" e "RPS-123" passariam
+  // como duas notas diferentes pro UNIQUE INDEX e pro findDuplicataByNfeChave, deixando a
+  // mesma NFS-e lastrear duas duplicatas.
+  it('detecta duplicidade de NFS-e mesmo com caixa/espaçamento diferentes', async () => {
+    const token = await registerCedente();
+    const codigo = `RPS-${unique()}`;
+
+    let res = await request(app)
+      .post('/api/emitir/submit')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        sacado: `Sacado NFS-e Dup ${unique()}`,
+        cnpj: '',
+        valor: '5.000',
+        vencimento: vencimentoFuturo(),
+        seguro: false,
+        tipoDocumento: 'servico',
+        nfAnexada: true,
+        nfeChave: codigo,
+        batchValores: [],
+      });
+    for (let i = 0; i < 8 && res.status !== 200; i++) {
+      res = await request(app)
+        .post('/api/emitir/submit')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          sacado: `Sacado NFS-e Dup ${unique()}`,
+          cnpj: '',
+          valor: '5.000',
+          vencimento: vencimentoFuturo(),
+          seguro: false,
+          tipoDocumento: 'servico',
+          nfAnexada: true,
+          nfeChave: codigo,
+          batchValores: [],
+        });
+    }
+    expect(res.status).toBe(200);
+
+    // Mesmo código, só em caixa diferente e com espaço extra nas bordas (trim + uppercase
+    // precisam tratar isso como idêntico ao original).
+    const codigoRecaseado = `  ${codigo.toLowerCase()}  `;
+    const segunda = await request(app)
+      .post('/api/emitir/submit')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        sacado: `Sacado NFS-e Dup 2 ${unique()}`,
+        cnpj: '',
+        valor: '5.000',
+        vencimento: vencimentoFuturo(),
+        seguro: false,
+        tipoDocumento: 'servico',
+        nfAnexada: true,
+        nfeChave: codigoRecaseado,
+        batchValores: [],
+      });
+    expect(segunda.status).toBe(409);
+    expect(segunda.body.error).toBe('nfe_duplicidade');
+  });
 });

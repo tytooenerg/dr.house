@@ -176,7 +176,11 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
   // 'cedente_kyb_required' (desligado por padrão — lib/featureFlags.ts): a exigência só
   // passa a valer de verdade quando um admin liga o flag em /admin (por isso nenhum dos
   // ~50 arquivos de teste que registram um cedente e emitem na hora precisou mudar).
-  if (user.role === 'cedente' && isFeatureEnabled('cedente_kyb_required', { userId: user.id }) && user.kyb_status !== 'approved') {
+  // !opts.sandbox: uma chamada de teste (chave de API em modo sandbox) existe justamente
+  // pra um parceiro validar a integração antes de ir ao ar — nunca toca o plano de dados
+  // real (sandbox=1) nem a registradora de verdade, e não devia ficar presa esperando o
+  // credenciamento documental de uma conta que ainda está testando.
+  if (!opts.sandbox && user.role === 'cedente' && isFeatureEnabled('cedente_kyb_required', { userId: user.id }) && user.kyb_status !== 'approved') {
     return {
       status: 403,
       body: {
@@ -192,8 +196,16 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
   // exigir e validar. NFS-e não: cada município emite o seu próprio código de verificação,
   // sem padrão nacional de formato (alfanumérico, tamanho variável) — exigir 44 dígitos
   // bloquearia toda emissão de serviço real. Por isso só a de produto passa pelo filtro de
-  // dígitos + regex; a de serviço fica como texto livre, com um teto de tamanho sensato.
-  const nfeChave = form.tipoDocumento === 'servico' ? form.nfeChave.trim().slice(0, 60) : form.nfeChave.replace(/\D/g, '');
+  // dígitos + regex; a de serviço fica como texto livre, com um teto de tamanho sensato —
+  // mas ainda normalizado (maiúsculas, espaços únicos), porque a checagem de duplicidade
+  // abaixo é uma comparação exata de string: sem isso, "rps-123" e "RPS-123" passariam
+  // como códigos diferentes pra UNIQUE INDEX idx_duplicatas_nfe_chave e pro
+  // findDuplicataByNfeChave, deixando a mesma NFS-e lastrear duas duplicatas — exatamente
+  // a fraude de duplicidade que este bloco existe pra impedir.
+  const nfeChave =
+    form.tipoDocumento === 'servico'
+      ? form.nfeChave.trim().toUpperCase().replace(/\s+/g, ' ').slice(0, 60)
+      : form.nfeChave.replace(/\D/g, '');
   if (form.tipoDocumento === 'produto' && nfeChave && !NFE_CHAVE_RE.test(nfeChave)) {
     return { status: 400, body: { error: 'validation_error', message: 'Chave de acesso da NF-e inválida — deve ter 44 dígitos.' } };
   }
