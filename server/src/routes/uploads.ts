@@ -16,7 +16,8 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadDir = path.resolve(__dirname, '../../uploads');
+// Exportado pra lib/uploadsDiskUsage.ts reusar o mesmo caminho em vez de duplicá-lo.
+export const uploadDir = path.resolve(__dirname, '../../uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({

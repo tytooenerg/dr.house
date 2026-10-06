@@ -39,6 +39,7 @@ import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } 
 import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordRecovery } from '../lib/legalCollectionFee.js';
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
 import { runBackup, listBackups, backupEnabled } from '../lib/backup.js';
+import { computeUploadsDiskUsage } from '../lib/uploadsDiskUsage.js';
 import { prontidao } from '../lib/preflight.js';
 import { listPendingTedDeposits, getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { listPendingStablecoinDeposits, getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
@@ -1132,6 +1133,14 @@ adminRouter.post(
     res.json({ backup: { ...backup, quando: fmtRelative(backup.createdAt) } });
   })
 );
+
+// Nenhum upload (comprovantes, contratos, documentos de KYB) é apagado em nenhum ponto do
+// código — provavelmente certo pra compliance (KYC costuma exigir retenção, não exclusão),
+// mas sem visibilidade um disco cheio só seria descoberto quando algo já tivesse quebrado.
+// Só soma o que já existe; não apaga nada.
+adminRouter.get('/uploads/disk-usage', (_req, res) => {
+  res.json(computeUploadsDiskUsage());
+});
 
 // Feature flags — see lib/featureFlags.ts for the registry and every real gate that
 // respects these. GET always returns every known flag (even ones never overridden), so
