@@ -10,8 +10,12 @@ export interface EmitirDuplicataInput {
   valor: string;
   vencimento: string;
   seguro?: boolean;
+  /** 'produto' (NF-e, padrão) ou 'servico' (NFS-e) — ver server/src/lib/emitirCore.ts. */
+  tipoDocumento?: 'produto' | 'servico';
   nfAnexada?: boolean;
   nfeChave?: string;
+  comprovanteEntregaAnexado?: boolean;
+  pedidoCompraAnexado?: boolean;
   batchValores?: string[];
 }
 

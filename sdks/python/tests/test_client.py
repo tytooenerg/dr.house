@@ -64,7 +64,13 @@ def test_abrir_leilao_refuses_before_the_sacado_accepts(base_url):
     client = LastroClient(api_key, base_url=base_url)
 
     emitida = client.emitir_duplicata(
-        sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-95", valor="10.000,00", vencimento="2027-12-01", nf_anexada=True
+        sacado="Grupo Atlas Varejo",
+        cnpj="12.345.678/0001-95",
+        valor="10.000,00",
+        vencimento="2027-12-01",
+        nf_anexada=True,
+        comprovante_entrega_anexado=True,
+        pedido_compra_anexado=True,
     )
     with pytest.raises(LastroApiError) as exc_info:
         client.abrir_leilao(emitida["duplicataId"], taxa_maxima=2.5, duracao_horas=24)

@@ -118,14 +118,17 @@ describe('LastroClient — real end-to-end against the live server', () => {
     const client = new LastroClient({ apiKey, baseUrl });
     const { setAceiteStatus, ensureAceite } = await import('../../../server/src/db/aceites.js');
 
-    // Lastro 100% (CNPJ + NF-e) faz a duplicata nascer 'aprovada'; sem o aceite do sacado ela
-    // ainda não é negociável, e é isso que a primeira chamada prova.
+    // Lastro 100% (CNPJ + NF-e + comprovante de entrega + pedido de compra) faz a duplicata
+    // nascer 'aprovada'; sem o aceite do sacado ela ainda não é negociável, e é isso que a
+    // primeira chamada prova.
     const emitida = await client.emitirDuplicata({
       sacado: 'Grupo Atlas Varejo',
       cnpj: '12.345.678/0001-95',
       valor: '10.000,00',
       vencimento: '2027-12-01',
       nfAnexada: true,
+      comprovanteEntregaAnexado: true,
+      pedidoCompraAnexado: true,
     });
     await expect(client.abrirLeilao(emitida.duplicataId)).rejects.toMatchObject({
       name: 'LastroApiError',

@@ -65,20 +65,30 @@ class LastroClient:
         vencimento: str,
         cnpj: str = "",
         seguro: bool = False,
+        tipo_documento: str = "produto",
         nf_anexada: bool = False,
         nfe_chave: str = "",
+        comprovante_entrega_anexado: bool = False,
+        pedido_compra_anexado: bool = False,
         batch_valores: Optional[List[str]] = None,
         idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Emit a real duplicata escriturada. Requires a write-scope key on a cedente account."""
+        """Emit a real duplicata escriturada. Requires a write-scope key on a cedente account.
+
+        tipo_documento: 'produto' (NF-e, default) or 'servico' (NFS-e) — see
+        server/src/lib/emitirCore.ts.
+        """
         body = {
             "sacado": sacado,
             "cnpj": cnpj,
             "valor": valor,
             "vencimento": vencimento,
             "seguro": seguro,
+            "tipoDocumento": tipo_documento,
             "nfAnexada": nf_anexada,
             "nfeChave": nfe_chave,
+            "comprovanteEntregaAnexado": comprovante_entrega_anexado,
+            "pedidoCompraAnexado": pedido_compra_anexado,
             "batchValores": batch_valores or [],
         }
         return self._request("POST", "/duplicatas", body, idempotency_key)
