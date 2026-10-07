@@ -506,9 +506,10 @@ export function MarketplacePage() {
       )}
 
       <div role="table" aria-label="Ofertas do marketplace" className="bg-white border border-border rounded-card overflow-hidden">
+        {/* Abaixo de 880px (o mesmo corte do menu lateral em layout/AppShell.tsx) as seis colunas não
+            cabem: a linha vira um cartão de duas colunas, com o rótulo em cima de cada valor. */}
         <div role="rowgroup"><div role="row"
-          className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
-          style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}
+          className="hidden min-[880px]:grid min-[880px]:grid-cols-[1.3fr_0.9fr_0.8fr_0.7fr_0.8fr_1.6fr] gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
         >
           <div role="columnheader">{t('marketplace.colSacado', 'Sacado')}</div>
           <div role="columnheader">{t('marketplace.colCedente', 'Cedente')}</div>
@@ -522,8 +523,8 @@ export function MarketplacePage() {
           const isExpanded = expanded.has(offer.id);
           return (
             <div key={offer.id} className="border-b border-border last:border-b-0">
-              <div role="row" className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}>
-                <div role="cell">
+              <div role="row" className="grid grid-cols-2 min-[880px]:grid-cols-[1.3fr_0.9fr_0.8fr_0.7fr_0.8fr_1.6fr] gap-x-3 gap-y-2.5 px-5 py-4 items-center text-sm">
+                <div role="cell" className="col-span-2 min-[880px]:col-span-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {offer.canBuy && (
                       <input
@@ -541,8 +542,12 @@ export function MarketplacePage() {
                   </div>
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
                 </div>
-                <div role="cell" className="text-textSecondary">{offer.cedente}</div>
+                <div role="cell" className="text-textSecondary">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colCedente', 'Cedente')}</span>
+                  {offer.cedente}
+                </div>
                 <div role="cell">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colValor', 'Valor')}</span>
                   <div className="font-bold font-mono-num">{offer.valorFmt}</div>
                   <div
                     className="text-[11.5px] text-textTertiary font-mono-num"
@@ -551,9 +556,15 @@ export function MarketplacePage() {
                     Reserva {offer.reservaPrecoFmt}
                   </div>
                 </div>
-                <div role="cell" className="text-green font-bold">{offer.desagio}</div>
-                <div role="cell" className="text-textSecondary">{offer.vencimento}</div>
-                <div role="cell" className="flex items-center gap-2 flex-wrap">
+                <div role="cell" className="text-green font-bold">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colDesagio', 'Deságio')}</span>
+                  {offer.desagio}
+                </div>
+                <div role="cell" className="text-textSecondary">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colVencimento', 'Vencimento')}</span>
+                  {offer.vencimento}
+                </div>
+                <div role="cell" className="col-span-2 min-[880px]:col-span-1 flex items-center gap-2 flex-wrap">
                   <span className="text-[11.5px] font-bold px-2 py-1 rounded-md" style={{ background: offer.scoreBg, color: offer.scoreColor }}>
                     {offer.score}
                   </span>
