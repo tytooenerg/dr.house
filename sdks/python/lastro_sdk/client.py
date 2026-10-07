@@ -212,6 +212,27 @@ class LastroClient:
         """Recusar e cancelar são o mesmo ato, visto de cada lado da mesa."""
         return self._request("POST", f"/otc/{int(negociacao_id)}/encerrar", {"como": como}, idempotency_key)
 
+    # --- Leilão primário (fundos e bancos) ---
+
+    def dar_lances_em_lote(
+        self,
+        lances: List[Dict[str, Any]],
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Até 200 lances numa chamada: [{"duplicataId": "...", "taxaAm": 2.5}, ...].
+
+        Cada lance segue as regras do lance único (menor deságio vence; acima da reserva é
+        recusado). Não é tudo-ou-nada: a resposta separa `registrados` e `recusados`, com o
+        motivo. Sem `taxaAm`, o lance vai na reserva da própria duplicata. Live keys only —
+        leilão de sandbox nunca é adjudicado. Passe `idempotency_key` para um retry de rede não
+        duplicar os lances.
+        """
+        return self._request("POST", "/lances/lote", {"lances": lances}, idempotency_key)
+
+    def list_meus_lances(self) -> Dict[str, Any]:
+        """Lances desta conta com o status de cada um: ativo, vencedor, perdedor ou cancelado."""
+        return self._request("GET", "/lances")
+
     # --- Marketplace ---
 
     def list_marketplace(self) -> Dict[str, Any]:

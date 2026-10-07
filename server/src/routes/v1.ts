@@ -10,6 +10,7 @@ import { getRegistradora, chooseRegistradora, registrarNaRegistradora, checkDupl
 import { withIdempotency } from '../lib/idempotency.js';
 import { getDuplicata, listMarketplace, listBySacadoNome, listByCedente } from '../db/duplicatas.js';
 import { abrirLeilao } from '../lib/auctionOpen.js';
+import { lanceLoteSchema, placeBatchAuctionBids, viewMyAuctionBids } from '../lib/auctionCore.js';
 import { abrirOtc, contrapropor, aceitarOtc, encerrarOtc, viewMinhasOtc, OTC_PRAZO_MAX_HORAS } from '../lib/otcCore.js';
 import { buildCashflowForecast } from '../lib/cashflowForecast.js';
 import { buildCfoRecommendation } from '../lib/cfoDecisionEngine.js';
@@ -782,5 +783,49 @@ v1Router.post(
       async () => encerrarOtc(req.apiUser!, Number(req.params.id), parsed.data.como)
     );
     res.status(outcome.status).json({ ...outcome.body, mode: req.apiKey!.mode });
+  })
+);
+
+// --- Leilão primário: lances de fundos e bancos pela API ---
+// O sistema do fundo/banco lê GET /v1/marketplace, decide e lança em lote. Só chave live:
+// o leilão de sandbox nunca é adjudicado (listAuctionsToClose filtra sandbox = 0), então um
+// lance de teste ficaria pendurado pra sempre fingindo estar em disputa.
+function leilaoSomenteInvestidorLive(req: import('express').Request, res: import('express').Response): boolean {
+  if (req.apiUser!.role !== 'investidor') {
+    res.status(403).json({ error: 'forbidden', message: 'Apenas chaves de contas investidor (fundos e bancos) dão lances.' });
+    return false;
+  }
+  if (req.apiKey!.mode === 'test') {
+    res.status(409).json({
+      error: 'sandbox_indisponivel',
+      message: 'O leilão não tem equivalente em sandbox — lances de teste nunca seriam adjudicados. Use uma chave live.',
+    });
+    return false;
+  }
+  return true;
+}
+
+v1Router.get(
+  '/lances',
+  asyncHandler(async (req, res) => {
+    if (!leilaoSomenteInvestidorLive(req, res)) return;
+    res.json({ lances: viewMyAuctionBids(req.apiUser!.id), mode: req.apiKey!.mode });
+  })
+);
+
+v1Router.post(
+  '/lances/lote',
+  requireWriteScope,
+  asyncHandler(async (req, res) => {
+    if (!leilaoSomenteInvestidorLive(req, res)) return;
+    const parsed = lanceLoteSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const outcome = await withIdempotency(req.apiUser!.id, 'POST /v1/lances/lote', idempotencyHeader(req), req.body ?? {}, async () =>
+      placeBatchAuctionBids(req.apiUser!, parsed.data.lances)
+    );
+    res.status(outcome.status).json({ ...(outcome.body as object), mode: req.apiKey!.mode });
   })
 );

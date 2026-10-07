@@ -78,6 +78,22 @@ def test_abrir_leilao_refuses_before_the_sacado_accepts(base_url):
     assert exc_info.value.error == "aceite_pendente"
 
 
+def test_lances_em_lote_recusa_chave_de_teste(base_url):
+    """O servidor roda como subprocesso, então aqui não dá pra credenciar a conta nem abrir um
+    leilão direto no banco (o SDK Node, que importa o app no mesmo processo, cobre o lance real
+    com chave live). O que se prova é o formato da requisição e a recusa honesta do sandbox."""
+    api_key = register_and_generate_key(internal_url(base_url), "investidor", unique())
+    client = LastroClient(api_key, base_url=base_url)
+    with pytest.raises(LastroApiError) as exc_info:
+        client.dar_lances_em_lote([{"duplicataId": "DUP-QUALQUER", "taxaAm": 2.5}])
+    assert exc_info.value.status == 409
+    assert exc_info.value.error == "sandbox_indisponivel"
+
+    with pytest.raises(LastroApiError) as exc_info:
+        client.list_meus_lances()
+    assert exc_info.value.error == "sandbox_indisponivel"
+
+
 def test_cashflow_is_gated_by_plan(base_url):
     api_key = register_and_generate_key(internal_url(base_url), "cedente", unique())
     client = LastroClient(api_key, base_url=base_url)

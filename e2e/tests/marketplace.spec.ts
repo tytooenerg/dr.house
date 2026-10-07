@@ -32,6 +32,24 @@ test('investidor can browse the live marketplace and place a real bid', async ({
   await expect(page.getByRole('button', { name: /Meus lances/ })).toBeVisible({ timeout: 10_000 });
 });
 
+test('investidor seleciona duas ofertas e dá lance em lote na reserva de cada uma', async ({ page }) => {
+  await loginAsInvestidor(page);
+  await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
+  await expect(page.getByText('Atualizações ao vivo')).toBeVisible({ timeout: 15_000 });
+
+  const caixas = page.getByRole('checkbox', { name: /para lance em lote/ });
+  await caixas.nth(0).check();
+  await caixas.nth(1).check();
+
+  const barra = page.getByRole('region', { name: 'Lance em lote' });
+  await expect(barra.getByText('2 selecionada(s)')).toBeVisible();
+  await barra.getByRole('button', { name: 'Dar 2 lance(s)' }).click();
+
+  await expect(page.getByText('2 lance(s) registrado(s)')).toBeVisible({ timeout: 10_000 });
+  await expect(barra).toBeHidden();
+});
+
 test('investidor opens funding-matching explainability ("Por que essa oferta?") on a live offer', async ({ page }) => {
   await loginAsInvestidor(page);
   await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });

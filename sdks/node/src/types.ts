@@ -124,6 +124,33 @@ export interface AbrirOtcInput {
   nota?: string;
 }
 
+export interface LanceLoteItem {
+  duplicataId: string;
+  /** Deságio proposto em % ao mês. Omitido = taxa de reserva da duplicata. */
+  taxaAm?: number | string;
+}
+
+export interface LanceLoteResult {
+  registrados: { duplicataId: string; bidId: number; taxaFmt: string; precoFmt: string }[];
+  recusados: { duplicataId: string; error: string; message: string }[];
+  totalPreco: number;
+  /** O que sai do caixa se todos os lances registrados vencerem. */
+  totalPrecoFmt: string;
+  mode: 'live';
+}
+
+export interface MeuLance {
+  id: number;
+  duplicataId: string;
+  sacado: string;
+  valorFmt: string;
+  taxaFmt: string;
+  precoFmt: string;
+  status: 'ativo' | 'vencedor' | 'perdedor' | 'cancelado';
+  closeAt: string | null;
+  quando: string;
+}
+
 export interface MarketplaceOffer {
   id: string;
   sacado: string;

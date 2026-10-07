@@ -14,7 +14,7 @@ import { cabeNaCapacidade } from '../lib/insurerExposure.js';
 import { INSURERS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { explainFundingOffer } from '../lib/fundingExplainability.js';
-import { placeAuctionBid, cancelAuctionBid, viewMyAuctionBids } from '../lib/auctionCore.js';
+import { placeAuctionBid, cancelAuctionBid, viewMyAuctionBids, placeBatchAuctionBids, lanceLoteSchema, parseTaxaAm } from '../lib/auctionCore.js';
 
 export const marketRouter = Router();
 marketRouter.use(requireAuth);
@@ -75,9 +75,23 @@ marketRouter.post('/:id/lance', (req, res) => {
     res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
     return;
   }
-  const raw = parsed.data.taxaAm;
-  const taxaAm = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(',', '.'));
-  const outcome = placeAuctionBid(req.user!, req.params.id, taxaAm);
+  const outcome = placeAuctionBid(req.user!, req.params.id, parseTaxaAm(parsed.data.taxaAm));
+  if (outcome.status !== 200) {
+    res.status(outcome.status).json(outcome.body);
+    return;
+  }
+  res.json({ ...(outcome.body as object), offers: listMarketplace().map((d) => buildOfferView(d, req.user!.id)) });
+});
+
+// Vários lances numa chamada — o fundo filtra, seleciona e lança em todas. Ver
+// placeBatchAuctionBids: cada item segue as mesmas regras do lance único.
+marketRouter.post('/lances/lote', (req, res) => {
+  const parsed = lanceLoteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const outcome = placeBatchAuctionBids(req.user!, parsed.data.lances);
   if (outcome.status !== 200) {
     res.status(outcome.status).json(outcome.body);
     return;

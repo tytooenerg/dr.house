@@ -13,6 +13,9 @@ import type {
   MarketplaceOffer,
   AbrirOtcInput,
   OtcNegociacao,
+  LanceLoteItem,
+  LanceLoteResult,
+  MeuLance,
   PldTriagemInput,
   PldTriagemResult,
   ReportSignalInput,
@@ -167,6 +170,26 @@ export class LastroClient {
   /** Recusar e cancelar são o mesmo ato, visto de cada lado da mesa. */
   encerrarOtc(id: number, como: 'recusada' | 'cancelada' = 'recusada', opts?: RequestOptions): Promise<{ negociacoes: OtcNegociacao[]; mode: 'live' }> {
     return this.request('POST', `/otc/${id}/encerrar`, { como }, opts);
+  }
+
+  // --- Leilão primário (fundos e bancos) ---
+
+  /**
+   * Até 200 lances numa chamada, cada um sob as mesmas regras do lance único: menor deságio
+   * vence no fechamento, lance acima da reserva do cedente é recusado. Não é tudo-ou-nada — a
+   * resposta separa `registrados` e `recusados` (com o motivo). Sem `taxaAm`, o lance vai na
+   * reserva da própria duplicata.
+   *
+   * Live keys only: leilão de sandbox nunca é adjudicado. Passe `idempotencyKey` em `opts`
+   * para um retry de rede não duplicar os lances.
+   */
+  darLancesEmLote(lances: LanceLoteItem[], opts?: RequestOptions): Promise<LanceLoteResult> {
+    return this.request('POST', '/lances/lote', { lances }, opts);
+  }
+
+  /** Lances desta conta com o status de cada um: ativo, vencedor, perdedor ou cancelado. */
+  listMeusLances(): Promise<{ lances: MeuLance[]; mode: 'live' }> {
+    return this.request('GET', '/lances');
   }
 
   // --- Marketplace ---

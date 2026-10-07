@@ -52,6 +52,11 @@ interface MeuLance {
   precoFmt: string;
   liderando: boolean;
 }
+interface LoteResultado {
+  registrados: { duplicataId: string; taxaFmt: string; precoFmt: string }[];
+  recusados: { duplicataId: string; error: string; message: string }[];
+  totalPrecoFmt: string;
+}
 interface ExplanationFactor {
   label: string;
   valor: string;
@@ -174,6 +179,14 @@ export function MarketplacePage() {
   const [explainFor, setExplainFor] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<FundingExplanation | null>(null);
   const [explainLoading, setExplainLoading] = useState(false);
+  // Lance em lote: o fundo filtra, marca várias ofertas e lança em todas de uma vez
+  // (POST /market/lances/lote). Cada item segue as regras do lance único no servidor.
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [modoTaxaLote, setModoTaxaLote] = useState<'reserva' | 'fixa'>('reserva');
+  const [taxaLote, setTaxaLote] = useState('');
+  const [loteBusy, setLoteBusy] = useState(false);
+  const [loteErro, setLoteErro] = useState('');
+  const [loteResultado, setLoteResultado] = useState<LoteResultado | null>(null);
 
   // "Meus lances" precisa existir porque o lance deixou de resolver na hora: entre propor e
   // saber o resultado passa o prazo do leilão, e sem essa lista o investidor não teria onde
@@ -271,6 +284,48 @@ export function MarketplacePage() {
       setBidError((prev) => ({ ...prev, [offerId]: err instanceof ApiError ? err.message : 'Não foi possível cancelar o lance.' }));
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const selecionaveis = offers.filter((o) => o.canBuy);
+  const todasFiltradasSelecionadas = selecionaveis.length > 0 && selecionaveis.every((o) => selecionadas.has(o.id));
+  const toggleSelecao = (id: string) => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleTodasFiltradas = () => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (todasFiltradasSelecionadas) selecionaveis.forEach((o) => next.delete(o.id));
+      else selecionaveis.forEach((o) => next.add(o.id));
+      return next;
+    });
+  };
+  const valorFaceSelecionado = liveOffers.filter((o) => selecionadas.has(o.id)).reduce((s, o) => s + o.valor, 0);
+  const sacadoDe = (id: string) => liveOffers.find((o) => o.id === id)?.sacado ?? id;
+
+  const darLancesEmLote = async () => {
+    setLoteErro('');
+    if (modoTaxaLote === 'fixa' && !taxaLote.trim()) {
+      setLoteErro('Informe a taxa (% a.m.) ou escolha lançar na reserva de cada uma.');
+      return;
+    }
+    setLoteBusy(true);
+    try {
+      const lances = [...selecionadas].map((duplicataId) => (modoTaxaLote === 'fixa' ? { duplicataId, taxaAm: taxaLote.trim() } : { duplicataId }));
+      const res = await api.post<LoteResultado>('/market/lances/lote', { lances });
+      setLoteResultado(res);
+      // Ficam marcadas só as recusadas, pro fundo ajustar a taxa e tentar de novo.
+      setSelecionadas(new Set(res.recusados.map((r) => r.duplicataId)));
+      void meusLances.reload();
+    } catch (err) {
+      setLoteErro(err instanceof ApiError ? err.message : 'Não foi possível enviar os lances.');
+    } finally {
+      setLoteBusy(false);
     }
   };
 
@@ -415,6 +470,41 @@ export function MarketplacePage() {
         )}
       </div>
 
+      {selecionaveis.length > 0 && (
+        <label className="flex items-center gap-2 mb-2.5 text-[12.5px] font-bold text-navy cursor-pointer w-fit">
+          <input type="checkbox" checked={todasFiltradasSelecionadas} onChange={toggleTodasFiltradas} className="w-4 h-4 accent-blue" />
+          Selecionar todas as {selecionaveis.length} ofertas filtradas com leilão aberto
+        </label>
+      )}
+
+      {loteResultado && (
+        <div className="bg-white border border-border rounded-card px-5 py-3.5 mb-2.5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-[13px] font-bold">
+              <span className="text-green">{loteResultado.registrados.length} lance(s) registrado(s)</span>
+              {loteResultado.recusados.length > 0 && <span className="text-red"> · {loteResultado.recusados.length} recusado(s)</span>}
+              {loteResultado.registrados.length > 0 && (
+                <span className="text-textSecondary font-semibold"> · {loteResultado.totalPrecoFmt} se vencer todos</span>
+              )}
+            </div>
+            <button type="button" className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer underline" onClick={() => setLoteResultado(null)}>
+              Fechar
+            </button>
+          </div>
+          {loteResultado.recusados.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1">
+              {loteResultado.recusados.map((r) => (
+                <div key={r.duplicataId} className="text-[12.5px]">
+                  <span className="font-semibold">{sacadoDe(r.duplicataId)}</span>
+                  <span className="text-textSecondary"> — {r.message}</span>
+                </div>
+              ))}
+              <div className="text-[12px] text-textTertiary mt-1">As recusadas continuam selecionadas: ajuste a taxa e envie de novo.</div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div role="table" aria-label="Ofertas do marketplace" className="bg-white border border-border rounded-card overflow-hidden">
         <div role="rowgroup"><div role="row"
           className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
@@ -435,6 +525,15 @@ export function MarketplacePage() {
               <div role="row" className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}>
                 <div role="cell">
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    {offer.canBuy && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${offer.sacado} para lance em lote`}
+                        checked={selecionadas.has(offer.id)}
+                        onChange={() => toggleSelecao(offer.id)}
+                        className="w-4 h-4 accent-blue cursor-pointer"
+                      />
+                    )}
                     <span className="font-semibold">{offer.sacado}</span>
                     {offer.setor && offer.setorLabel && (
                       <Badge label={offer.setorLabel} bg={SETOR_STYLE[offer.setor]?.bg ?? PALETTE.hairline} color={SETOR_STYLE[offer.setor]?.color ?? PALETTE.textSecondary} className="text-[10.5px] px-2 py-0.5" />
@@ -706,6 +805,44 @@ export function MarketplacePage() {
 
         {offers.length === 0 && <EmptyState title={t('marketplace.emptyTitle', 'Nenhuma oferta encontrada')} hint={t('marketplace.emptyHint', 'Tente buscar por outro sacado ou cedente')} />}
       </div>
+
+      {/* pr-20: o botão flutuante do chat de IA (layout/AiChat.tsx, fixed bottom-7 right-8) cobriria o canto direito da barra. */}
+      {selecionadas.size > 0 && (
+        <div role="region" aria-label="Lance em lote" className="sticky bottom-3 z-30 mt-3 bg-navy text-white rounded-card pl-5 pr-20 py-3.5 shadow-dropdown">
+          <div className="flex items-center gap-x-4 gap-y-2.5 flex-wrap">
+            <div className="text-[13px] font-bold">
+              {selecionadas.size} selecionada(s) ·{' '}
+              <span className="font-mono-num">{valorFaceSelecionado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span> em valor de face
+            </div>
+            <label className="flex items-center gap-1.5 text-[12.5px] cursor-pointer">
+              <input type="radio" name="modo-taxa-lote" checked={modoTaxaLote === 'reserva'} onChange={() => setModoTaxaLote('reserva')} className="accent-blue" />
+              Na reserva de cada uma
+            </label>
+            <label className="flex items-center gap-1.5 text-[12.5px] cursor-pointer">
+              <input type="radio" name="modo-taxa-lote" checked={modoTaxaLote === 'fixa'} onChange={() => setModoTaxaLote('fixa')} className="accent-blue" />
+              Mesma taxa para todas:
+            </label>
+            {modoTaxaLote === 'fixa' && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-[90px]">
+                  <Input aria-label="Taxa de deságio mensal para todas as selecionadas, em %" value={taxaLote} onChange={(e) => setTaxaLote(e.target.value)} placeholder="2,50" />
+                </div>
+                <span className="text-[12.5px]">% a.m.</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              <button type="button" className="bg-transparent border-none text-white/70 text-[12px] font-bold cursor-pointer underline" onClick={() => setSelecionadas(new Set())}>
+                Limpar
+              </button>
+              <Button size="sm" disabled={loteBusy} onClick={darLancesEmLote}>
+                {loteBusy ? 'Enviando…' : `Dar ${selecionadas.size} lance(s)`}
+              </Button>
+            </div>
+          </div>
+          {loteErro && <div className="text-[12.5px] font-semibold mt-2 text-amberMid">{loteErro}</div>}
+          <div className="text-[11.5px] text-white/60 mt-1.5">Cada leilão é independente: o lote não é tudo-ou-nada, e lance acima da reserva de uma oferta é recusado só nela.</div>
+        </div>
+      )}
     </div>
   );
 }
