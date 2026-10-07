@@ -13,7 +13,7 @@ import { DailyBriefingCard } from './admin/DailyBriefingCard';
 //
 // Os contadores dos badges (KYB/disputas/compliance/publicidade) continuam vindo do próprio
 // painel via onCount quando ele monta — mesma relação de antes, sem o pai dono da lista.
-const TABS = ['kyb', 'disputas', 'compliance', 'juridico', 'ia', 'agentes', 'reconciliacao', 'conformidade', 'confirming', 'flags', 'auditoria', 'publicidade'] as const;
+const TABS = ['indicadores', 'kyb', 'disputas', 'compliance', 'juridico', 'ia', 'agentes', 'reconciliacao', 'conformidade', 'confirming', 'flags', 'auditoria', 'publicidade'] as const;
 type Tab = (typeof TABS)[number];
 const DEFAULT_TAB: Tab = 'kyb';
 
@@ -34,6 +34,7 @@ const PLAIN_PANELS: Record<Exclude<Tab, 'kyb' | 'disputas' | 'compliance' | 'pub
   conformidade: lazy(() => import('./admin/ConformidadeEscrituralPanel').then((m) => ({ default: m.ConformidadeEscrituralPanel }))),
   confirming: lazy(() => import('./admin/ConfirmingAdminPanel').then((m) => ({ default: m.ConfirmingAdminPanel }))),
   flags: lazy(() => import('./admin/FeatureFlagsPanel').then((m) => ({ default: m.FeatureFlagsPanel }))),
+  indicadores: lazy(() => import('./admin/IndicadoresPanel').then((m) => ({ default: m.IndicadoresPanel }))),
 };
 const AuditTrailPanel = lazy(() => import('./admin/AuditTrailPanel').then((m) => ({ default: m.AuditTrailPanel })));
 const AuditoresPanel = lazy(() => import('./admin/AuditoresPanel').then((m) => ({ default: m.AuditoresPanel })));
@@ -57,6 +58,7 @@ export function AdminPage() {
   const tab: Tab = isTab(tabParam) ? tabParam : DEFAULT_TAB;
 
   const tabs: [Tab, string][] = [
+    ['indicadores', t('admin.tab.indicadores', 'Indicadores')],
     ['kyb', `${t('admin.tab.kyb', 'Fila de KYB')} (${kybCount})`],
     ['disputas', `${t('admin.tab.disputas', 'Disputas')} (${disputasCount})`],
     ['compliance', `${t('admin.tab.compliance', 'Compliance')} (${complianceCount})`],

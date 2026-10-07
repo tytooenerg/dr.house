@@ -165,6 +165,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     // PT-BR, same scoping choice the rest of this file documents up top.
     'admin.title': 'Back Office',
     'admin.subtitle': 'Onboarding approval, dispute arbitration and the platform audit trail',
+    'admin.tab.indicadores': 'Business metrics',
     'admin.tab.kyb': 'KYB queue',
     'admin.tab.disputas': 'Disputes',
     'admin.tab.compliance': 'Compliance',

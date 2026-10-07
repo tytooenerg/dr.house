@@ -62,6 +62,7 @@ import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/age
 import { trainModel, getModel, MIN_TRAINING_SAMPLES, MIN_NEURAL_NET_SAMPLES } from '../lib/mlScoring.js';
 import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 import { computeMetrics } from '../lib/metrics.js';
+import { computeIndicadoresNegocio } from '../lib/businessMetrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
 import { buildDarfSummary, streamDarfPdf } from '../lib/darfGenerator.js';
@@ -395,6 +396,12 @@ adminRouter.get('/fraud-anomalies', (_req, res) => {
 adminRouter.get('/metrics', (req, res) => {
   const windowMinutes = Math.max(1, Math.min(1440, Number(req.query.windowMinutes) || 60));
   res.json(computeMetrics(windowMinutes));
+});
+
+// Indicadores de negócio do plano de ação (volume, leilões, deságio, prazo, receita) —
+// /metrics acima é saúde técnica do servidor; este é saúde do marketplace.
+adminRouter.get('/indicadores', (_req, res) => {
+  res.json(computeIndicadoresNegocio());
 });
 
 // Compliance AI Engine's auto-suspend bar (see lib/complianceEngine.ts) — admin-tunable
