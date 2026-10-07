@@ -219,6 +219,42 @@ O Compose recria só o que mudou; `redis` e `caddy` normalmente nem reiniciam. M
 banco (`server/src/db/migrations/`) rodam automaticamente no boot do `app` — não é preciso
 nenhum passo manual.
 
+### Deploy automático (GitHub Actions)
+
+Com isto configurado, todo push no branch de produção roda o CI inteiro (testes, build,
+e2e) e, **só se passar**, o GitHub publica sozinho no servidor (`.github/workflows/deploy.yml`)
+e confere que o site respondeu. Os passos manuais acima viram plano B.
+
+A chave que o GitHub usa só consegue rodar `scripts/deploy/deploy-remoto.sh` — não abre um
+terminal no servidor. O script só publica commit do branch que o servidor já segue e para sem
+mexer em nada se houver arquivo alterado direto no servidor.
+
+**1. No servidor**, crie a chave só para o deploy e restrinja-a ao script:
+
+```bash
+cd ~/lastro && git pull
+ssh-keygen -t ed25519 -f ~/.ssh/lastro_deploy -N "" -C "github-actions-deploy"
+echo "command=\"$HOME/lastro/scripts/deploy/deploy-remoto.sh\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty $(cat ~/.ssh/lastro_deploy.pub)" >> ~/.ssh/authorized_keys
+```
+
+**2. No GitHub** (repositório → Settings → Secrets and variables → Actions → New repository
+secret), crie quatro secrets:
+
+| Nome | Valor |
+|---|---|
+| `DEPLOY_HOST` | o IP do servidor |
+| `DEPLOY_USER` | `root` (ou o usuário que roda o Docker) |
+| `DEPLOY_SSH_KEY` | a saída de `cat ~/.ssh/lastro_deploy` no servidor — a chave **privada** inteira, da linha `-----BEGIN` até `-----END` |
+| `DEPLOY_KNOWN_HOSTS` | a saída de `ssh-keyscan <IP-do-servidor>` rodado no servidor |
+
+A chave privada só vai para o secret do GitHub — não cole em chat, e-mail ou documento.
+
+**3. Teste:** em Actions → Deploy → Run workflow, informe o SHA do último commit
+(`git rev-parse HEAD` no servidor). Deve terminar verde com "Site no ar".
+
+Para desligar: apague o secret `DEPLOY_SSH_KEY` (o workflow avisa e não publica) ou remova a
+linha `lastro_deploy` do `~/.ssh/authorized_keys`.
+
 ## 9. Antes de abrir para clientes: o preflight
 
 A plataforma segue a disciplina "real-when-configured" — toda integração externa funciona de

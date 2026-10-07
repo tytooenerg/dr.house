@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # O branch de produção também: é dele que o servidor faz git pull, e o deploy automático
+    # (deploy.yml) só publica um commit depois que este workflow passou nele.
+    branches: [main, claude/prototype-software-transform-os4cxb]
   pull_request:
   # Catches the kind of drift that only shows up because real time passed, not because any
   # code changed — e.g. the seed data's vencimento dates silently going stale once the
@@ -31,7 +33,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck server
         run: npm run typecheck -w server
