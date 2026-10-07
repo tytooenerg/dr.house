@@ -179,7 +179,7 @@ export function CompliancePage() {
         <div className="flex flex-col gap-3.5">
           {data.financiadorReqs.map((req) => (
             <div key={req.label} className="flex items-start gap-3">
-              <span className="rounded-[5px] flex-shrink-0 mt-0.5 flex items-center justify-center" style={{ width: 18, height: 18, border: `2px solid ${req.color}` }}>
+              <span className="rounded-[5px] shrink-0 mt-0.5 flex items-center justify-center" style={{ width: 18, height: 18, border: `2px solid ${req.color}` }}>
                 <span className="rounded-[2px]" style={{ width: 8, height: 8, background: req.color }} />
               </span>
               <div>
@@ -196,7 +196,7 @@ export function CompliancePage() {
         <div className="flex flex-col gap-3.5">
           {data.cronograma.map((c) => (
             <div key={c.label} className="flex items-center gap-3.5">
-              <span className="rounded-full flex-shrink-0" style={{ width: 10, height: 10, background: c.dotColor }} />
+              <span className="rounded-full shrink-0" style={{ width: 10, height: 10, background: c.dotColor }} />
               <div className="flex-1">
                 <div className="font-semibold text-[13px]">{c.label}</div>
                 <div className="text-textSecondary text-[12.5px]">{c.periodo}</div>
@@ -264,7 +264,7 @@ export function CompliancePage() {
           <div className="flex flex-col gap-2">
             {data.fraudFlags.map((fl, i) => (
               <div key={i} className="flex items-center gap-2 text-[12.5px]">
-                <span className="rounded-full flex-shrink-0" style={{ width: 6, height: 6, background: fl.color }} />
+                <span className="rounded-full shrink-0" style={{ width: 6, height: 6, background: fl.color }} />
                 <span>{fl.text}</span>
               </div>
             ))}
@@ -283,7 +283,7 @@ export function CompliancePage() {
           <div className="flex flex-col gap-2 mb-3.5">
             {data.contractFlags.map((cf, i) => (
               <div key={i} className="flex items-center gap-2 text-[12.5px]">
-                <span className="rounded-full flex-shrink-0" style={{ width: 6, height: 6, background: cf.color }} />
+                <span className="rounded-full shrink-0" style={{ width: 6, height: 6, background: cf.color }} />
                 <span>{cf.text}</span>
               </div>
             ))}

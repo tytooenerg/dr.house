@@ -36,7 +36,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav aria-label="Navegação principal" className="bg-navy flex flex-col h-full w-[248px] py-5 px-3.5 overflow-y-auto">
-      <Link to="/developers" className="flex items-center gap-2.5 px-2 mb-5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60">
+      <Link to="/developers" className="flex items-center gap-2.5 px-2 mb-5 rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/60">
         <Logo dark />
       </Link>
 
@@ -49,7 +49,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <button
                   type="button"
                   aria-expanded={isOpen}
-                  className="flex items-center justify-between px-3 pb-1.5 border-none bg-transparent cursor-pointer w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                  className="flex items-center justify-between px-3 pb-1.5 border-none bg-transparent cursor-pointer w-full rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/60"
                   onClick={() => setCollapsed((c) => ({ ...c, [section.group]: !c[section.group] }))}
                 >
                   <span className="text-[10.5px] font-bold text-onNavyFaint uppercase tracking-wider">{t(`group.${section.group}`, section.label)}</span>
@@ -64,8 +64,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                         to={item.path}
                         onClick={onNavigate}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-[7px] rounded-lg text-[13px] font-semibold no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
-                            isActive ? 'bg-blue text-white' : 'text-onNavyDim hover:bg-white/[0.06] hover:text-white'
+                          `flex items-center gap-3 px-3 py-[7px] rounded-lg text-[13px] font-semibold no-underline transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/60 ${
+                            isActive ? 'bg-blue text-white' : 'text-onNavyDim hover:bg-white/6 hover:text-white'
                           }`
                         }
                       >
@@ -89,7 +89,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <div className="mt-3 flex items-center gap-2.5 p-3 rounded-[10px]" style={{ background: 'rgba(255,255,255,0.06)' }}>
-        <div className="w-[34px] h-[34px] rounded-full bg-blue text-white flex items-center justify-center font-bold text-[13px] flex-shrink-0">{initials}</div>
+        <div className="w-[34px] h-[34px] rounded-full bg-blue text-white flex items-center justify-center font-bold text-[13px] shrink-0">{initials}</div>
         <div className="flex-1 min-w-0">
           <div className="text-white text-[13px] font-semibold truncate">{user.nome}</div>
           <div className="text-textTertiary text-[11.5px] truncate">
@@ -100,7 +100,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <LanguageToggle className="text-textTertiary" />
         <button
           type="button"
-          className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/60"
           onClick={handleLogout}
         >
           {t('app.sair', 'Sair')}

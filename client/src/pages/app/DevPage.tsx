@@ -193,7 +193,7 @@ export function DevPage() {
             {newKey && (
               <div className="flex items-center gap-2.5 bg-surface border border-border rounded-lg px-3.5 py-2.5 font-mono-num text-[13px]">
                 <div className="flex-1 break-all">{newKey}</div>
-                <button type="button" onClick={copyKey} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none flex-shrink-0">
+                <button type="button" onClick={copyKey} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none shrink-0">
                   {copied ? 'Copiado!' : 'Copiar'}
                 </button>
               </div>
@@ -204,7 +204,7 @@ export function DevPage() {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-mono-num text-[13px]">{k.prefix}••••••••••••••••</span>
                     <span
-                      className="text-[10.5px] font-bold px-1.5 py-0.5 rounded"
+                      className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-sm"
                       style={k.mode === 'test' ? { background: PALETTE.amberBg, color: PALETTE.amber } : { background: PALETTE.greenBg, color: PALETTE.green }}
                     >
                       {k.mode === 'test' ? 'Sandbox' : 'Produção'}
@@ -213,7 +213,7 @@ export function DevPage() {
                       {k.scope === 'read_only' ? 'Somente leitura' : 'Leitura e escrita'}
                     </Badge>
                     {k.product !== 'platform' && (
-                      <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded" style={{ background: PALETTE.chip, color: PALETTE.blue }}>
+                      <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded-sm" style={{ background: PALETTE.chip, color: PALETTE.blue }}>
                         {NARROW_PRODUCT_LABELS[k.product]}
                       </span>
                     )}
@@ -222,7 +222,7 @@ export function DevPage() {
                     Criada {k.createdAt} · usada pela última vez: {k.lastUsed} · {k.callsThisMonth} chamada{k.callsThisMonth === 1 ? '' : 's'} este mês
                   </div>
                 </div>
-                <button type="button" onClick={() => revokeKey(k.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none flex-shrink-0">
+                <button type="button" onClick={() => revokeKey(k.id)} className="text-[11.5px] font-bold text-red cursor-pointer bg-transparent border-none shrink-0">
                   Revogar
                 </button>
               </div>
@@ -286,7 +286,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
                     <div className="font-semibold text-[13px] font-mono-num">{w.event}</div>
                     <div className="text-textSecondary text-[11.5px] mt-0.5 truncate">{w.url}</div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
                     <button type="button" onClick={() => toggleDeliveries(w.id)} className="text-[11.5px] font-bold text-blue cursor-pointer bg-transparent border-none">
                       {openDeliveriesFor === w.id ? 'Ocultar entregas' : 'Ver entregas'}
                     </button>
@@ -304,7 +304,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
                     {deliveries.map((d) => (
                       <div key={d.id} className="flex items-center gap-2 text-[11.5px] font-mono-num">
                         <span
-                          className="font-bold px-1.5 py-0.5 rounded"
+                          className="font-bold px-1.5 py-0.5 rounded-sm"
                           style={
                             d.status === 'success'
                               ? { background: PALETTE.greenBg, color: PALETTE.green }
@@ -331,7 +331,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
               placeholder="https://sua-url.com/webhook"
-              className="w-full px-3 py-2 rounded-md border border-inputBorder font-mono-num text-[12.5px] outline-none"
+              className="w-full px-3 py-2 rounded-md border border-inputBorder font-mono-num text-[12.5px] outline-hidden"
             />
             <Select aria-label="Evento do webhook" value={webhookEvent} onChange={(e) => setWebhookEvent(e.target.value)} className="font-mono-num text-[12.5px]">
               {data.webhookEvents.map((ev) => (
@@ -392,7 +392,7 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
                   <input aria-label="Valor do parâmetro"
                     value={f.value}
                     onChange={(e) => setFieldValue(f.key, e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-inputBorder font-mono-num text-[13px] outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-inputBorder font-mono-num text-[13px] outline-hidden"
                   />
                 </div>
               ))}
@@ -450,8 +450,8 @@ Authorization: Bearer ${newKey ?? (data.apiKeys[0] ? data.apiKeys[0].prefix + '�
               {data.addonCharges.map((c) => (
                 <div key={c.id} className="flex items-center justify-between text-[12.5px] gap-2">
                   <span className="text-textSecondary flex-1 min-w-0 truncate">{c.descricao}</span>
-                  <span className="font-mono-num font-bold flex-shrink-0">{c.valorFmt}</span>
-                  <span className="text-textTertiary flex-shrink-0">{c.quando}</span>
+                  <span className="font-mono-num font-bold shrink-0">{c.valorFmt}</span>
+                  <span className="text-textTertiary shrink-0">{c.quando}</span>
                 </div>
               ))}
             </div>

@@ -1,6 +1,122 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --spacing-4_5: 18px;
+  --spacing-5_5: 22px;
+  --spacing-6_5: 26px;
+  --spacing-7_5: 30px;
+
+  --color-blue: #1e5eff;
+  --color-navy: #0b1f3a;
+  --color-bg: #f5f7fa;
+  --color-border: #e4e8ee;
+  --color-hairline: #f0f2f5;
+  --color-inputBorder: #d6dce5;
+  --color-textPrimary: #0b1f3a;
+  --color-textSecondary: #5b6472;
+  --color-textTertiary: #8b97ac;
+  --color-textMuted: #9aa5b5;
+  --color-slate: #3d4658;
+  --color-green: #0a5c36;
+  --color-greenBg: #eaf3ee;
+  --color-amber: #b8790a;
+  --color-amberBg: #fbf1e0;
+  --color-red: #b03a2e;
+  --color-redBg: #f7e9e7;
+  --color-chip: #eef3ff;
+  --color-blueSoft: #c7d6ff;
+  --color-surface: #f7f8fa;
+  --color-onNavy: #9fb3d6;
+  --color-onNavyBright: #4c8cff;
+  --color-navyBorder: #2a3f5f;
+  --color-redBorder: #e9cfcb;
+  --color-greenBorder: #cfe6d9;
+  --color-amberMid: #f1c889;
+  --color-greenOnNavy: #6fcf97;
+  --color-onNavyDim: #b8c2d4;
+  --color-onNavyFaint: #7c8ba6;
+  --color-borderStrong: #c7d0de;
+
+  --font-sans: Inter, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --shadow-dropdown: 0 12px 32px rgba(11, 31, 58, 0.14);
+  --shadow-modal: 0 16px 40px rgba(11, 31, 58, 0.18);
+  --shadow-fab: 0 8px 20px rgba(30, 94, 255, 0.35);
+
+  --radius-card: 14px;
+
+  /* O Tailwind 4 grava a altura de linha de cada tamanho como proporção (text-sm = 1.4286), e
+     proporção é herdada como proporção: um text-[11.5px] dentro de um text-sm passava a ter
+     linha de 16,4px em vez dos 20px de antes, encolhendo badges, botões e linhas inteiras. Os
+     valores absolutos do Tailwind 3 mantêm o layout como era. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+}
+
+/* Compatibilidade com o preflight do Tailwind 3 — sem isto a tela muda em silêncio:
+   borda padrão cinza (no 4 é currentcolor), campos brancos (no 4 são transparentes e somem no
+   fundo cinza da página), placeholder cinza, cursor de mão em botão e o 1px de padrão das
+   células de tabela. Ficam na camada base, então qualquer classe utilitária continua ganhando. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: #e5e7eb;
+  }
+  input:where(:not([type='checkbox'], [type='radio'], [type='hidden'])),
+  textarea,
+  select {
+    background-color: #fff;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    opacity: 1;
+    color: #9ca3af;
+  }
+  button,
+  [role='button'] {
+    cursor: pointer;
+  }
+  :disabled {
+    cursor: default;
+  }
+  th,
+  td {
+    padding: 1px;
+  }
+  /* O preflight do 4 zera o padding interno dos campos de data do Chrome — o input de
+     vencimento ficava 2px mais baixo que os outros campos do formulário. */
+  ::-webkit-date-and-time-value {
+    min-height: revert;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: revert;
+  }
+  ::-webkit-datetime-edit,
+  ::-webkit-datetime-edit-year-field,
+  ::-webkit-datetime-edit-month-field,
+  ::-webkit-datetime-edit-day-field,
+  ::-webkit-datetime-edit-hour-field,
+  ::-webkit-datetime-edit-minute-field,
+  ::-webkit-datetime-edit-second-field,
+  ::-webkit-datetime-edit-millisecond-field,
+  ::-webkit-datetime-edit-meridiem-field {
+    padding-block: revert;
+  }
+}
+
+@utility font-mono-num {
+  font-family: 'IBM Plex Mono', monospace;
+}
 
 @layer base {
   html, body, #root {
@@ -26,11 +142,5 @@
   }
   input, select, button, textarea {
     font-family: inherit;
-  }
-}
-
-@layer utilities {
-  .font-mono-num {
-    font-family: 'IBM Plex Mono', monospace;
   }
 }

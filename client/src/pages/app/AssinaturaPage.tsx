@@ -80,7 +80,7 @@ export function AssinaturaPage() {
               <ul className="flex flex-col gap-2 mb-5 flex-1">
                 {p.features.map((f) => (
                   <li key={f} className={`text-[13px] flex items-start gap-2 ${p.key === 'pro' ? 'text-inputBorder' : 'text-textSecondary'}`}>
-                    <span className="mt-1 w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                    <span className="mt-1 w-1.5 h-1.5 rounded-full bg-current shrink-0" />
                     {f}
                   </li>
                 ))}

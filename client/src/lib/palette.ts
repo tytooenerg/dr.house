@@ -7,7 +7,7 @@
 // chegando a aparecer no mesmo arquivo (admin/KybPanel.tsx) — a mesma ideia pintada de duas
 // cores diferentes lado a lado.
 //
-// Toda cor vive aqui e no tailwind.config.js, com o MESMO nome nos dois lugares:
+// Toda cor vive aqui e no @theme de client/src/index.css, com o MESMO nome nos dois lugares:
 //   - em `className`, use o token do Tailwind: `text-green`, `bg-surface`, `border-navyBorder`
 //   - em valor de JS (style inline, props de Badge/Donut, mapas de status), use `PALETTE.green`
 //

@@ -72,7 +72,7 @@ export function FeatureFlagsPanel() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] font-bold text-navy">{f.label}</span>
-                  <code className="text-[10.5px] text-navy/50 bg-bg px-1.5 py-0.5 rounded">{f.key}</code>
+                  <code className="text-[10.5px] text-navy/50 bg-bg px-1.5 py-0.5 rounded-sm">{f.key}</code>
                   {!f.isOverridden && (
                     <span className="text-[10.5px] font-bold text-navy/40 uppercase tracking-wide">padrão</span>
                   )}

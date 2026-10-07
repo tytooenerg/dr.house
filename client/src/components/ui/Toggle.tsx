@@ -6,7 +6,7 @@ export function Toggle({ on, onClick, size = 'md' }: { on: boolean; onClick: () 
     <button
       type="button"
       onClick={onClick}
-      className="relative rounded-full border-none cursor-pointer flex-shrink-0 transition-colors"
+      className="relative rounded-full border-none cursor-pointer shrink-0 transition-colors"
       style={{ width: dims.w, height: dims.h, background: on ? PALETTE.blue : PALETTE.inputBorder }}
     >
       <span

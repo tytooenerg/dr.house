@@ -30,7 +30,7 @@ function payload(settings: ReturnType<typeof getSettings>, userId: number) {
       btnLabel: (settings.erpConnections as Record<string, boolean>)[c.key] ? 'Conectado ✓' : REAL_KEYS.has(c.key) ? 'Conectar com credenciais reais' : 'Conectar',
       // Não há btnBg/btnColor aqui: eram dois hex que a API decidia e a tela nunca leu —
       // sobra de antes da passada em que a cor virou fonte única (client/src/lib/palette.ts +
-      // tailwind.config.js). Cor é decisão de tela; o servidor manda estado, não estilo.
+      // o @theme de client/src/index.css). Cor é decisão de tela; o servidor manda estado, não estilo.
     })),
     whitelabelOn: settings.erpConnections.whitelabel,
     whitelabelBrand: settings.whitelabelBrand,

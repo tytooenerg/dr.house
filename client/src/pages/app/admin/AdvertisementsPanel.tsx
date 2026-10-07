@@ -80,7 +80,7 @@ export function AdvertisementsPanel({ onCount }: { onCount?: (n: number) => void
       {pending.map((ad) => (
         <div key={ad.id} className="bg-white border border-border rounded-card p-6">
           <div className="flex items-start gap-4 mb-4">
-            <img src={ad.logoUrl} alt={ad.empresa} className="w-14 h-14 rounded-lg object-contain bg-surface border border-border flex-shrink-0" />
+            <img src={ad.logoUrl} alt={ad.empresa} className="w-14 h-14 rounded-lg object-contain bg-surface border border-border shrink-0" />
             <div>
               <div className="font-bold text-[15px]">{ad.titulo}</div>
               <div className="text-textSecondary text-[12.5px] mt-0.5">{ad.texto}</div>

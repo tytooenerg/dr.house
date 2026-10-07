@@ -432,7 +432,7 @@ export function HistoricoPage() {
                     {analytics.maioresExposicoes.map((e) => (
                       <div key={e.sacado} className="flex items-center justify-between text-[12.5px] gap-2">
                         <span className="text-onNavy flex-1 min-w-0 truncate">{e.sacado}</span>
-                        <span className="font-mono-num flex-shrink-0">{e.valorFmt} ({e.pct}%)</span>
+                        <span className="font-mono-num shrink-0">{e.valorFmt} ({e.pct}%)</span>
                       </div>
                     ))}
                   </div>

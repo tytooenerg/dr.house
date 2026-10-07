@@ -23,7 +23,7 @@ export function OnboardingModal() {
 
   return (
     <ModalOverlay onClose={completeOnboarding}>
-      <div className="flex gap-1.5 mb-[22px]">
+      <div className="flex gap-1.5 mb-5.5">
         {steps.map((_, i) => (
           <div key={i} className="h-1 flex-1 rounded-full" style={{ background: i === step ? PALETTE.blue : PALETTE.border }} />
         ))}

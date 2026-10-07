@@ -103,7 +103,7 @@ export function RiscoPage() {
               }
               innerSub={<div className="text-[11.5px] text-textSecondary">score de 0–100</div>}
             />
-            <div className="font-bold text-base mt-[18px]">{selected.name}</div>
+            <div className="font-bold text-base mt-4.5">{selected.name}</div>
             <span className="text-[12.5px] font-bold px-2.5 py-1 rounded-md mt-2" style={{ background: selected.ratingBg, color: selected.ratingColor }}>
               Rating {selected.rating}
             </span>
@@ -130,7 +130,7 @@ export function RiscoPage() {
           </Card>
 
           <Card className="p-7">
-            <div className="font-bold text-[15px] mb-[18px]">Fatores de risco</div>
+            <div className="font-bold text-[15px] mb-4.5">Fatores de risco</div>
             <div className="flex flex-col gap-4">
               {selected.factors.map((f) => (
                 <div key={f.label}>
@@ -160,7 +160,7 @@ export function RiscoPage() {
             <div className="flex flex-col gap-2.5">
               {selected.aiSignals.map((s, i) => (
                 <div key={i} className="flex items-start gap-2 text-[12.5px]">
-                  <span className="rounded-full mt-1.5 flex-shrink-0" style={{ width: 6, height: 6, background: s.color }} />
+                  <span className="rounded-full mt-1.5 shrink-0" style={{ width: 6, height: 6, background: s.color }} />
                   <span className="text-slate">{s.text}</span>
                 </div>
               ))}

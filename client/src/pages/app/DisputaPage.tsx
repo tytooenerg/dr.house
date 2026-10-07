@@ -117,7 +117,7 @@ export function DisputaPage() {
             <div className="flex flex-col gap-2.5 mb-4.5">
               {d.timeline.map((t, i) => (
                 <div key={i} className="flex gap-2.5 text-[13px]">
-                  <span className="rounded-full mt-1.5 flex-shrink-0" style={{ width: 6, height: 6, background: PALETTE.onNavyDim }} />
+                  <span className="rounded-full mt-1.5 shrink-0" style={{ width: 6, height: 6, background: PALETTE.onNavyDim }} />
                   <div>
                     <b>{t.autor}</b> {t.texto} <span className="text-textMuted">— {t.quando}</span>
                   </div>

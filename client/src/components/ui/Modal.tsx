@@ -34,7 +34,7 @@ export function ModalOverlay({ children, maxWidth = 440, onClose }: { children: 
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[100] p-6" style={{ background: 'rgba(11,31,58,0.55)' }}>
+    <div className="fixed inset-0 flex items-center justify-center z-100 p-6" style={{ background: 'rgba(11,31,58,0.55)' }}>
       <div
         ref={contentRef}
         role="dialog"

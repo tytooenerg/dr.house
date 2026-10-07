@@ -642,7 +642,7 @@ export function EmitirPage() {
                   placeholder="Valor (R$)"
                   value={row.valor}
                   onChange={(e) => updateBatchRow(row.id, e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-md border border-inputBorder text-[13px] outline-none"
+                  className="flex-1 px-3 py-2 rounded-md border border-inputBorder text-[13px] outline-hidden"
                 />
                 <button type="button" onClick={() => removeBatchRow(row.id)} className="bg-transparent border-none text-red text-xs font-bold cursor-pointer">
                   Remover
@@ -690,7 +690,7 @@ export function EmitirPage() {
             <div className="flex flex-col gap-2.5">
               {(preview?.lastroChecklist.items ?? []).map((item) => (
                 <div key={item.label} className="flex items-center gap-2.5">
-                  <span className="rounded flex-shrink-0" style={{ width: 16, height: 16, border: `1.5px solid ${item.color}`, background: item.done ? item.color : 'transparent' }} />
+                  <span className="rounded-sm shrink-0" style={{ width: 16, height: 16, border: `1.5px solid ${item.color}`, background: item.done ? item.color : 'transparent' }} />
                   <span className="text-[13px]" style={{ color: item.textColor }}>
                     {item.label}
                   </span>
@@ -701,7 +701,7 @@ export function EmitirPage() {
 
           {preview?.sacadoRecognized && (
             <div className="flex items-center gap-2.5 p-3.5 rounded-[10px] bg-greenBg">
-              <span className="rounded-full bg-green flex-shrink-0" style={{ width: 9, height: 9 }} />
+              <span className="rounded-full bg-green shrink-0" style={{ width: 9, height: 9 }} />
               <span className="text-[12.5px] text-green font-semibold">{preview.sacadoRecognizedText}</span>
             </div>
           )}

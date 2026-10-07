@@ -655,7 +655,7 @@ export function ErpPage() {
             'Aprovação em minutos, dinheiro na conta em até 24h após o leilão fechar',
           ].map((t) => (
             <div key={t} className="flex items-center gap-2.5 text-[13px]">
-              <span className="rounded-full bg-blue flex-shrink-0" style={{ width: 6, height: 6 }} />
+              <span className="rounded-full bg-blue shrink-0" style={{ width: 6, height: 6 }} />
               {t}
             </div>
           ))}

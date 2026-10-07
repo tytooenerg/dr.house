@@ -54,7 +54,7 @@ export function AiChat() {
   };
 
   return (
-    <div className="fixed bottom-7 right-8 z-[60]" ref={ref}>
+    <div className="fixed bottom-7 right-8 z-60" ref={ref}>
       {open && (
         <div role="dialog" aria-label="Assistente Lastro" className="w-80 bg-white border border-border rounded-2xl shadow-modal overflow-hidden mb-3">
           <div className="bg-navy px-4 py-3.5 flex items-center gap-2">
@@ -92,7 +92,7 @@ export function AiChat() {
               disabled={asking}
               placeholder="Digite sua pergunta…"
               aria-label="Sua pergunta"
-              className="flex-1 border border-border rounded-lg px-3 py-2 text-[12.5px] outline-none disabled:opacity-60"
+              className="flex-1 border border-border rounded-lg px-3 py-2 text-[12.5px] outline-hidden disabled:opacity-60"
             />
             <button
               type="submit"

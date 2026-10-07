@@ -71,7 +71,7 @@ export function CestasPage() {
             <div className="text-textSecondary text-[12.5px] mb-3">{c.desc}</div>
             <div className="flex gap-1.5 flex-wrap mb-3">
               {c.ratings.map((r) => (
-                <span key={r} className="text-[11.5px] font-bold px-2 py-0.5 rounded bg-hairline text-textSecondary">
+                <span key={r} className="text-[11.5px] font-bold px-2 py-0.5 rounded-sm bg-hairline text-textSecondary">
                   {r}
                 </span>
               ))}

@@ -46,7 +46,7 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
         rel="noopener noreferrer sponsored"
         className="flex items-center gap-5 border border-border rounded-card p-6 hover:bg-surface transition-colors"
       >
-        <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-surface flex-shrink-0" />
+        <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-surface shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="font-bold text-[15px]">{ad.titulo}</div>
           <div className="text-textSecondary text-[13px] mt-1">{ad.texto}</div>

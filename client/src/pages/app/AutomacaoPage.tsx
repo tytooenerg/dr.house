@@ -170,12 +170,12 @@ export function AutomacaoPage() {
               'Só compra quando o deságio da oferta atinge o piso atual da escada da classe',
             ].map((t) => (
               <div key={t} className="flex items-center gap-2.5 text-[13px]">
-                <span className="rounded-full bg-blue flex-shrink-0" style={{ width: 6, height: 6 }} />
+                <span className="rounded-full bg-blue shrink-0" style={{ width: 6, height: 6 }} />
                 {t}
               </div>
             ))}
             <div className="flex items-center gap-2.5 text-[13px]">
-              <span className="rounded-full bg-blue flex-shrink-0" style={{ width: 6, height: 6 }} />
+              <span className="rounded-full bg-blue shrink-0" style={{ width: 6, height: 6 }} />
               Também disponível via API: <span className="font-mono-num">POST /v1/leiloes/:id/lances</span>
             </div>
           </div>
@@ -348,9 +348,9 @@ export function AutomacaoPage() {
         <div className="px-5 py-4.5 font-bold text-[15px] border-b border-border">Atividade da automação</div>
         {data.autoBidActivity.map((act, i) => (
           <div key={i} className="flex items-start gap-2.5 px-5 py-3.5 border-b border-hairline last:border-b-0">
-            <span className="rounded-full mt-1.5 flex-shrink-0" style={{ width: 7, height: 7, background: act.color }} />
+            <span className="rounded-full mt-1.5 shrink-0" style={{ width: 7, height: 7, background: act.color }} />
             <div className="flex-1 text-[13px] leading-snug">{act.text}</div>
-            <div className="text-xs text-textTertiary flex-shrink-0">{act.time}</div>
+            <div className="text-xs text-textTertiary shrink-0">{act.time}</div>
           </div>
         ))}
         {data.autoBidActivity.length === 0 && <div className="px-5 py-6 text-sm text-textSecondary">Nenhuma atividade ainda — ative o lance automático para começar.</div>}

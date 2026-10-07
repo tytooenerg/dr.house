@@ -17,13 +17,13 @@ export function TopBar({ onMenu }: { onMenu?: () => void }) {
   const groupLabel = item && item.group !== 'inicio' ? t(`group.${item.group}`, GROUP_LABELS[item.group]) : null;
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-3 h-14 px-4 md:px-8 bg-bg/90 backdrop-blur border-b border-hairline">
+    <header className="sticky top-0 z-40 flex items-center gap-3 h-14 px-4 md:px-8 bg-bg/90 backdrop-blur-sm border-b border-hairline">
       {onMenu && (
         <button
           type="button"
           onClick={onMenu}
           aria-label="Abrir menu"
-          className="w-9 h-9 -ml-1 rounded-lg border border-border bg-white cursor-pointer flex items-center justify-center text-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue"
+          className="w-9 h-9 -ml-1 rounded-lg border border-border bg-white cursor-pointer flex items-center justify-center text-navy focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue"
         >
           <Menu size={18} aria-hidden="true" />
         </button>

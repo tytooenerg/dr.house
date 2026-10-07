@@ -233,7 +233,7 @@ export function MinhasPage() {
                 <div className="w-full flex flex-wrap gap-3 mt-1">
                   {d.contratoCessaoFlags.map((f, i) => (
                     <span key={i} className="flex items-center gap-1.5 text-[11px] text-textSecondary">
-                      <span className="rounded-full flex-shrink-0" style={{ width: 6, height: 6, background: f.color }} />
+                      <span className="rounded-full shrink-0" style={{ width: 6, height: 6, background: f.color }} />
                       {f.text}
                     </span>
                   ))}
@@ -279,7 +279,7 @@ export function MinhasPage() {
           {/* Faixa de largura inteira, e não uma célula: a disputa é o produto, e espremê-la na
               coluna de status quebrava nome de financiador no meio. */}
           {d.leilao && (
-            <TableRow columns="1fr" className="!py-3 bg-surface">
+            <TableRow columns="1fr" className="py-3! bg-surface">
               <TableCell>
             <div className="flex items-center gap-2 flex-wrap w-full">
               {d.leilao.totalLances === 0 ? (

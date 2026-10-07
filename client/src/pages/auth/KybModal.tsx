@@ -65,7 +65,7 @@ export function KybModal() {
               className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-inputBorder text-[12.5px] font-semibold text-left cursor-pointer bg-transparent"
             >
               <span
-                className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center"
+                className="w-4 h-4 rounded-sm shrink-0 flex items-center justify-center"
                 style={{ border: `2px solid ${naoResidente ? PALETTE.blue : PALETTE.borderStrong}`, background: naoResidente ? PALETTE.blue : '#fff' }}
               >
                 {naoResidente && <span className="text-white text-[11.5px] leading-none">✓</span>}
@@ -138,7 +138,7 @@ export function KybModal() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-borderStrong rounded-xl p-[22px] text-center cursor-pointer bg-transparent"
+              className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent"
             >
               <div className="font-bold text-[13px]">{docUploaded ? 'Documento enviado ✓' : uploading ? 'Enviando…' : 'Envie sua autorização regulatória'}</div>
               <div className="text-textSecondary text-[12.5px] mt-1">Ato de autorização BCB/CVM ou contrato social + procuração</div>

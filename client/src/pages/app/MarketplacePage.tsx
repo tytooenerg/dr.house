@@ -655,7 +655,7 @@ export function MarketplacePage() {
                               {semCapacidade ? ins.motivoSemCapacidade ?? ins.selo : ins.selo}
                             </div>
                           </div>
-                          <div className="font-mono-num font-bold text-[13px] text-blue flex-shrink-0">{ins.premioFmt}</div>
+                          <div className="font-mono-num font-bold text-[13px] text-blue shrink-0">{ins.premioFmt}</div>
                         </button>
                       );
                     })}
@@ -789,7 +789,7 @@ export function MarketplacePage() {
                   <div className="flex flex-col gap-2">
                     {offer.bids.map((bid) => (
                       <div key={bid.id} className="flex items-center gap-3.5 bg-white rounded-lg px-3.5 py-2.5" style={{ border: `1px solid ${bid.borderColor}` }}>
-                        <div className="w-[26px] h-[26px] rounded-full text-white flex items-center justify-center text-[11.5px] font-bold flex-shrink-0" style={{ background: bid.avatarBg }}>
+                        <div className="w-6.5 h-6.5 rounded-full text-white flex items-center justify-center text-[11.5px] font-bold shrink-0" style={{ background: bid.avatarBg }}>
                           {bid.initials}
                         </div>
                         <div className="flex-1 text-[13px] font-semibold">{bid.name}</div>

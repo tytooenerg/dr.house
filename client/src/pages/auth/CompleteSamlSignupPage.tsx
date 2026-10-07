@@ -86,7 +86,7 @@ export function CompleteSamlSignupPage() {
                   className="flex items-center gap-3 px-4 py-3.5 rounded-[10px] cursor-pointer text-left transition-colors"
                   style={{ border: `2px solid ${selected ? PALETTE.blue : PALETTE.border}`, background: selected ? PALETTE.chip : '#fff' }}
                 >
-                  <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center flex-shrink-0">
+                  <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center shrink-0">
                     <RoleShape shape={r.shape} />
                   </div>
                   <div>

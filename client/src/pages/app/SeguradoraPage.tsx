@@ -327,7 +327,7 @@ export function SeguradoraPage() {
             <div role="cell" className="text-[11.5px] font-bold flex items-center gap-1.5 flex-wrap">
               {a.sinistroStatus === 'none' ? 'Sem sinistro' : a.sinistroStatus === 'aprovado' ? 'Indenizada' : 'Negada'}
               {a.emRisco && (
-                <span className="px-1.5 py-0.5 rounded bg-amberBg text-amber text-[11px] font-bold" title="O risco coberto ainda está em aberto — esta apólice entra na exposição">
+                <span className="px-1.5 py-0.5 rounded-sm bg-amberBg text-amber text-[11px] font-bold" title="O risco coberto ainda está em aberto — esta apólice entra na exposição">
                   Em risco
                 </span>
               )}
