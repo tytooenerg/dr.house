@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Publica no servidor um commit que já passou no CI. Chamado pelo GitHub Actions
-# (.github/workflows/deploy.yml) por SSH, com uma chave que o authorized_keys do servidor
+# (job `deploy` de .github/workflows/ci.yml) por SSH, com uma chave que o authorized_keys do servidor
 # restringe a ESTE comando (command="..."): quem tiver a chave não ganha um shell, só
 # consegue pedir "publique o commit X". O SHA chega em SSH_ORIGINAL_COMMAND.
 #
