@@ -165,8 +165,18 @@ jobs:
           KNOWN: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
-          printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts
+          # A chave costuma ser copiada de um terminal Windows para o secret: chega com \r,
+          # espaço no fim das linhas ou um tracinho a menos no BEGIN/END — e o ssh só diz
+          # "error in libcrypto". Normaliza esses três antes de usar.
+          printf '%s\n' "$KEY" | tr -d '\r' | sed -e 's/[[:space:]]*$//' \
+            -e 's/^-*BEGIN OPENSSH PRIVATE KEY-*$/-----BEGIN OPENSSH PRIVATE KEY-----/' \
+            -e 's/^-*END OPENSSH PRIVATE KEY-*$/-----END OPENSSH PRIVATE KEY-----/' > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          if ! ssh-keygen -y -f ~/.ssh/deploy > /dev/null 2>&1; then
+            echo "::error::A chave em DEPLOY_SSH_KEY está incompleta ou foi colada com defeito. Recrie o secret com a saída inteira de 'cat ~/.ssh/lastro_deploy' no servidor (da linha -----BEGIN até -----END). Nada foi publicado."
+            exit 1
+          fi
+          printf '%s\n' "$KNOWN" | tr -d '\r' > ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 "$USER_@$HOST" "$SHA"
 
       - name: Conferir que o site respondeu
