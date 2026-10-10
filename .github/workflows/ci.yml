@@ -168,12 +168,19 @@ jobs:
           # A chave costuma ser copiada de um terminal Windows para o secret: chega com \r,
           # espaço no fim das linhas ou um tracinho a menos no BEGIN/END — e o ssh só diz
           # "error in libcrypto". Normaliza esses três antes de usar.
-          printf '%s\n' "$KEY" | tr -d '\r' | sed -e 's/[[:space:]]*$//' \
-            -e 's/^-*BEGIN OPENSSH PRIVATE KEY-*$/-----BEGIN OPENSSH PRIVATE KEY-----/' \
-            -e 's/^-*END OPENSSH PRIVATE KEY-*$/-----END OPENSSH PRIVATE KEY-----/' > ~/.ssh/deploy
+          # Também aceita a chave numa linha só (`base64 -w0 ~/.ssh/lastro_deploy`), o formato
+          # recomendado no DEPLOY.md: sem tracinhos para perder, e qualquer espaço ou quebra
+          # de linha que o terminal enfiar no meio é descartado antes de decodificar.
+          if printf '%s' "$KEY" | grep -q 'PRIVATE KEY'; then
+            printf '%s\n' "$KEY" | tr -d '\r' | sed -e 's/[[:space:]]*$//' \
+              -e 's/^-*BEGIN OPENSSH PRIVATE KEY-*$/-----BEGIN OPENSSH PRIVATE KEY-----/' \
+              -e 's/^-*END OPENSSH PRIVATE KEY-*$/-----END OPENSSH PRIVATE KEY-----/' > ~/.ssh/deploy
+          else
+            printf '%s' "$KEY" | tr -d '[:space:]' | base64 -d > ~/.ssh/deploy 2>/dev/null || true
+          fi
           chmod 600 ~/.ssh/deploy
           if ! ssh-keygen -y -f ~/.ssh/deploy > /dev/null 2>&1; then
-            echo "::error::A chave em DEPLOY_SSH_KEY está incompleta ou foi colada com defeito. Recrie o secret com a saída inteira de 'cat ~/.ssh/lastro_deploy' no servidor (da linha -----BEGIN até -----END). Nada foi publicado."
+            echo "::error::A chave em DEPLOY_SSH_KEY está incompleta ou foi colada com defeito. Recrie o secret com a saída de 'base64 -w0 ~/.ssh/lastro_deploy' rodado no servidor (uma linha só). Nada foi publicado."
             exit 1
           fi
           printf '%s\n' "$KNOWN" | tr -d '\r' > ~/.ssh/known_hosts

@@ -244,7 +244,7 @@ secret), crie quatro secrets:
 |---|---|
 | `DEPLOY_HOST` | o IP do servidor |
 | `DEPLOY_USER` | `root` (ou o usuário que roda o Docker) |
-| `DEPLOY_SSH_KEY` | a saída de `cat ~/.ssh/lastro_deploy` no servidor — a chave **privada** inteira, da linha `-----BEGIN` até `-----END` |
+| `DEPLOY_SSH_KEY` | a saída de `base64 -w0 ~/.ssh/lastro_deploy; echo` no servidor — a chave **privada** numa linha só (copiar várias linhas de um terminal costuma perder pedaços; nesta forma, espaços e quebras de linha coladas por engano são ignorados). A saída de `cat ~/.ssh/lastro_deploy` inteira também é aceita |
 | `DEPLOY_KNOWN_HOSTS` | a saída de `ssh-keyscan <IP-do-servidor>` rodado no servidor |
 
 A chave privada só vai para o secret do GitHub — não cole em chat, e-mail ou documento.
