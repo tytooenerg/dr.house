@@ -11,6 +11,18 @@ interface BackupInfo {
   quando: string;
 }
 
+interface OffsiteStatus {
+  configurado: boolean;
+  destino: string | null;
+  ultimoEnvioEm: string | null;
+  ultimoEnvioQuando: string | null;
+  ultimoErro: string | null;
+  ultimoErroEm: string | null;
+  ultimoErroQuando: string | null;
+  documentosEnviados: number;
+  documentosPendentes: number;
+}
+
 interface UploadsDiskUsage {
   totalBytes: number;
   fileCount: number;
@@ -28,14 +40,16 @@ export function BackupsPanel() {
   const [runningBackup, setRunningBackup] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [diskUsage, setDiskUsage] = useState<UploadsDiskUsage | null>(null);
+  const [offsite, setOffsite] = useState<OffsiteStatus | null>(null);
 
   const loadBackups = () => {
     setLoadError(null);
     return api
-      .get<{ enabled: boolean; backups: BackupInfo[] }>('/admin/backups')
+      .get<{ enabled: boolean; backups: BackupInfo[]; offsite: OffsiteStatus }>('/admin/backups')
       .then((d) => {
         setBackupsEnabled(d.enabled);
         setBackups(d.backups);
+        setOffsite(d.offsite);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Falha ao carregar os backups.'));
   };
@@ -71,6 +85,7 @@ export function BackupsPanel() {
           {runningBackup ? 'Gerando…' : 'Rodar backup agora'}
         </Button>
       </div>
+      {offsite && <OffsiteLine offsite={offsite} />}
       {!backupsEnabled && (
         <div className="px-5 py-3.5 text-[13px] text-textMuted">Desabilitado neste ambiente (banco em memória — não há arquivo em disco para copiar).</div>
       )}
@@ -118,5 +133,43 @@ export function BackupsPanel() {
       )}
     </div>
     </>
+  );
+}
+
+function OffsiteLine({ offsite }: { offsite: OffsiteStatus }) {
+  if (!offsite.configurado) {
+    return (
+      <div className="px-5 py-3 border-b border-border bg-amberBg text-[13px]" data-testid="offsite-status">
+        <span className="font-semibold text-amber">Cópia fora do servidor: não configurada</span>
+        <span className="text-textMuted"> — os backups e os documentos enviados ficam só no disco do servidor. Ver DEPLOY.md, "Backup fora do servidor".</span>
+      </div>
+    );
+  }
+  // Erro mais novo que o último envio bem-sucedido: a cópia está parada.
+  if (offsite.ultimoErro && (!offsite.ultimoEnvioEm || (offsite.ultimoErroEm ?? '') > offsite.ultimoEnvioEm)) {
+    return (
+      <div className="px-5 py-3 border-b border-border bg-redBg text-[13px]" data-testid="offsite-status">
+        <span className="font-semibold text-red">Cópia fora do servidor: falhou{offsite.ultimoErroQuando ? ` ${offsite.ultimoErroQuando}` : ''}</span>
+        <span className="text-textMuted"> — {offsite.ultimoErro} ({offsite.destino})</span>
+      </div>
+    );
+  }
+  if (!offsite.ultimoEnvioEm) {
+    return (
+      <div className="px-5 py-3 border-b border-border text-[13px]" data-testid="offsite-status">
+        <span className="font-semibold">Cópia fora do servidor: configurada</span>
+        <span className="text-textMuted"> — nenhum envio ainda para {offsite.destino}. Clique em "Rodar backup agora" para testar.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="px-5 py-3 border-b border-border bg-greenBg text-[13px]" data-testid="offsite-status">
+      <span className="font-semibold text-green">Cópia fora do servidor: ativa</span>
+      <span className="text-textMuted">
+        {' '}
+        — último envio {offsite.ultimoEnvioQuando} para {offsite.destino} ({offsite.documentosEnviados} documento(s) copiados
+        {offsite.documentosPendentes > 0 ? `, ${offsite.documentosPendentes} aguardando o próximo envio` : ''})
+      </span>
+    </div>
   );
 }

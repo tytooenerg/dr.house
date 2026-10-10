@@ -74,8 +74,8 @@ Tudo mais no `docker-compose.prod.yml` é **opcional** — a aplicação roda de
 (com fallbacks honestos e claramente simulados) sem nenhuma dessas integrações. Preencha
 só as que você já contratou: `ANTHROPIC_API_KEY` (recursos de IA), `SENTRY_DSN` (erros),
 `SMTP_*` (e-mails reais em vez de só logados), `STRIPE_*` (cobrança real), `VAPID_*`
-(push web), `GOOGLE_OAUTH_*` (login com Google), `BACKUP_OFFSITE_CMD` (cópia do backup
-diário para fora do servidor — veja `server/src/lib/backup.ts`). A lista completa, com o
+(push web), `GOOGLE_OAUTH_*` (login com Google), `BACKUP_S3_*` (cópia dos backups
+e documentos para fora do servidor — veja a seção 7). A lista completa, com o
 que cada uma desbloqueia, está em `server/.env.example`.
 
 ## 5. Subir a stack
@@ -202,11 +202,65 @@ recebe essas contas automaticamente (ver `server/src/db/seed.ts`).
 ## 7. Backups
 
 O job de backup automático (`server/src/lib/backup.ts`) já roda dentro do container e
-grava snapshots do SQLite no volume `lastro-data`. Isso protege contra corrupção do banco,
-mas **não** contra a perda do servidor inteiro (disco, VPS deletado, etc.) — para isso,
-configure `BACKUP_OFFSITE_CMD` no `.env` com um comando real que copie o backup para fora
-do servidor (ex. `aws s3 cp`, `rclone copy`, `rsync` para outra máquina). Sem isso
-configurado, os backups existem mas ficam no mesmo disco que os dados originais.
+grava snapshots do SQLite no volume `lastro-data` a cada 6h. Isso protege contra corrupção do
+banco, mas **não** contra a perda do servidor inteiro (disco, VPS deletado, etc.) — e os
+documentos enviados (KYB, contratos, comprovantes) ficam só no volume `lastro-uploads`.
+
+### Backup fora do servidor
+
+Com as variáveis `BACKUP_S3_*` no `.env`, cada snapshot vai para `db/<arquivo>.db` num
+armazenamento compatível com S3, e todo documento enviado vai para `uploads/<nome>` — cada um
+uma vez só (`server/src/lib/offsiteStorage.ts`, sem instalar nada no container). O painel
+**Back-office → Auditoria → Backups** mostra a linha "Cópia fora do servidor": verde (ativa,
+com o horário do último envio), vermelha (falhou, com o motivo) ou âmbar (não configurada).
+
+Serve qualquer provedor S3 (AWS S3, Cloudflare R2, Wasabi). O roteiro abaixo usa o
+**Backblaze B2**: ~US$ 6/TB/mês e os primeiros 10 GB grátis.
+
+1. Crie a conta em backblaze.com (produto **B2 Cloud Storage**).
+2. **Buckets → Create a Bucket**: nome único (ex. `lastro-backups-2026`), **Files in Bucket:
+   Private**, **Default Encryption: Enable**. Anote o **Endpoint** que aparece no bucket
+   (ex. `s3.us-west-004.backblazeb2.com`).
+3. No bucket, **Lifecycle Settings → Use custom lifecycle rules**: prefixo `db/`, apagar
+   (hide) depois de **30** dias e deletar 1 dia após. Os snapshots antigos somem sozinhos; os
+   documentos (`uploads/`) ficam para sempre, como a retenção de compliance exige.
+4. **Application Keys → Add a New Application Key**: acesso **só a esse bucket**, tipo
+   **Write Only**. Mesmo que alguém invada o servidor, essa chave não consegue ler nem apagar
+   os backups que já estão lá. O B2 mostra o `keyID` e o `applicationKey` **uma vez só**.
+5. No servidor, acrescente ao `.env` (na pasta `~/lastro`):
+
+   ```bash
+   BACKUP_S3_ENDPOINT=s3.us-west-004.backblazeb2.com
+   BACKUP_S3_BUCKET=lastro-backups-2026
+   BACKUP_S3_ACCESS_KEY_ID=<keyID>
+   BACKUP_S3_SECRET_ACCESS_KEY=<applicationKey>
+   ```
+
+   `BACKUP_S3_REGION` pode ficar vazio: para B2, R2 e AWS ela é deduzida do endpoint.
+6. `docker compose -f docker-compose.prod.yml up -d` (recria o `app` com as variáveis novas),
+   abra o painel de backups e clique em **Rodar backup agora** — a linha deve ficar verde. O
+   primeiro envio leva todos os documentos já existentes; os seguintes, só os novos.
+
+Alternativa para quem já tem `aws`/`rclone` no host: `BACKUP_OFFSITE_CMD` continua funcionando,
+rodado como `<cmd> <caminho-do-snapshot>` depois de cada backup.
+
+### Restaurando
+
+1. No painel do B2, **Browse Files → db/**, baixe o `.db` mais recente e copie para o
+   servidor como `~/lastro/restore.db` (ex. `scp restore.db root@SERVIDOR:~/lastro/`).
+2. No servidor, dentro de `~/lastro`:
+
+   ```bash
+   chmod 644 restore.db
+   docker compose -f docker-compose.prod.yml stop app
+   docker compose -f docker-compose.prod.yml run --rm --no-deps -v "$PWD/restore.db:/restore.db:ro" \
+     --entrypoint sh app -c 'cp /restore.db /app/server/data/lastro.db && rm -f /app/server/data/lastro.db-wal /app/server/data/lastro.db-shm'
+   docker compose -f docker-compose.prod.yml start app
+   ```
+
+3. Documentos: se o volume `lastro-uploads` também se perdeu, crie no B2 uma chave **Read
+   Only** temporária e baixe a pasta `uploads/` de volta para o volume (ex. com `rclone copy`).
+   Apague a chave temporária depois.
 
 ## 8. Atualizando para uma nova versão
 

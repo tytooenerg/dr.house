@@ -38,7 +38,7 @@ import { sendForSignature, checkSignatureStatus, esignatureEnabled } from '../li
 import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } from '../db/regulatoryNotes.js';
 import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordRecovery } from '../lib/legalCollectionFee.js';
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
-import { runBackup, listBackups, backupEnabled } from '../lib/backup.js';
+import { runBackup, listBackups, backupEnabled, offsiteStatus } from '../lib/backup.js';
 import { computeUploadsDiskUsage } from '../lib/uploadsDiskUsage.js';
 import { prontidao } from '../lib/preflight.js';
 import { listPendingTedDeposits, getTedDeposit, concludeTedDeposit } from '../db/ted.js';
@@ -1125,7 +1125,16 @@ adminRouter.post(
 
 adminRouter.get('/backups', (_req, res) => {
   const backups = listBackups().map((b) => ({ ...b, quando: fmtRelative(b.createdAt) }));
-  res.json({ enabled: backupEnabled, backups });
+  const offsite = offsiteStatus();
+  res.json({
+    enabled: backupEnabled,
+    backups,
+    offsite: {
+      ...offsite,
+      ultimoEnvioQuando: offsite.ultimoEnvioEm ? fmtRelative(offsite.ultimoEnvioEm) : null,
+      ultimoErroQuando: offsite.ultimoErroEm ? fmtRelative(offsite.ultimoErroEm) : null,
+    },
+  });
 });
 
 adminRouter.post(

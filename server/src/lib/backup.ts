@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { db, dbPath, dataDirPath } from '../db/index.js';
 import { logger } from './logger.js';
+import { getOffsiteStatus, syncOffsite, type OffsiteStatus } from './offsiteStorage.js';
+import { uploadDir } from '../routes/uploads.js';
 
 // Real, periodic disaster-recovery backups of the SQLite datastore — every dollar/status
 // this platform tracks (saldo, duplicatas, ledger, KYB, audit log) lives in this one file,
@@ -10,12 +12,14 @@ import { logger } from './logger.js';
 // "Online Backup API"), which is safe to run against a live WAL-mode database without
 // locking out concurrent writers — not a naive `cp` of a file that might be mid-write.
 //
-// Deliberately local-disk, not S3/off-site — there's no cloud storage credential this
-// environment can honestly claim to have. BACKUP_OFFSITE_CMD lets a real deployment plug
-// in `aws s3 cp`/`rclone`/etc. as a post-backup hook without this module pretending to
-// ship one itself.
+// Off-site: com BACKUP_S3_* no .env, cada snapshot e todo documento enviado ainda não copiado
+// vão para um armazenamento compatível com S3 (lib/offsiteStorage.ts). Sem isso, os backups
+// ficam só neste disco — e o painel diz isso. BACKUP_OFFSITE_CMD continua como gancho
+// alternativo (`aws s3 cp`/`rclone`/etc.) para quem já tem essa ferramenta no host.
 
 export const backupsDir = path.join(dataDirPath, 'backups');
+// Fora do padrão *.db de listBackups(), então a retenção nunca o apaga.
+const offsiteStateFile = path.join(backupsDir, '.offsite-state.json');
 
 // In-memory test databases (DB_PATH=':memory:') have nothing on disk to back up — this is
 // the expected, honest state during `npm test`, not a misconfiguration.
@@ -60,8 +64,14 @@ export async function runBackup(): Promise<BackupInfo | null> {
     }
   }
 
+  await syncOffsite({ snapshotPath: dest, uploadsDir: uploadDir, stateFile: offsiteStateFile });
+
   applyRetention();
   return { filename, sizeBytes: stat.size, createdAt: new Date().toISOString() };
+}
+
+export function offsiteStatus(): OffsiteStatus {
+  return getOffsiteStatus(offsiteStateFile, uploadDir);
 }
 
 export function listBackups(): BackupInfo[] {
