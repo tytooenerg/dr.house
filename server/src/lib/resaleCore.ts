@@ -25,8 +25,9 @@ import {
 import { addNotification } from '../db/misc.js';
 import { recordAuditEvent } from '../db/audit.js';
 import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
-import { settleResale } from './settlement.js';
-import { fmtBRL, parseFlexibleDate } from './format.js';
+import { settleResale, splitRevenda } from './settlement.js';
+import { demonstrativoRevenda } from './demonstrativo.js';
+import { fmtBRL, fmtBRLCentavos, parseFlexibleDate } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow } from '../db/types.js';
 
@@ -68,6 +69,8 @@ export function viewResaleMarket() {
       precoFmt: fmtBRL(l.asking_valor),
       variacaoPct: l.original_valor > 0 ? +(((l.asking_valor - l.original_valor) / l.original_valor) * 100).toFixed(2) : 0,
       melhorLanceFmt: melhorLance !== null ? fmtBRL(melhorLance) : null,
+      // A conta da venda: comprador paga, taxa da plataforma, vendedor recebe, ganho no vencimento.
+      demonstrativo: demonstrativoRevenda(l.original_valor, l.asking_valor),
     };
   });
 }
@@ -75,7 +78,7 @@ export function viewResaleMarket() {
 // Positions this investor currently holds that are still tradeable (active, not yet
 // vencida, not already listed) — what the "revender" form on the client offers to sell.
 export function viewMyResalablePositions(userId: number) {
-  const result: { purchaseId: number; duplicataId: string; sacado: string; valorPagoFmt: string; vencimento: string; diasRestantes: number }[] = [];
+  const result: { purchaseId: number; duplicataId: string; sacado: string; valorPagoFmt: string; valorFaceFmt: string; vencimento: string; diasRestantes: number }[] = [];
   for (const purchase of listPurchasesByInvestor(userId)) {
     if (!purchase.active) continue;
     const duplicata = getDuplicata(purchase.duplicata_id);
@@ -87,6 +90,7 @@ export function viewMyResalablePositions(userId: number) {
       duplicataId: duplicata.id,
       sacado: duplicata.sacado_nome,
       valorPagoFmt: fmtBRL(purchase.valor),
+      valorFaceFmt: fmtBRL(duplicata.valor),
       vencimento: duplicata.vencimento,
       diasRestantes: daysUntil(duplicata.vencimento),
     });
@@ -105,7 +109,13 @@ export function viewMyListings(userId: number) {
     status: l.status,
     lances:
       l.status === 'ativo'
-        ? listActiveBidsForListing(l.id).map((b) => ({ id: b.id, bidderCompanyName: b.bidder_company_name, valorFmt: fmtBRL(b.valor) }))
+        ? listActiveBidsForListing(l.id).map((b) => ({
+            id: b.id,
+            bidderCompanyName: b.bidder_company_name,
+            valorFmt: fmtBRL(b.valor),
+            // Aceitar este lance credita isto — o lance menos a taxa da plataforma (settleResale).
+            voceRecebeFmt: fmtBRLCentavos(splitRevenda(b.valor).net),
+          }))
         : [],
   }));
 }
@@ -133,6 +143,21 @@ export type ResaleOutcome<T> =
 
 // A resale listing is only valid while the position hasn't matured yet — once vencimento
 // passes the receivable should have been paid out, not traded.
+// "Se eu anunciar por X, quanto eu recebo?" — a simulação que o formulário de revenda mostra
+// enquanto o vendedor digita o preço. Só para a própria posição.
+export function simularRevenda(user: UserRow, purchaseId: number, precoRaw: string): ResaleOutcome<ReturnType<typeof demonstrativoRevenda>> {
+  const purchase = getPurchaseById(purchaseId);
+  const duplicata = purchase ? getDuplicata(purchase.duplicata_id) : undefined;
+  if (!purchase || purchase.investor_id !== user.id || !purchase.active || !duplicata) {
+    return { status: 404, body: { error: 'not_found', message: 'Posição não encontrada ou não pertence a você.' } };
+  }
+  const preco = parseValor(precoRaw);
+  if (preco <= 0) {
+    return { status: 400, body: { error: 'validation_error', message: 'Informe um preço de venda válido.' } };
+  }
+  return { status: 200, body: demonstrativoRevenda(duplicata.valor, preco) };
+}
+
 export function createResaleListing(user: UserRow, purchaseId: number, askingValorRaw: string): ResaleOutcome<{ listingId: number; market: ReturnType<typeof viewResaleMarket> }> {
   const purchase = getPurchaseById(purchaseId);
   if (!purchase || purchase.investor_id !== user.id || !purchase.active) {

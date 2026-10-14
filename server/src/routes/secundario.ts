@@ -10,6 +10,7 @@ import {
   placeBid,
   placeBidSchema,
   rejectBid,
+  simularRevenda,
   viewMyBids,
   viewMyListings,
   viewMyResalablePositions,
@@ -35,6 +36,16 @@ function payload(userId: number) {
 }
 
 secundarioRouter.get('/', (req, res) => res.json(payload(req.user!.id)));
+
+secundarioRouter.get('/simulacao', (req, res) => {
+  const purchaseId = Number(req.query.purchaseId);
+  if (!Number.isInteger(purchaseId) || purchaseId <= 0) {
+    res.status(400).json({ error: 'validation_error', message: 'purchaseId inválido.' });
+    return;
+  }
+  const outcome = simularRevenda(req.user!, purchaseId, typeof req.query.preco === 'string' ? req.query.preco : '');
+  res.status(outcome.status).json(outcome.body);
+});
 
 const listSchema = z.object({ purchaseId: z.number().int().positive(), askingValor: z.string().trim() });
 

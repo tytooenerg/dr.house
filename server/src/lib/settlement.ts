@@ -55,9 +55,23 @@ function today(): string {
 // is the investor's actual return for financing early; before this, precoCompra didn't
 // exist and every caller passed the full face value here, so the deságio shown everywhere
 // in the UI was never applied to any real money movement.
+// A divisão do dinheiro de uma compra no primário, num lugar só: settlePurchase usa para
+// mover o dinheiro e lib/demonstrativo.ts usa para mostrar a conta na tela — os dois não
+// podem divergir.
+export function splitPrimario(valorFace: number, precoCompra: number): { fee: number; net: number } {
+  const fee = platformFee(valorFace);
+  return { fee, net: precoCompra - fee };
+}
+
+// Idem para a revenda no secundário (settleResale abaixo).
+export function splitRevenda(preco: number, feeDiscountPct = 0): { baseFee: number; fee: number; beneficio: number; net: number } {
+  const baseFee = platformFee(preco);
+  const fee = baseFee * (1 - feeDiscountPct);
+  return { baseFee, fee, beneficio: baseFee - fee, net: preco - fee };
+}
+
 export function settlePurchase(opts: { duplicataId: string; sacadoNome: string; investorId: number; cedenteId: number | null; valor: number; precoCompra: number }) {
-  const fee = platformFee(opts.valor);
-  const net = opts.precoCompra - fee;
+  const { fee, net } = splitPrimario(opts.valor, opts.precoCompra);
   addLedgerEntry(opts.investorId, today(), `Compra da duplicata ${opts.duplicataId} — ${opts.sacadoNome}`, -opts.precoCompra);
   if (opts.cedenteId) {
     addLedgerEntry(
@@ -127,10 +141,7 @@ export function settleAtMaturity(opts: { duplicataId: string; creditorId: number
 // não há exigência regulatória de neutralidade de taxa, Res. CMN 4.656/2018), o
 // benefício em reais é explicitado na descrição do lançamento do vendedor abaixo.
 export function settleResale(opts: { duplicataId: string; sacadoNome: string; buyerId: number; sellerId: number; valor: number; feeDiscountPct?: number }) {
-  const baseFee = platformFee(opts.valor);
-  const fee = baseFee * (1 - (opts.feeDiscountPct ?? 0));
-  const beneficio = baseFee - fee;
-  const net = opts.valor - fee;
+  const { fee, beneficio, net } = splitRevenda(opts.valor, opts.feeDiscountPct ?? 0);
   const feeLabel = opts.feeDiscountPct
     ? `${pctLabel(opts.valor)} com desconto institucional, ${fmtBRL(beneficio)} a menos que a taxa padrão`
     : pctLabel(opts.valor);

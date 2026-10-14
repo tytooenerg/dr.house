@@ -6,6 +6,7 @@ import { Notice } from '../../components/ui/Notice';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
 import { useLang } from '../../lib/i18n';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '../../components/ui/Table';
+import { DemonstrativoOperacao, type Demonstrativo } from '../../components/DemonstrativoOperacao';
 
 interface LanceNaEscada {
   id: number;
@@ -47,6 +48,8 @@ interface Duplicata {
     fechaEm: string;
     fechaEmSec: number;
     lances: LanceNaEscada[];
+    // Quanto entra no saldo da empresa: no melhor lance ou, sem lance, na reserva.
+    demonstrativo: Demonstrativo;
   } | null;
   // O instrumento de cessão desta duplicata — antes só existia como um upload isolado na
   // tela de Compliance, sem nenhum jeito de saber depois qual operação ele comprovava.
@@ -86,6 +89,7 @@ export function MinhasPage() {
   // Qual disputa está expandida. A linha fica compacta por padrão — o resumo já responde
   // "estão brigando pela minha duplicata?"; a escada responde "quem, e a que preço".
   const [disputaAberta, setDisputaAberta] = useState<string | null>(null);
+  const [contaAberta, setContaAberta] = useState<string | null>(null);
 
   // O leilão só abre depois que o cedente diz qual é o pior deságio que aceita. Antes disso
   // a plataforma escolhia esse piso por ele (banda de mercado em lib/dynamicPricing.ts), e o
@@ -306,6 +310,23 @@ export function MinhasPage() {
                   </button>
                 </>
               )}
+              <span className="text-[11.5px] text-textSecondary">
+                · {d.leilao.totalLances === 0 ? 'pela sua reserva, você receberia no mínimo' : 'você recebe'}{' '}
+                <b className="font-mono-num text-green">{recebe(d.leilao.demonstrativo)}</b>
+              </span>
+              <button
+                type="button"
+                aria-label={contaAberta === d.id ? `Ocultar a conta de ${d.sacado}` : `Ver a conta de ${d.sacado}`}
+                onClick={() => setContaAberta(contaAberta === d.id ? null : d.id)}
+                className="bg-transparent border-none text-blue text-[11.5px] font-bold cursor-pointer underline p-0"
+              >
+                {contaAberta === d.id ? 'Ocultar a conta' : 'Ver a conta'}
+              </button>
+              {contaAberta === d.id && (
+                <div className="w-full mt-1 max-w-[560px]">
+                  <DemonstrativoOperacao demonstrativo={d.leilao.demonstrativo} titulo={`Se o leilão fechasse agora — ${d.leilao.demonstrativo.referencia ?? ''}`} />
+                </div>
+              )}
               {disputaAberta === d.id && (
                 <ul className="w-full flex flex-col gap-1 mt-1 list-none p-0">
                   {d.leilao.lances.map((l) => (
@@ -335,4 +356,9 @@ export function MinhasPage() {
       )}
     </div>
   );
+}
+
+/** O "Empresa recebe" do demonstrativo — o que de fato entra no saldo, já sem a taxa da plataforma. */
+function recebe(d: Demonstrativo): string {
+  return d.linhas.find((l) => l.tipo === 'resultado')?.valorFmt ?? '—';
 }

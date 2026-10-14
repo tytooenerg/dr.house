@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { AiTag, Badge } from '../../components/ui/Badge';
 import { useLang } from '../../lib/i18n';
 import { PALETTE, SECTOR_COLORS } from '../../lib/palette';
+import { DemonstrativoOperacao, useDemonstrativoSimulado, type Demonstrativo } from '../../components/DemonstrativoOperacao';
 
 interface Insurer {
   key: string;
@@ -145,6 +146,7 @@ interface Offer {
   meuLance: MeuLance | null;
   bidCount: number;
   bids: Bid[];
+  demonstrativo: Demonstrativo;
   countdownSec: number;
   aceiteBadgeLabel: string;
   aceiteBadgeBg: string;
@@ -786,6 +788,10 @@ export function MarketplacePage() {
                   )}
                   {bidError[offer.id] && <div className="text-red text-[12.5px] font-semibold mb-2.5">{bidError[offer.id]}</div>}
 
+                  <div className="mb-2.5">
+                    <ContaDoLance offer={offer} taxaDigitada={offer.leilaoAberto ? bidTaxa[offer.id] ?? '' : ''} />
+                  </div>
+
                   <div className="flex flex-col gap-2">
                     {offer.bids.map((bid) => (
                       <div key={bid.id} className="flex items-center gap-3.5 bg-white rounded-lg px-3.5 py-2.5" style={{ border: `1px solid ${bid.borderColor}` }}>
@@ -855,5 +861,26 @@ export function MarketplacePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// A conta em reais do leilão: com uma taxa digitada, quanto o investidor pagaria e quanto a
+// empresa receberia se ESSE lance vencesse; sem nada digitado, a do melhor lance (ou da
+// reserva). Ver server/src/lib/demonstrativo.ts.
+function ContaDoLance({ offer, taxaDigitada }: { offer: Offer; taxaDigitada: string }) {
+  const taxa = taxaDigitada.trim();
+  const taxaValida = /^\d+([.,]\d+)?$/.test(taxa) && parseFloat(taxa.replace(',', '.')) > 0;
+  const { demonstrativo: simulado, carregando } = useDemonstrativoSimulado(
+    taxaValida ? `/market/${encodeURIComponent(offer.id)}/simulacao?taxaAm=${encodeURIComponent(taxa)}` : null
+  );
+  if (taxaValida && simulado) {
+    return <DemonstrativoOperacao demonstrativo={simulado} carregando={carregando} titulo={`Se o seu lance de ${taxa.replace('.', ',')}% a.m. vencer`} />;
+  }
+  return (
+    <DemonstrativoOperacao
+      demonstrativo={offer.demonstrativo}
+      carregando={taxaValida && carregando}
+      titulo={`${offer.leilaoAberto ? 'Se o leilão fechasse agora' : 'Conta da operação'} — ${offer.demonstrativo.referencia ?? ''}`}
+    />
   );
 }

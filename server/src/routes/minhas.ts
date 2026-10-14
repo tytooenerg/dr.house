@@ -8,7 +8,7 @@ import { getContractAnalysisByUploadId, SEVERITY_COLOR } from '../db/contractAna
 import { aceiteConfirmado } from '../lib/aceiteCore.js';
 import { fmtBRL } from '../lib/format.js';
 import { estimateRateBand } from '../lib/dynamicPricing.js';
-import { auctionCountdown, computePurchasePrice, viewAuctionLadder } from '../lib/marketCompute.js';
+import { auctionCountdown, computePurchasePrice, demonstrativoDaOferta, viewAuctionLadder } from '../lib/marketCompute.js';
 import { abrirLeilao } from '../lib/auctionOpen.js';
 import { ratingFromScore } from '../lib/riscoCore.js';
 import { COLORS } from '../data/seed.js';
@@ -53,6 +53,9 @@ function view(d: ReturnType<typeof getDuplicata>) {
         fechaEm: auctionCountdown(d.close_at).countdown,
         fechaEmSec: auctionCountdown(d.close_at).remainingSec,
         lances,
+        // Em reais: quanto o comprador paga, a taxa da plataforma e quanto ENTRA no saldo da
+        // empresa — no melhor lance (se o leilão fechasse agora) ou, sem lance, na reserva.
+        demonstrativo: demonstrativoDaOferta(d),
       }
     : null;
 

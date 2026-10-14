@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import { listMarketplace, getDuplicata, setInsurer, createPurchase, isPurchased } from '../db/duplicatas.js';
 import { getAceiteByDuplicata } from '../db/aceites.js';
-import { getSeguradoraByInsurerKey } from '../db/users.js';
+import { effectiveOwnerId, getSeguradoraByInsurerKey } from '../db/users.js';
 import { buildOfferView, computePurchasePrice } from '../lib/marketCompute.js';
+import { demonstrativoPrimario } from '../lib/demonstrativo.js';
 import { deliverWebhookEvent } from '../lib/webhookDelivery.js';
 import { informarNegociacao, type RegistradoraKey } from '../lib/registradoras.js';
 import { settlePurchase, settleInsurance } from '../lib/settlement.js';
@@ -62,6 +63,25 @@ marketRouter.get('/', (req, res) => {
   const paged = offers.slice((page - 1) * pageSize, page * pageSize);
 
   res.json({ offers: paged, page, pageSize, total });
+});
+
+// "Se eu der um lance de X% a.m., quanto eu pago e quanto a empresa recebe?" — a conta que
+// a tela do leilão mostra enquanto o investidor digita. Mesmo cálculo que placeAuctionBid
+// usaria para fixar o preço do lance agora (computePurchasePrice) e mesma divisão que a
+// liquidação aplica (lib/demonstrativo.ts). Visível para o que está no mercado e, fora dele,
+// só para o cedente dono da duplicata.
+marketRouter.get('/:id/simulacao', (req, res) => {
+  const d = getDuplicata(req.params.id);
+  if (!d || (d.status !== 'no_mercado' && d.cedente_id !== effectiveOwnerId(req.user!))) {
+    res.status(404).json({ error: 'not_found', message: 'Duplicata não encontrada.' });
+    return;
+  }
+  const taxaAm = parseTaxaAm(typeof req.query.taxaAm === 'string' ? req.query.taxaAm : '');
+  if (!Number.isFinite(taxaAm) || taxaAm <= 0 || taxaAm > 100) {
+    res.status(400).json({ error: 'validation_error', message: 'Informe uma taxa de deságio mensal válida (ex.: 2,5).' });
+    return;
+  }
+  res.json(demonstrativoPrimario(d.valor, computePurchasePrice(d, taxaAm)));
 });
 
 const lanceSchema = z.object({ taxaAm: z.union([z.number(), z.string()]) });
@@ -181,7 +201,7 @@ marketRouter.post('/:id/insure', (req, res) => {
     const seguradoraUser = getSeguradoraByInsurerKey(insurer.key);
     settleInsurance({ duplicataId: d.id, investorId: req.user!.id, insurerKey: insurer.key, insurerUserId: seguradoraUser?.id ?? null, premio });
   }
-  res.json({ offers: listMarketplace().map(buildOfferView) });
+  res.json({ offers: listMarketplace().map((d) => buildOfferView(d)) });
 });
 
 // Tokenização/fracionamento (lib/fractionalOfferings.ts) — a real, purely additive

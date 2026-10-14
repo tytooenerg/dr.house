@@ -256,7 +256,7 @@ v1Router.get(
 // A test-mode key sees only the seeded sandbox marketplace (lib/sandboxData.ts) — never
 // the real, live offers other partners' live keys operate on.
 v1Router.get('/marketplace', (req, res) => {
-  res.json({ offers: listMarketplace(req.apiKey!.mode === 'test').map(buildOfferView) });
+  res.json({ offers: listMarketplace(req.apiKey!.mode === 'test').map((d) => buildOfferView(d)) });
 });
 
 // Sacado-facing aceite endpoints — a sacado's ERP can list pending aceites and

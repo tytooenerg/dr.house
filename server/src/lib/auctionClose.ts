@@ -6,7 +6,7 @@ import { settlePurchase } from './settlement.js';
 import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { fmtTaxa } from './auctionCore.js';
-import { fmtBRL } from './format.js';
+import { fmtBRL, fmtBRLCentavos } from './format.js';
 import { logger } from './logger.js';
 import { COLORS } from '../data/seed.js';
 import { getFundoSistemaUserIdIfExists } from './confirmingFundo.js';
@@ -71,7 +71,7 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
 
     try {
       createPurchase(id, vencedor.bidder_id, d.valor, fmtTaxa(vencedor.taxa_am), Math.round(d.valor - vencedor.preco));
-      settlePurchase({
+      const liquidacao = settlePurchase({
         duplicataId: id,
         sacadoNome: d.sacado_nome,
         investorId: vencedor.bidder_id,
@@ -96,7 +96,14 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
           totalLances: bids.length,
         });
         void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: id, valor: d.valor, investorId: vencedor.bidder_id });
-        addNotification(d.cedente_id, `Leilão de ${d.sacado_nome} arrematado a ${fmtTaxa(vencedor.taxa_am)} a.m. — ${fmtBRL(vencedor.preco)} liberados.`, COLORS.GREEN, 'leilao');
+        // O que entra no saldo é o preço MENOS a taxa da plataforma (settlePurchase) — a
+        // mensagem dizia "preço liberados", R$ 3,50 a mais por R$ 1.000 do que o cedente via no extrato.
+        addNotification(
+          d.cedente_id,
+          `Leilão de ${d.sacado_nome} arrematado a ${fmtTaxa(vencedor.taxa_am)} a.m. — ${fmtBRLCentavos(liquidacao.net)} creditados (${fmtBRLCentavos(vencedor.preco)} pagos pelo comprador − ${fmtBRLCentavos(liquidacao.fee)} de taxa da plataforma).`,
+          COLORS.GREEN,
+          'leilao'
+        );
       }
       // Se quem venceu foi a conta de sistema do Fundo de Fomento, é aqui que o pool é
       // debitado e o limite do programa consumido — propor um lance não move dinheiro.

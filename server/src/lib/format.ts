@@ -4,6 +4,12 @@ export function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 
+// Com centavos — para demonstrativos em que a diferença é a própria taxa (0,35% de R$ 1.000
+// são R$ 3,50; arredondado viraria "R$ 4" e a conta da tela não fecharia).
+export function fmtBRLCentavos(n: number): string {
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // Prefixa "+" só quando o valor é realmente positivo — `fmtBRL` de um número negativo já
 // vem com "-" embutido (ex.: "-R$ 500"), então grudar um "+" incondicional na frente (como
 // vários lugares faziam) produzia "+-R$ 500" pra qualquer retorno negativo. Um retorno
