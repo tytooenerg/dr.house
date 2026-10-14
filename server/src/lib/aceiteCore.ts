@@ -23,6 +23,7 @@ import { fmtBRL, fmtRelative } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow, DuplicataRow } from '../db/types.js';
 import { getUltimoConvite } from '../db/aceiteConvites.js';
+import { tentarLeilaoAutomatico } from './pilotoAutomatico.js';
 
 export const STATUS_META = {
   aguardando: { label: 'Aguardando manifestação', bg: '#FBF1E0', color: COLORS.AMBER },
@@ -162,6 +163,9 @@ export function applyAceiteDecision(aceite: { id: number }, duplicata: Duplicata
       addSignal(duplicata.sacado_cnpj, duplicata.cedente_id, decision === 'aceita' ? 'pagamento_pontual' : 'contestacao');
     }
   }
+  // Piloto automático (lib/pilotoAutomatico.ts): com o aceite dado, a empresa que ligou o
+  // "leilão automático" não precisa voltar à tela para clicar em Disparar leilão.
+  if (decision === 'aceita') tentarLeilaoAutomatico(duplicata.id);
 }
 
 // Achado corrigido: a UI (AceitePage.tsx) e o texto de compliance (data/seed.ts's

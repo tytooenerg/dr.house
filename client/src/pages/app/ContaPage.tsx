@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
 import { CedenteKybCard } from '../../components/CedenteKybCard';
 import { useApi } from '../../lib/useApi';
+import { Toggle } from '../../components/ui/Toggle';
 
 interface KycItem {
   label: string;
@@ -64,7 +65,16 @@ interface StablecoinDeposit {
   network: string;
   endereco: string;
 }
+interface Piloto {
+  leilaoAoAceitar: boolean;
+  reservaAm: number | null;
+  relancarSemLance: boolean;
+  saqueAutomaticoPix: boolean;
+}
+
 interface AccountData {
+  // Só para a empresa (server/src/lib/pilotoAutomatico.ts); null para os outros papéis.
+  pilotoAutomatico: Piloto | null;
   taxaFaixas: { label: string; pctFmt: string }[];
   kycChecklist: KycItem[];
   bankAccountDisplay: string;
@@ -310,6 +320,8 @@ export function ContaPage() {
           <CedenteKybCard contexto="conta" onEnviado={load} />
         </div>
       )}
+
+      {data.pilotoAutomatico && <PilotoAutomaticoCard piloto={data.pilotoAutomatico} temPix={!!data.kycChecklist.find((k) => k.label === 'Chave Pix para liquidação' && k.status === 'Concluído')} onSalvo={setData} />}
 
       <div className="grid gap-4 mb-4 grid-cols-1 md:grid-cols-2">
         <Card>
@@ -728,5 +740,92 @@ export function ContaPage() {
         </div>
       </NavyCard>
     </div>
+  );
+}
+
+// Piloto automático da empresa (server/src/lib/pilotoAutomatico.ts). Cada parte liga em
+// separado; a ação automática passa pelos mesmos caminhos do clique, com as mesmas travas.
+function PilotoAutomaticoCard({ piloto, temPix, onSalvo }: { piloto: Piloto; temPix: boolean; onSalvo: (d: AccountData) => void }) {
+  const [reserva, setReserva] = useState(piloto.reservaAm !== null ? piloto.reservaAm.toFixed(2).replace('.', ',') : '');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [salvo, setSalvo] = useState(false);
+
+  const salvar = async (patch: Partial<Piloto>) => {
+    setSalvando(true);
+    setErro('');
+    setSalvo(false);
+    const reservaNum = reserva.trim() ? parseFloat(reserva.replace(',', '.')) : null;
+    try {
+      const d = await api.post<AccountData>('/account/piloto-automatico', { ...piloto, reservaAm: reservaNum, ...patch });
+      onSalvo(d);
+      setSalvo(true);
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const linhas: { key: keyof Piloto; titulo: string; texto: string }[] = [
+    {
+      key: 'leilaoAoAceitar',
+      titulo: 'Abrir o leilão sozinho',
+      texto: 'Assim que o sacado confirmar a duplicata (e os documentos estiverem completos), o leilão abre sem você precisar entrar.',
+    },
+    {
+      key: 'relancarSemLance',
+      titulo: 'Relançar leilão sem lance',
+      texto: 'Se um leilão fechar sem nenhum lance, ele é aberto de novo — até 3 vezes. Depois disso, volta para você decidir.',
+    },
+    {
+      key: 'saqueAutomaticoPix',
+      titulo: 'Mandar o dinheiro direto para o Pix',
+      texto: temPix ? 'Quando um leilão fecha, o valor líquido vai para a sua chave Pix na hora.' : 'Quando um leilão fecha, o valor líquido vai para a sua chave Pix na hora. Cadastre a chave Pix abaixo antes.',
+    },
+  ];
+
+  return (
+    <Card className="mb-4" data-testid="piloto-automatico">
+      <div className="font-bold text-[15px] mb-1">Piloto automático</div>
+      <div className="text-textSecondary text-[13px] mb-4">Deixe a plataforma fazer os passos repetitivos por você. Cada ação automática aparece nas suas notificações.</div>
+      <div className="flex flex-col gap-3.5">
+        {linhas.map((l) => (
+          <div key={l.key} className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[13.5px] font-bold">{l.titulo}</div>
+              <div className="text-[12.5px] text-textSecondary">{l.texto}</div>
+            </div>
+            <Toggle label={l.titulo} on={piloto[l.key] as boolean} onClick={() => !salvando && salvar({ [l.key]: !piloto[l.key] })} />
+          </div>
+        ))}
+        {piloto.leilaoAoAceitar && (
+          <div className="flex items-center gap-2 flex-wrap text-[12.5px]">
+            <label htmlFor="piloto-reserva" className="font-bold text-textSecondary">
+              Taxa máxima nos leilões automáticos
+            </label>
+            <input
+              id="piloto-reserva"
+              value={reserva}
+              onChange={(e) => setReserva(e.target.value)}
+              placeholder="banda de mercado"
+              className="w-[130px] px-2 py-1 rounded-md border border-inputBorder font-mono-num"
+            />
+            <span className="text-textSecondary">% a.m.</span>
+            <button
+              type="button"
+              disabled={salvando}
+              onClick={() => salvar({})}
+              className="px-2.5 py-1 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer disabled:opacity-60"
+            >
+              Salvar
+            </button>
+            <span className="text-textTertiary w-full">Em branco, usa a taxa de mercado do dia para o perfil de cada sacado.</span>
+          </div>
+        )}
+        {erro && <div className="text-red text-[12.5px] font-semibold">{erro}</div>}
+        {salvo && !erro && <div className="text-green text-[12.5px] font-semibold">Salvo.</div>}
+      </div>
+    </Card>
   );
 }

@@ -7,6 +7,7 @@ import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { fmtTaxa } from './auctionCore.js';
 import { fmtBRL, fmtBRLCentavos } from './format.js';
+import { saqueAutomatico, tentarRelancar } from './pilotoAutomatico.js';
 import { logger } from './logger.js';
 import { COLORS } from '../data/seed.js';
 import { getFundoSistemaUserIdIfExists } from './confirmingFundo.js';
@@ -41,7 +42,9 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
       // serve pra não readjudicar um leilão vendido, e esta duplicata não foi vendida.
       devolverDeLeilaoSemLance(id);
       semLance++;
-      if (d.cedente_id) {
+      // Piloto automático: relança sozinho (até 3 vezes) e avisa — senão, o aviso de sempre.
+      const relancado = tentarRelancar(id);
+      if (d.cedente_id && !relancado) {
         addNotification(
           d.cedente_id,
           `Leilão de ${d.sacado_nome} encerrou sem lances dentro da reserva — a duplicata voltou pra "Minhas Duplicatas" e pode ser reofertada.`,
@@ -104,6 +107,9 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
           COLORS.GREEN,
           'leilao'
         );
+        // Piloto automático: o líquido vai direto para a chave Pix da empresa, se ela ligou.
+        const cedenteId = d.cedente_id;
+        void saqueAutomatico(cedenteId, liquidacao.net, id).catch((err) => logger.error({ err, duplicataId: id }, '[piloto] falha no saque automático'));
       }
       // Se quem venceu foi a conta de sistema do Fundo de Fomento, é aqui que o pool é
       // debitado e o limite do programa consumido — propor um lance não move dinheiro.

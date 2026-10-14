@@ -73,6 +73,9 @@ export interface UserSettings {
   kycDocsUploaded: boolean;
   kycDocsRejected: boolean;
   kycDocsAttempts: number;
+  // Piloto automático da empresa (lib/pilotoAutomatico.ts) — tudo desligado por padrão; a
+  // empresa liga em Conta & Liquidação. reservaAm null = usa a banda de mercado do dia.
+  pilotoAutomatico: { leilaoAoAceitar: boolean; reservaAm: number | null; relancarSemLance: boolean; saqueAutomaticoPix: boolean };
   playgroundEndpoint: string;
   playgroundParams: Record<string, string>;
   fidcPL: string;
@@ -135,6 +138,7 @@ export function defaultSettings(): UserSettings {
     kycDocsUploaded: false,
     kycDocsRejected: false,
     kycDocsAttempts: 0,
+    pilotoAutomatico: { leilaoAoAceitar: false, reservaAm: null, relancarSemLance: false, saqueAutomaticoPix: false },
     playgroundEndpoint: 'emitir',
     playgroundParams: {
       sacado_cnpj: '12.345.678/0001-95', valor: '84500.00', vencimento: '2026-08-12', seguro: 'true',
@@ -230,6 +234,8 @@ export interface DuplicataRow {
   reserva_taxa_am: number | null;
   // JSON {chave do item: cumprido} do checklist de lastro na emissão — ver migração 0077.
   lastro_itens: string | null;
+  // Quantas vezes o piloto automático já relançou o leilão desta duplicata sem lance (0079).
+  leilao_tentativas: number;
 }
 
 export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';

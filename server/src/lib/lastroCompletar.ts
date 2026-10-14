@@ -4,6 +4,7 @@ import { recordAuditEvent } from '../db/audit.js';
 import { effectiveOwnerId } from '../db/users.js';
 import { cnpjChecksumValido } from './cnpjLookup.js';
 import { COLORS } from '../data/seed.js';
+import { tentarLeilaoAutomatico } from './pilotoAutomatico.js';
 import type { DuplicataRow, UserRow } from '../db/types.js';
 
 // Completar o lastro DEPOIS da emissão.
@@ -108,6 +109,8 @@ export function reavaliarLastro(duplicataId: string): { liberada: boolean; check
       'aceite'
     );
   }
+  // Se o sacado já tinha confirmado, a duplicata está pronta: o piloto automático abre o leilão.
+  tentarLeilaoAutomatico(d.id);
   return { liberada: true, checklist };
 }
 

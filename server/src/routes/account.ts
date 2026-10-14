@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { sacarViaPix, saldoDisponivel } from '../lib/saque.js';
+import { pilotoSchema, salvarPiloto } from '../lib/pilotoAutomatico.js';
 import { cnpjChecksumValido } from '../lib/cnpjLookup.js';
 import { requireAuth } from '../auth/middleware.js';
 import { anonymizeUser, getSettings, updateSettings } from '../db/users.js';
@@ -83,9 +85,6 @@ function extratoView(userId: number) {
   return withRunningBalance;
 }
 
-function saldoDisponivel(userId: number): number {
-  return listLedger(userId).reduce((sum, r) => sum + r.valor, 0);
-}
 
 function kycItensReais(user: import('../db/types.js').UserRow) {
   const form = JSON.parse(user.kyb_form || '{}') as { cnpj?: string };
@@ -117,6 +116,8 @@ function kycItensReais(user: import('../db/types.js').UserRow) {
 function payload(req: import('express').Request) {
   const settings = getSettings(req.user!);
   return {
+    // Só a empresa tem piloto automático (lib/pilotoAutomatico.ts).
+    pilotoAutomatico: req.user!.role === 'cedente' ? settings.pilotoAutomatico : null,
     kycChecklist: [
       // Os dois itens abaixo eram de mentira: "Dados cadastrais" era sempre "Concluído", e
       // "Documentos societários" não recebia arquivo nenhum — o botão recusava a primeira
@@ -397,24 +398,11 @@ accountRouter.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
-    const settings = getSettings(req.user!);
-    if (!settings.pixChave) {
-      res.status(409).json({ error: 'no_pix_key', message: 'Cadastre uma chave Pix antes de sacar.' });
+    const saque = await sacarViaPix(req.user!, parsed.data.valor);
+    if (!saque.ok) {
+      res.status(saque.status).json({ error: saque.error, message: saque.message });
       return;
     }
-    const disponivel = saldoDisponivel(req.user!.id);
-    if (parsed.data.valor > disponivel) {
-      res.status(409).json({ error: 'insufficient_balance', message: `Saldo disponível: ${fmtBRL(disponivel)}` });
-      return;
-    }
-    const payout = await enviarPix({ chaveDestino: settings.pixChave, valor: parsed.data.valor, descricao: `Saque Lastro — ${req.user!.company_name}` });
-    recordPixPayout({ userId: req.user!.id, valor: parsed.data.valor, chaveDestino: settings.pixChave, simulado: payout.simulado, endToEndId: payout.endToEndId });
-    addLedgerEntry(
-      req.user!.id,
-      new Date().toLocaleDateString('pt-BR'),
-      `Saque via Pix para ${settings.pixChave}${payout.simulado ? ' (simulado)' : ''}`,
-      -parsed.data.valor
-    );
     res.json(payload(req));
   })
 );
@@ -553,6 +541,21 @@ accountRouter.post(
     res.json(payload(req));
   })
 );
+
+accountRouter.post('/piloto-automatico', (req, res) => {
+  if (req.user!.role !== 'cedente') {
+    res.status(403).json({ error: 'forbidden', message: 'O piloto automático é da conta da empresa.' });
+    return;
+  }
+  const parsed = pilotoSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', message: 'Taxa máxima inválida — use um número entre 0 e 20% a.m.' });
+    return;
+  }
+  salvarPiloto(req.user!, parsed.data);
+  req.user!.settings = JSON.stringify({ ...getSettings(req.user!), pilotoAutomatico: parsed.data });
+  res.json(payload(req));
+});
 
 const speedSchema = z.object({ speed: z.enum(['d0', 'd1']) });
 
