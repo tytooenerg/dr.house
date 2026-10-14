@@ -225,7 +225,7 @@ export function SecundarioPage() {
                   <div className="text-textTertiary text-[11.5px]">{p.diasRestantes}d até vencer</div>
                 </div>
                 <div className="text-textSecondary text-[12.5px] mb-2.5">
-                  Valor da duplicata: {p.valorFaceFmt} · vence {p.vencimento}
+                  Valor da duplicata: {p.valorFaceFmt} · você pagou {p.valorPagoFmt} · vence {p.vencimento}
                 </div>
                 <div className="flex items-center gap-2">
                   <Input aria-label="Preço de venda"

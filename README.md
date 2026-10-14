@@ -934,6 +934,19 @@ Isso expunha dois bugs reais, não só o `discountRatio` já documentado:
 
 Novo `server/test/purchases-valor-preco-pago.test.ts`: `totalInvestidoFmt` do relatório institucional e do rebalanceamento batem com o preço pago real, não o valor de face; `retornoAnualizadoPct` do dashboard de performance sai maior que a versão ingênua (dividida por valor de face); uma posição já revendida mantém "Investido" como o registro original; `discountRatio` do block trade escolhe corretamente o anúncio com maior desconto real vs. valor de face, mesmo quando ele vem de uma revenda anterior com um preço-base diferente. `server/test/settlement.test.ts`/`investor-performance.test.ts` atualizados (assumiam valor de face como "Investido" — exatamente o bug). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 116 arquivos/710 testes).
 
+### `purchases.valor` = preço pago, sempre (migração 0080)
+
+Fecha de vez o duplo sentido acima. O remendo `preço pago = face − retorno` só valia para posição ativa: uma compra primária que foi revendida tem o `retorno` sobrescrito com o ganho realizado, e aí Carteira & Histórico, o relatório institucional, a performance e o dashboard mostravam a **face** como "Investido" — um valor que o investidor nunca pagou.
+
+- **Gravação:** `lib/auctionClose.ts` grava `face − retorno` (o preço pago, mesmo arredondamento do retorno). Revenda (`lib/resaleCore.ts`) já gravava o preço pago. `precoPago()` (`lib/investorPositions.ts`) passa a ser só `p.valor`; o custo do vendedor na revenda vem de `originalPurchase.valor`.
+- **Dados antigos (`0080_purchases_valor_preco_pago.sql`):** só a compra primária de cada duplicata que ainda guarda a face — ativa vira `face − retorno`; revendida tira o preço do lance vencedor (`auction_bids`) ou, antes do leilão, do lançamento "Compra da duplicata …" do ledger; sem fonte, fica como está.
+- **Leitores que precisavam de face continuam em face:** NAV do fundo Confirming (`sumOutstandingPurchasesByInvestor` → `d.valor`), limites de exposição da automação/auto-bid (`faceValor`) e a demanda do pricing dinâmico (`d.valor`).
+- **Leitores que contavam revendas como se fossem primárias:** resumo fiscal do cedente, volume do mercado primário (relatório CVM) e "volume financiado" da transparência — agora só a primeira compra de cada duplicata.
+
+Testes: `server/test/purchases-valor-migracao.test.ts` (migração sobre linhas no formato antigo, idempotência, arremate grava o preço pago, resumo fiscal ignora revendas); `purchases-valor-preco-pago`, `resale-retorno`, `block-trade`, `fiscal-cedente` e `investor-performance` atualizados para o novo significado.
+
+Em aberto (achados nesta rodada, não corrigidos): DARF e Informe de Rendimentos usam o vencimento como data de tributação mesmo quando a posição foi encerrada por revenda; a performance conta posições revendidas como "em atraso".
+
 ### Auditoria de conformidade com as regras mais recentes da duplicata escritural
 
 Pesquisa das mudanças regulatórias reais desde meados de 2023 (Resolução BCB nº 540/2025 — que já formalizou "aquisição com regresso" como parte de "negociação" e reforçou o dever do sacador de informar a registradora sobre atos de negociação; cronograma de obrigatoriedade escalonado por faturamento; IN BCB 597/2025 sobre homologação de registradoras; capital mínimo novo pra SCD/SEP) cruzada com um mapeamento completo do que o projeto já implementa. A base já estava genuinamente em dia — já cita a 540/2025 em vários lugares, já modela `com_regresso`, já inclui a Grafeno (SPC). Apareceram 4 achados reais.

@@ -40,8 +40,9 @@ function buyPosition(investorId: number, sacadoNome: string, valor: number, reto
     lastroPct: 100,
     seguro: false,
   });
-  createPurchase(d.id, investorId, valor, '2,0%', 0);
-  db.prepare('UPDATE purchases SET retorno = ?, created_at = ? WHERE duplicata_id = ?').run(retorno, appliedAt, d.id);
+  // purchases.valor = preço pago = face − retorno, como a produção grava (lib/auctionClose.ts).
+  createPurchase(d.id, investorId, valor - retorno, '2,0%', retorno);
+  db.prepare('UPDATE purchases SET created_at = ? WHERE duplicata_id = ?').run(appliedAt, d.id);
   return d.id;
 }
 

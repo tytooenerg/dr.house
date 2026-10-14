@@ -95,7 +95,9 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   const passesSetor = sectorAlloc === null || sectorAlloc > 0;
 
   const purchases = listPurchasesByInvestor(user.id).filter((p) => p.active);
-  const exposicaoSacadoAtual = purchases.filter((p) => p.sacado_nome === offer.sacado_nome).reduce((sum, p) => sum + p.valor, 0);
+  // Exposição medida em valor de FACE (p.faceValor), na mesma unidade de offer.valor —
+  // purchases.valor é o preço pago, que subestimaria o risco em aberto pelo deságio.
+  const exposicaoSacadoAtual = purchases.filter((p) => p.sacado_nome === offer.sacado_nome).reduce((sum, p) => sum + p.faceValor, 0);
   const limiteSacado = parseBRLNumber(settings.autoBidRules.exposicaoSacado) || Infinity;
   const passesExposicaoSacado = exposicaoSacadoAtual + offer.valor <= limiteSacado;
 
@@ -104,7 +106,7 @@ function maybeTick(user: UserRow, settings: ReturnType<typeof getSettings>) {
   inicioMes.setHours(0, 0, 0, 0);
   const exposicaoMesAtual = purchases
     .filter((p) => new Date(p.created_at + 'Z') >= inicioMes)
-    .reduce((sum, p) => sum + p.valor, 0);
+    .reduce((sum, p) => sum + p.faceValor, 0);
   const limiteMensal = parseBRLNumber(settings.autoBidRules.exposicaoMensal) || Infinity;
   const passesExposicaoMensal = exposicaoMesAtual + offer.valor <= limiteMensal;
 

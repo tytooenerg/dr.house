@@ -73,7 +73,12 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
     for (const p of perdedores) setAuctionBidStatus(p.id, 'perdedor');
 
     try {
-      createPurchase(id, vencedor.bidder_id, d.valor, fmtTaxa(vencedor.taxa_am), Math.round(d.valor - vencedor.preco));
+      // purchases.valor = quanto o investidor PAGOU (base de custo), como numa compra de
+      // revenda — gravava o valor de face, e uma posição revendida aparecia em Carteira &
+      // Histórico com a face como "investido" (migração 0080). Mesmo arredondamento do
+      // retorno, para que face − retorno = valor feche exato.
+      const retorno = Math.round(d.valor - vencedor.preco);
+      createPurchase(id, vencedor.bidder_id, d.valor - retorno, fmtTaxa(vencedor.taxa_am), retorno);
       const liquidacao = settlePurchase({
         duplicataId: id,
         sacadoNome: d.sacado_nome,

@@ -224,16 +224,10 @@ export function executeResaleTrade(
   // relatório PDF, o Informe de Rendimentos e o DARF continuariam mostrando um número que o
   // investidor nunca recebeu de verdade (ver db/resaleListings.ts's deactivatePurchase).
   //
-  // O que o vendedor pagou não dá pra ler direto de originalPurchase.valor: essa coluna
-  // guarda o valor de face pra uma compra primária (routes/market.ts e afins), mas o preço
-  // efetivamente pago pra uma posição que já veio de uma revenda anterior — o mesmo campo
-  // significa duas coisas diferentes dependendo da origem da linha. `duplicata.valor` (o
-  // valor de face real, que não muda entre revendas) menos o retorno que a linha já carregava
-  // recupera o custo de aquisição corretamente nos dois casos: pra uma compra primária,
-  // retorno = faceValue − precoCompra, então faceValue − retorno = precoCompra; pra uma
-  // posição já revendida, retorno = faceValue − precoPago, então faceValue − retorno =
-  // precoPago igualmente.
-  const oQueOVendedorPagou = duplicata.valor - (originalPurchase?.retorno ?? 0);
+  // O que o vendedor pagou é originalPurchase.valor: em toda linha de purchases ele é o preço
+  // pago — compra primária ou revenda (migração 0080). Antes a compra primária guardava a
+  // face, e isto era recuperado como face − retorno.
+  const oQueOVendedorPagou = originalPurchase?.valor ?? duplicata.valor;
   deactivatePurchase(listing.purchase_id, Math.round(settlement.net - oQueOVendedorPagou));
   // Real, determinístico — o mesmo número usado pra desagioPct acima, em reais em vez de
   // percentual: o novo comprador paga `valor` (preço combinado) e recebe o valor de face

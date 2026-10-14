@@ -314,10 +314,11 @@ export async function seedIfEmpty() {
       lastroPct: 100,
       seguro: false,
     });
+    // valor = preço pago (face − retorno), o mesmo significado de toda linha de purchases.
     db.prepare('INSERT INTO purchases (duplicata_id, investor_id, valor, taxa, retorno, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
       d.id,
       investidor.id,
-      h.investido,
+      h.investido - h.retorno,
       '',
       h.retorno,
       compraEm.toISOString()

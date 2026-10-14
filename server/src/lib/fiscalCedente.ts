@@ -89,7 +89,7 @@ interface OperacaoRow {
   created_at: string;
   vencimento: string;
   face: number;
-  retorno: number;
+  preco: number;
   veiculo: string;
 }
 
@@ -98,11 +98,17 @@ export function buildResumoFiscalCedente(cedenteId: number, ano: number): Resumo
   // é o fato gerador, não a emissão nem o leilão aberto.
   const rows = db
     .prepare(
-      `SELECT p.duplicata_id, d.sacado_nome, p.created_at, d.vencimento, p.valor as face, p.retorno, u.veiculo
+      // Só a compra PRIMÁRIA de cada duplicata (a primeira linha de purchases) é operação do
+      // cedente — uma revenda depois é entre investidores e não passa pelo caixa dele.
+      // Face = d.valor; preço recebido = p.valor da compra primária (o que o financiador
+      // pagou — migração 0080). Antes as revendas entravam aqui e o preço vinha de face −
+      // retorno, que o fechamento da posição sobrescreve com o ganho realizado.
+      `SELECT p.duplicata_id, d.sacado_nome, p.created_at, d.vencimento, d.valor as face, p.valor as preco, u.veiculo
          FROM purchases p
          JOIN duplicatas d ON d.id = p.duplicata_id
          JOIN users u ON u.id = p.investor_id
         WHERE d.cedente_id = ? AND d.sandbox = 0 AND strftime('%Y', p.created_at) = ?
+          AND p.id = (SELECT MIN(p2.id) FROM purchases p2 WHERE p2.duplicata_id = p.duplicata_id)
         ORDER BY p.created_at DESC`
     )
     .all(cedenteId, String(ano)) as OperacaoRow[];
@@ -120,7 +126,8 @@ export function buildResumoFiscalCedente(cedenteId: number, ano: number): Resumo
   let indeterminadas = 0;
 
   for (const row of rows) {
-    const precoRecebido = row.face - row.retorno;
+    const precoRecebido = row.preco;
+    const despesaFinanceira = row.face - row.preco;
     const veiculoLabel = VEICULO_LABEL[row.veiculo] ?? 'Não informado';
     const incideConhecido = INCIDE_IOF[row.veiculo];
 
@@ -158,8 +165,8 @@ export function buildResumoFiscalCedente(cedenteId: number, ano: number): Resumo
       valorFaceFmt: fmtBRL(row.face),
       precoRecebido,
       precoRecebidoFmt: fmtBRL(precoRecebido),
-      despesaFinanceira: row.retorno,
-      despesaFinanceiraFmt: fmtBRL(row.retorno),
+      despesaFinanceira,
+      despesaFinanceiraFmt: fmtBRL(despesaFinanceira),
       taxaPlataforma: taxaPorDuplicata.get(row.duplicata_id) ?? 0,
       taxaPlataformaFmt: fmtBRL(taxaPorDuplicata.get(row.duplicata_id) ?? 0),
       veiculoComprador: veiculoLabel,

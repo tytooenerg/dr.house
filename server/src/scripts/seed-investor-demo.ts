@@ -156,7 +156,9 @@ async function main() {
       const investor = rand(investidores);
       const demoRate = 1.5 + Math.random() * 3;
       const { precoCompra } = computePurchasePrice(d, demoRate);
-      createPurchase(d.id, investor.id, valor, `${demoRate.toFixed(1)}%`, Math.round(valor - precoCompra));
+      const retorno = Math.round(valor - precoCompra);
+      // valor = preço pago (base de custo), como em lib/auctionClose.ts.
+      createPurchase(d.id, investor.id, valor - retorno, `${demoRate.toFixed(1)}%`, retorno);
       const purchaseRow = db.prepare('SELECT id, created_at FROM purchases WHERE duplicata_id = ? ORDER BY id DESC LIMIT 1').get(d.id) as {
         id: number;
         created_at: string;

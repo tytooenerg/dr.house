@@ -285,14 +285,9 @@ export interface PurchaseRow {
   created_at: string;
 }
 
-// purchases.valor tem dois significados dependendo da origem da compra: valor de face
-// numa compra primária/cesta/Confirming (market.ts, cestasCore.ts, confirmingCore.ts
-// sempre chamam createPurchase com duplicata.valor), mas preço pago numa compra
-// originada de revenda (resaleCore.ts's executeResaleTrade passa o preço da revenda).
-// `faceValor` (d.valor, sempre o valor de face real) permite recuperar o preço
-// efetivamente pago em qualquer caso via `faceValor - retorno` — retorno já é, de forma
-// universal, valor de face menos preço pago (mesma fórmula usada desde a correção do
-// retorno fabricado) — sem precisar saber a origem da linha.
+// purchases.valor = quanto o investidor pagou (base de custo), em toda linha — compra
+// primária (lib/auctionClose.ts) ou revenda (lib/resaleCore.ts); ver migração 0080.
+// `faceValor` (d.valor) é o valor de face, que não muda entre revendas.
 export function listPurchasesByInvestor(
   investorId: number
 ): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number; duplicata_status: string })[] {
@@ -314,7 +309,9 @@ export function listPurchasesByInvestor(
 export function sumOutstandingPurchasesByInvestor(investorId: number): number {
   const row = db
     .prepare(
-      `SELECT COALESCE(SUM(p.valor), 0) as total FROM purchases p
+      // Valor de FACE (d.valor): é o que essas posições vão render no vencimento, e é o que o
+      // NAV do fundo soma (lib/confirmingFundo.ts). purchases.valor é o preço pago.
+      `SELECT COALESCE(SUM(d.valor), 0) as total FROM purchases p
        JOIN duplicatas d ON d.id = p.duplicata_id
        WHERE p.investor_id = ? AND p.active = 1 AND d.status != 'paga'`
     )

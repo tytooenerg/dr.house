@@ -115,12 +115,17 @@ describe('resumo fiscal do cedente — os números da operação', () => {
     const inv = await registrarInvestidor('fidc');
     const dup = await operacaoNegociada(ced.userId, inv.token, 80000);
 
-    const compra = db.prepare('SELECT valor, retorno FROM purchases WHERE duplicata_id = ?').get(dup) as { valor: number; retorno: number };
+    // purchases.valor é o preço pago pelo financiador (migração 0080); a face é a da duplicata.
+    const compra = db
+      .prepare('SELECT p.valor, p.retorno, d.valor as face FROM purchases p JOIN duplicatas d ON d.id = p.duplicata_id WHERE p.duplicata_id = ?')
+      .get(dup) as { valor: number; retorno: number; face: number };
     const resumo = buildResumoFiscalCedente(ced.userId, anoAtual);
     const linha = resumo.linhas.find((l) => l.duplicataId === dup)!;
 
+    expect(linha.valorFace).toBe(compra.face);
+    expect(linha.precoRecebido).toBe(compra.valor);
     expect(linha.despesaFinanceira).toBe(compra.retorno);
-    expect(linha.precoRecebido).toBe(compra.valor - compra.retorno);
+    expect(compra.face - compra.valor).toBe(compra.retorno);
     expect(resumo.despesaFinanceiraTotal).toBe(compra.retorno);
   });
 
