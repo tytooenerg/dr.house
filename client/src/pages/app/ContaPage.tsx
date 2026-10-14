@@ -5,6 +5,7 @@ import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { PALETTE } from '../../lib/palette';
+import { CedenteKybCard } from '../../components/CedenteKybCard';
 import { useApi } from '../../lib/useApi';
 
 interface KycItem {
@@ -100,6 +101,7 @@ export function ContaPage() {
   const [stablecoinWalletInput, setStablecoinWalletInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mostrarKyb, setMostrarKyb] = useState(false);
 
   const { data, error: loadError, reload: load, setData } = useApi<AccountData>('/account', { fallbackMessage: 'Falha ao carregar sua conta.' });
 
@@ -107,10 +109,7 @@ export function ContaPage() {
   if (!data) return <PageSkeleton />;
 
   const runAction = async (key: string) => {
-    if (key === 'docs') {
-      await api.post('/account/kyc/docs');
-      load();
-    }
+    if (key === 'kyb') setMostrarKyb(true);
   };
 
   const enviarSelfie = async (file: File) => {
@@ -306,7 +305,13 @@ export function ContaPage() {
     <div>
       <PageHeader title="Conta & Liquidação" subtitle="Verificação da empresa, conta bancária e como a Lastro monetiza cada operação" />
 
-      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      {mostrarKyb && (
+        <div className="mb-4">
+          <CedenteKybCard contexto="conta" onEnviado={load} />
+        </div>
+      )}
+
+      <div className="grid gap-4 mb-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <div className="font-bold text-[15px] mb-4">Verificação (KYC)</div>
           <div className="flex flex-col gap-3">
@@ -374,7 +379,7 @@ export function ContaPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid gap-4 mb-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <div className="flex items-center justify-between mb-4">
             <div className="font-bold text-[15px]">Depositar via Pix</div>
@@ -486,7 +491,7 @@ export function ContaPage() {
           ))}
       </Card>
 
-      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid gap-4 mb-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <div className="flex items-center justify-between mb-4">
             <div className="font-bold text-[15px]">Depositar via TED</div>
@@ -599,7 +604,7 @@ export function ContaPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid gap-4 mb-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <div className="flex items-center justify-between mb-4">
             <div className="font-bold text-[15px]">Depositar via {data.stablecoinAsset}</div>
@@ -707,7 +712,7 @@ export function ContaPage() {
           ))}
         </div>
         <div className="text-onNavy text-[12px] mb-3">Exemplo de uma operação de R$ 84.500 (faixa de 0,35%):</div>
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-3">
           <div className="rounded-[10px] p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
             <div className="text-onNavy text-xs font-semibold">Valor da operação</div>
             <div className="text-[20px] font-extrabold mt-1.5">R$ 84.500</div>

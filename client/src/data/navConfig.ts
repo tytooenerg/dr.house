@@ -70,7 +70,9 @@ export const NAV_ITEMS: NavItem[] = [
 
 export const DEFAULT_TAB_BY_ROLE: Record<string, string> = {
   investidor: 'dashboard',
-  cedente: 'minhas',
+  // Visão Geral, onde fica o guia de primeiros passos (server/src/lib/primeirosPassos.ts) — antes
+  // a empresa nova caía numa lista vazia de Minhas Duplicatas sem saber por onde começar.
+  cedente: 'dashboard',
   sacado: 'sacado',
   admin: 'admin',
   seguradora: 'seguradora',

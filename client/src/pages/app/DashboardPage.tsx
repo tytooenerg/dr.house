@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
 import { useApi } from '../../lib/useApi';
+import { Link } from 'react-router-dom';
 
 interface Kpi {
   label: string;
@@ -27,6 +28,7 @@ interface Legend {
 }
 interface DashboardData {
   kpis: Kpi[];
+  primeirosPassos?: { passos: Passo[]; concluidos: number; total: number } | null;
   monthlyBars: Bar[];
   ratingLegend: Legend[];
   riskDonutStops: { color: string; from: number; to: number }[];
@@ -54,7 +56,9 @@ export function DashboardPage() {
         right={<div className="text-[13px] text-textSecondary font-mono-num">{new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</div>}
       />
 
-      <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      {data.primeirosPassos && data.primeirosPassos.concluidos < data.primeirosPassos.total && <PrimeirosPassos guia={data.primeirosPassos} />}
+
+      <div className="grid gap-4 mb-6 grid-cols-2 lg:grid-cols-4">
         {data.kpis.map((kpi, i) => {
           const destaque = i === 0;
           return (
@@ -69,7 +73,7 @@ export function DashboardPage() {
         })}
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '1.6fr 1fr' }}>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1.6fr_1fr]">
         <Card>
           <div className="font-bold text-[15px] mb-5">{data.monthlyTitle}</div>
           {data.monthlyEmptyHint ? (
@@ -109,5 +113,60 @@ export function DashboardPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+interface Passo {
+  key: string;
+  titulo: string;
+  descricao: string;
+  estado: 'feito' | 'em_andamento' | 'pendente';
+  estadoLabel: string;
+  link: string;
+  acao: string;
+}
+
+// "Seu primeiro dinheiro em 4 passos" — progresso real calculado no servidor
+// (server/src/lib/primeirosPassos.ts). Some quando os quatro estão feitos.
+function PrimeirosPassos({ guia }: { guia: { passos: Passo[]; concluidos: number; total: number } }) {
+  const proximo = guia.passos.find((p) => p.estado === 'pendente');
+  return (
+    <Card className="mb-6" data-testid="primeiros-passos">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+        <div className="font-bold text-[15px]">Seu primeiro dinheiro em 4 passos</div>
+        <div className="text-[12.5px] font-bold text-textSecondary">
+          {guia.concluidos} de {guia.total} feitos
+        </div>
+      </div>
+      <div className="h-1.5 rounded-full bg-hairline mb-4 overflow-hidden">
+        <div className="h-full bg-green rounded-full" style={{ width: `${(guia.concluidos / guia.total) * 100}%` }} />
+      </div>
+      <ol className="list-none m-0 p-0 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {guia.passos.map((p, i) => (
+          <li key={p.key} className={`rounded-lg border px-3.5 py-3 ${p === proximo ? 'border-blue bg-chip' : 'border-border'}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className={`w-5.5 h-5.5 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0 ${
+                  p.estado === 'feito' ? 'bg-green text-white' : p.estado === 'em_andamento' ? 'bg-amber text-white' : 'bg-hairline text-textSecondary'
+                }`}
+              >
+                {p.estado === 'feito' ? '✓' : i + 1}
+              </span>
+              <span className="font-bold text-[13px]">{p.titulo}</span>
+            </div>
+            <div className="text-[12px] text-textSecondary mb-2">{p.descricao}</div>
+            {p.estado === 'feito' ? (
+              <span className="text-[11.5px] font-bold text-green">{p.estadoLabel}</span>
+            ) : p.estado === 'em_andamento' ? (
+              <span className="text-[11.5px] font-bold text-amber">{p.estadoLabel}</span>
+            ) : (
+              <Link to={p.link} className="text-[12px] font-bold text-blue">
+                {p.acao} →
+              </Link>
+            )}
+          </li>
+        ))}
+      </ol>
+    </Card>
   );
 }

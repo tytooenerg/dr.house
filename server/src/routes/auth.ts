@@ -14,6 +14,7 @@ import {
   updateKybForm,
   setVeiculo,
   updateSettings,
+  updateProfile,
   approveKyb,
   updatePasswordHash,
 } from '../db/users.js';
@@ -38,6 +39,7 @@ import {
   verifyPasswordResetToken,
 } from '../auth/jwt.js';
 import { sendEmail } from '../lib/mailer.js';
+import { cnpjChecksumValido } from '../lib/cnpjLookup.js';
 import { googleOAuthEnabled, buildGoogleAuthUrl, exchangeCodeForProfile } from '../lib/googleOAuth.js';
 import { samlSsoEnabled, buildLoginRequestUrl, validateAssertion } from '../lib/samlSso.js';
 import express from 'express';
@@ -95,6 +97,13 @@ const registerSchema = z.object({
     .enum(INSURERS.map((i) => i.key) as [string, ...string[]])
     .optional(),
   referralCode: z.string().trim().optional(),
+  // Opcionais na API (contas de teste, parceiros, SDKs não mandam), exigidos pela tela de
+  // cadastro para empresa e sacado. Quando vierem, o CNPJ precisa passar no dígito
+  // verificador e já fica guardado para o credenciamento (kyb_form), e o telefone liga os
+  // avisos por WhatsApp se a pessoa marcou.
+  cnpj: z.string().trim().optional().default(''),
+  telefone: z.string().trim().optional().default(''),
+  whatsapp: z.boolean().optional().default(false),
 });
 
 const loginSchema = z.object({
@@ -146,7 +155,8 @@ function publicUser(user: UserRow) {
           }
         : null,
     showOnboarding: !onboardingSeen,
-    onboardingSteps: steps,
+    // O título trazia "Bem-vinda, Marina" fixo para todo mundo; agora usa o primeiro nome.
+    onboardingSteps: steps.map((st) => ({ ...st, title: st.title.replace('{nome}', user.nome.trim().split(/\s+/)[0] || user.company_name) })),
     sessionLabel:
       user.role === 'sacado'
         ? 'Sessão Sacado'
@@ -192,7 +202,16 @@ authRouter.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
-    const { nome, email, password, companyName, role, insurerKey, referralCode } = parsed.data;
+    const { nome, email, password, companyName, role, insurerKey, referralCode, cnpj, telefone, whatsapp } = parsed.data;
+    if (cnpj && !cnpjChecksumValido(cnpj.replace(/\D/g, ''))) {
+      res.status(400).json({ error: 'validation_error', message: 'CNPJ inválido — confira os 14 dígitos.' });
+      return;
+    }
+    const telefoneDigitos = telefone.replace(/\D/g, '');
+    if (telefone && telefoneDigitos.length < 10) {
+      res.status(400).json({ error: 'validation_error', message: 'Telefone inválido — informe DDD e número.' });
+      return;
+    }
     if (role === 'seguradora' && !insurerKey) {
       res.status(400).json({ error: 'validation_error', message: 'Selecione qual seguradora sua conta representa.' });
       return;
@@ -202,7 +221,13 @@ authRouter.post(
       return;
     }
     const passwordHash = await hashPassword(password);
-    const user = createUser({ email, passwordHash, nome, companyName, role, insurerKey, referredByCode: referralCode });
+    let user = createUser({ email, passwordHash, nome, companyName, role, insurerKey, referredByCode: referralCode });
+    if (cnpj) updateKybForm(user.id, 'cnpj', cnpj);
+    if (telefoneDigitos) {
+      updateProfile(user.id, { telefone: telefoneDigitos });
+      if (whatsapp) updateSettings(user.id, { notifyViaWhatsapp: true });
+    }
+    user = getUserById(user.id)!;
     const { accessToken, refreshToken } = issueTokens(user);
     recordAuditEvent(user.id, user.company_name, 'user.registered', { role });
     res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });

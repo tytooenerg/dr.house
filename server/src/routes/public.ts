@@ -19,6 +19,8 @@ import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
 import { isFeatureEnabled } from '../lib/featureFlags.js';
 import { respostaSchema, responderConvite, verConvite } from '../lib/aceiteConvite.js';
+import { cnpjChecksumValido, cnpjLookupEnabled, consultarCnpj } from '../lib/cnpjLookup.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 import { listActiveApprovedAdvertisements, incrementImpressoes, registerClique } from '../db/advertisements.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
@@ -222,6 +224,31 @@ publicRouter.post('/aceite/:token', aceiteLinkLimiter, (req, res) => {
   const out = responderConvite(req.params.token, parsed.data, { ip: req.ip ?? null, userAgent: req.get('user-agent') ?? null });
   res.status(out.status).json(out.body);
 });
+
+// Cadastro: confere o CNPJ enquanto a pessoa digita e, com CNPJ_LOOKUP_LIVE, traz a razão
+// social e a situação da Receita (via BrasilAPI) para preencher o nome da empresa. Sem a
+// consulta real, diz isso (consultaReal: false) — só o dígito verificador foi checado.
+const cnpjLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Muitas consultas — aguarde um instante.' },
+});
+
+publicRouter.get(
+  '/cnpj/:cnpj',
+  cnpjLimiter,
+  asyncHandler(async (req, res) => {
+    const digits = req.params.cnpj.replace(/\D/g, '');
+    if (!cnpjChecksumValido(digits)) {
+      res.json({ valido: false, consultaReal: cnpjLookupEnabled, razaoSocial: null, situacao: null, ativo: null });
+      return;
+    }
+    const info = await consultarCnpj(digits);
+    res.json({ valido: true, consultaReal: !!info, razaoSocial: info?.razaoSocial || null, situacao: info?.situacao ?? null, ativo: info ? info.ativo : null });
+  })
+);
 
 const simulateLimiter = rateLimit({
   windowMs: 60 * 1000,

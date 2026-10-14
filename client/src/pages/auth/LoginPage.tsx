@@ -72,6 +72,13 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
+  // Empresa e sacado informam o CNPJ já no cadastro: ele confere o dígito na hora, preenche o
+  // nome pela Receita quando a consulta está ligada no servidor e fica guardado para o
+  // credenciamento — a empresa não digita de novo depois.
+  const [cnpj, setCnpj] = useState('');
+  const [cnpjInfo, setCnpjInfo] = useState<{ valido: boolean; consultaReal: boolean; razaoSocial: string | null; situacao: string | null } | null>(null);
+  const [telefone, setTelefone] = useState('');
+  const [whatsapp, setWhatsapp] = useState(true);
   // Deep-link support (?mode=register&role=api_partner) — used by the Score/PLD API
   // marketing sections (PrecosPage/DevelopersPage) so "Quero só a API" lands directly on
   // the right pre-selected registration option instead of a generic /login.
@@ -131,6 +138,32 @@ export function LoginPage() {
     window.location.href = `/api/auth/saml/login${ref ? `?ref=${encodeURIComponent(ref)}` : ''}`;
   };
 
+  const pedeCnpj = role === 'cedente' || role === 'sacado';
+
+  // Antes de qualquer return antecipado (if (loading) return null) — hook depois dele
+  // muda a ordem dos hooks entre renderizações e o React derruba a página (erro #310).
+  useEffect(() => {
+    const digits = cnpj.replace(/\D/g, '');
+    if (digits.length !== 14) {
+      setCnpjInfo(null);
+      return;
+    }
+    let cancelado = false;
+    api
+      .get<{ valido: boolean; consultaReal: boolean; razaoSocial: string | null; situacao: string | null }>(`/public/cnpj/${digits}`)
+      .then((info) => {
+        if (cancelado) return;
+        setCnpjInfo(info);
+        if (info.razaoSocial) setCompanyName((atual) => atual || info.razaoSocial!);
+      })
+      .catch(() => {
+        if (!cancelado) setCnpjInfo(null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [cnpj]);
+
   if (loading) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -179,7 +212,18 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const referralCode = new URLSearchParams(window.location.search).get('ref') ?? undefined;
-      await register({ nome, email, password, companyName, role, insurerKey: role === 'seguradora' ? insurerKey! : undefined, referralCode });
+      await register({
+        nome,
+        email,
+        password,
+        companyName,
+        role,
+        insurerKey: role === 'seguradora' ? insurerKey! : undefined,
+        referralCode,
+        cnpj: pedeCnpj ? cnpj : undefined,
+        telefone: telefone || undefined,
+        whatsapp: !!telefone && whatsapp,
+      });
     } catch {
       // authError is surfaced below
     } finally {
@@ -436,6 +480,21 @@ export function LoginPage() {
             )}
 
             <div className="flex flex-col gap-3.5 mb-5">
+              {pedeCnpj && (
+                <div>
+                  <Field label="CNPJ da empresa">
+                    <Input required value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" inputMode="numeric" />
+                  </Field>
+                  {cnpjInfo && !cnpjInfo.valido && <div className="text-[12px] font-semibold text-red mt-1">CNPJ inválido — confira os números.</div>}
+                  {cnpjInfo?.valido && cnpjInfo.razaoSocial && (
+                    <div className="text-[12px] text-green font-semibold mt-1">
+                      {cnpjInfo.razaoSocial}
+                      {cnpjInfo.situacao ? ` · ${cnpjInfo.situacao}` : ''}
+                    </div>
+                  )}
+                  {cnpjInfo?.valido && !cnpjInfo.razaoSocial && <div className="text-[12px] text-textSecondary mt-1">CNPJ válido ✓ — confira o nome da empresa abaixo.</div>}
+                </div>
+              )}
               <Field label="Seu nome">
                 <Input required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Marina Costa" />
               </Field>
@@ -448,10 +507,19 @@ export function LoginPage() {
               <Field label="Senha">
                 <Input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
               </Field>
+              <Field label="Celular / WhatsApp (opcional)">
+                <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" inputMode="tel" />
+              </Field>
+              {telefone && (
+                <label className="flex items-center gap-2 text-[12.5px] text-textSecondary -mt-1.5">
+                  <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} className="accent-blue" />
+                  Quero receber os avisos importantes (aceite, leilão, pagamento) pelo WhatsApp
+                </label>
+              )}
             </div>
 
             {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
-            <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={!role || (role === 'seguradora' && !insurerKey) || submitting}>
+            <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={!role || (role === 'seguradora' && !insurerKey) || (pedeCnpj && cnpjInfo?.valido !== true) || submitting}>
               {submitting ? 'Criando conta…' : 'Criar conta e entrar'}
             </Button>
           </form>

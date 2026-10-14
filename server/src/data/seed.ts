@@ -292,10 +292,19 @@ export const WEBHOOK_EVENTS = [
 
 export const CHAT_SUGGESTIONS = ['O que é deságio?', 'Sou obrigado a aceitar a duplicata?', 'Como funciona o leilão?'];
 
+// Para a empresa (cedente), as perguntas que ela de fato faz — as genéricas acima incluem
+// uma de sacado ("Sou obrigado a aceitar…"), que não é dela.
+export const CHAT_SUGGESTIONS_BY_ROLE: Partial<Record<string, string[]>> = {
+  cedente: ['Quanto vou receber?', 'Como peço o aceite do meu cliente?', 'Por que minha duplicata está pendente?'],
+};
+
 export const CHAT_ANSWERS: Record<string, string> = {
   'O que é deságio?': 'Deságio é a diferença entre o valor de face da duplicata e o valor líquido pago por ela na antecipação — funciona como o "juro" embutido na compra do recebível. No marketplace Lastro, o leilão entre vários financiadores tende a reduzir esse deságio.',
   'Sou obrigado a aceitar a duplicata?': 'Não. Como sacado, você pode confirmar (aceite expresso) ou contestar a duplicata dentro do prazo legal. Se você não se manifestar dentro do prazo, ocorre o aceite tácito, e o título passa a valer como garantia de crédito mesmo assim.',
-  'Como funciona o leilão?': 'Quando uma duplicata entra em leilão, bancos, FIDCs e fintechs cadastrados enviam lances (taxas de deságio). A menor taxa competitiva vence, e o cedente recebe o valor líquido assim que o leilão fecha — normalmente em até 24h.',
+  'Como funciona o leilão?': 'Quando uma duplicata entra em leilão, bancos, FIDCs e fundos credenciados enviam lances (taxas de deságio). Vence a menor taxa até o fechamento, e o valor líquido (já sem o deságio e a taxa da plataforma) entra no saldo da empresa assim que o leilão fecha — de lá ela saca por Pix.',
+  'Quanto vou receber?': 'Valor da duplicata, menos o deságio do financiador (taxa ao mês × prazo), menos a taxa da plataforma (0,35% até R$ 200 mil). Em Minhas Duplicatas, clique em "Ver a conta" no leilão: aparece em reais quanto o banco paga e quanto entra no seu saldo.',
+  'Como peço o aceite do meu cliente?': 'Em Aceite do Sacado, clique em "Enviar link de aceite" e informe o e-mail ou WhatsApp do seu cliente — ele confere a duplicata e confirma sem precisar criar conta. Você também pode informar o contato já na hora de emitir. Sem resposta em 15 dias, vale o aceite tácito.',
+  'Por que minha duplicata está pendente?': 'Ela só vai a leilão com todos os documentos: CNPJ do sacado, nota fiscal, comprovante de entrega e pedido de compra. Em Minhas Duplicatas aparece "Falta: …" com o botão Anexar — completou, ela é liberada na hora.',
 };
 
 // Sob qual veículo um investidor adquire o crédito. Não é taxonomia de marketing: comprar
@@ -336,28 +345,28 @@ export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'adm
   ],
   auditor: [
     {
-      title: 'Bem-vinda, auditoria',
+      title: 'Boas-vindas, {nome}',
       body: 'Você tem acesso somente-leitura à trilha de auditoria, fila de compliance, reconciliação, disputas de aceite, o balcão (OTC) e os relatórios regulatórios da plataforma.',
     },
     { title: 'Trilha de auditoria', body: 'Todo evento sensível fica em um log encadeado por hash — qualquer alteração retroativa quebra a cadeia de forma detectável.' },
   ],
   seguradora: [
-    { title: 'Bem-vinda, parceira', body: 'Você está entrando como Seguradora parceira da Lastro. Vamos te mostrar o essencial.' },
+    { title: 'Boas-vindas, {nome}', body: 'Você está entrando como Seguradora parceira da Lastro. Vamos te mostrar o essencial.' },
     { title: 'Acompanhe suas apólices', body: 'Toda duplicata segurada pela sua seguradora aparece com prêmio e status em um só lugar.' },
     { title: 'Decida sinistros', body: 'Duplicatas vencidas e não pagas viram sinistros — aprove ou negue a indenização diretamente por aqui.' },
   ],
   investidor: [
-    { title: 'Bem-vinda, Marina', body: 'Você está entrando como Investidor/Financiador. Vamos te mostrar o essencial em 3 passos rápidos.' },
+    { title: 'Boas-vindas, {nome}', body: 'Você está entrando como Investidor/Financiador. Vamos te mostrar o essencial em 3 passos rápidos.' },
     { title: 'Explore o Marketplace', body: 'Veja ofertas com score de risco, status de aceite e seguro disponível — dê lances no leilão ao vivo.' },
     { title: 'Acompanhe sua Carteira', body: 'Retornos, histórico de operações e rentabilidade média ficam em Carteira & Histórico.' },
   ],
   cedente: [
-    { title: 'Bem-vinda, Marina', body: 'Você está entrando como Empresa (cedente). Vamos preparar sua primeira antecipação.' },
-    { title: 'Complete seu KYC', body: 'Em Conta & Liquidação, conecte sua conta bancária e envie os documentos societários.' },
-    { title: 'Emita sua primeira duplicata', body: 'Em Emitir Duplicata, registre o título na CERC e envie para o Marketplace em poucos cliques.' },
+    { title: 'Boas-vindas, {nome}', body: 'Você está entrando como Empresa (cedente). Em 4 passos você antecipa sua primeira duplicata — o guia fica na Visão Geral.' },
+    { title: 'Documentos da empresa e chave Pix', body: 'Em Conta & Liquidação: cartão CNPJ, contrato social e documento do representante (análise em até 2 dias úteis), e a chave Pix onde o dinheiro vai cair.' },
+    { title: 'Emita e peça o aceite', body: 'Em Emitir Duplicata, anexe a nota fiscal e informe o e-mail ou WhatsApp do seu cliente — ele confirma por um link, sem precisar criar conta.' },
   ],
   sacado: [
-    { title: 'Bem-vinda, Marina', body: 'Você está entrando como Empresa (sacado). Sua função aqui é confirmar ou contestar duplicatas.' },
+    { title: 'Boas-vindas, {nome}', body: 'Você está entrando como Empresa (sacado). Sua função aqui é confirmar ou contestar duplicatas.' },
     { title: 'Veja duplicatas pendentes', body: 'O Portal do Sacado lista tudo que espera sua manifestação, com prazo em destaque.' },
     { title: 'Confirme ou conteste', body: 'Sua resposta em até 15 dias dá validade jurídica plena ao título — sem ela, ninguém financia com segurança.' },
   ],

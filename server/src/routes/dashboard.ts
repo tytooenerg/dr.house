@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../auth/middleware.js';
 import { listAllDuplicatas } from '../db/duplicatas.js';
 import { buildDashboard } from '../lib/dashboardCore.js';
+import { primeirosPassos } from '../lib/primeirosPassos.js';
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireAuth);
@@ -13,5 +14,6 @@ dashboardRouter.use(requireAuth);
 dashboardRouter.get('/', (req, res) => {
   const user = req.user!;
   const precisaDaPlataforma = user.role !== 'investidor' && user.role !== 'cedente' && user.role !== 'sacado';
-  res.json(buildDashboard(user, precisaDaPlataforma ? listAllDuplicatas() : []));
+  // Só para a empresa: o guia "seu primeiro dinheiro em 4 passos" (lib/primeirosPassos.ts).
+  res.json({ ...buildDashboard(user, precisaDaPlataforma ? listAllDuplicatas() : []), primeirosPassos: primeirosPassos(user) });
 });

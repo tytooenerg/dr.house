@@ -49,7 +49,7 @@ interface SessionContextValue {
   authError: string | null;
   login: (email: string, password: string) => Promise<{ twoFactorRequired: boolean; challengeToken?: string }>;
   verifyTwoFactor: (challengeToken: string, code: string) => Promise<void>;
-  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => Promise<void>;
+  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string; cnpj?: string; telefone?: string; whatsapp?: boolean }) => Promise<void>;
   acceptTeamInvite: (input: { token: string; nome?: string; password: string }) => Promise<void>;
   loginWithTokens: (token: string, refreshToken: string) => Promise<void>;
   completeGoogleSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
@@ -153,7 +153,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => {
+  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string; cnpj?: string; telefone?: string; whatsapp?: boolean }) => {
     setAuthError(null);
     try {
       const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/register', input);

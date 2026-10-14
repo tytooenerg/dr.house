@@ -13,6 +13,9 @@ async function registerAs(page: Page, opts: { roleTitle: string; nome: string; c
   await page.getByPlaceholder('Sua empresa Ltda').fill(opts.companyName);
   await page.getByPlaceholder('voce@empresa.com.br').fill(opts.email);
   await page.getByPlaceholder('mínimo 6 caracteres').fill('senha123');
+  // Empresa e sacado informam o CNPJ no cadastro — o botão só libera com um CNPJ válido.
+  await page.getByRole('textbox', { name: 'CNPJ da empresa' }).fill('11.444.777/0001-61');
+  await expect(page.getByText(/CNPJ válido/)).toBeVisible();
   await page.getByRole('button', { name: 'Criar conta e entrar' }).click();
   await dismissOnboardingIfPresent(page);
 }

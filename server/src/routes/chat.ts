@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
-import { CHAT_ANSWERS, CHAT_SUGGESTIONS } from '../data/seed.js';
+import { CHAT_ANSWERS, CHAT_SUGGESTIONS, CHAT_SUGGESTIONS_BY_ROLE } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { askClaude, claudeEnabled } from '../lib/claude.js';
@@ -45,7 +45,7 @@ ${forecast.insights.map((i) => `- ${i.mensagem}`).join('\n')}`;
 // assistant should answer cashflow questions with worse (invented) numbers instead of the
 // same real computation.
 
-chatRouter.get('/', (_req, res) => res.json({ suggestions: CHAT_SUGGESTIONS, llmEnabled: claudeEnabled }));
+chatRouter.get('/', (req, res) => res.json({ suggestions: CHAT_SUGGESTIONS_BY_ROLE[req.user!.role] ?? CHAT_SUGGESTIONS, llmEnabled: claudeEnabled }));
 
 const askSchema = z.object({ question: z.string().trim().min(1).max(2000) });
 

@@ -158,6 +158,15 @@ adminRouter.post(
     }
     approveKyb(userId);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'kyb.approved', { targetUserId: userId });
+    // A conta não ficava sabendo — só descobria tentando emitir/dar lance de novo.
+    addNotification(
+      userId,
+      alvo?.role === 'cedente'
+        ? 'Documentos da empresa aprovados — você já pode emitir duplicatas.'
+        : 'Credenciamento aprovado — você já pode dar lances.',
+      COLORS.GREEN,
+      'compliance'
+    );
     res.json({ ok: true });
   })
 );
@@ -175,6 +184,7 @@ adminRouter.post(
     const userId = Number(req.params.userId);
     rejectKyb(userId, parsed.data.reason);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'kyb.rejected', { targetUserId: userId, reason: parsed.data.reason });
+    addNotification(userId, `Documentos recusados: ${parsed.data.reason}. Envie novamente em Conta & Liquidação.`, COLORS.RED, 'compliance');
     res.json({ ok: true });
   })
 );
