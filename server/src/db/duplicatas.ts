@@ -115,13 +115,14 @@ export function createDuplicata(input: {
   desagio?: string | null;
   registradora?: string | null;
   nfeChave?: string | null;
+  lastroItens?: Record<string, boolean> | null;
   id?: string;
   sandbox?: boolean;
 }): DuplicataRow {
   const id = input.id ?? nextId('DUP-2026');
   db.prepare(
-    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, setor, registradora, nfe_chave, sandbox)
-     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @setor, @registradora, @nfeChave, @sandbox)`
+    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, setor, registradora, nfe_chave, sandbox, lastro_itens)
+     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @setor, @registradora, @nfeChave, @sandbox, @lastroItens)`
   ).run({
     id,
     cedenteId: input.cedenteId,
@@ -141,6 +142,7 @@ export function createDuplicata(input: {
     registradora: input.registradora ?? null,
     nfeChave: input.nfeChave || null,
     sandbox: input.sandbox ? 1 : 0,
+    lastroItens: input.lastroItens ? JSON.stringify(input.lastroItens) : null,
   });
   return getDuplicata(id)!;
 }
@@ -161,6 +163,14 @@ export function sacadoValorStats(sacadoCnpj: string): { avg: number; n: number }
 
 export function setStatus(id: string, status: string) {
   db.prepare('UPDATE duplicatas SET status = ? WHERE id = ?').run(status, id);
+}
+
+export function setLastro(id: string, pct: number, itens: Record<string, boolean>) {
+  db.prepare('UPDATE duplicatas SET lastro_pct = ?, lastro_itens = ? WHERE id = ?').run(pct, JSON.stringify(itens), id);
+}
+
+export function setSacadoCnpj(id: string, cnpj: string) {
+  db.prepare('UPDATE duplicatas SET sacado_cnpj = ? WHERE id = ?').run(cnpj, id);
 }
 
 export function setComplianceScore(id: string, score: number) {

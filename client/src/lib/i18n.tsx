@@ -140,8 +140,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     // My Receivables page (static chrome only)
     'minhas.title': 'My Receivables',
     'minhas.subtitle': 'Register and track the receivables you sent to market',
-    'minhas.dropzoneTitle': 'Drag an XML or PDF of an invoice / receivable',
-    'minhas.dropzoneHint': 'or click to select a file from your computer',
+    'minhas.dropzoneTitle': 'Issue a new receivable',
+    'minhas.dropzoneHint': 'Upload the invoice XML or PDF and the fields are filled in for you',
     'minhas.colSacado': 'Debtor',
     'minhas.colValor': 'Amount',
     'minhas.colEmissao': 'Issued',

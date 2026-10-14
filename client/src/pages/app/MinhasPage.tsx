@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, ApiError, uploadFile } from '../../lib/api';
 import { PageHeader } from '../../components/ui/Card';
 import { ErrorState } from '../../components/ui/ErrorState';
@@ -56,6 +57,15 @@ interface Duplicata {
   contratoCessaoAnexado: boolean;
   contratoCessaoFilename: string | null;
   contratoCessaoFlags: { text: string; color: string }[] | null;
+  // O que falta para ir a leilão (server/src/lib/lastroCompletar.ts). Vazio fora de
+  // "Pendente análise".
+  faltando: ItemFaltando[];
+}
+
+interface ItemFaltando {
+  key: string;
+  label: string;
+  acao: { tipo: 'upload'; kind: string } | { tipo: 'cnpj' } | null;
 }
 
 const COLS = '1.2fr 0.8fr 0.7fr 0.7fr 0.7fr 1.2fr';
@@ -128,6 +138,47 @@ export function MinhasPage() {
     }
   };
 
+  // Completar o lastro: anexar o documento que faltou na emissão ou informar o CNPJ do sacado.
+  // Mesmo padrão de "um input de arquivo, vários disparadores" do instrumento de cessão.
+  const [lastroAlvo, setLastroAlvo] = useState<{ id: string; kind: string } | null>(null);
+  const [lastroEnviando, setLastroEnviando] = useState<string | null>(null);
+  const [lastroErro, setLastroErro] = useState<Record<string, string>>({});
+  const [cnpjSacado, setCnpjSacado] = useState<Record<string, string>>({});
+  const lastroFileRef = useRef<HTMLInputElement>(null);
+
+  const anexarDocumento = (id: string, kind: string) => {
+    setLastroErro((e) => ({ ...e, [id]: '' }));
+    setLastroAlvo({ id, kind });
+    lastroFileRef.current?.click();
+  };
+
+  const handleLastroFile = async (file: File) => {
+    if (!lastroAlvo) return;
+    setLastroEnviando(lastroAlvo.id);
+    try {
+      await uploadFile(lastroAlvo.kind, file, lastroAlvo.id);
+      await load();
+    } catch (err) {
+      setLastroErro((e) => ({ ...e, [lastroAlvo.id]: err instanceof ApiError ? err.message : 'Falha ao enviar o documento.' }));
+    } finally {
+      setLastroEnviando(null);
+      setLastroAlvo(null);
+    }
+  };
+
+  const salvarCnpjSacado = async (id: string) => {
+    setLastroEnviando(id);
+    setLastroErro((e) => ({ ...e, [id]: '' }));
+    try {
+      const data = await api.post<{ duplicatas: Duplicata[] }>(`/minhas/${id}/sacado-cnpj`, { cnpj: cnpjSacado[id] ?? '' });
+      setDuplicatas(data.duplicatas);
+    } catch (err) {
+      setLastroErro((e) => ({ ...e, [id]: err instanceof ApiError ? err.message : 'Não foi possível salvar o CNPJ.' }));
+    } finally {
+      setLastroEnviando(null);
+    }
+  };
+
   const abrirReserva = (d: Duplicata) => {
     setDispararErro('');
     setReservaPara(d.id);
@@ -160,14 +211,19 @@ export function MinhasPage() {
         />
       </div>
 
-      <div className="border-2 border-dashed border-borderStrong rounded-card p-9 text-center bg-white mb-6">
+      {/* Era uma área "arraste um XML ou PDF" que não fazia nada — nenhum handler de arquivo.
+          A emissão (com leitura automática da nota) vive em Emitir Duplicata; isto leva até lá. */}
+      <Link
+        to="/app/emitir"
+        className="block border-2 border-dashed border-borderStrong rounded-card p-9 text-center bg-white mb-6 no-underline text-navy hover:border-blue"
+      >
         <div className="w-11 h-11 rounded-[10px] border-2 border-blue mx-auto mb-3.5 flex items-center justify-center relative">
           <div className="w-4 h-0.5 bg-blue absolute" />
           <div className="w-0.5 h-4 bg-blue absolute" />
         </div>
-        <div className="font-bold text-[15px]">{t('minhas.dropzoneTitle', 'Arraste um XML ou PDF de NF-e / duplicata')}</div>
-        <div className="text-textSecondary text-[13px] mt-1.5">{t('minhas.dropzoneHint', 'ou clique para selecionar um arquivo do seu computador')}</div>
-      </div>
+        <div className="font-bold text-[15px]">{t('minhas.dropzoneTitle', 'Emitir nova duplicata')}</div>
+        <div className="text-textSecondary text-[13px] mt-1.5">{t('minhas.dropzoneHint', 'Envie o XML ou PDF da nota fiscal e os dados são preenchidos para você')}</div>
+      </Link>
 
       <input
         ref={cessaoFileRef}
@@ -177,6 +233,17 @@ export function MinhasPage() {
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) handleCessaoFile(f);
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={lastroFileRef}
+        type="file"
+        accept=".pdf,.xml,.png,.jpg,.jpeg"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleLastroFile(f);
           e.target.value = '';
         }}
       />
@@ -280,6 +347,54 @@ export function MinhasPage() {
               )}
             </TableCell>
           </TableRow>
+          {d.faltando.length > 0 && (
+            <TableRow columns="1fr" className="py-3! bg-amberBg">
+              <TableCell>
+                <div className="w-full" data-testid={`faltando-${d.id}`}>
+                  <div className="text-[12.5px] font-bold text-navy mb-1.5">
+                    Falta {d.faltando.length === 1 ? '1 item' : `${d.faltando.length} itens`} para esta duplicata poder ir a leilão:
+                  </div>
+                  <ul className="flex flex-col gap-1.5 list-none p-0 m-0">
+                    {d.faltando.map((f) => (
+                      <li key={f.key} className="flex items-center gap-2 flex-wrap text-[12.5px]">
+                        <span className="text-textSecondary">• {f.label}</span>
+                        {f.acao?.tipo === 'upload' && (
+                          <button
+                            type="button"
+                            disabled={lastroEnviando === d.id}
+                            onClick={() => anexarDocumento(d.id, (f.acao as { kind: string }).kind)}
+                            className="px-2.5 py-1 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer disabled:bg-onNavyDim"
+                          >
+                            {lastroEnviando === d.id && lastroAlvo?.kind === (f.acao as { kind: string }).kind ? 'Enviando…' : 'Anexar'}
+                          </button>
+                        )}
+                        {f.acao?.tipo === 'cnpj' && (
+                          <span className="flex items-center gap-1.5">
+                            <input
+                              aria-label={`CNPJ do sacado de ${d.sacado}`}
+                              placeholder="00.000.000/0000-00"
+                              value={cnpjSacado[d.id] ?? ''}
+                              onChange={(e) => setCnpjSacado((v) => ({ ...v, [d.id]: e.target.value }))}
+                              className="w-[170px] px-2 py-1 rounded-md border border-inputBorder text-[12.5px] font-mono-num bg-white"
+                            />
+                            <button
+                              type="button"
+                              disabled={lastroEnviando === d.id}
+                              onClick={() => salvarCnpjSacado(d.id)}
+                              className="px-2.5 py-1 rounded-md border-none bg-blue text-white text-[11.5px] font-bold cursor-pointer disabled:bg-onNavyDim"
+                            >
+                              Salvar CNPJ
+                            </button>
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {lastroErro[d.id] && <div className="text-[12px] font-semibold text-red mt-1.5">{lastroErro[d.id]}</div>}
+                </div>
+              </TableCell>
+            </TableRow>
+          )}
           {/* Faixa de largura inteira, e não uma célula: a disputa é o produto, e espremê-la na
               coluna de status quebrava nome de financiador no meio. */}
           {d.leilao && (

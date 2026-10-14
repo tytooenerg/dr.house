@@ -33,6 +33,7 @@ export function resetDbForTests() {
     DELETE FROM auction_bids;
     DELETE FROM dispute_events;
     DELETE FROM disputes;
+    DELETE FROM aceite_convites;
     DELETE FROM aceites;
     DELETE FROM addon_charges;
     DELETE FROM advertisements;

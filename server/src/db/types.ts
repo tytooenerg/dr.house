@@ -228,6 +228,8 @@ export interface DuplicataRow {
   // Pior deságio mensal que o cedente aceita neste leilão. NULL = usa a banda de mercado
   // (lib/dynamicPricing.ts) como sugestão — ver migração 0069.
   reserva_taxa_am: number | null;
+  // JSON {chave do item: cumprido} do checklist de lastro na emissão — ver migração 0077.
+  lastro_itens: string | null;
 }
 
 export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';

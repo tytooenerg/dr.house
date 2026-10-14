@@ -60,6 +60,7 @@ const EmbedSimuladorPage = lazy(() => import('./pages/public/EmbedSimuladorPage'
 const SecundarioPage = lazy(() => import('./pages/app/SecundarioPage').then((m) => ({ default: m.SecundarioPage })));
 const CestasPage = lazy(() => import('./pages/app/CestasPage').then((m) => ({ default: m.CestasPage })));
 const SuitabilityPage = lazy(() => import('./pages/app/SuitabilityPage').then((m) => ({ default: m.SuitabilityPage })));
+const AceiteLinkPage = lazy(() => import('./pages/public/AceiteLinkPage').then((m) => ({ default: m.AceiteLinkPage })));
 const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 export default function App() {
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="/transparencia" element={<TransparenciaPage />} />
           <Route path="/status" element={<StatusPage />} />
           <Route path="/embed/simulador" element={<EmbedSimuladorPage />} />
+          <Route path="/aceite/:token" element={<AceiteLinkPage />} />
 
           <Route path="/app" element={<AppShell />}>
             <Route path="dashboard" element={<Gate tab="dashboard"><DashboardPage /></Gate>} />

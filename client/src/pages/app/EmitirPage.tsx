@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, ApiError, uploadFile } from '../../lib/api';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
@@ -21,6 +22,15 @@ interface EmitForm {
   vencimento: string;
   seguro: boolean;
   nfeChave: string;
+  // Para onde mandar o link de aceite logo após emitir (server/src/lib/aceiteConvite.ts).
+  sacadoEmail: string;
+  sacadoTelefone: string;
+}
+interface ConviteNaEmissao {
+  link: string;
+  whatsappUrl: string;
+  email: { destino: string; status: 'enviado' | 'simulado' } | null;
+  whatsapp: { destino: string; status: 'enviado' | 'nao_configurado' } | null;
 }
 interface BatchRow {
   id: string;
@@ -336,11 +346,12 @@ function fmtBRL(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 
-const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', seguro: false, nfeChave: '' };
+const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', seguro: false, nfeChave: '', sacadoEmail: '', sacadoTelefone: '' };
 
 export function EmitirPage() {
   const { t } = useLang();
   const { user } = useSession();
+  const navigate = useNavigate();
   const [form, setForm] = useState<EmitForm>(EMPTY_FORM);
   const [batchRows, setBatchRows] = useState<BatchRow[]>([]);
   // 'produto' (NF-e) é o padrão histórico — mercadoria tem chave de acesso nacional de 44
@@ -357,7 +368,14 @@ export function EmitirPage() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ registro: string; seguro: boolean; registradora: string } | null>(null);
+  const [result, setResult] = useState<{
+    registro: string;
+    seguro: boolean;
+    registradora: string;
+    complianceSuspensa?: boolean;
+    lastroPct: number;
+    convite?: ConviteNaEmissao | null;
+  } | null>(null);
   const [matriculas, setMatriculas] = useState<MinhaMatricula[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const comprovanteFileRef = useRef<HTMLInputElement>(null);
@@ -389,6 +407,7 @@ export function EmitirPage() {
       setNfAnexada(true);
       if (extracted) {
         setForm((f) => ({
+          ...f,
           sacado: f.sacado || extracted.sacado,
           cnpj: f.cnpj || extracted.cnpj,
           valor: f.valor || extracted.valor,
@@ -449,7 +468,7 @@ export function EmitirPage() {
     }
     setSubmitting(true);
     try {
-      const data = await api.post<{ registro: string; seguro: boolean; registradora: string }>('/emitir/submit', {
+      const data = await api.post<{ registro: string; seguro: boolean; registradora: string; complianceSuspensa?: boolean; convite?: ConviteNaEmissao | null }>('/emitir/submit', {
         ...form,
         tipoDocumento,
         nfAnexada,
@@ -457,7 +476,7 @@ export function EmitirPage() {
         pedidoCompraAnexado,
         batchValores: batchRows.map((r) => r.valor),
       });
-      setResult(data);
+      setResult({ ...data, lastroPct: preview?.lastroChecklist.pct ?? 0 });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha ao registrar — conexão instável. Tente novamente.');
     } finally {
@@ -484,16 +503,50 @@ export function EmitirPage() {
             <div className="w-6 h-6 rounded-full border-[3px] border-green" />
           </div>
           <div className="font-extrabold text-lg">Duplicata registrada com sucesso</div>
-          <div className="text-textSecondary text-[13px] mt-2">
-            {`Registro escritural nº ${result.registro} confirmado na ${result.registradora}. Status: enviada ao Marketplace.`}
+          <div className="text-textSecondary text-[13px] mt-2">{`Registro escritural nº ${result.registro} confirmado na ${result.registradora}.`}</div>
+          {/* Dizia "Status: enviada ao Marketplace" — mas a duplicata ainda depende do aceite do
+              sacado, do lastro completo e de a empresa abrir o leilão. Agora diz o que vem. */}
+          <div className="text-left text-[13px] mt-4 bg-surface rounded-lg px-4 py-3" data-testid="proximos-passos">
+            {result.complianceSuspensa ? (
+              <span>Ela está em revisão de compliance. Avisamos você assim que for liberada.</span>
+            ) : result.lastroPct < 100 ? (
+              <span>
+                <b>Faltam documentos</b> para ela poder ir a leilão. Anexe o que falta em <b>Minhas Duplicatas</b> — assim que completar, ela é liberada.
+              </span>
+            ) : (
+              <>
+                <div className="font-bold mb-1.5">Próximos passos</div>
+                <ol className="m-0 pl-4.5 flex flex-col gap-1 text-textSecondary">
+                  <li>O sacado confirma a duplicata (prazo de até 15 dias).</li>
+                  <li>Você abre o leilão em Minhas Duplicatas e escolhe a taxa máxima que aceita.</li>
+                  <li>Quando o leilão fecha, o valor cai no seu saldo.</li>
+                </ol>
+              </>
+            )}
           </div>
           <div className="flex justify-center gap-2.5 mt-5.5">
             <Badge variant="success">Registrada — {result.registradora}</Badge>
             {result.seguro && <Badge variant="info">Protegida por seguro</Badge>}
           </div>
-          <Button className="mt-6" onClick={reset}>
-            Emitir outra duplicata
-          </Button>
+          {result.convite && (
+            <div className="text-left text-[13px] mt-3 bg-greenBg rounded-lg px-4 py-3" data-testid="convite-emissao">
+              <div className="font-bold mb-1">Link de aceite para o sacado</div>
+              <div className="text-textSecondary mb-2">
+                {result.convite.email?.status === 'enviado' || result.convite.whatsapp?.status === 'enviado'
+                  ? 'Enviado. Se quiser, mande também pelo seu WhatsApp:'
+                  : 'O envio automático ainda não está configurado na plataforma — mande o link pelo seu WhatsApp:'}
+              </div>
+              <a href={result.convite.whatsappUrl} target="_blank" rel="noreferrer" className="inline-block px-3 py-1.5 rounded-md bg-green text-white font-bold no-underline">
+                Enviar pelo meu WhatsApp
+              </a>
+            </div>
+          )}
+          <div className="flex justify-center gap-2.5 mt-6 flex-wrap">
+            <Button onClick={() => navigate('/app/minhas')}>Ver em Minhas Duplicatas</Button>
+            <Button variant="secondary" onClick={reset}>
+              Emitir outra duplicata
+            </Button>
+          </div>
         </Card>
       </div>
     );
@@ -504,7 +557,7 @@ export function EmitirPage() {
       <PageHeader
         title={t('emitir.title', 'Emitir Duplicata')}
         subtitle={t('emitir.subtitle', 'Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma')}
-        right={<Badge variant="success" size="lg">Aprovação em minutos · dinheiro em até 24h</Badge>}
+        right={<Badge variant="success" size="lg">Registro na hora · financiadores disputam sua duplicata</Badge>}
       />
 
       <div className="mb-4">
@@ -554,7 +607,18 @@ export function EmitirPage() {
               <Input placeholder="Não existe dígito verificador nacional pra NFS-e — cada município tem o seu" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
             </Field>
           )}
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2">
+            <Field label="E-mail do sacado (opcional)">
+              <Input placeholder="financeiro@cliente.com.br" value={form.sacadoEmail} onChange={(e) => setField('sacadoEmail', e.target.value)} />
+            </Field>
+            <Field label="WhatsApp do sacado (opcional)">
+              <Input placeholder="(11) 99999-9999" value={form.sacadoTelefone} onChange={(e) => setField('sacadoTelefone', e.target.value)} />
+            </Field>
+          </div>
+          <div className="text-[11.5px] text-textTertiary -mt-2">
+            Com um deles, mandamos na hora um link para o sacado confirmar a duplicata — sem ele precisar criar conta.
+          </div>
+          <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2">
             <Field label="Valor (R$)">
               <Input placeholder="50.000" value={form.valor} onChange={(e) => setField('valor', e.target.value)} />
             </Field>
@@ -684,6 +748,12 @@ export function EmitirPage() {
               </div>
             </div>
             <div className="text-textSecondary text-xs mb-3.5">Quanto mais completo, menor o risco percebido pelo financiador — e melhor a taxa</div>
+            {preview && preview.lastroChecklist.pct < 100 && (
+              <div className="text-[12px] text-navy bg-amberBg rounded-md px-3 py-2 mb-3.5">
+                Abaixo de 100% a duplicata é registrada, mas só pode ir a leilão depois que você anexar o que falta — dá para fazer depois, em
+                Minhas Duplicatas.
+              </div>
+            )}
             <div className="mb-4">
               <ProgressBar pct={preview?.lastroChecklist.pct ?? 0} color={preview?.lastroChecklist.color ?? PALETTE.inputBorder} />
             </div>

@@ -72,9 +72,13 @@ export const authRouter = Router();
 
 // Only guards the credential-guessable endpoints — /me, /refresh etc. are hit
 // automatically and often, and rate-limiting those would just break active sessions.
+// AUTH_RATE_LIMIT existe para o e2e (e2e/playwright.config.ts): a suíte inteira roda de um
+// IP só e passa de 20 logins/cadastros em 15 minutos. Em produção fica o padrão, 20.
+const authRateLimit = Number(process.env.AUTH_RATE_LIMIT) > 0 ? Number(process.env.AUTH_RATE_LIMIT) : 20;
+
 const bruteForceLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: authRateLimit,
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => !!process.env.VITEST,

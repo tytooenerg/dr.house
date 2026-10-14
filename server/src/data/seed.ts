@@ -359,7 +359,7 @@ export const ONBOARDING_STEPS: Record<'investidor' | 'cedente' | 'sacado' | 'adm
   sacado: [
     { title: 'Bem-vinda, Marina', body: 'Você está entrando como Empresa (sacado). Sua função aqui é confirmar ou contestar duplicatas.' },
     { title: 'Veja duplicatas pendentes', body: 'O Portal do Sacado lista tudo que espera sua manifestação, com prazo em destaque.' },
-    { title: 'Confirme ou conteste', body: 'Sua resposta em até 10 dias úteis dá validade jurídica plena ao título — sem ela, ninguém financia com segurança.' },
+    { title: 'Confirme ou conteste', body: 'Sua resposta em até 15 dias dá validade jurídica plena ao título — sem ela, ninguém financia com segurança.' },
   ],
 };
 

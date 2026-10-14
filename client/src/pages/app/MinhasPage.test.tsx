@@ -29,6 +29,7 @@ const BASE = {
   reservaTaxaAm: 3,
   precoEstimadoFmt: 'R$ 37.900',
   leilao: null as unknown,
+  faltando: [] as unknown[],
 };
 
 // Montado no servidor por lib/demonstrativo.ts (melhor lance de 1,90% a.m.).
@@ -128,6 +129,24 @@ describe('MinhasPage — o leilão da própria duplicata', () => {
   it('sem lance, diz o mínimo que a reserva garante', async () => {
     renderMinhas([{ ...BASE, leilao: { ...ESCADA, totalLances: 0, melhorTaxaFmt: null, melhorPrecoFmt: null, lances: [] } }]);
     await waitFor(() => expect(screen.getByText(/pela sua reserva, você receberia no mínimo/)).toBeInTheDocument());
+  });
+
+  it('duplicata com documentos faltando diz o que falta e oferece anexar ou informar o CNPJ', async () => {
+    renderMinhas([
+      {
+        ...BASE,
+        status: 'Pendente análise',
+        leilao: null,
+        faltando: [
+          { key: 'sacado_cnpj', label: 'CNPJ do sacado', acao: { tipo: 'cnpj' } },
+          { key: 'comprovante_entrega', label: 'Comprovante de entrega ou de execução do serviço', acao: { tipo: 'upload', kind: 'comprovante_entrega' } },
+        ],
+      },
+    ]);
+    await waitFor(() => expect(screen.getByText(/Falta 2 itens para esta duplicata poder ir a leilão/)).toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: /CNPJ do sacado de/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar CNPJ' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anexar' })).toBeInTheDocument();
   });
 
   it('fora do leilão não desenha disputa nenhuma', async () => {

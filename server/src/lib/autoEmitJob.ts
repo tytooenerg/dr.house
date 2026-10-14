@@ -74,6 +74,8 @@ export async function runAutoEmitForUser(user: UserRow): Promise<{ emitidas: num
       comprovanteEntregaAnexado: false,
       pedidoCompraAnexado: false,
       batchValores: [],
+      sacadoEmail: '',
+      sacadoTelefone: '',
     };
     try {
       const outcome = await submitEmitir(user, form);

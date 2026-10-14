@@ -12,6 +12,9 @@ import { auctionCountdown, computePurchasePrice, demonstrativoDaOferta, viewAuct
 import { abrirLeilao } from '../lib/auctionOpen.js';
 import { ratingFromScore } from '../lib/riscoCore.js';
 import { COLORS } from '../data/seed.js';
+import { checklistDaDuplicata, informarCnpjDoSacado } from '../lib/lastroCompletar.js';
+
+const cnpjSacadoSchema = z.object({ cnpj: z.string().trim().min(1) });
 
 const leilaoSchema = z.object({ taxaMaxima: z.union([z.number(), z.string()]).optional() });
 
@@ -88,6 +91,9 @@ function view(d: ReturnType<typeof getDuplicata>) {
     reservaSugeridaAm: bandaAm,
     reservaTaxaAm: d.reserva_taxa_am,
     lastroColor: d.lastro_pct === 100 ? COLORS.GREEN : d.lastro_pct >= 60 ? COLORS.AMBER : COLORS.RED,
+    // O que falta para a duplicata poder ir a leilão, e como resolver cada item pela tela —
+    // sem isso uma duplicata abaixo de 100% ficava "Pendente análise" para sempre.
+    faltando: d.status === 'pendente_analise' ? checklistDaDuplicata(d).faltando : [],
     canDisparar: d.lastro_pct === 100 && d.status === 'aprovada' && aceiteConfirmado(d.id),
     aguardandoAceite: d.status === 'aprovada' && !aceiteConfirmado(d.id),
     contratoCessaoAnexado: !!cessaoUpload,
@@ -120,4 +126,18 @@ minhasRouter.post('/:id/leilao', (req, res) => {
     return;
   }
   res.json({ duplicatas: listByCedente(effectiveOwnerId(req.user!)).map(view) });
+});
+
+minhasRouter.post('/:id/sacado-cnpj', (req, res) => {
+  const parsed = cnpjSacadoSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  const out = informarCnpjDoSacado(req.user!, req.params.id, parsed.data.cnpj);
+  if (out.status !== 200) {
+    res.status(out.status).json(out.body);
+    return;
+  }
+  res.json({ ...out.body, duplicatas: listByCedente(effectiveOwnerId(req.user!)).map(view) });
 });

@@ -20,6 +20,7 @@ import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { withSpan } from './tracing.js';
+import { criarConvite } from './aceiteConvite.js';
 import type { UserRow } from '../db/types.js';
 
 export const emitirFormSchema = z.object({
@@ -42,6 +43,10 @@ export const emitirFormSchema = z.object({
   comprovanteEntregaAnexado: z.boolean().optional().default(false),
   pedidoCompraAnexado: z.boolean().optional().default(false),
   batchValores: z.array(z.string()).optional().default([]),
+  // Opcional: para onde mandar o link de aceite (lib/aceiteConvite.ts) logo após emitir —
+  // assim o sacado fica sabendo na hora, mesmo sem conta na Lastro.
+  sacadoEmail: z.string().trim().optional().default(''),
+  sacadoTelefone: z.string().trim().optional().default(''),
 });
 
 export type EmitirForm = z.infer<typeof emitirFormSchema>;
@@ -86,13 +91,14 @@ export function computeEmitirPreview(form: EmitirForm) {
   const cnpjDigits = form.cnpj.replace(/\D/g, '');
   const nfeChaveDigits = form.nfeChave.replace(/\D/g, '');
   const items = [
-    { label: 'Dados do sacado e CNPJ', done: !!(form.sacado && cnpjDigits) && cnpjChecksumValido(cnpjDigits) },
-    { label: 'Valor e vencimento definidos', done: !!(form.valor && form.vencimento) },
+    { key: 'sacado_cnpj', label: 'Dados do sacado e CNPJ', done: !!(form.sacado && cnpjDigits) && cnpjChecksumValido(cnpjDigits) },
+    { key: 'valor_vencimento', label: 'Valor e vencimento definidos', done: !!(form.valor && form.vencimento) },
     // A chave da NF-e é opcional no formulário (nem todo cedente a informa) — quando
     // ausente, o item continua valendo só pela flag de anexo; quando presente, agora
     // também precisa bater o dígito verificador. Pra NFS-e (tipoDocumento='servico') não
     // existe dígito verificador nacional pra checar — o item vale só pelo anexo mesmo.
     {
+      key: 'nota_fiscal',
       label: form.tipoDocumento === 'servico' ? 'NFS-e anexada e vinculada' : 'NF-e anexada e vinculada',
       done: form.nfAnexada && (form.tipoDocumento === 'servico' || !nfeChaveDigits || chaveNfeChecksumValida(nfeChaveDigits)),
     },
@@ -101,9 +107,9 @@ export function computeEmitirPreview(form: EmitirForm) {
     // inflava preApprovedLimit embaixo com um documento que nunca existiu. Agora cada um
     // exige seu próprio upload real (EmitirPage.tsx envia kind='comprovante_entrega' e
     // kind='pedido_compra' via uploadFile).
-    { label: 'Comprovante de entrega ou execução do serviço anexado', done: form.comprovanteEntregaAnexado },
-    { label: 'Pedido de compra ou contrato comercial anexado', done: form.pedidoCompraAnexado },
-    { label: 'Histórico de pagamento do sacado consultado', done: !!form.sacado },
+    { key: 'comprovante_entrega', label: 'Comprovante de entrega ou execução do serviço anexado', done: form.comprovanteEntregaAnexado },
+    { key: 'pedido_compra', label: 'Pedido de compra ou contrato comercial anexado', done: form.pedidoCompraAnexado },
+    { key: 'historico_sacado', label: 'Histórico de pagamento do sacado consultado', done: !!form.sacado },
   ];
   const doneCount = items.filter((i) => i.done).length;
   const pct = Math.round((doneCount / items.length) * 100);
@@ -112,7 +118,7 @@ export function computeEmitirPreview(form: EmitirForm) {
 
   return {
     lastroChecklist: {
-      items: items.map((i) => ({ label: i.label, done: i.done, color: i.done ? COLORS.GREEN : '#D6DCE5', textColor: i.done ? COLORS.NAVY : '#9AA5B5' })),
+      items: items.map((i) => ({ key: i.key, label: i.label, done: i.done, color: i.done ? COLORS.GREEN : '#D6DCE5', textColor: i.done ? COLORS.NAVY : '#9AA5B5' })),
       pct,
       color,
       doneCount,
@@ -150,7 +156,15 @@ export function computeEmitirPreview(form: EmitirForm) {
 export type EmitirOutcome =
   | {
       status: 200;
-      body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string; complianceSuspensa: boolean };
+      body: {
+        ok: true;
+        registro: string;
+        duplicataId: string;
+        seguro: boolean;
+        registradora: string;
+        complianceSuspensa: boolean;
+        convite: { link: string; whatsappUrl: string; email: unknown; whatsapp: unknown } | null;
+      };
     }
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 402; body: { error: 'plan_required'; requiredPlan: 'pro'; message: string } }
@@ -300,13 +314,20 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
     emissao: new Date().toLocaleDateString('pt-BR'),
     status: preview.lastroChecklist.pct === 100 ? 'aprovada' : 'pendente_analise',
     lastroPct: preview.lastroChecklist.pct,
+    lastroItens: Object.fromEntries(preview.lastroChecklist.items.map((i) => [i.key, i.done])),
     seguro: form.seguro,
     registro,
     registradora: opts.sandbox ? null : registradora.key,
     nfeChave: nfeChave || null,
     sandbox: opts.sandbox,
   });
-  ensureAceite(duplicata.id, '10 dias úteis restantes');
+  const aceite = ensureAceite(duplicata.id, '15 dias para o sacado confirmar');
+  let convite: { link: string; whatsappUrl: string; email: unknown; whatsapp: unknown } | null = null;
+  if (!opts.sandbox && (form.sacadoEmail || form.sacadoTelefone)) {
+    const out = await criarConvite(user, aceite.id, { email: form.sacadoEmail || undefined, telefone: form.sacadoTelefone || undefined });
+    // Um contato inválido não desfaz a emissão — a empresa reenvia pela tela de Aceite.
+    if (out.status === 200) convite = out.body;
+  }
   // Previously the sacado only ever found out a duplicata needed their aceite via the
   // deadline-reminder WhatsApp job (lib/aceiteReminder.ts, only fires once ≤2 days remain)
   // or by happening to log in and check themselves — a real gap for anyone without
@@ -447,6 +468,7 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
       seguro: form.seguro,
       registradora: registradora.name,
       complianceSuspensa: suspended,
+      convite,
     },
   };
 }

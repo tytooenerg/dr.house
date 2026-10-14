@@ -18,6 +18,7 @@ import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
 import { isFeatureEnabled } from '../lib/featureFlags.js';
+import { respostaSchema, responderConvite, verConvite } from '../lib/aceiteConvite.js';
 import { listActiveApprovedAdvertisements, incrementImpressoes, registerClique } from '../db/advertisements.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
@@ -197,6 +198,31 @@ publicRouter.get('/status', (_req, res) => {
   });
 });
 
+// Aceite do sacado por link (lib/aceiteConvite.ts). Público: quem tem o link é quem o
+// cedente escolheu avisar. Limitado para ninguém varrer tokens.
+const aceiteLinkLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Muitas tentativas — aguarde um instante.' },
+});
+
+publicRouter.get('/aceite/:token', aceiteLinkLimiter, (req, res) => {
+  const out = verConvite(req.params.token);
+  res.status(out.status).json(out.body);
+});
+
+publicRouter.post('/aceite/:token', aceiteLinkLimiter, (req, res) => {
+  const parsed = respostaSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', message: 'Preencha CNPJ, nome e cargo de quem está respondendo.' });
+    return;
+  }
+  const out = responderConvite(req.params.token, parsed.data, { ip: req.ip ?? null, userAgent: req.get('user-agent') ?? null });
+  res.status(out.status).json(out.body);
+});
+
 const simulateLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 30,
@@ -239,6 +265,8 @@ publicRouter.post('/simular', simulateLimiter, (req, res) => {
     comprovanteEntregaAnexado: false,
     pedidoCompraAnexado: false,
     batchValores: [],
+    sacadoEmail: '',
+    sacadoTelefone: '',
   });
   res.json({
     valorFmt: preview.emitSummary.valorFmt,

@@ -14,6 +14,7 @@ import { recordContractAnalysis } from '../db/contractAnalyses.js';
 import { verificarProvaDeVida } from '../lib/biometricKyc.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
+import { KINDS_DE_LASTRO, reavaliarLastro } from '../lib/lastroCompletar.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Exportado pra lib/uploadsDiskUsage.ts reusar o mesmo caminho em vez de duplicá-lo.
@@ -80,6 +81,10 @@ uploadsRouter.post(
 
     if (kind === 'kyb_doc') markKybDone(req.user!.id);
 
+    // Documento que faltou na emissão, anexado depois pela tela de Minhas Duplicatas: pode
+    // completar o lastro e liberar a duplicata para leilão (lib/lastroCompletar.ts).
+    const lastro = duplicataId && KINDS_DE_LASTRO.has(kind) ? reavaliarLastro(duplicataId) : null;
+
     // Real NF-e/NFS-e data extraction via Claude (lib/nfeExtraction.ts,
     // lib/nfseExtraction.ts) — reads the actual uploaded file instead of always returning
     // the same hardcoded sample. Returns null (not a fabricated guess) when
@@ -118,6 +123,7 @@ uploadsRouter.post(
 
     res.status(201).json({
       upload: { id: record.id, filename: record.filename, kind: record.kind, duplicataId: record.duplicata_id, createdAt: record.created_at },
+      lastro,
       extracted,
       analysis,
       biometria,

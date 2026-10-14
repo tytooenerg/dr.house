@@ -232,9 +232,12 @@ export async function seedIfEmpty() {
       sacadoNome: a.sacado,
       sacadoCnpj: '',
       valor: a.valor,
-      vencimento: '',
+      // Lastro 100% nasce 'aprovada' numa emissão real (lib/emitirCore.ts) — o que falta é só
+      // o aceite. Eram seedadas 'pendente_analise' e sem vencimento, um estado que nenhuma
+      // emissão produz e que a tela de Minhas Duplicatas mostrava como "faltam documentos".
+      vencimento: daysFromNow(45),
       emissao: new Date().toLocaleDateString('pt-BR'),
-      status: 'pendente_analise',
+      status: 'aprovada',
       lastroPct: 100,
       seguro: false,
       id: a.duplicataId,
@@ -253,9 +256,9 @@ export async function seedIfEmpty() {
       sacadoNome: sacado.company_name,
       sacadoCnpj: '',
       valor: e.valor,
-      vencimento: '',
+      vencimento: daysFromNow(40),
       emissao: new Date().toLocaleDateString('pt-BR'),
-      status: 'pendente_analise',
+      status: 'aprovada',
       lastroPct: 100,
       seguro: false,
     });
