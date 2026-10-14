@@ -137,6 +137,7 @@ export function computeEmitirPreview(form: EmitirForm) {
         ? 'Faixa das cotações das seguradoras para esta duplicata. Quem contrata e paga é o investidor, no momento da compra — não sai do seu valor a receber.'
         : 'Sem seguro de crédito oferecido nesta duplicata.',
       taxaEstimadaFmt: taxaMid.toFixed(1).replace('.', ',') + '% a.m.',
+      taxaEstimadaAm: taxaMid,
       // A registradora que ESTA duplicata vai usar. A tela listava "CERC · B3 · Núclea"
       // fixo, mas chooseRegistradora escolhe UMA (a de menor custo entre as elegíveis por
       // valor) — e até R$ 200 mil a escolhida é a Grafeno, que nem aparecia na lista.

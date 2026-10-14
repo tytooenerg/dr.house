@@ -156,6 +156,7 @@ function publicUser(user: UserRow) {
         : null,
     showOnboarding: !onboardingSeen,
     // O título trazia "Bem-vinda, Marina" fixo para todo mundo; agora usa o primeiro nome.
+    menuCompleto: settings.menuCompleto,
     onboardingSteps: steps.map((st) => ({ ...st, title: st.title.replace('{nome}', user.nome.trim().split(/\s+/)[0] || user.company_name) })),
     sessionLabel:
       user.role === 'sacado'
@@ -802,6 +803,20 @@ authRouter.post(
 authRouter.post('/onboarding/complete', requireAuth, (req, res) => {
   updateSettings(req.user!.id, { onboardingSeen: true });
   res.json({ ok: true });
+});
+
+// Modo essencial do menu da empresa (client/src/data/navConfig.ts's ABAS_ESSENCIAIS): 18 abas
+// assustam quem só quer antecipar uma duplicata. Só muda a exibição — as permissões
+// (ROLE_TABS) continuam as mesmas, e uma aba escondida segue acessível pelo endereço.
+const menuSchema = z.object({ completo: z.boolean() });
+authRouter.post('/menu', requireAuth, (req, res) => {
+  const parsed = menuSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  updateSettings(req.user!.id, { menuCompleto: parsed.data.completo });
+  res.json({ user: publicUser(getUserById(req.user!.id)!) });
 });
 
 // Generates a new secret and returns it for the user to add to their authenticator app —

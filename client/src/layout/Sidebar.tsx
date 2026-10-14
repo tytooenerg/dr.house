@@ -3,7 +3,8 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { NavIcon } from '../components/NavIcon';
-import { groupNavItems } from '../data/navConfig';
+import { abasDoMenu, groupNavItems } from '../data/navConfig';
+import { api } from '../lib/api';
 import { useSession } from '../state/SessionContext';
 import { useLang } from '../lib/i18n';
 import { LanguageToggle } from '../components/LanguageToggle';
@@ -15,13 +16,24 @@ import { LanguageToggle } from '../components/LanguageToggle';
 // botão do meio, aparece como link pra leitor de tela e ganha aria-current="page" sozinho
 // (inclusive em sub-rotas: /app/admin/kyb acende "Back-office").
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { user, logout } = useSession();
+  const { user, logout, refresh } = useSession();
+  const [trocandoMenu, setTrocandoMenu] = useState(false);
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const { t } = useLang();
 
   if (!user) return null;
-  const sections = groupNavItems(user.navTabs);
+  const { abas, ocultas } = abasDoMenu(user);
+  const sections = groupNavItems(abas);
+  const alternarMenu = async () => {
+    setTrocandoMenu(true);
+    try {
+      await api.post('/auth/menu', { completo: !user.menuCompleto });
+      await refresh();
+    } finally {
+      setTrocandoMenu(false);
+    }
+  };
   const initials = user.nome
     .split(' ')
     .map((n) => n[0])
@@ -79,6 +91,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </div>
           );
         })}
+        {user.role === 'cedente' && (
+          <button
+            type="button"
+            disabled={trocandoMenu}
+            onClick={alternarMenu}
+            className="mx-3 text-left bg-transparent border-none text-onNavyDim text-[12px] font-semibold cursor-pointer underline p-0 hover:text-white"
+          >
+            {user.menuCompleto ? 'Mostrar só o essencial' : `Mostrar todas as ferramentas (+${ocultas})`}
+          </button>
+        )}
       </div>
 
       {/* Selo de conformidade: antes era um card grande logo abaixo da logo, empurrando o menu

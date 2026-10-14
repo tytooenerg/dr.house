@@ -49,7 +49,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'app.publicidade': 'Advertising',
     'nav.legal': 'Legal',
     'nav.entrar': 'Log in',
-    'nav.falarVendas': 'Talk to sales',
+    'nav.criarConta': 'Sign up',
     'footer.termos': 'Terms of use',
     'footer.privacidade': 'Privacy',
     'footer.status': 'Status',

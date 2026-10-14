@@ -19,3 +19,16 @@ test('rejects a wrong password with an inline error', async ({ page }) => {
   await expect(page.getByText('E-mail ou senha incorretos.')).toBeVisible();
   await expect(page).toHaveURL('/login');
 });
+
+// Site público → empresa: o simulador mostra quanto ela recebe e o botão leva ao cadastro já
+// com "Empresa (cedente)" escolhido (antes os dois botões iam para a página de contato).
+test('visitante simula quanto a empresa recebe e segue para o cadastro', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('link', { name: 'Simular quanto recebo' }).click();
+  await page.getByRole('button', { name: 'Simular', exact: true }).click();
+  const conta = page.getByTestId('demonstrativo');
+  await expect(conta).toContainText('Empresa recebe', { timeout: 10_000 });
+  await expect(conta).toContainText('Taxa da plataforma Lastro');
+  await page.getByRole('link', { name: 'Criar conta e antecipar' }).click();
+  await expect(page.getByRole('textbox', { name: 'CNPJ da empresa' })).toBeVisible({ timeout: 10_000 });
+});

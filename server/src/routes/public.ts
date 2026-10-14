@@ -21,6 +21,10 @@ import { isFeatureEnabled } from '../lib/featureFlags.js';
 import { respostaSchema, responderConvite, verConvite } from '../lib/aceiteConvite.js';
 import { cnpjChecksumValido, cnpjLookupEnabled, consultarCnpj } from '../lib/cnpjLookup.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { demonstrativoPrimario } from '../lib/demonstrativo.js';
+import { computePurchasePrice } from '../lib/marketCompute.js';
+import { parseBRLNumber, parseFlexibleDate } from '../lib/format.js';
+import type { DuplicataRow } from '../db/types.js';
 import { listActiveApprovedAdvertisements, incrementImpressoes, registerClique } from '../db/advertisements.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
@@ -301,5 +305,16 @@ publicRouter.post('/simular', simulateLimiter, (req, res) => {
     plataformaFeeFmt: preview.emitSummary.plataformaFeeFmt,
     sacadoRecognized: preview.sacadoRecognized,
     sacadoRecognizedText: preview.sacadoRecognizedText,
+    // A conta inteira em reais — quanto a empresa RECEBE, não só a taxa (lib/demonstrativo.ts,
+    // a mesma conta que a liquidação aplica). Precisa de valor e vencimento.
+    demonstrativo: demonstrativoSimulado(parsed.data.valor, parsed.data.vencimento, preview.emitSummary.taxaEstimadaAm),
   });
 });
+
+function demonstrativoSimulado(valorRaw: string, vencimento: string, taxaAm: number) {
+  const valor = parseBRLNumber(valorRaw);
+  if (!(valor > 0) || !vencimento || Number.isNaN(parseFlexibleDate(vencimento).getTime())) return null;
+  const d = { valor, vencimento } as DuplicataRow;
+  if (computePurchasePrice(d, taxaAm).prazoDias <= 0) return null;
+  return demonstrativoPrimario(valor, computePurchasePrice(d, taxaAm));
+}

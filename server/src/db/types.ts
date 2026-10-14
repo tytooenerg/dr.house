@@ -36,6 +36,8 @@ export interface LadderConfig {
 
 export interface UserSettings {
   onboardingSeen: boolean;
+  // Menu da empresa: false = modo essencial (6 abas), true = todas as ferramentas.
+  menuCompleto: boolean;
   // digest only means anything for an admin account (Resumo diário do back-office —
   // lib/dailyBriefing.ts) but lives on the same shared shape every role's notifPrefs
   // already uses, same as marketing being irrelevant-but-present for every role.
@@ -110,6 +112,7 @@ export interface UserSettings {
 export function defaultSettings(): UserSettings {
   return {
     onboardingSeen: false,
+    menuCompleto: false,
     notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false, digest: true, compliance: true },
     notifyViaWhatsapp: false,
     autoBidEnabled: false,

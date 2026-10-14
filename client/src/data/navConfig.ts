@@ -88,6 +88,18 @@ export interface NavSection {
 }
 
 // Grupos na ordem de NAV_GROUPS, só com os itens que o papel pode ver; grupos vazios somem.
+// Modo essencial da empresa: as 6 abas do caminho "emitir → aceite → receber". As outras
+// (ERP, AI CFO, Fiscal, Risco, Desenvolvedores…) seguem permitidas pelo ROLE_TABS do
+// servidor e acessíveis por "Mostrar todas as ferramentas" — 18 abas de cara assustavam
+// quem só quer antecipar uma duplicata.
+export const ABAS_ESSENCIAIS_CEDENTE = ['dashboard', 'emitir', 'minhas', 'aceite', 'conta', 'perfil'];
+
+export function abasDoMenu(user: { role: string; navTabs: string[]; menuCompleto?: boolean }): { abas: string[]; ocultas: number } {
+  if (user.role !== 'cedente' || user.menuCompleto) return { abas: user.navTabs, ocultas: 0 };
+  const abas = user.navTabs.filter((k) => ABAS_ESSENCIAIS_CEDENTE.includes(k));
+  return { abas, ocultas: user.navTabs.length - abas.length };
+}
+
 export function groupNavItems(allowedKeys: Iterable<string>): NavSection[] {
   const allowed = new Set(allowedKeys);
   return NAV_GROUPS.map((group) => ({

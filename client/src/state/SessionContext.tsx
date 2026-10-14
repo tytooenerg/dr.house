@@ -36,6 +36,8 @@ export interface SessionUser {
   onboardingSteps: OnboardingStep[];
   sessionLabel: string;
   navTabs: string[];
+  // Menu da empresa: false = modo essencial (navConfig.ts's ABAS_ESSENCIAIS_CEDENTE).
+  menuCompleto?: boolean;
   plan: Plan;
   subscriptionStatus: 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
   insurerKey: string | null;
