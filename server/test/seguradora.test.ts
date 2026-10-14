@@ -92,7 +92,7 @@ describe('seguradora role', () => {
       valor: '20.000',
       vencimento: vencimentoFuturo(), // futuro DE VERDADE: relativo a hoje, não uma data fixa que caduca
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     expect(emit.status).toBe(200);
@@ -150,7 +150,7 @@ describe('seguradora role', () => {
       valor: '15.000',
       vencimento: vencimentoFuturo(),
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     const duplicataId = emit.body.duplicataId as string;
@@ -183,7 +183,7 @@ describe('seguradora role', () => {
       valor: '10.000',
       vencimento: '2020-01-10', // já vencida antes mesmo de tentar segurar
       seguro: false,
-      nfAnexada: true,
+      nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
       batchValores: [],
     });
     expect(emit.status).toBe(200);

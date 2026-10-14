@@ -43,13 +43,13 @@ export function AppShell() {
   return (
     <div className="flex min-h-screen w-full bg-bg text-navy">
       {!isMobile && (
-        <aside className="sticky top-0 h-screen flex-shrink-0">
+        <aside className="sticky top-0 h-screen shrink-0">
           <Sidebar />
         </aside>
       )}
 
       {isMobile && menuOpen && (
-        <div className="fixed inset-0 z-[70] flex">
+        <div className="fixed inset-0 z-70 flex">
           <div className="absolute inset-0 bg-navy/60" onClick={() => setMenuOpen(false)} aria-hidden="true" />
           <div role="dialog" aria-modal="true" aria-label="Menu" className="relative h-full max-w-[85vw] shadow-modal">
             <Sidebar onNavigate={() => setMenuOpen(false)} />
@@ -57,7 +57,7 @@ export function AppShell() {
               type="button"
               onClick={() => setMenuOpen(false)}
               aria-label="Fechar menu"
-              className="absolute top-4 right-3 w-8 h-8 rounded-md bg-white/10 text-white border-none cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              className="absolute top-4 right-3 w-8 h-8 rounded-md bg-white/10 text-white border-none cursor-pointer flex items-center justify-center focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white/60"
             >
               <X size={16} aria-hidden="true" />
             </button>

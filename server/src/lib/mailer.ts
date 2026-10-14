@@ -12,6 +12,8 @@ const transporter = host
     })
   : null;
 
+export const mailerEnabled = !!transporter;
+
 if (transporter) logger.info('[mail] SMTP transport configured — notification emails will be sent for real');
 else logger.info('[mail] SMTP_HOST not set — notification emails will be logged instead of sent');
 

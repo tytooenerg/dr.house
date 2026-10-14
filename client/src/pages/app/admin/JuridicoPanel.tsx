@@ -91,6 +91,7 @@ export function JuridicoPanel() {
   const [signerNameById, setSignerNameById] = useState<Record<number, string>>({});
   const [signerEmailById, setSignerEmailById] = useState<Record<number, string>>({});
   const [signingId, setSigningId] = useState<number | null>(null);
+  const [signErrorById, setSignErrorById] = useState<Record<number, string>>({});
   const [regulatoryNotes, setRegulatoryNotes] = useState<RegulatoryNote[]>([]);
   const [regTitle, setRegTitle] = useState('');
   const [regText, setRegText] = useState('');
@@ -182,10 +183,13 @@ export function JuridicoPanel() {
     const signerEmail = (signerEmailById[id] ?? '').trim();
     if (!signerName || !signerEmail) return;
     setSigningId(id);
+    setSignErrorById((prev) => ({ ...prev, [id]: '' }));
     try {
       await api.post(`/admin/juridico/documentos/${id}/assinatura`, { signerName, signerEmail });
       await loadMinutas();
       await loadCobrancaJuridica();
+    } catch (err) {
+      setSignErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível enviar para assinatura.' }));
     } finally {
       setSigningId(null);
     }
@@ -193,10 +197,13 @@ export function JuridicoPanel() {
 
   const checkMinutaSignature = async (id: number) => {
     setSigningId(id);
+    setSignErrorById((prev) => ({ ...prev, [id]: '' }));
     try {
       await api.post(`/admin/juridico/documentos/${id}/assinatura/status`);
       await loadMinutas();
       await loadCobrancaJuridica();
+    } catch (err) {
+      setSignErrorById((prev) => ({ ...prev, [id]: err instanceof ApiError ? err.message : 'Não foi possível verificar o status.' }));
     } finally {
       setSigningId(null);
     }
@@ -482,6 +489,7 @@ export function JuridicoPanel() {
                   >
                     {signingId === doc.id ? 'Enviando…' : 'Enviar para assinatura eletrônica'}
                   </Button>
+                  {signErrorById[doc.id] && <div className="w-full text-red text-[12.5px] font-semibold">{signErrorById[doc.id]}</div>}
                 </div>
               )}
               {doc.signatureStatus === 'enviado' && (
@@ -492,6 +500,7 @@ export function JuridicoPanel() {
                   <Button size="sm" variant="secondary" disabled={signingId === doc.id} onClick={() => checkMinutaSignature(doc.id)}>
                     {signingId === doc.id ? 'Verificando…' : 'Verificar status'}
                   </Button>
+                  {signErrorById[doc.id] && <div className="w-full text-red text-[12.5px] font-semibold">{signErrorById[doc.id]}</div>}
                 </div>
               )}
               {doc.signatureStatus === 'assinado' && (

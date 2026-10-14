@@ -59,7 +59,7 @@ async function sellerWithListing(askingValor: string, faceValor = '20.000') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Block ${unique()} Ltda`, cnpj: '77.666.555/0001-00', valor: faceValor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Block ${unique()} Ltda`, cnpj: '77.666.555/0001-00', valor: faceValor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   // Achado corrigido (usuário): dispararLeilao agora exige aceite confirmado — direto no
@@ -158,7 +158,8 @@ describe('institutional block trade', () => {
     const retornoRealEsperadoA = Math.round(netA - custoRecuperadoA);
 
     const historicoA = await request(app).get('/api/historico?pageSize=200').set('Authorization', `Bearer ${listingA.seller.token}`);
-    const rowA = historicoA.body.historico.find((h: { investidoFmt: string }) => Math.round(parseBRL(h.investidoFmt)) === faceA);
+    // "Investido" da posição revendida = o que o vendedor pagou (migração 0080), não a face.
+    const rowA = historicoA.body.historico.find((h: { investidoFmt: string }) => Math.round(parseBRL(h.investidoFmt)) === custoRecuperadoA);
     expect(rowA).toBeTruthy();
     expect(rowA.retornoFmt).toBe(fmtBRLSigned(retornoRealEsperadoA));
 

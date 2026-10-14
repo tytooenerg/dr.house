@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TAB_BY_ROLE, findNavItem, GROUP_LABELS, groupNavItems, NAV_GROUPS, NAV_ITEMS } from './navConfig';
+import { ABAS_ESSENCIAIS_CEDENTE, abasDoMenu, DEFAULT_TAB_BY_ROLE, findNavItem, GROUP_LABELS, groupNavItems, NAV_GROUPS, NAV_ITEMS } from './navConfig';
 
 // Espelho local de ROLE_TABS (server/src/data/seed.ts) pros dois papéis mais carregados —
 // se o servidor ganhar uma tab nova sem entrada aqui, o Sidebar simplesmente não mostra
@@ -43,5 +43,25 @@ describe('navConfig — menu agrupado por tarefa', () => {
     expect(findNavItem('/app/admin')?.key).toBe('admin');
     expect(findNavItem('/app/contas-pagar')?.key).toBe('contas-pagar');
     expect(findNavItem('/app/nada')).toBeUndefined();
+  });
+});
+
+// Modo essencial do menu da empresa.
+const TODAS = ['dashboard', 'emitir', 'minhas', 'aceite', 'erp', 'conta', 'historico', 'credito', 'contas-pagar', 'ai-cfo', 'fiscal', 'risco', 'compliance', 'disputas', 'dev', 'receita', 'assinatura', 'perfil'];
+
+describe('abasDoMenu — modo essencial da empresa', () => {
+  it('empresa no modo essencial vê só as 6 abas do caminho emitir → aceite → receber', () => {
+    const { abas, ocultas } = abasDoMenu({ role: 'cedente', navTabs: TODAS, menuCompleto: false });
+    expect(abas).toEqual(ABAS_ESSENCIAIS_CEDENTE);
+    expect(ocultas).toBe(TODAS.length - 6);
+  });
+
+  it('com o menu completo, ou para outros papéis, nada é escondido', () => {
+    expect(abasDoMenu({ role: 'cedente', navTabs: TODAS, menuCompleto: true })).toEqual({ abas: TODAS, ocultas: 0 });
+    expect(abasDoMenu({ role: 'investidor', navTabs: ['dashboard', 'marketplace'] })).toEqual({ abas: ['dashboard', 'marketplace'], ocultas: 0 });
+  });
+
+  it('nunca mostra uma aba que o papel não tem', () => {
+    expect(abasDoMenu({ role: 'cedente', navTabs: ['dashboard', 'minhas'] }).abas).toEqual(['dashboard', 'minhas']);
   });
 });

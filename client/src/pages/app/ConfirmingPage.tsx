@@ -409,7 +409,7 @@ export function ConfirmingPage() {
                             placeholder={`Sublimite (sugestão: ${c.sublimiteSugeridoFmt})`}
                             value={sublimiteById[c.cedenteUserId] ?? ''}
                             onChange={(e) => setSublimiteById((s) => ({ ...s, [c.cedenteUserId]: e.target.value }))}
-                            className="w-[180px] px-2.5 py-1.5 rounded-md border border-inputBorder text-[12.5px] outline-none"
+                            className="w-[180px] px-2.5 py-1.5 rounded-md border border-inputBorder text-[12.5px] outline-hidden"
                           />
                           <Button size="sm" onClick={() => matricular(c.cedenteUserId)} disabled={busyKey === `matricular:${c.cedenteUserId}`}>
                             {busyKey === `matricular:${c.cedenteUserId}` ? 'Matriculando…' : 'Matricular'}

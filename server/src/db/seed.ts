@@ -138,6 +138,10 @@ export async function seedIfEmpty() {
   const cedente = contas.get('cedente@lastro.demo')!;
   const sacado = contas.get('sacado@lastro.demo')!;
   approveKyb(investidor.id);
+  // KYB documental do cedente (lib/cedenteKyb.ts) bloqueia emissão pra conta nova — mas a
+  // conta demo já existia antes dessa exigência existir, mesmo raciocínio da migração 0076
+  // que aprova de uma vez todo cedente já cadastrado em produção.
+  approveKyb(cedente.id);
   // Kayrós Capital é um fundo de investimento — sem veículo classificado a conta seria
   // aprovada e mesmo assim incapaz de dar lance (lib/auctionCore.ts).
   setVeiculo(investidor.id, 'fundo');
@@ -228,9 +232,12 @@ export async function seedIfEmpty() {
       sacadoNome: a.sacado,
       sacadoCnpj: '',
       valor: a.valor,
-      vencimento: '',
+      // Lastro 100% nasce 'aprovada' numa emissão real (lib/emitirCore.ts) — o que falta é só
+      // o aceite. Eram seedadas 'pendente_analise' e sem vencimento, um estado que nenhuma
+      // emissão produz e que a tela de Minhas Duplicatas mostrava como "faltam documentos".
+      vencimento: daysFromNow(45),
       emissao: new Date().toLocaleDateString('pt-BR'),
-      status: 'pendente_analise',
+      status: 'aprovada',
       lastroPct: 100,
       seguro: false,
       id: a.duplicataId,
@@ -249,9 +256,9 @@ export async function seedIfEmpty() {
       sacadoNome: sacado.company_name,
       sacadoCnpj: '',
       valor: e.valor,
-      vencimento: '',
+      vencimento: daysFromNow(40),
       emissao: new Date().toLocaleDateString('pt-BR'),
-      status: 'pendente_analise',
+      status: 'aprovada',
       lastroPct: 100,
       seguro: false,
     });
@@ -307,10 +314,11 @@ export async function seedIfEmpty() {
       lastroPct: 100,
       seguro: false,
     });
+    // valor = preço pago (face − retorno), o mesmo significado de toda linha de purchases.
     db.prepare('INSERT INTO purchases (duplicata_id, investor_id, valor, taxa, retorno, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
       d.id,
       investidor.id,
-      h.investido,
+      h.investido - h.retorno,
       '',
       h.retorno,
       compraEm.toISOString()

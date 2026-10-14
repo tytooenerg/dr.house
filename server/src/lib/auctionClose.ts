@@ -6,7 +6,8 @@ import { settlePurchase } from './settlement.js';
 import { informarNegociacao, type RegistradoraKey } from './registradoras.js';
 import { deliverWebhookEvent } from './webhookDelivery.js';
 import { fmtTaxa } from './auctionCore.js';
-import { fmtBRL } from './format.js';
+import { fmtBRL, fmtBRLCentavos } from './format.js';
+import { saqueAutomatico, tentarRelancar } from './pilotoAutomatico.js';
 import { logger } from './logger.js';
 import { COLORS } from '../data/seed.js';
 import { getFundoSistemaUserIdIfExists } from './confirmingFundo.js';
@@ -41,7 +42,9 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
       // serve pra não readjudicar um leilão vendido, e esta duplicata não foi vendida.
       devolverDeLeilaoSemLance(id);
       semLance++;
-      if (d.cedente_id) {
+      // Piloto automático: relança sozinho (até 3 vezes) e avisa — senão, o aviso de sempre.
+      const relancado = tentarRelancar(id);
+      if (d.cedente_id && !relancado) {
         addNotification(
           d.cedente_id,
           `Leilão de ${d.sacado_nome} encerrou sem lances dentro da reserva — a duplicata voltou pra "Minhas Duplicatas" e pode ser reofertada.`,
@@ -70,8 +73,13 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
     for (const p of perdedores) setAuctionBidStatus(p.id, 'perdedor');
 
     try {
-      createPurchase(id, vencedor.bidder_id, d.valor, fmtTaxa(vencedor.taxa_am), Math.round(d.valor - vencedor.preco));
-      settlePurchase({
+      // purchases.valor = quanto o investidor PAGOU (base de custo), como numa compra de
+      // revenda — gravava o valor de face, e uma posição revendida aparecia em Carteira &
+      // Histórico com a face como "investido" (migração 0080). Mesmo arredondamento do
+      // retorno, para que face − retorno = valor feche exato.
+      const retorno = Math.round(d.valor - vencedor.preco);
+      createPurchase(id, vencedor.bidder_id, d.valor - retorno, fmtTaxa(vencedor.taxa_am), retorno);
+      const liquidacao = settlePurchase({
         duplicataId: id,
         sacadoNome: d.sacado_nome,
         investorId: vencedor.bidder_id,
@@ -96,7 +104,17 @@ export function closeDueAuctions(nowIso = new Date().toISOString(), apenasDuplic
           totalLances: bids.length,
         });
         void deliverWebhookEvent(d.cedente_id, 'pagamento.confirmado', { duplicataId: id, valor: d.valor, investorId: vencedor.bidder_id });
-        addNotification(d.cedente_id, `Leilão de ${d.sacado_nome} arrematado a ${fmtTaxa(vencedor.taxa_am)} a.m. — ${fmtBRL(vencedor.preco)} liberados.`, COLORS.GREEN, 'leilao');
+        // O que entra no saldo é o preço MENOS a taxa da plataforma (settlePurchase) — a
+        // mensagem dizia "preço liberados", R$ 3,50 a mais por R$ 1.000 do que o cedente via no extrato.
+        addNotification(
+          d.cedente_id,
+          `Leilão de ${d.sacado_nome} arrematado a ${fmtTaxa(vencedor.taxa_am)} a.m. — ${fmtBRLCentavos(liquidacao.net)} creditados (${fmtBRLCentavos(vencedor.preco)} pagos pelo comprador − ${fmtBRLCentavos(liquidacao.fee)} de taxa da plataforma).`,
+          COLORS.GREEN,
+          'leilao'
+        );
+        // Piloto automático: o líquido vai direto para a chave Pix da empresa, se ela ligou.
+        const cedenteId = d.cedente_id;
+        void saqueAutomatico(cedenteId, liquidacao.net, id).catch((err) => logger.error({ err, duplicataId: id }, '[piloto] falha no saque automático'));
       }
       // Se quem venceu foi a conta de sistema do Fundo de Fomento, é aqui que o pool é
       // debitado e o limite do programa consumido — propor um lance não move dinheiro.

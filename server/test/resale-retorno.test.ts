@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { db } from '../src/db/index.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
@@ -54,7 +55,7 @@ async function emitirEComprar(valor: string, buyer: { token: string }) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Revenda Ret ${unique()} Ltda`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Revenda Ret ${unique()} Ltda`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();
@@ -94,13 +95,16 @@ describe('mercado secundário — retorno realizado da posição original após 
 
     const buyResale = await request(app).post(`/api/secundario/${listing.id}/comprar`).set('Authorization', `Bearer ${buyer.token}`);
     expect(buyResale.status).toBe(200);
+    // A revenda grava quando a posição do vendedor foi encerrada — é a data do imposto (migração 0081).
+    const encerrada = db.prepare('SELECT encerrada_em FROM purchases WHERE duplicata_id = ? AND investor_id = ?').get(duplicataId, seller.userId) as { encerrada_em: string | null };
+    expect(encerrada.encerrada_em).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 
     const fee = platformFee(askingValor);
     const net = askingValor - fee;
-    // Espelha exatamente o cálculo da produção (lib/resaleCore.ts's executeResaleTrade): o
-    // custo de aquisição é recuperado como faceValor − retorno já arredondado da compra
-    // original, não o precoCompra fracionário puro — um arredondamento de até R$1 é
-    // esperado e correto, não um erro de precisão do teste.
+    // Espelha o cálculo da produção (lib/resaleCore.ts): o
+    // custo de aquisição é o purchases.valor da compra original, gravado como faceValor −
+    // retorno já arredondado (lib/auctionClose.ts), não o precoCompra fracionário puro — um
+    // arredondamento de até R$1 é esperado e correto, não um erro de precisão do teste.
     const custoRecuperado = faceValor - Math.round(faceValor - precoCompra);
     const retornoRealEsperado = Math.round(net - custoRecuperado);
     const retornoSeSeguradoAteVencimento = Math.round(30000 - precoCompra);
@@ -109,7 +113,8 @@ describe('mercado secundário — retorno realizado da posição original após 
     // dois por coincidência de arredondamento, não provaria nada.
     expect(retornoRealEsperado).not.toBe(retornoSeSeguradoAteVencimento);
 
-    const row = await historicoRowFor(seller.token, faceValor);
+    // O "Investido" da posição revendida é o que o vendedor pagou (migração 0080), não a face.
+    const row = await historicoRowFor(seller.token, custoRecuperado);
     expect(row).toBeTruthy();
     expect(row.retornoFmt).toBe(fmtBRLSigned(retornoRealEsperado));
   });
@@ -139,7 +144,8 @@ describe('mercado secundário — retorno realizado da posição original após 
     const retornoRealEsperado = Math.round(askingValor - fee - custoRecuperado);
     expect(retornoRealEsperado).toBeLessThan(0);
 
-    const row = await historicoRowFor(seller.token, faceValor);
+    // O "Investido" da posição revendida é o que o vendedor pagou (migração 0080), não a face.
+    const row = await historicoRowFor(seller.token, custoRecuperado);
     expect(row).toBeTruthy();
     expect(row.retornoFmt).toBe(fmtBRLSigned(retornoRealEsperado));
     expect(row.retornoFmt).not.toContain('+-');
@@ -175,7 +181,8 @@ describe('mercado secundário — retorno realizado da posição original após 
     const custoRecuperado = faceValor - Math.round(faceValor - precoCompra);
     const retornoRealEsperado = Math.round(bidValor - fee - custoRecuperado);
 
-    const row = await historicoRowFor(seller.token, faceValor);
+    // O "Investido" da posição revendida é o que o vendedor pagou (migração 0080), não a face.
+    const row = await historicoRowFor(seller.token, custoRecuperado);
     expect(row).toBeTruthy();
     expect(row.retornoFmt).toBe(fmtBRLSigned(retornoRealEsperado));
   });

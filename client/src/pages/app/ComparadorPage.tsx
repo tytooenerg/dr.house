@@ -62,7 +62,7 @@ export function ComparadorPage() {
             <input aria-label="Valor a antecipar"
               value={input.valor}
               onChange={(e) => setField('valor', e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg text-white outline-none text-sm"
+              className="w-full px-3.5 py-2.5 rounded-lg text-white outline-hidden text-sm"
               style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)' }}
             />
           </div>
@@ -71,7 +71,7 @@ export function ComparadorPage() {
             <input aria-label="Prazo em dias"
               value={input.prazo}
               onChange={(e) => setField('prazo', e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-lg text-white outline-none text-sm"
+              className="w-full px-3.5 py-2.5 rounded-lg text-white outline-hidden text-sm"
               style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)' }}
             />
           </div>

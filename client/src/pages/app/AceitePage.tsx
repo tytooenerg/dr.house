@@ -18,6 +18,16 @@ interface Aceite {
   slaDiasRestantes: number | null;
   slaVencido: boolean;
   disputeProposal: { disputeId: number; note: string; quando: string } | null;
+  // Só na visão da empresa: pode mandar o link de aceite (server/src/lib/aceiteConvite.ts).
+  podeConvidar?: boolean;
+  convite?: { email: string | null; telefone: string | null; enviadoHa: string; respondido: boolean } | null;
+}
+
+interface ConviteEnviado {
+  link: string;
+  whatsappUrl: string;
+  email: { destino: string; status: 'enviado' | 'simulado' } | null;
+  whatsapp: { destino: string; status: 'enviado' | 'nao_configurado' } | null;
 }
 
 const COLS = '1.1fr 1.3fr 0.9fr 1.2fr 1.3fr';
@@ -80,6 +90,7 @@ export function AceitePage() {
                 )}
               </div>
             </div>
+            {a.podeConvidar && <ConvidarSacado aceite={a} onEnviado={load} />}
             {a.disputeProposal && (
               <div className="mx-5 mb-4 rounded-[10px] px-4 py-3.5 bg-amberBg">
                 <div className="text-[12.5px] font-bold mb-1" style={{ color: PALETTE.amber }}>
@@ -114,6 +125,112 @@ export function AceitePage() {
         ))}
         {aceites.length === 0 && <EmptyState title="Nenhuma duplicata aguardando manifestação" hint="Novas duplicatas emitidas para você vão aparecer aqui" />}
       </div>
+      )}
+    </div>
+  );
+}
+
+// O sacado sem conta na Lastro não ficava sabendo da duplicata — a empresa esperava os 15 dias
+// do aceite tácito. Daqui a empresa manda um link: o sacado confere e responde sem criar conta.
+function ConvidarSacado({ aceite, onEnviado }: { aceite: Aceite; onEnviado: () => Promise<unknown> | void }) {
+  const [aberto, setAberto] = useState(false);
+  const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [enviado, setEnviado] = useState<ConviteEnviado | null>(null);
+  const [copiado, setCopiado] = useState(false);
+
+  const enviar = async () => {
+    setEnviando(true);
+    setErro('');
+    try {
+      const res = await api.post<ConviteEnviado>(`/aceites/${aceite.id}/convite`, { email, telefone });
+      setEnviado(res);
+      setAberto(false);
+      await onEnviado();
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : 'Não foi possível enviar o link.');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const copiar = async () => {
+    if (!enviado) return;
+    try {
+      await navigator.clipboard.writeText(enviado.link);
+      setCopiado(true);
+    } catch {
+      setCopiado(false);
+    }
+  };
+
+  return (
+    <div className="mx-5 mb-4 rounded-[10px] px-4 py-3 bg-surface text-[12.5px]" data-testid={`convite-${aceite.id}`}>
+      {aceite.convite && !enviado && (
+        <div className="text-textSecondary mb-2">
+          Link enviado {aceite.convite.enviadoHa} para {[aceite.convite.email, aceite.convite.telefone].filter(Boolean).join(' e ')}.
+        </div>
+      )}
+      {enviado && (
+        <div className="mb-2.5 flex flex-col gap-1.5">
+          {enviado.email && (
+            <div>
+              {enviado.email.status === 'enviado'
+                ? `✓ E-mail enviado para ${enviado.email.destino}.`
+                : `E-mail para ${enviado.email.destino} não foi enviado de verdade (e-mail da plataforma ainda não configurado) — use o WhatsApp ou copie o link.`}
+            </div>
+          )}
+          {enviado.whatsapp && enviado.whatsapp.status === 'enviado' && <div>✓ WhatsApp enviado para {enviado.whatsapp.destino}.</div>}
+          <div className="flex gap-2 flex-wrap items-center">
+            <a
+              href={enviado.whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-md bg-green text-white font-bold no-underline"
+            >
+              Enviar pelo meu WhatsApp
+            </a>
+            <button type="button" onClick={copiar} className="px-3 py-1.5 rounded-md border border-border bg-white font-bold cursor-pointer">
+              {copiado ? 'Link copiado' : 'Copiar link'}
+            </button>
+          </div>
+        </div>
+      )}
+      {!aberto ? (
+        <button type="button" onClick={() => setAberto(true)} className="bg-transparent border-none text-blue font-bold cursor-pointer underline p-0">
+          {aceite.convite || enviado ? 'Reenviar link de aceite' : 'Enviar link de aceite para o sacado'}
+        </button>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="text-textSecondary">O sacado recebe um link, confere a duplicata e confirma (ou contesta) sem precisar criar conta.</div>
+          <div className="flex gap-2 flex-wrap">
+            <input
+              aria-label="E-mail do sacado"
+              placeholder="e-mail do financeiro do sacado"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="flex-1 min-w-[200px] px-2.5 py-1.5 rounded-md border border-inputBorder bg-white"
+            />
+            <input
+              aria-label="WhatsApp do sacado"
+              placeholder="WhatsApp (com DDD)"
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              className="w-[180px] px-2.5 py-1.5 rounded-md border border-inputBorder bg-white"
+            />
+            <button
+              type="button"
+              disabled={enviando}
+              onClick={enviar}
+              className="px-3 py-1.5 rounded-md border-none bg-blue text-white font-bold cursor-pointer disabled:opacity-60"
+            >
+              {enviando ? 'Enviando…' : 'Enviar link'}
+            </button>
+          </div>
+          {erro && <div className="text-red font-semibold">{erro}</div>}
+        </div>
       )}
     </div>
   );

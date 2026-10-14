@@ -42,6 +42,9 @@ export default defineConfig({
       // every spec here that logs into a demo account (login/marketplace/billing/seguradora)
       // fails at the login step, not at whatever it's actually meant to test.
       SEED_DEMO_DATA: 'true',
+      // A suíte faz mais de 20 logins/cadastros de um IP só em menos de 15 minutos — o limite
+      // anti força bruta de produção (routes/auth.ts) derrubaria o login dos últimos testes.
+      AUTH_RATE_LIMIT: '200',
     },
   },
 });

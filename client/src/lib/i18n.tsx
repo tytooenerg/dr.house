@@ -49,7 +49,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     'app.publicidade': 'Advertising',
     'nav.legal': 'Legal',
     'nav.entrar': 'Log in',
-    'nav.falarVendas': 'Talk to sales',
+    'nav.criarConta': 'Sign up',
     'footer.termos': 'Terms of use',
     'footer.privacidade': 'Privacy',
     'footer.status': 'Status',
@@ -140,8 +140,8 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     // My Receivables page (static chrome only)
     'minhas.title': 'My Receivables',
     'minhas.subtitle': 'Register and track the receivables you sent to market',
-    'minhas.dropzoneTitle': 'Drag an XML or PDF of an invoice / receivable',
-    'minhas.dropzoneHint': 'or click to select a file from your computer',
+    'minhas.dropzoneTitle': 'Issue a new receivable',
+    'minhas.dropzoneHint': 'Upload the invoice XML or PDF and the fields are filled in for you',
     'minhas.colSacado': 'Debtor',
     'minhas.colValor': 'Amount',
     'minhas.colEmissao': 'Issued',
@@ -165,6 +165,7 @@ const TRANSLATIONS: Record<Lang, Record<string, string>> = {
     // PT-BR, same scoping choice the rest of this file documents up top.
     'admin.title': 'Back Office',
     'admin.subtitle': 'Onboarding approval, dispute arbitration and the platform audit trail',
+    'admin.tab.indicadores': 'Business metrics',
     'admin.tab.kyb': 'KYB queue',
     'admin.tab.disputas': 'Disputes',
     'admin.tab.compliance': 'Compliance',

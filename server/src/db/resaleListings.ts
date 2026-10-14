@@ -37,8 +37,10 @@ export function setListingStatus(id: number, status: 'vendido' | 'cancelado') {
 // DARF como se o investidor tivesse recebido o valor de face na data do vencimento, quando
 // na verdade ele saiu da posição antes disso por um valor diferente (ver
 // lib/resaleCore.ts's executeResaleTrade, o único chamador real).
+// encerrada_em (migração 0081): a data em que o ganho foi realizado — é ela, e não o
+// vencimento, que vale para o imposto e para o prazo da posição (lib/investorPositions.ts).
 export function deactivatePurchase(id: number, retorno: number) {
-  db.prepare('UPDATE purchases SET active = 0, retorno = ? WHERE id = ?').run(retorno, id);
+  db.prepare("UPDATE purchases SET active = 0, retorno = ?, encerrada_em = datetime('now') WHERE id = ?").run(retorno, id);
 }
 
 // original_valor precisa ser o valor de face real (d.valor), não purchases.valor — essa

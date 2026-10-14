@@ -213,7 +213,7 @@ A follow-up pass built out the concrete, software-buildable gaps identified agai
 
 A follow-up pass closed three gaps that matter specifically once real money is moving through the platform, not just feature completeness.
 
-- **Automated SQLite backups** (`lib/backup.ts`, admin **Auditoria** tab) — the single most important gap of the three: until this pass there was no disaster-recovery story at all for the datastore backing every saldo, duplicata and audit record. A background job snapshots the live database every 6h (configurable via `BACKUP_INTERVAL_MS`) using SQLite's own online backup API (safe against a live WAL-mode database, not a naive file copy), retains the most recent 28 by default (`BACKUP_RETENTION_COUNT`), and optionally hands each snapshot to `BACKUP_OFFSITE_CMD` (e.g. `aws s3 cp`) for off-instance storage — no cloud credential is shipped by default. An admin can also trigger a snapshot on demand and see the list with sizes/timestamps.
+- **Automated SQLite backups** (`lib/backup.ts`, admin **Auditoria** tab) — the single most important gap of the three: until this pass there was no disaster-recovery story at all for the datastore backing every saldo, duplicata and audit record. A background job snapshots the live database every 6h (configurable via `BACKUP_INTERVAL_MS`) using SQLite's own online backup API (safe against a live WAL-mode database, not a naive file copy), retains the most recent 28 by default (`BACKUP_RETENTION_COUNT`), and, with `BACKUP_S3_*` set, ships each snapshot plus every uploaded document (once each) to any S3-compatible bucket (`lib/offsiteStorage.ts`, AWS SigV4 over `node:crypto`, no extra tooling in the container — see DEPLOY.md §7 for the Backblaze B2 walkthrough with a write-only key); `BACKUP_OFFSITE_CMD` remains as an alternative hook. Without either, the admin panel says plainly that backups live only on the server's own disk. An admin can also trigger a snapshot on demand and see the list with sizes/timestamps.
 - **Real TED payment rail** (`lib/tedRail.ts`, `TED_PSP_*`/`LASTRO_TED_*`) — a third deposit/withdrawal method on Conta & Liquidação alongside Pix and boleto, for large institutional transfers. Deliberately asymmetric from Pix/boleto: TED has no universal real-time confirmation contract, so there's no user-facing "confirmar (simulado)" button — a deposit is only ever confirmed by a real BaaS webhook (when `TED_PSP_*` is configured) or by an admin matching the real bank statement by hand (`GET/POST /admin/ted/*`), the same way TED reconciliation actually works at a fintech without a virtual-account BaaS product in front of it.
 - **Real sandbox data isolation for partner API keys** (`lib/sandboxData.ts`) — closes the previous gap where a test-mode key (`lastro_test_…`) read/wrote the exact same account data as a live key, just labeled differently. Duplicatas created via a test-mode key are now tagged `sandbox=1` and filtered out of every live/internal read path (Minhas Duplicatas, Marketplace, monthly emit-limit counting, seguradora claim queues) at the query layer in `db/duplicatas.ts`, and `/v1/duplicatas/:id` 404s on any cross-mode lookup. Generating a test key auto-seeds a small deterministic demo dataset so a partner has something to explore immediately, and a sandbox emission never touches a real registradora regardless of configuration. Extended to aceites (`GET/POST /v1/aceites*` respect the calling key's mode, cross-mode lookups 404) and disputes (a dispute raised against a sandbox aceite never surfaces in a real cedente's Disputas screen or the admin arbitration queue) in the "o que está faltando" pass — not yet extended to insurance sinistro sub-resources.
 
@@ -933,6 +933,29 @@ Isso expunha dois bugs reais, não só o `discountRatio` já documentado:
 - Nos 4 arquivos afetados: `precoPago(p) = p.active ? p.faceValor - p.retorno : p.valor`.
 
 Novo `server/test/purchases-valor-preco-pago.test.ts`: `totalInvestidoFmt` do relatório institucional e do rebalanceamento batem com o preço pago real, não o valor de face; `retornoAnualizadoPct` do dashboard de performance sai maior que a versão ingênua (dividida por valor de face); uma posição já revendida mantém "Investido" como o registro original; `discountRatio` do block trade escolhe corretamente o anúncio com maior desconto real vs. valor de face, mesmo quando ele vem de uma revenda anterior com um preço-base diferente. `server/test/settlement.test.ts`/`investor-performance.test.ts` atualizados (assumiam valor de face como "Investido" — exatamente o bug). Verificado: `npm run typecheck`/`build`/`test` todos verdes (server 116 arquivos/710 testes).
+
+### `purchases.valor` = preço pago, sempre (migração 0080)
+
+Fecha de vez o duplo sentido acima. O remendo `preço pago = face − retorno` só valia para posição ativa: uma compra primária que foi revendida tem o `retorno` sobrescrito com o ganho realizado, e aí Carteira & Histórico, o relatório institucional, a performance e o dashboard mostravam a **face** como "Investido" — um valor que o investidor nunca pagou.
+
+- **Gravação:** `lib/auctionClose.ts` grava `face − retorno` (o preço pago, mesmo arredondamento do retorno). Revenda (`lib/resaleCore.ts`) já gravava o preço pago. `precoPago()` (`lib/investorPositions.ts`) passa a ser só `p.valor`; o custo do vendedor na revenda vem de `originalPurchase.valor`.
+- **Dados antigos (`0080_purchases_valor_preco_pago.sql`):** só a compra primária de cada duplicata que ainda guarda a face — ativa vira `face − retorno`; revendida tira o preço do lance vencedor (`auction_bids`) ou, antes do leilão, do lançamento "Compra da duplicata …" do ledger; sem fonte, fica como está.
+- **Leitores que precisavam de face continuam em face:** NAV do fundo Confirming (`sumOutstandingPurchasesByInvestor` → `d.valor`), limites de exposição da automação/auto-bid (`faceValor`) e a demanda do pricing dinâmico (`d.valor`).
+- **Leitores que contavam revendas como se fossem primárias:** resumo fiscal do cedente, volume do mercado primário (relatório CVM) e "volume financiado" da transparência — agora só a primeira compra de cada duplicata.
+
+Testes: `server/test/purchases-valor-migracao.test.ts` (migração sobre linhas no formato antigo, idempotência, arremate grava o preço pago, resumo fiscal ignora revendas); `purchases-valor-preco-pago`, `resale-retorno`, `block-trade`, `fiscal-cedente` e `investor-performance` atualizados para o novo significado.
+
+Os dois achados em aberto desta rodada foram fechados logo em seguida — ver a seção abaixo.
+
+### Data do resgate: revenda conta na data da revenda (migração 0081)
+
+DARF, Informe de Rendimentos, agente fiscal e performance usavam o **vencimento** da duplicata como data do resgate até para quem já tinha saído da posição vendendo no secundário — o ganho realizado caía no mês/ano errado e a alíquota da tabela regressiva saía pelo prazo até o vencimento. O Informe, além disso, separava o ano pela data da **compra**.
+
+- `purchases.encerrada_em` (0081): gravada por `deactivatePurchase` na revenda; as posições antigas recebem a data da compra seguinte da mesma duplicata (a do novo dono).
+- `dataDeResgate()` (`lib/investorPositions.ts`): revenda → `encerrada_em`, senão vencimento. Usada pelo DARF (seleção do mês, prazo, alíquota, marca "rev." no PDF), Informe (ano do rendimento recebido, só resgates já ocorridos), agente fiscal e `diasCarencia` da performance.
+- Performance: posição revendida não entra em atraso/inadimplência — o risco é do novo dono.
+
+Testes: `server/test/resgate-por-revenda.test.ts`; `income-tax-statement.test.ts` ajustado (uma posição que ainda não venceu não entra no informe).
 
 ### Auditoria de conformidade com as regras mais recentes da duplicata escritural
 

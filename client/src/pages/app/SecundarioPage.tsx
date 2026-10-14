@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { PageSkeleton } from '../../components/ui/Skeleton';
 import { Badge } from '../../components/ui/Badge';
 import { useApi } from '../../lib/useApi';
+import { DemonstrativoOperacao, useDemonstrativoSimulado, type Demonstrativo } from '../../components/DemonstrativoOperacao';
 
 interface ListingView {
   id: number;
@@ -21,12 +22,14 @@ interface ListingView {
   precoFmt: string;
   variacaoPct: number;
   melhorLanceFmt: string | null;
+  demonstrativo: Demonstrativo;
 }
 interface PositionView {
   purchaseId: number;
   duplicataId: string;
   sacado: string;
   valorPagoFmt: string;
+  valorFaceFmt: string;
   vencimento: string;
   diasRestantes: number;
 }
@@ -34,6 +37,7 @@ interface BidOnMyListingView {
   id: number;
   bidderCompanyName: string;
   valorFmt: string;
+  voceRecebeFmt: string;
 }
 interface MyListingView {
   id: number;
@@ -104,6 +108,7 @@ const BID_STATUS_LABEL: Record<MyBidView['status'], string> = {
 export function SecundarioPage() {
   const [prices, setPrices] = useState<Record<number, string>>({});
   const [bidValues, setBidValues] = useState<Record<number, string>>({});
+  const [contaAberta, setContaAberta] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [marketQuery, setMarketQuery] = useState('');
   const [marketSort, setMarketSort] = useState<'variacao' | 'valor' | 'prazo' | 'score'>('variacao');
@@ -219,7 +224,9 @@ export function SecundarioPage() {
                   <div className="font-semibold text-[13px]">{p.sacado}</div>
                   <div className="text-textTertiary text-[11.5px]">{p.diasRestantes}d até vencer</div>
                 </div>
-                <div className="text-textSecondary text-[12.5px] mb-2.5">Pago: {p.valorPagoFmt} · vence {p.vencimento}</div>
+                <div className="text-textSecondary text-[12.5px] mb-2.5">
+                  Valor da duplicata: {p.valorFaceFmt} · você pagou {p.valorPagoFmt} · vence {p.vencimento}
+                </div>
                 <div className="flex items-center gap-2">
                   <Input aria-label="Preço de venda"
                     placeholder="Preço de venda"
@@ -231,6 +238,7 @@ export function SecundarioPage() {
                     {busyKey === `listar:${p.purchaseId}` ? 'Anunciando…' : 'Anunciar'}
                   </Button>
                 </div>
+                <SimulacaoRevenda purchaseId={p.purchaseId} preco={prices[p.purchaseId] ?? ''} />
               </div>
             ))}
             {data.minhasPosicoes.length === 0 && <div className="text-textSecondary text-[12.5px]">Nenhuma posição disponível para revenda no momento.</div>}
@@ -264,6 +272,8 @@ export function SecundarioPage() {
                           <div key={b.id} className="flex items-center justify-between bg-surface rounded-md px-2.5 py-1.5">
                             <span className="text-textSecondary">
                               Lance de <b>{b.bidderCompanyName}</b>: {b.valorFmt}
+                              <span className="text-textTertiary"> · você recebe </span>
+                              <b className="font-mono-num text-green">{b.voceRecebeFmt}</b>
                             </span>
                             <div className="flex gap-1.5">
                               <button
@@ -339,8 +349,23 @@ export function SecundarioPage() {
                   <div className="text-textTertiary text-[11.5px]">{l.diasRestantes}d até vencer</div>
                 </div>
                 <div className="text-textSecondary text-[12.5px] mb-1">
-                  Preço original {l.valorOriginalFmt} → agora {l.precoFmt} ({l.variacaoPct > 0 ? '+' : ''}
+                  Valor da duplicata {l.valorOriginalFmt} → preço {l.precoFmt} ({l.variacaoPct > 0 ? '+' : ''}
                   {l.variacaoPct}%)
+                </div>
+                <div className="text-[12px] mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setContaAberta((v) => (v === l.id ? null : l.id))}
+                    aria-label={contaAberta === l.id ? `Ocultar a conta de ${l.sacado}` : `Ver a conta de ${l.sacado}`}
+                    className="bg-transparent border-none text-blue font-bold cursor-pointer underline p-0"
+                  >
+                    {contaAberta === l.id ? 'Ocultar a conta' : 'Ver a conta: quem paga e quem recebe'}
+                  </button>
+                  {contaAberta === l.id && (
+                    <div className="mt-2">
+                      <DemonstrativoOperacao demonstrativo={l.demonstrativo} titulo={`Comprando por ${l.precoFmt}`} />
+                    </div>
+                  )}
                 </div>
                 {l.melhorLanceFmt && <div className="text-textSecondary text-[11.5px] mb-2">Melhor lance no mercado: {l.melhorLanceFmt}</div>}
                 <div className="flex items-center gap-2">
@@ -565,6 +590,20 @@ export function SecundarioPage() {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+// "Se eu anunciar por X, quanto eu recebo?" — a conta aparece enquanto o vendedor digita o
+// preço, calculada no servidor com a mesma taxa que a venda vai descontar.
+function SimulacaoRevenda({ purchaseId, preco }: { purchaseId: number; preco: string }) {
+  const valor = preco.trim();
+  const valido = /\d/.test(valor);
+  const { demonstrativo, carregando } = useDemonstrativoSimulado(valido ? `/secundario/simulacao?purchaseId=${purchaseId}&preco=${encodeURIComponent(valor)}` : null);
+  if (!valido || !demonstrativo) return null;
+  return (
+    <div className="mt-2.5">
+      <DemonstrativoOperacao demonstrativo={demonstrativo} carregando={carregando} titulo="Se você vender por esse preço" />
     </div>
   );
 }

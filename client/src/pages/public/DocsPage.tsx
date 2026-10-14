@@ -154,8 +154,8 @@ export function DocsPage() {
       <div className="px-14 pb-10 max-w-[900px]">
         <div className="font-bold text-lg mb-3">Começando</div>
         <div className="text-textSecondary text-[14px] leading-relaxed mb-4">
-          Toda chamada usa a URL base <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">/api/v1</code> e autenticação por{' '}
-          <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">Authorization: Bearer &lt;sua chave&gt;</code>. Gere uma chave gratuita em{' '}
+          Toda chamada usa a URL base <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded-sm">/api/v1</code> e autenticação por{' '}
+          <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded-sm">Authorization: Bearer &lt;sua chave&gt;</code>. Gere uma chave gratuita em{' '}
           <Link to="/login" className="text-blue font-semibold">
             Desenvolvedores
           </Link>{' '}
@@ -216,7 +216,7 @@ export function DocsPage() {
       <div className="px-14 pb-10 max-w-[900px]">
         <div className="font-bold text-lg mb-2">Estabilidade e versionamento</div>
         <div className="text-textSecondary text-[13px] leading-relaxed">
-          <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">/v1</code> nunca foi descontinuada — nenhum parceiro jamais recebeu um aviso de
+          <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded-sm">/v1</code> nunca foi descontinuada — nenhum parceiro jamais recebeu um aviso de
           migração. Se um dia isso mudar, uma futura <code className="font-mono-num">/v2</code> coexistirá com <code className="font-mono-num">/v1</code>{' '}
           por no mínimo 12 meses antes de qualquer desligamento, e toda resposta de <code className="font-mono-num">/v1</code> passará a carregar
           cabeçalhos reais <code className="font-mono-num">Deprecation</code>/<code className="font-mono-num">Sunset</code> (RFC 8594) — mecanismo já
@@ -228,7 +228,7 @@ export function DocsPage() {
       <div className="px-14 pb-10 max-w-[900px]">
         <div className="font-bold text-lg mb-2">Idempotência</div>
         <div className="text-textSecondary text-[13px] leading-relaxed">
-          Todo endpoint de mutação aceita um cabeçalho opcional <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded">Idempotency-Key</code>.
+          Todo endpoint de mutação aceita um cabeçalho opcional <code className="font-mono-num bg-chip px-1.5 py-0.5 rounded-sm">Idempotency-Key</code>.
           Reenviar a mesma chave com o mesmo corpo replica a resposta original em vez de repetir o efeito colateral (emitir de novo, decidir de novo);
           reenviar com um corpo diferente retorna <code className="font-mono-num">409</code>. Mesmo contrato que o Stripe usa.
         </div>
@@ -252,7 +252,7 @@ export function DocsPage() {
                     <div key={`${method}-${path}`} className="bg-white border border-border rounded-card p-5">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <span
-                          className="font-mono-num font-extrabold text-[12.5px] px-2 py-0.5 rounded"
+                          className="font-mono-num font-extrabold text-[12.5px] px-2 py-0.5 rounded-sm"
                           style={{ background: method === 'get' ? PALETTE.chip : PALETTE.greenBg, color: method === 'get' ? PALETTE.blue : PALETTE.green }}
                         >
                           {method.toUpperCase()}

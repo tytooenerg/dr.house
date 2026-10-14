@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { PALETTE } from '../../lib/palette';
 
 // As pílulas de status estavam montadas à mão em 26 arquivos — 46 delas, em 11 formas
-// ligeiramente diferentes (`px-2 py-0.5 rounded` aqui, `px-2.5 py-1 rounded-md` ali) e sempre
+// ligeiramente diferentes (`px-2 py-0.5 rounded-sm` aqui, `px-2.5 py-1 rounded-md` ali) e sempre
 // repetindo um dos mesmos 5 pares de cores. `variant` nomeia o par (ninguém precisa lembrar
 // que "aprovado" é greenBg/green) e `size` reduz as 11 formas a 3.
 //
@@ -21,7 +21,7 @@ const VARIANT: Record<BadgeVariant, { bg: string; color: string }> = {
 };
 
 const SIZE: Record<BadgeSize, string> = {
-  sm: 'text-[10.5px] px-1.5 py-0.5 rounded',
+  sm: 'text-[10.5px] px-1.5 py-0.5 rounded-sm',
   md: 'text-[11.5px] px-2.5 py-1 rounded-md',
   lg: 'text-[11.5px] px-3 py-1.5 rounded-md',
 };
@@ -55,7 +55,7 @@ export function Badge({
 }
 
 export function Dot({ color, size = 7, className = '' }: { color: string; size?: number; className?: string }) {
-  return <span className={`rounded-full flex-shrink-0 ${className}`} style={{ background: color, width: size, height: size }} />;
+  return <span className={`rounded-full shrink-0 ${className}`} style={{ background: color, width: size, height: size }} />;
 }
 
 export function AiTag({ label = 'IA' }: { label?: string }) {

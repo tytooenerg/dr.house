@@ -40,9 +40,11 @@ describe('IR regressive table — real bracket boundaries', () => {
 
 describe('Informe de rendimentos — real per-operation IR estimate', () => {
   it('computes bruto/IR/líquido for a real purchase held ~90 days (22,5% bracket)', async () => {
-    const currentYear = new Date().getUTCFullYear();
     const { userId } = await registerInvestidor();
-    const vencimento = new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    // Aplicada há 92 dias, venceu há 2: o rendimento já foi recebido. (Uma posição que ainda
+    // não venceu não entra no informe — o rendimento não aconteceu.)
+    const vencimento = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const currentYear = new Date(vencimento).getUTCFullYear();
     const d = createDuplicata({
       cedenteId: null,
       cedenteNome: 'Cedente Teste',
@@ -59,7 +61,7 @@ describe('Informe de rendimentos — real per-operation IR estimate', () => {
     // Force a known, deterministic retorno for a clean assertion — createPurchase's own
     // retorno is randomized within a real range, which is fine for settlement but not for
     // asserting an exact IR figure here.
-    db.prepare('UPDATE purchases SET retorno = 1000 WHERE duplicata_id = ?').run(d.id);
+    db.prepare("UPDATE purchases SET retorno = 1000, created_at = datetime('now', '-92 days') WHERE duplicata_id = ?").run(d.id);
 
     const statement = buildIncomeTaxStatement(userId, 'Fundo Teste IR', currentYear);
     expect(statement.operacoesCount).toBe(1);

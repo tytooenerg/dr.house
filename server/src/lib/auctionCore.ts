@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import type { UserRow } from '../db/types.js';
+import { recordAuditEvent } from '../db/audit.js';
 import { getDuplicata, listMarketplace } from '../db/duplicatas.js';
 import { auctionIsOpen } from './auctionGate.js';
 import {
@@ -55,7 +57,9 @@ export function priceForRate(duplicataId: string, taxaAm: number): number | null
   return computePurchasePrice(d, taxaAm).precoCompra;
 }
 
-export function placeAuctionBid(user: UserRow, duplicataId: string, taxaAm: number): AuctionOutcome<{ bidId: number; taxaFmt: string; precoFmt: string }> {
+// Quem pode comprar, independente de qual duplicata — separado de placeAuctionBid pro lote
+// recusar UMA vez, em vez de devolver o mesmo 403 repetido para cada item.
+function checarComprador(user: UserRow): { status: number; body: { error: string; message: string } } | null {
   if (user.role !== 'investidor')
     return { status: 403, body: { error: 'forbidden', message: 'Apenas contas de investidor podem dar lances.' } };
   if (user.kyb_status !== 'approved')
@@ -73,6 +77,12 @@ export function placeAuctionBid(user: UserRow, duplicataId: string, taxaAm: numb
         message: 'Informe sob qual veículo você adquire recebíveis (instituição financeira, FIDC, fundo ou factoring) em Perfil & Configurações antes de dar lances.',
       },
     };
+  return null;
+}
+
+export function placeAuctionBid(user: UserRow, duplicataId: string, taxaAm: number): AuctionOutcome<{ bidId: number; taxaFmt: string; precoFmt: string }> {
+  const recusa = checarComprador(user);
+  if (recusa) return recusa;
 
   const open = auctionIsOpen(duplicataId);
   if (!open.ok) return { status: open.status, body: { error: open.error, message: open.message } };
@@ -111,6 +121,74 @@ export function placeAuctionBid(user: UserRow, duplicataId: string, taxaAm: numb
     });
   }
   return { status: 200, body: { bidId: bid.id, taxaFmt: fmtTaxa(taxaAm), precoFmt: fmtBRL(preco) } };
+}
+
+// Lance em lote: o fundo escolhe várias ofertas e lança em todas numa chamada. Cada item passa
+// pelo mesmo placeAuctionBid — mesma reserva, mesmas regras, mesmo webhook — e os leilões são
+// independentes, então o lote não é tudo-ou-nada: o que passa fica, o que não passa volta com
+// o motivo.
+export const LOTE_MAX_LANCES = 200;
+
+export const lanceLoteSchema = z.object({
+  lances: z
+    .array(
+      z.object({
+        duplicataId: z.string().trim().min(1),
+        taxaAm: z.union([z.number(), z.string().trim().min(1)]).optional(),
+      })
+    )
+    .min(1)
+    .max(LOTE_MAX_LANCES),
+});
+
+export type LanceLoteInput = z.infer<typeof lanceLoteSchema>['lances'];
+
+export interface LanceLoteResultado {
+  registrados: { duplicataId: string; bidId: number; taxaFmt: string; precoFmt: string }[];
+  recusados: { duplicataId: string; error: string; message: string }[];
+  totalPreco: number;
+  totalPrecoFmt: string;
+}
+
+export function parseTaxaAm(raw: number | string): number {
+  return typeof raw === 'number' ? raw : parseFloat(raw.replace(',', '.'));
+}
+
+export function placeBatchAuctionBids(user: UserRow, lances: LanceLoteInput): AuctionOutcome<LanceLoteResultado> {
+  const recusa = checarComprador(user);
+  if (recusa) return recusa;
+
+  const vistos = new Set<string>();
+  const resultado: LanceLoteResultado = { registrados: [], recusados: [], totalPreco: 0, totalPrecoFmt: '' };
+  for (const item of lances) {
+    if (vistos.has(item.duplicataId)) continue;
+    vistos.add(item.duplicataId);
+
+    // Sem taxa = aceita a reserva da própria duplicata (o pior deságio que o cedente aceita),
+    // como as cestas fazem — cada oferta tem a sua, então "a reserva" não é um número só.
+    const taxaAm = item.taxaAm === undefined ? reserveRate(item.duplicataId)?.taxaAm : parseTaxaAm(item.taxaAm);
+    if (taxaAm === undefined) {
+      resultado.recusados.push({ duplicataId: item.duplicataId, error: 'not_found', message: 'Duplicata não encontrada.' });
+      continue;
+    }
+    const outcome = placeAuctionBid(user, item.duplicataId, taxaAm);
+    if (outcome.status === 200) {
+      const body = outcome.body as { bidId: number; taxaFmt: string; precoFmt: string };
+      resultado.registrados.push({ duplicataId: item.duplicataId, ...body });
+      resultado.totalPreco += priceForRate(item.duplicataId, taxaAm) ?? 0;
+    } else {
+      const body = outcome.body as { error: string; message?: string };
+      resultado.recusados.push({ duplicataId: item.duplicataId, error: body.error, message: body.message ?? body.error });
+    }
+  }
+  resultado.totalPrecoFmt = fmtBRL(resultado.totalPreco);
+
+  recordAuditEvent(user.id, user.company_name, 'lance.lote', {
+    total: vistos.size,
+    registrados: resultado.registrados.length,
+    recusados: resultado.recusados.length,
+  });
+  return { status: 200, body: resultado };
 }
 
 export function cancelAuctionBid(user: UserRow, bidId: number): AuctionOutcome<{ ok: true }> {

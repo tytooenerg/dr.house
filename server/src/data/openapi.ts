@@ -69,6 +69,13 @@ export const openApiSpec = {
                   valor: { type: 'string', example: '84.500,00' },
                   vencimento: { type: 'string', example: '2026-08-12' },
                   seguro: { type: 'boolean', default: false },
+                  tipoDocumento: {
+                    type: 'string',
+                    enum: ['produto', 'servico'],
+                    default: 'produto',
+                    description:
+                      "'produto' (NF-e, chave de acesso nacional de 44 dígitos) ou 'servico' (NFS-e — não existe chave/dígito verificador nacional; cada município emite a sua).",
+                  },
                 },
               },
             },
@@ -396,6 +403,57 @@ export const openApiSpec = {
         description:
           'Agregado calculado ao vivo sobre o volume real (não-sandbox) transacionado na Lastro, mesma disciplina de honestidade do painel público de transparência (lib/publicStatsCore.ts) — números reais, que começam pequenos e crescem com o uso real, nunca um benchmark fabricado.',
         responses: { '200': { description: '`avgDesagioGeralPct`, `taxaInadimplenciaGeralPct` e `porRating` (por AA/A/B/C).' } },
+      },
+    },
+    '/lances': {
+      get: {
+        summary: 'Listar meus lances no leilão primário (fundos e bancos)',
+        description: 'Todos os lances da conta, com o status de cada um: ativo (leilão ainda aberto), vencedor, perdedor ou cancelado. Só chave live.',
+        responses: {
+          '200': { description: 'Lista de lances com sacado, valor, taxa, preço, status e prazo do leilão.' },
+          '403': { description: 'Chave não pertence a uma conta investidor.' },
+          '409': { description: 'Chave de teste: o leilão não existe em sandbox — use uma chave live.' },
+        },
+      },
+    },
+    '/lances/lote': {
+      post: {
+        summary: 'Dar lances em várias duplicatas de uma vez (fundos e bancos)',
+        description:
+          'Até 200 lances numa chamada, cada um sob as mesmas regras do lance único: menor deságio vence no fechamento do leilão, lance acima da reserva do cedente é recusado. Os leilões são independentes — o lote não é tudo-ou-nada: a resposta separa `registrados` e `recusados` (com o motivo de cada um). Sem `taxaAm`, o lance vai na taxa de reserva da própria duplicata. Lançar de novo numa duplicata substitui o lance anterior. Dispara lance.recebido para cada cedente.',
+        parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['lances'],
+                properties: {
+                  lances: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: 200,
+                    items: {
+                      type: 'object',
+                      required: ['duplicataId'],
+                      properties: {
+                        duplicataId: { type: 'string', example: 'DUP-2026-1025-0baf' },
+                        taxaAm: { oneOf: [{ type: 'number' }, { type: 'string' }], example: 2.5, description: 'Deságio proposto, em % ao mês. Omitido = taxa de reserva.' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '`registrados` (duplicataId, bidId, taxaFmt, precoFmt), `recusados` (duplicataId, error, message) e `totalPrecoFmt` — o que sai do caixa se todos vencerem.' },
+          '400': { description: 'Lista vazia, com mais de 200 itens, ou item sem duplicataId.' },
+          '403': { description: 'Chave somente-leitura, conta não investidor, credenciamento (KYB) em análise ou veículo de aquisição não informado.' },
+          '409': { description: 'Chave de teste: o leilão não existe em sandbox — use uma chave live.' },
+        },
       },
     },
     '/otc': {

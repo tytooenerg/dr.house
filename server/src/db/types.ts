@@ -36,6 +36,8 @@ export interface LadderConfig {
 
 export interface UserSettings {
   onboardingSeen: boolean;
+  // Menu da empresa: false = modo essencial (6 abas), true = todas as ferramentas.
+  menuCompleto: boolean;
   // digest only means anything for an admin account (Resumo diário do back-office —
   // lib/dailyBriefing.ts) but lives on the same shared shape every role's notifPrefs
   // already uses, same as marketing being irrelevant-but-present for every role.
@@ -73,6 +75,9 @@ export interface UserSettings {
   kycDocsUploaded: boolean;
   kycDocsRejected: boolean;
   kycDocsAttempts: number;
+  // Piloto automático da empresa (lib/pilotoAutomatico.ts) — tudo desligado por padrão; a
+  // empresa liga em Conta & Liquidação. reservaAm null = usa a banda de mercado do dia.
+  pilotoAutomatico: { leilaoAoAceitar: boolean; reservaAm: number | null; relancarSemLance: boolean; saqueAutomaticoPix: boolean };
   playgroundEndpoint: string;
   playgroundParams: Record<string, string>;
   fidcPL: string;
@@ -107,6 +112,7 @@ export interface UserSettings {
 export function defaultSettings(): UserSettings {
   return {
     onboardingSeen: false,
+    menuCompleto: false,
     notifPrefs: { leilao: true, aceite: true, disputa: true, marketing: false, digest: true, compliance: true },
     notifyViaWhatsapp: false,
     autoBidEnabled: false,
@@ -135,6 +141,7 @@ export function defaultSettings(): UserSettings {
     kycDocsUploaded: false,
     kycDocsRejected: false,
     kycDocsAttempts: 0,
+    pilotoAutomatico: { leilaoAoAceitar: false, reservaAm: null, relancarSemLance: false, saqueAutomaticoPix: false },
     playgroundEndpoint: 'emitir',
     playgroundParams: {
       sacado_cnpj: '12.345.678/0001-95', valor: '84500.00', vencimento: '2026-08-12', seguro: 'true',
@@ -228,6 +235,10 @@ export interface DuplicataRow {
   // Pior deságio mensal que o cedente aceita neste leilão. NULL = usa a banda de mercado
   // (lib/dynamicPricing.ts) como sugestão — ver migração 0069.
   reserva_taxa_am: number | null;
+  // JSON {chave do item: cumprido} do checklist de lastro na emissão — ver migração 0077.
+  lastro_itens: string | null;
+  // Quantas vezes o piloto automático já relançou o leilão desta duplicata sem lance (0079).
+  leilao_tentativas: number;
 }
 
 export type NetworkSignalTipo = 'pagamento_pontual' | 'atraso' | 'protesto' | 'contestacao';

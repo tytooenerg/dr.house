@@ -9,6 +9,7 @@ import { ratingFromScore, SETOR_LABELS } from './riscoCore.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { listInsuranceQuotesComCapacidade } from './insuranceQuotes.js';
 import { getLatestInsuranceSettlement } from '../db/insuranceSettlements.js';
+import { demonstrativoPrimario } from './demonstrativo.js';
 
 const ACEITE_BADGE = {
   aceita: { label: 'Aceite confirmado', bg: '#EAF3EE', color: COLORS.GREEN },
@@ -48,12 +49,43 @@ export function computePurchasePrice(
   // proporcional ao prazo que falta, então adiar barateia, e essa comparação só é honesta se
   // sair do mesmo lugar que o preço real.
   nowMs: number = Date.now()
-): { precoCompra: number; descontoValor: number; descontoPct: number; taxaAmPct: number } {
+): { precoCompra: number; descontoValor: number; descontoPct: number; taxaAmPct: number; prazoDias: number } {
   const taxaAmPct = rateOverridePct ?? effectiveMonthlyRatePct(d);
   const prazoDias = Math.max(0, Math.round((parseFlexibleDate(d.vencimento).getTime() - nowMs) / 86_400_000));
   const descontoPct = Math.min((taxaAmPct * (prazoDias / 30)) / 100, MAX_DESCONTO_PCT);
   const descontoValor = d.valor * descontoPct;
-  return { precoCompra: d.valor - descontoValor, descontoValor, descontoPct, taxaAmPct };
+  return { precoCompra: d.valor - descontoValor, descontoValor, descontoPct, taxaAmPct, prazoDias };
+}
+
+// O cálculo de um lance JÁ DADO. O preço do lance é fixado quando ele é dado
+// (auctionCore.priceForRate) e é exatamente o que o vencedor paga no fechamento
+// (auctionClose.ts) — recalcular agora, com menos dias de prazo, mostraria um número que
+// ninguém vai pagar. O prazo usado naquele momento sai da própria conta (desconto = taxa ×
+// prazo/30), exceto quando o desconto bateu no teto, em que o prazo não importa.
+export function calcFromBid(d: DuplicataRow, taxaAm: number, preco: number): ReturnType<typeof computePurchasePrice> {
+  const descontoValor = d.valor - preco;
+  const descontoPct = d.valor > 0 ? descontoValor / d.valor : 0;
+  const atual = computePurchasePrice(d, taxaAm);
+  const noTeto = descontoPct >= MAX_DESCONTO_PCT - 1e-9;
+  const prazoDias = noTeto || taxaAm <= 0 ? atual.prazoDias : Math.round((descontoPct * 3000) / taxaAm);
+  return { precoCompra: preco, descontoValor, descontoPct, taxaAmPct: taxaAm, prazoDias };
+}
+
+/**
+ * A conta "quem paga e quem recebe" que a oferta mostra antes de qualquer digitação: no
+ * melhor lance, se houver (o que aconteceria se o leilão fechasse agora), senão na reserva
+ * do cedente (o pior caso que ele aceita).
+ */
+export function demonstrativoDaOferta(d: DuplicataRow) {
+  const melhor = listActiveAuctionBids(d.id)[0];
+  if (melhor) {
+    return { referencia: `melhor lance (${melhor.taxa_am.toFixed(2).replace('.', ',')}% a.m.)`, ...demonstrativoPrimario(d.valor, calcFromBid(d, melhor.taxa_am, melhor.preco)) };
+  }
+  const reserva = reserveRateFor(d);
+  return {
+    referencia: `reserva do cedente (${reserva.taxaAm.toFixed(2).replace('.', ',')}% a.m.)`,
+    ...demonstrativoPrimario(d.valor, computePurchasePrice(d, reserva.taxaAm)),
+  };
 }
 
 // A reserva de VERDADE: o pior deságio que o cedente aceita. Quando ele informa uma ao
@@ -236,6 +268,7 @@ export function buildOfferView(d: DuplicataRow, viewerId: number | null = null) 
       : null,
     bidCount: bids.length,
     bids,
+    demonstrativo: demonstrativoDaOferta(d),
     countdown,
     countdownSec: remainingSec,
     aceiteBadgeLabel: aceiteBadge.label,

@@ -64,12 +64,34 @@ def test_abrir_leilao_refuses_before_the_sacado_accepts(base_url):
     client = LastroClient(api_key, base_url=base_url)
 
     emitida = client.emitir_duplicata(
-        sacado="Grupo Atlas Varejo", cnpj="12.345.678/0001-95", valor="10.000,00", vencimento="2027-12-01", nf_anexada=True
+        sacado="Grupo Atlas Varejo",
+        cnpj="12.345.678/0001-95",
+        valor="10.000,00",
+        vencimento="2027-12-01",
+        nf_anexada=True,
+        comprovante_entrega_anexado=True,
+        pedido_compra_anexado=True,
     )
     with pytest.raises(LastroApiError) as exc_info:
         client.abrir_leilao(emitida["duplicataId"], taxa_maxima=2.5, duracao_horas=24)
     assert exc_info.value.status == 409
     assert exc_info.value.error == "aceite_pendente"
+
+
+def test_lances_em_lote_recusa_chave_de_teste(base_url):
+    """O servidor roda como subprocesso, então aqui não dá pra credenciar a conta nem abrir um
+    leilão direto no banco (o SDK Node, que importa o app no mesmo processo, cobre o lance real
+    com chave live). O que se prova é o formato da requisição e a recusa honesta do sandbox."""
+    api_key = register_and_generate_key(internal_url(base_url), "investidor", unique())
+    client = LastroClient(api_key, base_url=base_url)
+    with pytest.raises(LastroApiError) as exc_info:
+        client.dar_lances_em_lote([{"duplicataId": "DUP-QUALQUER", "taxaAm": 2.5}])
+    assert exc_info.value.status == 409
+    assert exc_info.value.error == "sandbox_indisponivel"
+
+    with pytest.raises(LastroApiError) as exc_info:
+        client.list_meus_lances()
+    assert exc_info.value.error == "sandbox_indisponivel"
 
 
 def test_cashflow_is_gated_by_plan(base_url):

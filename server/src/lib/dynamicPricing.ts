@@ -45,7 +45,14 @@ export function computeLiquiditySignal(): LiquiditySignal {
   const supply = db
     .prepare(`SELECT COALESCE(SUM(valor), 0) as v FROM duplicatas WHERE sandbox = 0 AND created_at >= datetime('now', '-30 days')`)
     .get() as { v: number };
-  const demand = db.prepare(`SELECT COALESCE(SUM(valor), 0) as v FROM purchases WHERE created_at >= datetime('now', '-30 days')`).get() as { v: number };
+  // Demanda em valor de FACE das compras primárias — a mesma unidade da oferta (duplicatas.valor).
+  // Antes somava purchases.valor de todas as linhas, contando revendas e misturando face e preço.
+  const demand = db
+    .prepare(
+      `SELECT COALESCE(SUM(d.valor), 0) as v FROM purchases p JOIN duplicatas d ON d.id = p.duplicata_id
+       WHERE p.created_at >= datetime('now', '-30 days') AND p.id = (SELECT MIN(p2.id) FROM purchases p2 WHERE p2.duplicata_id = p.duplicata_id)`
+    )
+    .get() as { v: number };
   return computeMultiplier(supply.v, demand.v);
 }
 
@@ -78,9 +85,9 @@ export function computeLiquiditySignalForRating(rating: Rating): LiquiditySignal
 
   const demand = db
     .prepare(
-      `SELECT COALESCE(SUM(p.valor), 0) as v FROM purchases p
+      `SELECT COALESCE(SUM(d.valor), 0) as v FROM purchases p
        JOIN duplicatas d ON d.id = p.duplicata_id
-       WHERE p.created_at >= datetime('now', '-30 days') AND d.score BETWEEN ? AND ?`
+       WHERE p.created_at >= datetime('now', '-30 days') AND d.score BETWEEN ? AND ? AND p.id = (SELECT MIN(p2.id) FROM purchases p2 WHERE p2.duplicata_id = p.duplicata_id)`
     )
     .get(scoreMin, scoreMax) as { v: number };
   return { ...computeMultiplier(supply.v, demand.v), segmented: true };

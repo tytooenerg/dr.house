@@ -41,7 +41,7 @@ async function submitEmitir(token: string) {
         valor: '10.000',
         vencimento: vencimentoFuturo(),
         seguro: false,
-        nfAnexada: true,
+        nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
         batchValores: [],
       });
     lastStatus = res.status;

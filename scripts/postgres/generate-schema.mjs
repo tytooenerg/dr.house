@@ -157,6 +157,18 @@ ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('investidor','
   '0059_advertisement_addon_kind.sql': `ALTER TABLE addon_charges DROP CONSTRAINT addon_charges_kind_check;
 ALTER TABLE addon_charges ADD CONSTRAINT addon_charges_kind_check CHECK (kind IN ('api_overage', 'score_api', 'pld_screening_api', 'registro_api', 'whitelabel_plus', 'institutional_reporting', 'judicial_records_api', 'fraud_screening_api', 'document_intelligence_api', 'reconciliation_api', 'suitability_api', 'market_index_api', 'publicidade_carrossel'));
 `,
+  // Mesmo idioma de reconstrução de novo (amplia compliance_alerts.type para os alertas de
+  // CNPJ e de NF-e). As versões nativas foram escritas à mão em migrations-postgres/ e nunca
+  // registradas aqui — rodar o gerador as trocava pela reconstrução traduzida, exatamente o
+  // que os comentários de 0045/0046 avisavam que ia continuar acontecendo.
+  '0073_cnpj_alertas.sql': `ALTER TABLE compliance_alerts DROP CONSTRAINT compliance_alerts_type_check;
+ALTER TABLE compliance_alerts ADD CONSTRAINT compliance_alerts_type_check
+  CHECK (type IN ('nfe_duplicidade','valor_anomalo','pld_screening','cnpj_invalido','cnpj_situacao_irregular'));
+`,
+  '0074_nfe_status_alertas.sql': `ALTER TABLE compliance_alerts DROP CONSTRAINT compliance_alerts_type_check;
+ALTER TABLE compliance_alerts ADD CONSTRAINT compliance_alerts_type_check
+  CHECK (type IN ('nfe_duplicidade','valor_anomalo','pld_screening','cnpj_invalido','cnpj_situacao_irregular','nfe_chave_invalida','nfe_situacao_irregular'));
+`,
 };
 
 const files = readdirSync(srcDir).filter((f) => f.endsWith('.sql')).sort();

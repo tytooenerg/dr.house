@@ -52,7 +52,7 @@ describe('informarNegociacao é chamada nos pontos reais de negociação, não s
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: `Sacado Negoc ${unique()} Ltda`, cnpj: '22.333.444/0001-55', valor: '35.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+        .send({ sacado: `Sacado Negoc ${unique()} Ltda`, cnpj: '22.333.444/0001-55', valor: '35.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).toBeTruthy();

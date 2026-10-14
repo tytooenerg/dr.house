@@ -70,5 +70,5 @@ const ICONS: Record<string, LucideIcon> = {
 
 export function NavIcon({ tab, size = 16 }: { tab: string; size?: number }) {
   const Icon = ICONS[tab] ?? LayoutDashboard;
-  return <Icon size={size} strokeWidth={1.75} aria-hidden="true" className="flex-shrink-0" />;
+  return <Icon size={size} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />;
 }

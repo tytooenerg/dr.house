@@ -6,7 +6,7 @@ import { bureauEnabled } from './creditBureau.js';
 import { esignatureEnabled } from './esignature.js';
 import { pldProviderEnabled } from './sanctionsFeed.js';
 import { biometricKycEnabled } from './biometricKyc.js';
-import { backupEnabled } from './backup.js';
+import { offsiteEnabled } from './offsiteStorage.js';
 import { claudeEnabled } from './claude.js';
 import { twilioEnabled } from './smsNotifier.js';
 import { sentryEnabled } from './sentry.js';
@@ -80,7 +80,13 @@ export function integracoes(): ItemDePreflight[] {
     { chave: 'pld', nome: 'PLD/sanções (provedor pago)', real: pldProviderEnabled, envs: ['PLD_PROVIDER_API_URL', 'PLD_PROVIDER_API_KEY'], semEle: 'a triagem cai na lista OFAC gratuita ou na tabela fictícia de demonstração' },
     { chave: 'esignature', nome: 'Assinatura eletrônica', real: esignatureEnabled, envs: ['ESIGNATURE_API_URL', 'ESIGNATURE_API_KEY'], semEle: 'o envio para assinatura é simulado' },
     { chave: 'kyc', nome: 'KYC biométrico', real: biometricKycEnabled, envs: ['BIOMETRIC_KYC_API_URL', 'BIOMETRIC_KYC_API_KEY'], semEle: 'verificação biométrica desativada' },
-    { chave: 'backup', nome: 'Backup off-site', real: backupEnabled, envs: ['BACKUP_OFFSITE_CMD'], semEle: 'o snapshot fica só no disco do próprio servidor' },
+    {
+      chave: 'backup',
+      nome: 'Backup off-site',
+      real: offsiteEnabled() || !!process.env.BACKUP_OFFSITE_CMD,
+      envs: ['BACKUP_S3_ENDPOINT', 'BACKUP_S3_BUCKET', 'BACKUP_S3_ACCESS_KEY_ID', 'BACKUP_S3_SECRET_ACCESS_KEY'],
+      semEle: 'o snapshot e os documentos enviados ficam só no disco do próprio servidor',
+    },
     { chave: 'sentry', nome: 'Monitoramento de erros', real: sentryEnabled, envs: ['SENTRY_DSN'], semEle: 'erros de produção só aparecem no log local' },
     { chave: 'claude', nome: 'IA (Claude)', real: claudeEnabled, envs: ['ANTHROPIC_API_KEY'], semEle: 'os recursos assistidos por IA usam fallback estático, rotulado' },
     { chave: 'twilio', nome: 'WhatsApp/SMS', real: twilioEnabled, envs: ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN'], semEle: 'mensagens são apenas logadas' },

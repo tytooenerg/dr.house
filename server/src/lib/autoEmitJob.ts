@@ -63,9 +63,19 @@ export async function runAutoEmitForUser(user: UserRow): Promise<{ emitidas: num
       valor: c.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       vencimento: c.vencimento,
       seguro: false,
+      // O conector de ERP só traz contas a receber genéricas, sem distinguir mercadoria de
+      // serviço — 'produto' é o padrão histórico desta função, mantido aqui.
+      tipoDocumento: 'produto',
       nfAnexada: true,
       nfeChave: '',
+      // O conector de ERP não traz comprovante de entrega/execução nem pedido de compra —
+      // marcar como true aqui repetiria o mesmo problema que o checklist tinha antes
+      // (um documento "feito" sem nunca ter sido enviado de verdade).
+      comprovanteEntregaAnexado: false,
+      pedidoCompraAnexado: false,
       batchValores: [],
+      sacadoEmail: '',
+      sacadoTelefone: '',
     };
     try {
       const outcome = await submitEmitir(user, form);

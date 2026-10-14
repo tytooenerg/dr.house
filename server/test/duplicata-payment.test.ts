@@ -46,7 +46,7 @@ function formCompleto(sacado: string, valor: string) {
   // nfAnexada: true — precisa de checklist 100% (status 'aprovada' na hora) pra poder
   // disparar leilão ou reportar pagamento direto; sem isso a duplicata fica
   // 'pendente_analise'.
-  return { sacado, cnpj: '33.222.111/0001-00', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] };
+  return { sacado, cnpj: '33.222.111/0001-00', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] };
 }
 
 async function extratoOf(token: string) {

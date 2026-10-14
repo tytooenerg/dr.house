@@ -200,8 +200,8 @@ export function AddonRevenuePanel() {
               <span className="text-textMuted flex-1 min-w-0 truncate">
                 <b className="text-textPrimary">{c.empresa}</b> — {c.descricao}
               </span>
-              <span className="font-mono-num font-bold flex-shrink-0">{c.valorFmt}</span>
-              <span className="text-textTertiary flex-shrink-0">{c.quando}</span>
+              <span className="font-mono-num font-bold shrink-0">{c.valorFmt}</span>
+              <span className="text-textTertiary shrink-0">{c.quando}</span>
             </div>
           ))}
           {addonRecentes.length === 0 && <EmptyState title="Nenhuma cobrança de add-on ainda" hint="Cobranças aparecem aqui assim que geradas" />}

@@ -29,9 +29,29 @@ const BASE = {
   reservaTaxaAm: 3,
   precoEstimadoFmt: 'R$ 37.900',
   leilao: null as unknown,
+  faltando: [] as unknown[],
+};
+
+// Montado no servidor por lib/demonstrativo.ts (melhor lance de 1,90% a.m.).
+const DEMONSTRATIVO = {
+  referencia: 'melhor lance (1,90% a.m.)',
+  linhas: [
+    { rotulo: 'Valor da duplicata', detalhe: null, valorFmt: 'R$ 40.000,00', tipo: 'base' },
+    { rotulo: 'Deságio do banco/fundo', detalhe: '1,90% a.m. × 55 dias = 3,48%', valorFmt: '− R$ 1.393,33', tipo: 'menos' },
+    { rotulo: 'Banco/fundo paga hoje', detalhe: null, valorFmt: 'R$ 38.606,67', tipo: 'total' },
+    { rotulo: 'Taxa da plataforma Lastro', detalhe: '0,35% sobre o valor da duplicata', valorFmt: '− R$ 140,00', tipo: 'menos' },
+    { rotulo: 'Empresa recebe', detalhe: null, valorFmt: 'R$ 38.466,67', tipo: 'resultado' },
+  ],
+  rodape: 'No vencimento o banco/fundo recebe R$ 40.000,00 do sacado — ganho de R$ 1.393,33 (3,61% no período).',
+  valorFace: 40000,
+  compradorPaga: 38606.67,
+  taxaPlataforma: 140,
+  vendedorRecebe: 38466.67,
+  ganhoComprador: 1393.33,
 };
 
 const ESCADA = {
+  demonstrativo: DEMONSTRATIVO,
   totalLances: 2,
   melhorTaxaFmt: '1,90%',
   melhorPrecoFmt: 'R$ 38.240',
@@ -90,6 +110,43 @@ describe('MinhasPage — o leilão da própria duplicata', () => {
     renderMinhas([{ ...BASE, leilao: { ...ESCADA, totalLances: 0, melhorTaxaFmt: null, melhorPrecoFmt: null, lances: [] } }]);
     await waitFor(() => expect(screen.getByText(/Nenhum lance ainda/)).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Ver a disputa/ })).not.toBeInTheDocument();
+  });
+
+  it('diz quanto ENTRA no saldo da empresa (já sem a taxa) e abre a conta inteira', async () => {
+    renderMinhas([{ ...BASE, leilao: ESCADA }]);
+    await waitFor(() => expect(screen.getByText(/você recebe/)).toBeInTheDocument());
+    expect(screen.getByText('R$ 38.466,67')).toBeInTheDocument();
+    expect(screen.queryByTestId('demonstrativo')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Ver a conta/ }));
+    const conta = screen.getByTestId('demonstrativo');
+    expect(conta).toHaveTextContent('Se o leilão fechasse agora — melhor lance (1,90% a.m.)');
+    expect(conta).toHaveTextContent('Taxa da plataforma Lastro');
+    expect(conta).toHaveTextContent('− R$ 140,00');
+    expect(conta).toHaveTextContent('Empresa recebe');
+  });
+
+  it('sem lance, diz o mínimo que a reserva garante', async () => {
+    renderMinhas([{ ...BASE, leilao: { ...ESCADA, totalLances: 0, melhorTaxaFmt: null, melhorPrecoFmt: null, lances: [] } }]);
+    await waitFor(() => expect(screen.getByText(/pela sua reserva, você receberia no mínimo/)).toBeInTheDocument());
+  });
+
+  it('duplicata com documentos faltando diz o que falta e oferece anexar ou informar o CNPJ', async () => {
+    renderMinhas([
+      {
+        ...BASE,
+        status: 'Pendente análise',
+        leilao: null,
+        faltando: [
+          { key: 'sacado_cnpj', label: 'CNPJ do sacado', acao: { tipo: 'cnpj' } },
+          { key: 'comprovante_entrega', label: 'Comprovante de entrega ou de execução do serviço', acao: { tipo: 'upload', kind: 'comprovante_entrega' } },
+        ],
+      },
+    ]);
+    await waitFor(() => expect(screen.getByText(/Falta 2 itens para esta duplicata poder ir a leilão/)).toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: /CNPJ do sacado de/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar CNPJ' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anexar' })).toBeInTheDocument();
   });
 
   it('fora do leilão não desenha disputa nenhuma', async () => {

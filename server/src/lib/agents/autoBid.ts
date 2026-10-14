@@ -61,8 +61,9 @@ export const autoBidAgent: AgentDefinition = {
       inputSchema: { type: 'object', properties: { userId: { type: 'number' }, sacadoNome: { type: 'string' } } , required: ['userId']},
       handler: async (input: { userId: number; sacadoNome?: string }) => {
         const purchases = listPurchasesByInvestor(input.userId).filter((p) => p.active);
-        const total = purchases.reduce((sum, p) => sum + p.valor, 0);
-        const porSacado = input.sacadoNome ? purchases.filter((p) => p.sacado_nome === input.sacadoNome).reduce((sum, p) => sum + p.valor, 0) : null;
+        // Em valor de face — a mesma unidade dos limites e das ofertas (purchases.valor é o preço pago).
+        const total = purchases.reduce((sum, p) => sum + p.faceValor, 0);
+        const porSacado = input.sacadoNome ? purchases.filter((p) => p.sacado_nome === input.sacadoNome).reduce((sum, p) => sum + p.faceValor, 0) : null;
         return { totalAlocadoFmt: fmtBRL(total), totalAlocado: total, exposicaoNesteSacado: porSacado, nPosicoes: purchases.length };
       },
     },

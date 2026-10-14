@@ -65,20 +65,30 @@ class LastroClient:
         vencimento: str,
         cnpj: str = "",
         seguro: bool = False,
+        tipo_documento: str = "produto",
         nf_anexada: bool = False,
         nfe_chave: str = "",
+        comprovante_entrega_anexado: bool = False,
+        pedido_compra_anexado: bool = False,
         batch_valores: Optional[List[str]] = None,
         idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Emit a real duplicata escriturada. Requires a write-scope key on a cedente account."""
+        """Emit a real duplicata escriturada. Requires a write-scope key on a cedente account.
+
+        tipo_documento: 'produto' (NF-e, default) or 'servico' (NFS-e) — see
+        server/src/lib/emitirCore.ts.
+        """
         body = {
             "sacado": sacado,
             "cnpj": cnpj,
             "valor": valor,
             "vencimento": vencimento,
             "seguro": seguro,
+            "tipoDocumento": tipo_documento,
             "nfAnexada": nf_anexada,
             "nfeChave": nfe_chave,
+            "comprovanteEntregaAnexado": comprovante_entrega_anexado,
+            "pedidoCompraAnexado": pedido_compra_anexado,
             "batchValores": batch_valores or [],
         }
         return self._request("POST", "/duplicatas", body, idempotency_key)
@@ -201,6 +211,27 @@ class LastroClient:
     ) -> Dict[str, Any]:
         """Recusar e cancelar são o mesmo ato, visto de cada lado da mesa."""
         return self._request("POST", f"/otc/{int(negociacao_id)}/encerrar", {"como": como}, idempotency_key)
+
+    # --- Leilão primário (fundos e bancos) ---
+
+    def dar_lances_em_lote(
+        self,
+        lances: List[Dict[str, Any]],
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Até 200 lances numa chamada: [{"duplicataId": "...", "taxaAm": 2.5}, ...].
+
+        Cada lance segue as regras do lance único (menor deságio vence; acima da reserva é
+        recusado). Não é tudo-ou-nada: a resposta separa `registrados` e `recusados`, com o
+        motivo. Sem `taxaAm`, o lance vai na reserva da própria duplicata. Live keys only —
+        leilão de sandbox nunca é adjudicado. Passe `idempotency_key` para um retry de rede não
+        duplicar os lances.
+        """
+        return self._request("POST", "/lances/lote", {"lances": lances}, idempotency_key)
+
+    def list_meus_lances(self) -> Dict[str, Any]:
+        """Lances desta conta com o status de cada um: ativo, vencedor, perdedor ou cancelado."""
+        return self._request("GET", "/lances")
 
     # --- Marketplace ---
 

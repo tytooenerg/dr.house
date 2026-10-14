@@ -32,13 +32,13 @@ async function emitir(token: string, cnpj: string) {
   let res = await request(app)
     .post('/api/emitir/submit')
     .set('Authorization', `Bearer ${token}`)
-    .send({ sacado: `Sacado CNPJ Lastro ${unique()}`, cnpj, valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+    .send({ sacado: `Sacado CNPJ Lastro ${unique()}`, cnpj, valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
   // Retry past registradora's ~12% simulated instability, mesmo padrão de emitir.test.ts.
   for (let i = 0; i < 8 && res.status !== 200; i++) {
     res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado: `Sacado CNPJ Lastro ${unique()}`, cnpj, valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado CNPJ Lastro ${unique()}`, cnpj, valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
   }
   expect(res.status).toBe(200);
   return res.body.duplicataId as string;

@@ -118,14 +118,17 @@ describe('LastroClient — real end-to-end against the live server', () => {
     const client = new LastroClient({ apiKey, baseUrl });
     const { setAceiteStatus, ensureAceite } = await import('../../../server/src/db/aceites.js');
 
-    // Lastro 100% (CNPJ + NF-e) faz a duplicata nascer 'aprovada'; sem o aceite do sacado ela
-    // ainda não é negociável, e é isso que a primeira chamada prova.
+    // Lastro 100% (CNPJ + NF-e + comprovante de entrega + pedido de compra) faz a duplicata
+    // nascer 'aprovada'; sem o aceite do sacado ela ainda não é negociável, e é isso que a
+    // primeira chamada prova.
     const emitida = await client.emitirDuplicata({
       sacado: 'Grupo Atlas Varejo',
       cnpj: '12.345.678/0001-95',
       valor: '10.000,00',
       vencimento: '2027-12-01',
       nfAnexada: true,
+      comprovanteEntregaAnexado: true,
+      pedidoCompraAnexado: true,
     });
     await expect(client.abrirLeilao(emitida.duplicataId)).rejects.toMatchObject({
       name: 'LastroApiError',
@@ -211,6 +214,60 @@ describe('LastroClient — real end-to-end against the live server', () => {
     const client = new LastroClient({ apiKey, baseUrl });
     const { aceites } = await client.listAceites();
     expect(Array.isArray(aceites)).toBe(true);
+  });
+
+  it('a fund places batch bids with a live key and lists them; a test key is refused honestly', async () => {
+    const email = `fundo-sdk-${unique()}@example.com`;
+    const reg = await fetch(`${baseUrl.replace('/v1', '')}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: 'SDK Fundo', email, password: 'senha123', companyName: `Fundo SDK ${unique()}`, role: 'investidor' }),
+    }).then((r) => r.json());
+    const token = reg.token as string;
+    const { approveKyb, setVeiculo } = await import('../../../server/src/db/users.js');
+    approveKyb(reg.user.id);
+    setVeiculo(reg.user.id, 'fidc');
+    // Chave live da API de plataforma exige o plano Empresarial.
+    await fetch(`${baseUrl.replace('/v1', '')}/billing/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ plan: 'empresarial' }),
+    });
+    const gerar = (mode: 'live' | 'test') =>
+      fetch(`${baseUrl.replace('/v1', '')}/dev/keys/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ mode, scope: 'read_write', product: 'platform' }),
+      })
+        .then((r) => r.json())
+        .then((b) => b.rawKey as string);
+
+    const { createDuplicata, dispararLeilao } = await import('../../../server/src/db/duplicatas.js');
+    const { setAceiteStatus, ensureAceite } = await import('../../../server/src/db/aceites.js');
+    const d = createDuplicata({
+      cedenteId: null,
+      cedenteNome: 'Cedente SDK',
+      sacadoNome: `Sacado SDK ${unique()} Ltda`,
+      sacadoCnpj: '',
+      valor: 25000,
+      vencimento: new Date(Date.now() + 60 * 24 * 3600_000).toISOString().slice(0, 10),
+      emissao: '10/08/2026',
+      status: 'aprovada',
+      lastroPct: 100,
+      seguro: false,
+    });
+    setAceiteStatus(ensureAceite(d.id, 'Aceite no teste do SDK').id, 'aceita');
+    dispararLeilao(d.id, new Date(Date.now() + 3600_000).toISOString());
+
+    const live = new LastroClient({ apiKey: await gerar('live'), baseUrl });
+    const lote = await live.darLancesEmLote([{ duplicataId: d.id }, { duplicataId: 'DUP-NAO-EXISTE' }], { idempotencyKey: `sdk-lote-${unique()}` });
+    expect(lote.registrados.map((r) => r.duplicataId)).toEqual([d.id]);
+    expect(lote.recusados[0]).toMatchObject({ duplicataId: 'DUP-NAO-EXISTE', error: 'not_found' });
+    const { lances } = await live.listMeusLances();
+    expect(lances.find((l) => l.duplicataId === d.id)?.status).toBe('ativo');
+
+    const teste = new LastroClient({ apiKey: await gerar('test'), baseUrl });
+    await expect(teste.darLancesEmLote([{ duplicataId: d.id }])).rejects.toMatchObject({ name: 'LastroApiError', status: 409, error: 'sandbox_indisponivel' });
   });
 
   it('rejects an empty apiKey at construction time, before any network call', () => {

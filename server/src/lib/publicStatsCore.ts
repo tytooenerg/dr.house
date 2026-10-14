@@ -7,7 +7,11 @@ import { getRegistradora } from './registradoras.js';
 // any transparency page should.
 export function buildPublicStats() {
   const volumeEmitido = (db.prepare('SELECT COALESCE(SUM(valor), 0) as v FROM duplicatas').get() as { v: number }).v;
-  const volumeFinanciado = (db.prepare('SELECT COALESCE(SUM(valor), 0) as v FROM purchases').get() as { v: number }).v;
+  // Dinheiro que de fato chegou às empresas: o preço pago na compra primária de cada
+  // duplicata (revendas entre investidores não financiam ninguém de novo).
+  const volumeFinanciado = (
+    db.prepare(`SELECT COALESCE(SUM(p.valor), 0) as v FROM purchases p WHERE p.id = (SELECT MIN(p2.id) FROM purchases p2 WHERE p2.duplicata_id = p.duplicata_id)`).get() as { v: number }
+  ).v;
   const totalDuplicatas = (db.prepare('SELECT COUNT(*) as n FROM duplicatas').get() as { n: number }).n;
   const totalCedentes = (db.prepare("SELECT COUNT(*) as n FROM users WHERE role = 'cedente'").get() as { n: number }).n;
   const totalInvestidores = (db.prepare("SELECT COUNT(*) as n FROM users WHERE role = 'investidor'").get() as { n: number }).n;

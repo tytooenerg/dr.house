@@ -6,7 +6,7 @@ import { useLang } from '../../lib/i18n';
 export function PublicNav({ active }: { active?: 'developers' | 'docs' | 'precos' | 'legal' | 'transparencia' | 'status' }) {
   const { t } = useLang();
   return (
-    <div className="flex items-center justify-between px-14 py-5 border-b border-hairline">
+    <div className="flex items-center justify-between gap-3 px-5 md:px-14 py-5 border-b border-hairline">
       <div className="flex items-center gap-9">
         <Link to="/">
           <Logo size={24} />
@@ -32,13 +32,13 @@ export function PublicNav({ active }: { active?: 'developers' | 'docs' | 'precos
           </Link>
         </div>
       </div>
-      <div className="flex items-center gap-5 text-sm font-semibold">
+      <div className="flex items-center gap-3 md:gap-5 text-sm font-semibold">
         <LanguageToggle />
         <Link to="/login" className="text-slate">
           {t('nav.entrar', 'Entrar')}
         </Link>
-        <Link to="/legal#contato" className="px-4.5 py-2.5 rounded-lg bg-navy text-white">
-          {t('nav.falarVendas', 'Falar com vendas')}
+        <Link to="/login?mode=register&role=cedente" className="px-4.5 py-2.5 rounded-lg bg-navy text-white whitespace-nowrap">
+          {t('nav.criarConta', 'Criar conta')}
         </Link>
       </div>
     </div>

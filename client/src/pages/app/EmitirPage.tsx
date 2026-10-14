@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, ApiError, uploadFile } from '../../lib/api';
 import { PageHeader, Card, NavyCard } from '../../components/ui/Card';
 import { Field, Input } from '../../components/ui/Input';
@@ -6,10 +7,14 @@ import { Button } from '../../components/ui/Button';
 import { Toggle } from '../../components/ui/Toggle';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { SelfServiceAgentCard } from '../../components/agents/SelfServiceAgentCard';
+import { useSession } from '../../state/SessionContext';
 import { useLang } from '../../lib/i18n';
 import { PALETTE } from '../../lib/palette';
 import { Badge } from '../../components/ui/Badge';
 import { Notice } from '../../components/ui/Notice';
+import { CedenteKybCard } from '../../components/CedenteKybCard';
+
+type TipoDocumento = 'produto' | 'servico';
 
 interface EmitForm {
   sacado: string;
@@ -18,6 +23,15 @@ interface EmitForm {
   vencimento: string;
   seguro: boolean;
   nfeChave: string;
+  // Para onde mandar o link de aceite logo após emitir (server/src/lib/aceiteConvite.ts).
+  sacadoEmail: string;
+  sacadoTelefone: string;
+}
+interface ConviteNaEmissao {
+  link: string;
+  whatsappUrl: string;
+  email: { destino: string; status: 'enviado' | 'simulado' } | null;
+  whatsapp: { destino: string; status: 'enviado' | 'nao_configurado' } | null;
 }
 interface BatchRow {
   id: string;
@@ -196,20 +210,41 @@ function fmtBRL(n: number) {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 
-const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', seguro: false, nfeChave: '' };
+const EMPTY_FORM: EmitForm = { sacado: '', cnpj: '', valor: '', vencimento: '', seguro: false, nfeChave: '', sacadoEmail: '', sacadoTelefone: '' };
 
 export function EmitirPage() {
   const { t } = useLang();
+  const { user } = useSession();
+  const navigate = useNavigate();
+  const bloqueadoPorKyb = !!user && user.cedenteKybRequired && user.kybStatus !== 'approved';
   const [form, setForm] = useState<EmitForm>(EMPTY_FORM);
   const [batchRows, setBatchRows] = useState<BatchRow[]>([]);
+  // 'produto' (NF-e) é o padrão histórico — mercadoria tem chave de acesso nacional de 44
+  // dígitos. 'servico' (NFS-e) não tem padrão nacional de chave nem de consulta de
+  // situação (cada município tem a sua própria), então o campo de chave muda de "exige 44
+  // dígitos" pra "código de verificação livre, opcional" — ver server/src/lib/emitirCore.ts.
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('produto');
   const [nfAnexada, setNfAnexada] = useState(false);
+  const [comprovanteEntregaAnexado, setComprovanteEntregaAnexado] = useState(false);
+  const [pedidoCompraAnexado, setPedidoCompraAnexado] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingComprovante, setUploadingComprovante] = useState(false);
+  const [uploadingPedido, setUploadingPedido] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ registro: string; seguro: boolean; registradora: string } | null>(null);
+  const [result, setResult] = useState<{
+    registro: string;
+    seguro: boolean;
+    registradora: string;
+    complianceSuspensa?: boolean;
+    lastroPct: number;
+    convite?: ConviteNaEmissao | null;
+  } | null>(null);
   const [matriculas, setMatriculas] = useState<MinhaMatricula[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const comprovanteFileRef = useRef<HTMLInputElement>(null);
+  const pedidoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api
@@ -221,22 +256,23 @@ export function EmitirPage() {
   useEffect(() => {
     const t = setTimeout(() => {
       api
-        .post<Preview>('/emitir/preview', { ...form, nfAnexada, batchValores: batchRows.map((r) => r.valor) })
+        .post<Preview>('/emitir/preview', { ...form, tipoDocumento, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchValores: batchRows.map((r) => r.valor) })
         .then(setPreview)
         .catch(() => {});
     }, 250);
     return () => clearTimeout(t);
-  }, [form, nfAnexada, batchRows]);
+  }, [form, tipoDocumento, nfAnexada, comprovanteEntregaAnexado, pedidoCompraAnexado, batchRows]);
 
   const setField = (field: keyof EmitForm, value: string | boolean) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleNfFile = async (file: File) => {
     setUploading(true);
     try {
-      const { extracted } = await uploadFile('nfe', file);
+      const { extracted } = await uploadFile(tipoDocumento === 'servico' ? 'nfse' : 'nfe', file);
       setNfAnexada(true);
       if (extracted) {
         setForm((f) => ({
+          ...f,
           sacado: f.sacado || extracted.sacado,
           cnpj: f.cnpj || extracted.cnpj,
           valor: f.valor || extracted.valor,
@@ -252,6 +288,39 @@ export function EmitirPage() {
     }
   };
 
+  const handleComprovanteFile = async (file: File) => {
+    setUploadingComprovante(true);
+    try {
+      await uploadFile('comprovante_entrega', file);
+      setComprovanteEntregaAnexado(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao enviar o arquivo.');
+    } finally {
+      setUploadingComprovante(false);
+    }
+  };
+
+  const handlePedidoFile = async (file: File) => {
+    setUploadingPedido(true);
+    try {
+      await uploadFile('pedido_compra', file);
+      setPedidoCompraAnexado(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao enviar o arquivo.');
+    } finally {
+      setUploadingPedido(false);
+    }
+  };
+
+  // Trocar o tipo depois de já ter anexado um arquivo deixaria "NF-e anexada ✓" aceso pra
+  // um documento do tipo errado — a chave/código também deixa de fazer sentido no formato
+  // antigo, então limpa os dois junto com a troca.
+  const trocarTipoDocumento = (tipo: TipoDocumento) => {
+    setTipoDocumento(tipo);
+    setNfAnexada(false);
+    setField('nfeChave', '');
+  };
+
   const addBatchRow = () => setBatchRows((rows) => [...rows, { id: 'b' + Math.random().toString(16).slice(2, 8), valor: '' }]);
   const updateBatchRow = (id: string, valor: string) => setBatchRows((rows) => rows.map((r) => (r.id === id ? { ...r, valor } : r)));
   const removeBatchRow = (id: string) => setBatchRows((rows) => rows.filter((r) => r.id !== id));
@@ -264,12 +333,15 @@ export function EmitirPage() {
     }
     setSubmitting(true);
     try {
-      const data = await api.post<{ registro: string; seguro: boolean; registradora: string }>('/emitir/submit', {
+      const data = await api.post<{ registro: string; seguro: boolean; registradora: string; complianceSuspensa?: boolean; convite?: ConviteNaEmissao | null }>('/emitir/submit', {
         ...form,
+        tipoDocumento,
         nfAnexada,
+        comprovanteEntregaAnexado,
+        pedidoCompraAnexado,
         batchValores: batchRows.map((r) => r.valor),
       });
-      setResult(data);
+      setResult({ ...data, lastroPct: preview?.lastroChecklist.pct ?? 0 });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha ao registrar — conexão instável. Tente novamente.');
     } finally {
@@ -281,7 +353,10 @@ export function EmitirPage() {
     setResult(null);
     setForm(EMPTY_FORM);
     setBatchRows([]);
+    setTipoDocumento('produto');
     setNfAnexada(false);
+    setComprovanteEntregaAnexado(false);
+    setPedidoCompraAnexado(false);
   };
 
   if (result) {
@@ -293,16 +368,50 @@ export function EmitirPage() {
             <div className="w-6 h-6 rounded-full border-[3px] border-green" />
           </div>
           <div className="font-extrabold text-lg">Duplicata registrada com sucesso</div>
-          <div className="text-textSecondary text-[13px] mt-2">
-            {`Registro escritural nº ${result.registro} confirmado na ${result.registradora}. Status: enviada ao Marketplace.`}
+          <div className="text-textSecondary text-[13px] mt-2">{`Registro escritural nº ${result.registro} confirmado na ${result.registradora}.`}</div>
+          {/* Dizia "Status: enviada ao Marketplace" — mas a duplicata ainda depende do aceite do
+              sacado, do lastro completo e de a empresa abrir o leilão. Agora diz o que vem. */}
+          <div className="text-left text-[13px] mt-4 bg-surface rounded-lg px-4 py-3" data-testid="proximos-passos">
+            {result.complianceSuspensa ? (
+              <span>Ela está em revisão de compliance. Avisamos você assim que for liberada.</span>
+            ) : result.lastroPct < 100 ? (
+              <span>
+                <b>Faltam documentos</b> para ela poder ir a leilão. Anexe o que falta em <b>Minhas Duplicatas</b> — assim que completar, ela é liberada.
+              </span>
+            ) : (
+              <>
+                <div className="font-bold mb-1.5">Próximos passos</div>
+                <ol className="m-0 pl-4.5 flex flex-col gap-1 text-textSecondary">
+                  <li>O sacado confirma a duplicata (prazo de até 15 dias).</li>
+                  <li>Você abre o leilão em Minhas Duplicatas e escolhe a taxa máxima que aceita.</li>
+                  <li>Quando o leilão fecha, o valor cai no seu saldo.</li>
+                </ol>
+              </>
+            )}
           </div>
           <div className="flex justify-center gap-2.5 mt-5.5">
             <Badge variant="success">Registrada — {result.registradora}</Badge>
             {result.seguro && <Badge variant="info">Protegida por seguro</Badge>}
           </div>
-          <Button className="mt-6" onClick={reset}>
-            Emitir outra duplicata
-          </Button>
+          {result.convite && (
+            <div className="text-left text-[13px] mt-3 bg-greenBg rounded-lg px-4 py-3" data-testid="convite-emissao">
+              <div className="font-bold mb-1">Link de aceite para o sacado</div>
+              <div className="text-textSecondary mb-2">
+                {result.convite.email?.status === 'enviado' || result.convite.whatsapp?.status === 'enviado'
+                  ? 'Enviado. Se quiser, mande também pelo seu WhatsApp:'
+                  : 'O envio automático ainda não está configurado na plataforma — mande o link pelo seu WhatsApp:'}
+              </div>
+              <a href={result.convite.whatsappUrl} target="_blank" rel="noreferrer" className="inline-block px-3 py-1.5 rounded-md bg-green text-white font-bold no-underline">
+                Enviar pelo meu WhatsApp
+              </a>
+            </div>
+          )}
+          <div className="flex justify-center gap-2.5 mt-6 flex-wrap">
+            <Button onClick={() => navigate('/app/minhas')}>Ver em Minhas Duplicatas</Button>
+            <Button variant="secondary" onClick={reset}>
+              Emitir outra duplicata
+            </Button>
+          </div>
         </Card>
       </div>
     );
@@ -313,7 +422,7 @@ export function EmitirPage() {
       <PageHeader
         title={t('emitir.title', 'Emitir Duplicata')}
         subtitle={t('emitir.subtitle', 'Emita e registre uma duplicata escritural diretamente na Lastro — sem sair da plataforma')}
-        right={<Badge variant="success" size="lg">Aprovação em minutos · dinheiro em até 24h</Badge>}
+        right={<Badge variant="success" size="lg">Registro na hora · financiadores disputam sua duplicata</Badge>}
       />
 
       <div className="mb-4">
@@ -324,18 +433,60 @@ export function EmitirPage() {
         />
       </div>
 
-      <div className="grid gap-4 items-start" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
+      {bloqueadoPorKyb && (
+        <div className="mb-4">
+          <CedenteKybCard contexto="emitir" />
+        </div>
+      )}
+
+      {/* Sem o credenciamento aprovado o envio é recusado (403 kyb_required) — antes o
+          formulário ficava preenchível e a empresa só descobria isso no fim. */}
+      <fieldset disabled={bloqueadoPorKyb} className={`m-0 p-0 border-0 min-w-0 ${bloqueadoPorKyb ? 'opacity-50' : ''}`}>
+      <div className="grid gap-4 items-start grid-cols-1 lg:grid-cols-[1.4fr_1fr]">
         <Card className="p-7 flex flex-col gap-4">
+          <div className="flex gap-2 p-1 rounded-xl bg-surface">
+            {([
+              ['produto', 'Mercadoria (NF-e)'],
+              ['servico', 'Serviço (NFS-e)'],
+            ] as [TipoDocumento, string][]).map(([tipo, label]) => (
+              <button
+                key={tipo}
+                type="button"
+                onClick={() => trocarTipoDocumento(tipo)}
+                className="flex-1 py-2 rounded-lg text-[12.5px] font-bold cursor-pointer border-none"
+                style={tipoDocumento === tipo ? { background: 'white', color: PALETTE.navy, boxShadow: '0 1px 2px rgba(0,0,0,0.08)' } : { background: 'transparent', color: PALETTE.textSecondary }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <Field label="Empresa sacada">
             <Input placeholder="ex: Grupo Atlas Varejo" value={form.sacado} onChange={(e) => setField('sacado', e.target.value)} />
           </Field>
           <Field label="CNPJ do sacado">
             <Input placeholder="00.000.000/0001-00" value={form.cnpj} onChange={(e) => setField('cnpj', e.target.value)} />
           </Field>
-          <Field label="Chave de acesso da NF-e (opcional — 44 dígitos)">
-            <Input placeholder="Previne duplicidade: a mesma nota não pode lastrear duas duplicatas" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
-          </Field>
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {tipoDocumento === 'produto' ? (
+            <Field label="Chave de acesso da NF-e (opcional — 44 dígitos)">
+              <Input placeholder="Previne duplicidade: a mesma nota não pode lastrear duas duplicatas" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
+            </Field>
+          ) : (
+            <Field label="Código de verificação da NFS-e (opcional)">
+              <Input placeholder="Não existe dígito verificador nacional pra NFS-e — cada município tem o seu" value={form.nfeChave} onChange={(e) => setField('nfeChave', e.target.value)} />
+            </Field>
+          )}
+          <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2">
+            <Field label="E-mail do sacado (opcional)">
+              <Input placeholder="financeiro@cliente.com.br" value={form.sacadoEmail} onChange={(e) => setField('sacadoEmail', e.target.value)} />
+            </Field>
+            <Field label="WhatsApp do sacado (opcional)">
+              <Input placeholder="(11) 99999-9999" value={form.sacadoTelefone} onChange={(e) => setField('sacadoTelefone', e.target.value)} />
+            </Field>
+          </div>
+          <div className="text-[11.5px] text-textTertiary -mt-2">
+            Com um deles, mandamos na hora um link para o sacado confirmar a duplicata — sem ele precisar criar conta.
+          </div>
+          <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2">
             <Field label="Valor (R$)">
               <Input placeholder="50.000" value={form.valor} onChange={(e) => setField('valor', e.target.value)} />
             </Field>
@@ -355,9 +506,57 @@ export function EmitirPage() {
             }}
           />
           <button type="button" onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
-            <div className="font-bold text-[13px]">{nfAnexada ? 'NF-e anexada ✓' : uploading ? 'Enviando…' : 'Anexar NF-e (XML, PDF ou imagem)'}</div>
+            <div className="font-bold text-[13px]">
+              {nfAnexada
+                ? `${tipoDocumento === 'servico' ? 'NFS-e' : 'NF-e'} anexada ✓`
+                : uploading
+                  ? 'Enviando…'
+                  : `Anexar ${tipoDocumento === 'servico' ? 'NFS-e' : 'NF-e'} (XML, PDF ou imagem)`}
+            </div>
             <div className="text-textSecondary text-[12.5px] mt-1">
-              {nfAnexada ? 'Sacado, CNPJ, valor e vencimento extraídos automaticamente por IA' : 'Lastro fiscal necessário para registro escritural — clique para enviar o arquivo'}
+              {nfAnexada
+                ? tipoDocumento === 'servico'
+                  ? 'Tomador do serviço, CNPJ e valor extraídos automaticamente por IA — confira o vencimento, que a NFS-e raramente informa'
+                  : 'Sacado, CNPJ, valor e vencimento extraídos automaticamente por IA'
+                : 'Lastro fiscal necessário para registro escritural — clique para enviar o arquivo'}
+            </div>
+          </button>
+
+          <input
+            ref={comprovanteFileRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleComprovanteFile(f);
+            }}
+          />
+          <button type="button" onClick={() => comprovanteFileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
+            <div className="font-bold text-[13px]">
+              {comprovanteEntregaAnexado ? 'Comprovante de entrega anexado ✓' : uploadingComprovante ? 'Enviando…' : 'Anexar comprovante de entrega ou execução do serviço'}
+            </div>
+            <div className="text-textSecondary text-[12.5px] mt-1">
+              {comprovanteEntregaAnexado ? 'Evidência de que a mercadoria ou serviço foi efetivamente entregue ao sacado' : 'Canhoto de entrega, romaneio assinado, protocolo de recebimento ou similar'}
+            </div>
+          </button>
+
+          <input
+            ref={pedidoFileRef}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handlePedidoFile(f);
+            }}
+          />
+          <button type="button" onClick={() => pedidoFileRef.current?.click()} className="border-2 border-dashed border-borderStrong rounded-xl p-5.5 text-center cursor-pointer bg-transparent">
+            <div className="font-bold text-[13px]">
+              {pedidoCompraAnexado ? 'Pedido de compra anexado ✓' : uploadingPedido ? 'Enviando…' : 'Anexar pedido de compra ou contrato comercial'}
+            </div>
+            <div className="text-textSecondary text-[12.5px] mt-1">
+              {pedidoCompraAnexado ? 'Evidência da relação comercial que originou esta duplicata' : 'Pedido de compra, ordem de serviço ou contrato assinado com o sacado'}
             </div>
           </button>
 
@@ -375,7 +574,7 @@ export function EmitirPage() {
                   placeholder="Valor (R$)"
                   value={row.valor}
                   onChange={(e) => updateBatchRow(row.id, e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-md border border-inputBorder text-[13px] outline-none"
+                  className="flex-1 px-3 py-2 rounded-md border border-inputBorder text-[13px] outline-hidden"
                 />
                 <button type="button" onClick={() => removeBatchRow(row.id)} className="bg-transparent border-none text-red text-xs font-bold cursor-pointer">
                   Remover
@@ -398,8 +597,12 @@ export function EmitirPage() {
             <Toggle on={form.seguro} onClick={() => setField('seguro', !form.seguro)} />
           </div>
 
-          <Button disabled={submitting} onClick={submit} className="py-3.5">
-            {submitting ? 'Registrando na registradora…' : 'Emitir e registrar duplicata escritural'}
+          <Button disabled={submitting || !!(user && user.cedenteKybRequired && user.kybStatus !== 'approved')} onClick={submit} className="py-3.5">
+            {submitting
+              ? 'Registrando na registradora…'
+              : user && user.cedenteKybRequired && user.kybStatus !== 'approved'
+                ? 'Complete o credenciamento acima para emitir'
+                : 'Emitir e registrar duplicata escritural'}
           </Button>
           {error && <Notice variant="danger" className="text-sm">{error}</Notice>}
         </Card>
@@ -413,13 +616,19 @@ export function EmitirPage() {
               </div>
             </div>
             <div className="text-textSecondary text-xs mb-3.5">Quanto mais completo, menor o risco percebido pelo financiador — e melhor a taxa</div>
+            {preview && preview.lastroChecklist.pct < 100 && (
+              <div className="text-[12px] text-navy bg-amberBg rounded-md px-3 py-2 mb-3.5">
+                Abaixo de 100% a duplicata é registrada, mas só pode ir a leilão depois que você anexar o que falta — dá para fazer depois, em
+                Minhas Duplicatas.
+              </div>
+            )}
             <div className="mb-4">
               <ProgressBar pct={preview?.lastroChecklist.pct ?? 0} color={preview?.lastroChecklist.color ?? PALETTE.inputBorder} />
             </div>
             <div className="flex flex-col gap-2.5">
               {(preview?.lastroChecklist.items ?? []).map((item) => (
                 <div key={item.label} className="flex items-center gap-2.5">
-                  <span className="rounded flex-shrink-0" style={{ width: 16, height: 16, border: `1.5px solid ${item.color}`, background: item.done ? item.color : 'transparent' }} />
+                  <span className="rounded-sm shrink-0" style={{ width: 16, height: 16, border: `1.5px solid ${item.color}`, background: item.done ? item.color : 'transparent' }} />
                   <span className="text-[13px]" style={{ color: item.textColor }}>
                     {item.label}
                   </span>
@@ -430,7 +639,7 @@ export function EmitirPage() {
 
           {preview?.sacadoRecognized && (
             <div className="flex items-center gap-2.5 p-3.5 rounded-[10px] bg-greenBg">
-              <span className="rounded-full bg-green flex-shrink-0" style={{ width: 9, height: 9 }} />
+              <span className="rounded-full bg-green shrink-0" style={{ width: 9, height: 9 }} />
               <span className="text-[12.5px] text-green font-semibold">{preview.sacadoRecognizedText}</span>
             </div>
           )}
@@ -514,8 +723,9 @@ export function EmitirPage() {
           </NavyCard>
         </div>
       </div>
+      </fieldset>
 
-      <LoteEmissaoCard />
+      {!bloqueadoPorKyb && <LoteEmissaoCard />}
     </div>
   );
 }

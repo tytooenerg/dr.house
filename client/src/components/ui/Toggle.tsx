@@ -1,12 +1,15 @@
 import { PALETTE } from '../../lib/palette';
-export function Toggle({ on, onClick, size = 'md' }: { on: boolean; onClick: () => void; size?: 'sm' | 'md' | 'lg' }) {
+export function Toggle({ on, onClick, size = 'md', label }: { on: boolean; onClick: () => void; size?: 'sm' | 'md' | 'lg'; label?: string }) {
   const dims = size === 'lg' ? { w: 48, h: 28, knob: 22, pad: 3 } : size === 'sm' ? { w: 40, h: 24, knob: 18, pad: 3 } : { w: 44, h: 26, knob: 20, pad: 3 };
   const left = on ? dims.w - dims.knob - dims.pad : dims.pad;
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
       onClick={onClick}
-      className="relative rounded-full border-none cursor-pointer flex-shrink-0 transition-colors"
+      className="relative rounded-full border-none cursor-pointer shrink-0 transition-colors"
       style={{ width: dims.w, height: dims.h, background: on ? PALETTE.blue : PALETTE.inputBorder }}
     >
       <span

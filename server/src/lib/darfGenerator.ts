@@ -1,3 +1,4 @@
+import { dataDeResgate } from './investorPositions.js';
 import PDFDocument from 'pdfkit';
 import type { Response } from 'express';
 import { db } from '../db/index.js';
@@ -44,6 +45,9 @@ export interface DarfLine {
   investorId: number;
   investorName: string;
   vencimento: string;
+  // Data do resgate (coluna "vencimento" mantida por compatibilidade): o vencimento da
+  // duplicata ou, se o investidor saiu antes, a data da revenda — ver `evento`.
+  evento: 'vencimento' | 'revenda';
   diasCarencia: number;
   rendimentoBrutoFmt: string;
   aliquotaLabel: string;
@@ -64,25 +68,37 @@ export interface DarfSummary {
   valorTotalFmt: string;
 }
 
-// Taxable event is resgate (vencimento) — same as incomeTaxStatement.ts's per-line logic —
-// aggregated here across every investor whose position matured within the competência month.
+// Fato gerador = resgate: o vencimento da duplicata ou, para quem revendeu antes, a data da
+// revenda (purchases.encerrada_em, migração 0081 — lib/investorPositions.ts's dataDeResgate).
+// Antes a posição revendida caía no mês do vencimento, com alíquota pelo prazo até o vencimento.
 export function buildDarfSummary(period: string): DarfSummary {
   const { start, end } = monthRange(period);
   const rows = db
     .prepare(
-      `SELECT p.duplicata_id, p.investor_id, p.retorno, p.created_at, u.company_name as investor_name, d.vencimento as vencimento
+      `SELECT p.duplicata_id, p.investor_id, p.retorno, p.created_at, p.active, p.encerrada_em, u.company_name as investor_name, d.vencimento as vencimento
        FROM purchases p
        JOIN users u ON u.id = p.investor_id
        JOIN duplicatas d ON d.id = p.duplicata_id
-       WHERE d.sandbox = 0 AND d.vencimento >= ? AND d.vencimento < ?
-       ORDER BY d.vencimento ASC`
+       WHERE d.sandbox = 0
+         AND ((p.encerrada_em IS NULL AND d.vencimento >= ? AND d.vencimento < ?)
+           OR (p.encerrada_em IS NOT NULL AND p.encerrada_em >= ? AND p.encerrada_em < ?))
+       ORDER BY COALESCE(p.encerrada_em, d.vencimento) ASC`
     )
-    .all(start, end) as { duplicata_id: string; investor_id: number; retorno: number; created_at: string; investor_name: string; vencimento: string }[];
+    .all(start, end, start, end) as {
+    duplicata_id: string;
+    investor_id: number;
+    retorno: number;
+    created_at: string;
+    active: number;
+    encerrada_em: string | null;
+    investor_name: string;
+    vencimento: string;
+  }[];
 
   let valorPrincipal = 0;
   const lines: DarfLine[] = rows.map((r) => {
     const dataAplicacao = new Date(toIsoUtc(r.created_at));
-    const dataResgate = new Date(r.vencimento);
+    const { data: dataResgate, evento } = dataDeResgate(r);
     const diasCarencia = Math.max(0, Math.round((dataResgate.getTime() - dataAplicacao.getTime()) / (24 * 3600 * 1000)));
     const band = aliquotaForDias(diasCarencia);
     const irEstimado = r.retorno * band.aliquota;
@@ -92,6 +108,7 @@ export function buildDarfSummary(period: string): DarfSummary {
       investorId: r.investor_id,
       investorName: r.investor_name,
       vencimento: dataResgate.toLocaleDateString('pt-BR'),
+      evento,
       diasCarencia,
       rendimentoBrutoFmt: fmtBRL(r.retorno),
       aliquotaLabel: band.label,
@@ -141,7 +158,7 @@ export function streamDarfPdf(res: Response, summary: DarfSummary) {
     const y = doc.y;
     doc.fontSize(8).fillColor('#0B1F3A');
     doc.text(l.investorName, colX[0], y, { width: 165 });
-    doc.text(l.vencimento, colX[1], y, { width: 65 });
+    doc.text(l.evento === 'revenda' ? `${l.vencimento} (rev.)` : l.vencimento, colX[1], y, { width: 65 });
     doc.text(String(l.diasCarencia), colX[2], y, { width: 50 });
     doc.text(l.rendimentoBrutoFmt, colX[3], y, { width: 60 });
     doc.fontSize(6.5).text(l.aliquotaLabel, colX[4], y, { width: 65 });

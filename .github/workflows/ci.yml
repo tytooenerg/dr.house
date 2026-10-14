@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # O branch de produção também: é dele que o servidor faz git pull, e o deploy automático
+    # (deploy.yml) só publica um commit depois que este workflow passou nele.
+    branches: [main, claude/prototype-software-transform-os4cxb]
   pull_request:
   # Catches the kind of drift that only shows up because real time passed, not because any
   # code changed — e.g. the seed data's vencimento dates silently going stale once the
@@ -31,7 +33,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck server
         run: npm run typecheck -w server
@@ -116,3 +118,83 @@ jobs:
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: postgres
+
+  # Publica no servidor o commit que acabou de passar em TUDO acima — sem ninguém entrar por
+  # SSH. Mora aqui, como job final do CI, e não num workflow_run separado: gatilhos
+  # workflow_run só disparam a partir do branch padrão (main), e o servidor segue o branch de
+  # produção. O servidor faz o trabalho em scripts/deploy/deploy-remoto.sh; a chave usada aqui
+  # só consegue rodar aquele script (ver DEPLOY.md, "Deploy automático").
+  #
+  # Secrets do repositório (Settings → Secrets and variables → Actions):
+  #   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+  # Sem eles o job avisa e termina sem publicar nada.
+  deploy:
+    needs: [build-and-test, postgres-schema-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/claude/prototype-software-transform-os4cxb'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Um deploy por vez; o próximo espera em vez de cancelar no meio de um docker compose.
+    concurrency:
+      group: deploy-producao
+      cancel-in-progress: false
+    env:
+      SHA: ${{ github.sha }}
+      HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'https://app.lastrox.com.br/api/health' }}
+    steps:
+      - name: Conferir configuração
+        id: config
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          USER_: ${{ secrets.DEPLOY_USER }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$KEY" ] || [ -z "$KNOWN" ] || [ -z "$USER_" ]; then
+            echo "::warning::Deploy automático não configurado (faltam secrets DEPLOY_*) — nada foi publicado. Ver DEPLOY.md."
+            echo "pronto=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "pronto=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publicar ${{ env.SHA }}
+        if: steps.config.outputs.pronto == 'true'
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER_: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # A chave costuma ser copiada de um terminal Windows para o secret: chega com \r,
+          # espaço no fim das linhas ou um tracinho a menos no BEGIN/END — e o ssh só diz
+          # "error in libcrypto". Normaliza esses três antes de usar.
+          # Também aceita a chave numa linha só (`base64 -w0 ~/.ssh/lastro_deploy`), o formato
+          # recomendado no DEPLOY.md: sem tracinhos para perder, e qualquer espaço ou quebra
+          # de linha que o terminal enfiar no meio é descartado antes de decodificar.
+          if printf '%s' "$KEY" | grep -q 'PRIVATE KEY'; then
+            printf '%s\n' "$KEY" | tr -d '\r' | sed -e 's/[[:space:]]*$//' \
+              -e 's/^-*BEGIN OPENSSH PRIVATE KEY-*$/-----BEGIN OPENSSH PRIVATE KEY-----/' \
+              -e 's/^-*END OPENSSH PRIVATE KEY-*$/-----END OPENSSH PRIVATE KEY-----/' > ~/.ssh/deploy
+          else
+            printf '%s' "$KEY" | tr -d '[:space:]' | base64 -d > ~/.ssh/deploy 2>/dev/null || true
+          fi
+          chmod 600 ~/.ssh/deploy
+          if ! ssh-keygen -y -f ~/.ssh/deploy > /dev/null 2>&1; then
+            echo "::error::A chave em DEPLOY_SSH_KEY está incompleta ou foi colada com defeito. Recrie o secret com a saída de 'base64 -w0 ~/.ssh/lastro_deploy' rodado no servidor (uma linha só). Nada foi publicado."
+            exit 1
+          fi
+          printf '%s\n' "$KNOWN" | tr -d '\r' > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 "$USER_@$HOST" "$SHA"
+
+      - name: Conferir que o site respondeu
+        if: steps.config.outputs.pronto == 'true'
+        run: |
+          for i in $(seq 1 36); do
+            if curl -fsS --max-time 10 "$HEALTH_URL" > /dev/null; then
+              echo "Site no ar: $HEALTH_URL"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::O site não respondeu em $HEALTH_URL depois do deploy"
+          exit 1

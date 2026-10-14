@@ -51,7 +51,7 @@ async function submitEmitir(token: string, overrides: Partial<{ vencimento: stri
         valor: overrides.valor ?? '10.000',
         vencimento: overrides.vencimento ?? '2020-01-10',
         seguro: false,
-        nfAnexada: true,
+        nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true,
         batchValores: [],
       });
     lastStatus = res.status;

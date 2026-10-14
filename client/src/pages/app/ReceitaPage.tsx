@@ -126,7 +126,7 @@ export function ReceitaPage() {
           <div className="flex flex-col gap-2.5">
             {data.streams.map((r) => (
               <div key={r.label} className="flex items-center gap-2.5">
-                <span className="rounded-[2px] flex-shrink-0" style={{ width: 9, height: 9, background: r.color }} />
+                <span className="rounded-[2px] shrink-0" style={{ width: 9, height: 9, background: r.color }} />
                 <span className="flex-1 text-[13px] font-semibold">{r.label}</span>
                 <span className="text-[13px] text-textSecondary font-mono-num">{r.valorFmt}</span>
                 <span className="text-[12.5px] font-bold w-12 text-right">{r.pctFmt}</span>

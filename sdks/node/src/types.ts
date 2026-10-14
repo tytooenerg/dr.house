@@ -10,8 +10,12 @@ export interface EmitirDuplicataInput {
   valor: string;
   vencimento: string;
   seguro?: boolean;
+  /** 'produto' (NF-e, padrão) ou 'servico' (NFS-e) — ver server/src/lib/emitirCore.ts. */
+  tipoDocumento?: 'produto' | 'servico';
   nfAnexada?: boolean;
   nfeChave?: string;
+  comprovanteEntregaAnexado?: boolean;
+  pedidoCompraAnexado?: boolean;
   batchValores?: string[];
 }
 
@@ -118,6 +122,33 @@ export interface AbrirOtcInput {
   /** Validade da proposta em horas. Padrão 48, teto 168. */
   prazoHoras?: number;
   nota?: string;
+}
+
+export interface LanceLoteItem {
+  duplicataId: string;
+  /** Deságio proposto em % ao mês. Omitido = taxa de reserva da duplicata. */
+  taxaAm?: number | string;
+}
+
+export interface LanceLoteResult {
+  registrados: { duplicataId: string; bidId: number; taxaFmt: string; precoFmt: string }[];
+  recusados: { duplicataId: string; error: string; message: string }[];
+  totalPreco: number;
+  /** O que sai do caixa se todos os lances registrados vencerem. */
+  totalPrecoFmt: string;
+  mode: 'live';
+}
+
+export interface MeuLance {
+  id: number;
+  duplicataId: string;
+  sacado: string;
+  valorFmt: string;
+  taxaFmt: string;
+  precoFmt: string;
+  status: 'ativo' | 'vencedor' | 'perdedor' | 'cancelado';
+  closeAt: string | null;
+  quando: string;
 }
 
 export interface MarketplaceOffer {

@@ -86,7 +86,7 @@ export function PrecosPage() {
               <div className="text-[26px] font-extrabold mb-1.5">R$ 3,50</div>
               <div className="text-textSecondary text-[13px] mb-5">por registro — POST /v1/registro</div>
               <div className="flex flex-col gap-2.5 text-[13px] text-slate">
-                <div>✓ Roteamento inteligente entre CERC/B3/Núclea/Grafeno</div>
+                <div>✓ Roteamento inteligente entre CERC/B3/Núclea (+ Grafeno, quando homologada)</div>
                 <div>✓ Checagem de duplicidade na registradora escolhida</div>
                 <div>✓ Nunca entra no seu marketplace nem cria conta cedente</div>
               </div>

@@ -13,6 +13,9 @@ async function registerAs(page: Page, opts: { roleTitle: string; nome: string; c
   await page.getByPlaceholder('Sua empresa Ltda').fill(opts.companyName);
   await page.getByPlaceholder('voce@empresa.com.br').fill(opts.email);
   await page.getByPlaceholder('mínimo 6 caracteres').fill('senha123');
+  // Empresa e sacado informam o CNPJ no cadastro — o botão só libera com um CNPJ válido.
+  await page.getByRole('textbox', { name: 'CNPJ da empresa' }).fill('11.444.777/0001-61');
+  await expect(page.getByText(/CNPJ válido/)).toBeVisible();
   await page.getByRole('button', { name: 'Criar conta e entrar' }).click();
   await dismissOnboardingIfPresent(page);
 }
@@ -70,4 +73,48 @@ test('a cedente can emit a duplicata and the matching sacado can confirm it', as
   await expect(confirmButton).toBeVisible();
   await confirmButton.click();
   await expect(page.getByText('Aceita pelo sacado').first()).toBeVisible();
+});
+
+// O sacado sem conta: a empresa informa o e-mail dele na emissão, recebe o link de aceite e o
+// sacado confirma pela página pública, sem cadastro (server/src/lib/aceiteConvite.ts).
+test('sacado sem conta confirma a duplicata pelo link enviado na emissão', async ({ page }) => {
+  const suffix = unique();
+  await registerAs(page, {
+    roleTitle: 'Empresa (cedente)',
+    nome: 'Cedente Link',
+    companyName: `Cedente Link ${suffix}`,
+    email: `cedente-link-${suffix}@example.com`,
+  });
+  await expect(page).toHaveURL(/\/app\//, { timeout: 15_000 });
+  await page.goto('/app/emitir', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
+
+  await page.getByPlaceholder('ex: Grupo Atlas Varejo').fill(`Cliente Sem Conta ${suffix}`);
+  await page.getByRole('textbox', { name: 'CNPJ do sacado' }).fill('11.222.333/0001-81');
+  await page.getByRole('textbox', { name: 'E-mail do sacado (opcional)' }).fill('financeiro@cliente.com.br');
+  await page.getByRole('textbox', { name: 'Valor (R$)' }).fill('15.000');
+  await page.locator('input[type="date"]').fill('2026-12-31');
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await page.getByRole('button', { name: /Emitir e registrar duplicata/ }).click();
+    const success = page.getByText('Duplicata registrada com sucesso');
+    const failure = page.getByText(/Falha ao registrar na CERC/);
+    await Promise.race([success.waitFor({ timeout: 8000 }), failure.waitFor({ timeout: 8000 })]).catch(() => {});
+    if (await success.isVisible().catch(() => false)) break;
+  }
+  await expect(page.getByText('Duplicata registrada com sucesso')).toBeVisible();
+
+  // O atalho do WhatsApp carrega a mensagem com o link — é o que a empresa manda ao sacado.
+  const href = await page.getByTestId('convite-emissao').getByRole('link', { name: 'Enviar pelo meu WhatsApp' }).getAttribute('href');
+  const mensagem = decodeURIComponent(new URL(href!).searchParams.get('text')!);
+  const link = mensagem.match(/https?:\/\/\S+\/aceite\/[A-Za-z0-9_-]+/)![0];
+
+  await page.goto(new URL(link).pathname, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('Confirme esta duplicata')).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Confirmo' }).click();
+  await page.getByRole('textbox', { name: /CNPJ da sua empresa/ }).fill('11.222.333/0001-81');
+  await page.getByRole('textbox', { name: 'Seu nome' }).fill('Ana Souza');
+  await page.getByRole('textbox', { name: 'Seu cargo' }).fill('Financeiro');
+  await page.getByRole('button', { name: 'Confirmar a duplicata' }).click();
+  await expect(page.getByText('Duplicata confirmada')).toBeVisible({ timeout: 10_000 });
 });

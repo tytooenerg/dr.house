@@ -16,9 +16,9 @@ import { vencimentoFuturo } from './helpers/datas.js';
 // somavam purchases.valor direto — valor de face numa compra primária, não o preço
 // realmente pago (sempre <= valor de face por causa do deságio). Isso superestimava
 // "quanto o investidor investiu" e subestimava toda métrica de retorno percentual
-// (rentMedia, retornoAnualizadoPct) derivada dele. Corrigido via faceValor - retorno
-// (fórmula universal, só válida enquanto a posição está ativa — ver comentário em cada
-// arquivo). db/resaleListings.ts's discountRatio também usava purchases.valor em vez do
+// (rentMedia, retornoAnualizadoPct) derivada dele. Primeiro foi remendado via faceValor −
+// retorno (só válido enquanto a posição está ativa); desde a migração 0080 purchases.valor é
+// sempre o preço pago, também para posições já revendidas. db/resaleListings.ts's discountRatio também usava purchases.valor em vez do
 // valor de face real de duplicatas.
 
 function unique() {
@@ -48,7 +48,7 @@ async function emitirELeiloar(valor: string) {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${cedenteToken}`)
-      .send({ sacado: `Sacado Preco Pago ${unique()} Ltda`, cnpj: '77.666.555/0001-44', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, batchValores: [] });
+      .send({ sacado: `Sacado Preco Pago ${unique()} Ltda`, cnpj: '77.666.555/0001-44', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true, batchValores: [] });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();
@@ -120,7 +120,7 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     expect(posicao.retornoAnualizadoPct).toBeGreaterThan(retornoPctIngenuo * (365 / posicao.diasCarencia) * 0.999);
   });
 
-  it('uma posição já revendida mantém "Investido" como o registro original (valor de face) — não recalcula por cima de um retorno já sobrescrito pela revenda', async () => {
+  it('uma posição já revendida continua mostrando o preço pago como "Investido" — não o valor de face', async () => {
     const seller = await registerInvestidor();
     const buyer = await registerInvestidor();
     const duplicataId = await emitirELeiloar('30.000');
@@ -139,16 +139,15 @@ describe('purchases.valor ambíguo — preço pago real em vez de valor de face'
     const resaleBuy = await request(app).post(`/api/secundario/${listing.id}/comprar`).set('Authorization', `Bearer ${buyer.token}`);
     expect(resaleBuy.status).toBe(200);
 
-    // A posição original do vendedor agora está inativa (active=0) e seu retorno foi
-    // sobrescrito com o ganho realizado da revenda (lib/resaleCore.ts) — não é mais
-    // "faceValor - precoCompra". Aplicar faceValor - retorno por cima disso daria um
-    // número sem sentido; por isso "Investido" dessa linha continua vindo direto de
-    // purchases.valor (nunca tocado por deactivatePurchase) — que numa compra primária é
-    // o valor de face (30000), o mesmo registro que resale-retorno.test.ts já espera.
+    // A posição original do vendedor agora está inativa e o retorno dela foi sobrescrito com
+    // o ganho realizado da revenda (lib/resaleCore.ts). Antes da migração 0080 o "Investido"
+    // dessa linha caía no purchases.valor da compra primária — o valor de face (30000), que o
+    // vendedor nunca pagou. Agora purchases.valor é sempre o preço pago.
+    const investidoEsperado = 30000 - Math.round(30000 - precoCompra);
     const historico = await request(app).get('/api/historico?pageSize=200').set('Authorization', `Bearer ${seller.token}`);
-    const row = historico.body.historico.find((h: { investidoFmt: string }) => Math.round(parseBRL(h.investidoFmt)) === 30000);
-    expect(row).toBeTruthy();
-    expect(Math.round(parseBRL(row.investidoFmt))).not.toBe(Math.round(precoCompra));
+    const investidos = historico.body.historico.map((h: { investidoFmt: string }) => Math.round(parseBRL(h.investidoFmt)));
+    expect(investidos).toContain(investidoEsperado);
+    expect(investidos).not.toContain(30000);
   });
 
   it('discountRatio do block trade usa o valor de face real, não purchases.valor, mesmo quando o anúncio vem de uma revenda anterior', async () => {

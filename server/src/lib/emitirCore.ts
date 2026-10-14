@@ -14,11 +14,13 @@ import { platformFee } from './settlement.js';
 import { chooseRegistradora, registrarNaRegistradora } from './registradoras.js';
 import { cnpjChecksumValido, consultarCnpj } from './cnpjLookup.js';
 import { chaveNfeChecksumValida, consultarSituacaoNfe } from './nfeStatus.js';
+import { isFeatureEnabled } from './featureFlags.js';
 import { fmtBRL, parseBRLNumber } from './format.js';
 import { logger } from './logger.js';
 import { COLORS, SACADOS } from '../data/seed.js';
 import { estimateRateBand } from './dynamicPricing.js';
 import { withSpan } from './tracing.js';
+import { criarConvite } from './aceiteConvite.js';
 import type { UserRow } from '../db/types.js';
 
 export const emitirFormSchema = z.object({
@@ -27,9 +29,24 @@ export const emitirFormSchema = z.object({
   valor: z.string().trim(),
   vencimento: z.string().trim(),
   seguro: z.boolean().optional().default(false),
+  // 'produto': duplicata lastreada em mercadoria, com NF-e — chave de acesso nacional de 44
+  // dígitos, dígito verificador oficial (lib/nfeStatus.ts) e, quando configurado, consulta
+  // real de situação junto à SEFAZ. 'servico': lastreada em NFS-e — ao contrário da NF-e,
+  // não existe padrão nacional de chave/dígito verificador nem API de situação única: cada
+  // município emite e verifica a sua própria nota, por sistema próprio. Não dá pra fingir
+  // uma validação nacional que não existe (mesmo caso do SISCOAF em lib/regulatoryReports.ts)
+  // — pra NFS-e, nfeChave vira um código de verificação opcional em texto livre, sem
+  // checksum nem consulta de situação.
+  tipoDocumento: z.enum(['produto', 'servico']).optional().default('produto'),
   nfAnexada: z.boolean().optional().default(false),
   nfeChave: z.string().trim().optional().default(''),
+  comprovanteEntregaAnexado: z.boolean().optional().default(false),
+  pedidoCompraAnexado: z.boolean().optional().default(false),
   batchValores: z.array(z.string()).optional().default([]),
+  // Opcional: para onde mandar o link de aceite (lib/aceiteConvite.ts) logo após emitir —
+  // assim o sacado fica sabendo na hora, mesmo sem conta na Lastro.
+  sacadoEmail: z.string().trim().optional().default(''),
+  sacadoTelefone: z.string().trim().optional().default(''),
 });
 
 export type EmitirForm = z.infer<typeof emitirFormSchema>;
@@ -74,14 +91,25 @@ export function computeEmitirPreview(form: EmitirForm) {
   const cnpjDigits = form.cnpj.replace(/\D/g, '');
   const nfeChaveDigits = form.nfeChave.replace(/\D/g, '');
   const items = [
-    { label: 'Dados do sacado e CNPJ', done: !!(form.sacado && cnpjDigits) && cnpjChecksumValido(cnpjDigits) },
-    { label: 'Valor e vencimento definidos', done: !!(form.valor && form.vencimento) },
+    { key: 'sacado_cnpj', label: 'Dados do sacado e CNPJ', done: !!(form.sacado && cnpjDigits) && cnpjChecksumValido(cnpjDigits) },
+    { key: 'valor_vencimento', label: 'Valor e vencimento definidos', done: !!(form.valor && form.vencimento) },
     // A chave da NF-e é opcional no formulário (nem todo cedente a informa) — quando
     // ausente, o item continua valendo só pela flag de anexo; quando presente, agora
-    // também precisa bater o dígito verificador.
-    { label: 'NF-e anexada e vinculada', done: form.nfAnexada && (!nfeChaveDigits || chaveNfeChecksumValida(nfeChaveDigits)) },
-    { label: 'Comprovante de entrega ou aceite do serviço', done: form.nfAnexada },
-    { label: 'Histórico de pagamento do sacado consultado', done: !!form.sacado },
+    // também precisa bater o dígito verificador. Pra NFS-e (tipoDocumento='servico') não
+    // existe dígito verificador nacional pra checar — o item vale só pelo anexo mesmo.
+    {
+      key: 'nota_fiscal',
+      label: form.tipoDocumento === 'servico' ? 'NFS-e anexada e vinculada' : 'NF-e anexada e vinculada',
+      done: form.nfAnexada && (form.tipoDocumento === 'servico' || !nfeChaveDigits || chaveNfeChecksumValida(nfeChaveDigits)),
+    },
+    // Eram o mesmo flag do NF-e até aqui (form.nfAnexada) — anexar a nota marcava "entrega
+    // comprovada" sozinho, sem nenhum comprovante de entrega/execução ter sido enviado, e
+    // inflava preApprovedLimit embaixo com um documento que nunca existiu. Agora cada um
+    // exige seu próprio upload real (EmitirPage.tsx envia kind='comprovante_entrega' e
+    // kind='pedido_compra' via uploadFile).
+    { key: 'comprovante_entrega', label: 'Comprovante de entrega ou execução do serviço anexado', done: form.comprovanteEntregaAnexado },
+    { key: 'pedido_compra', label: 'Pedido de compra ou contrato comercial anexado', done: form.pedidoCompraAnexado },
+    { key: 'historico_sacado', label: 'Histórico de pagamento do sacado consultado', done: !!form.sacado },
   ];
   const doneCount = items.filter((i) => i.done).length;
   const pct = Math.round((doneCount / items.length) * 100);
@@ -90,7 +118,7 @@ export function computeEmitirPreview(form: EmitirForm) {
 
   return {
     lastroChecklist: {
-      items: items.map((i) => ({ label: i.label, done: i.done, color: i.done ? COLORS.GREEN : '#D6DCE5', textColor: i.done ? COLORS.NAVY : '#9AA5B5' })),
+      items: items.map((i) => ({ key: i.key, label: i.label, done: i.done, color: i.done ? COLORS.GREEN : '#D6DCE5', textColor: i.done ? COLORS.NAVY : '#9AA5B5' })),
       pct,
       color,
       doneCount,
@@ -109,6 +137,7 @@ export function computeEmitirPreview(form: EmitirForm) {
         ? 'Faixa das cotações das seguradoras para esta duplicata. Quem contrata e paga é o investidor, no momento da compra — não sai do seu valor a receber.'
         : 'Sem seguro de crédito oferecido nesta duplicata.',
       taxaEstimadaFmt: taxaMid.toFixed(1).replace('.', ',') + '% a.m.',
+      taxaEstimadaAm: taxaMid,
       // A registradora que ESTA duplicata vai usar. A tela listava "CERC · B3 · Núclea"
       // fixo, mas chooseRegistradora escolhe UMA (a de menor custo entre as elegíveis por
       // valor) — e até R$ 200 mil a escolhida é a Grafeno, que nem aparecia na lista.
@@ -128,10 +157,19 @@ export function computeEmitirPreview(form: EmitirForm) {
 export type EmitirOutcome =
   | {
       status: 200;
-      body: { ok: true; registro: string; duplicataId: string; seguro: boolean; registradora: string; complianceSuspensa: boolean };
+      body: {
+        ok: true;
+        registro: string;
+        duplicataId: string;
+        seguro: boolean;
+        registradora: string;
+        complianceSuspensa: boolean;
+        convite: { link: string; whatsappUrl: string; email: unknown; whatsapp: unknown } | null;
+      };
     }
   | { status: 400; body: { error: 'validation_error'; message: string } }
   | { status: 402; body: { error: 'plan_required'; requiredPlan: 'pro'; message: string } }
+  | { status: 403; body: { error: 'kyb_required'; message: string } }
   | { status: 409; body: { error: 'nfe_duplicidade'; message: string } }
   | { status: 502; body: { error: 'cerc_unavailable'; message: string } };
 
@@ -145,11 +183,45 @@ const NFE_CHAVE_RE = /^\d{44}$/;
 // register fake data against a real registry, and the resulting duplicata is tagged
 // sandbox=1, invisible to every live/internal read (db/duplicatas.ts).
 export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sandbox?: boolean } = {}): Promise<EmitirOutcome> {
+  // KYB documental do cedente (lib/cedenteKyb.ts) — quem recebe o dinheiro antecipado
+  // precisa provar que a empresa existe de verdade antes de poder emitir, mesmo gate que o
+  // investidor já tinha pra dar lance (lib/auctionCore.ts), agora espelhado aqui. Contas já
+  // existentes antes desta mudança foram aprovadas de uma vez (migração 0076) — isto só
+  // bloqueia conta nova que ainda não completou o credenciamento. Atrás do feature flag
+  // 'cedente_kyb_required' (desligado por padrão — lib/featureFlags.ts): a exigência só
+  // passa a valer de verdade quando um admin liga o flag em /admin (por isso nenhum dos
+  // ~50 arquivos de teste que registram um cedente e emitem na hora precisou mudar).
+  // !opts.sandbox: uma chamada de teste (chave de API em modo sandbox) existe justamente
+  // pra um parceiro validar a integração antes de ir ao ar — nunca toca o plano de dados
+  // real (sandbox=1) nem a registradora de verdade, e não devia ficar presa esperando o
+  // credenciamento documental de uma conta que ainda está testando.
+  if (!opts.sandbox && user.role === 'cedente' && isFeatureEnabled('cedente_kyb_required', { userId: user.id }) && user.kyb_status !== 'approved') {
+    return {
+      status: 403,
+      body: {
+        error: 'kyb_required',
+        message: 'Complete o credenciamento documental (CNPJ, contrato social e documento do representante legal) antes de emitir uma duplicata.',
+      },
+    };
+  }
   if (!form.sacado || !form.valor || !form.vencimento) {
     return { status: 400, body: { error: 'validation_error', message: 'Preencha empresa sacada, valor e vencimento antes de enviar.' } };
   }
-  const nfeChave = form.nfeChave.replace(/\D/g, '');
-  if (nfeChave && !NFE_CHAVE_RE.test(nfeChave)) {
+  // NF-e tem uma chave de acesso nacional, só numérica, de 44 dígitos — formato fixo, dá pra
+  // exigir e validar. NFS-e não: cada município emite o seu próprio código de verificação,
+  // sem padrão nacional de formato (alfanumérico, tamanho variável) — exigir 44 dígitos
+  // bloquearia toda emissão de serviço real. Por isso só a de produto passa pelo filtro de
+  // dígitos + regex; a de serviço fica como texto livre, com um teto de tamanho sensato —
+  // mas ainda normalizado (maiúsculas, espaços únicos), porque a checagem de duplicidade
+  // abaixo é uma comparação exata de string: sem isso, "rps-123" e "RPS-123" passariam
+  // como códigos diferentes pra UNIQUE INDEX idx_duplicatas_nfe_chave e pro
+  // findDuplicataByNfeChave, deixando a mesma NFS-e lastrear duas duplicatas — exatamente
+  // a fraude de duplicidade que este bloco existe pra impedir.
+  const nfeChave =
+    form.tipoDocumento === 'servico'
+      ? form.nfeChave.trim().toUpperCase().replace(/\s+/g, ' ').slice(0, 60)
+      : form.nfeChave.replace(/\D/g, '');
+  if (form.tipoDocumento === 'produto' && nfeChave && !NFE_CHAVE_RE.test(nfeChave)) {
     return { status: 400, body: { error: 'validation_error', message: 'Chave de acesso da NF-e inválida — deve ter 44 dígitos.' } };
   }
   // Prevents the same NF-e from backing two different duplicatas inside Lastro's own
@@ -243,13 +315,20 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
     emissao: new Date().toLocaleDateString('pt-BR'),
     status: preview.lastroChecklist.pct === 100 ? 'aprovada' : 'pendente_analise',
     lastroPct: preview.lastroChecklist.pct,
+    lastroItens: Object.fromEntries(preview.lastroChecklist.items.map((i) => [i.key, i.done])),
     seguro: form.seguro,
     registro,
     registradora: opts.sandbox ? null : registradora.key,
     nfeChave: nfeChave || null,
     sandbox: opts.sandbox,
   });
-  ensureAceite(duplicata.id, '10 dias úteis restantes');
+  const aceite = ensureAceite(duplicata.id, '15 dias para o sacado confirmar');
+  let convite: { link: string; whatsappUrl: string; email: unknown; whatsapp: unknown } | null = null;
+  if (!opts.sandbox && (form.sacadoEmail || form.sacadoTelefone)) {
+    const out = await criarConvite(user, aceite.id, { email: form.sacadoEmail || undefined, telefone: form.sacadoTelefone || undefined });
+    // Um contato inválido não desfaz a emissão — a empresa reenvia pela tela de Aceite.
+    if (out.status === 200) convite = out.body;
+  }
   // Previously the sacado only ever found out a duplicata needed their aceite via the
   // deadline-reminder WhatsApp job (lib/aceiteReminder.ts, only fires once ≤2 days remain)
   // or by happening to log in and check themselves — a real gap for anyone without
@@ -319,8 +398,11 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
   // Mesma postura do bloco de CNPJ acima: eixo separado da Compliance AI Engine, alerta
   // não-bloqueante — o dígito verificador da chave pega erro de digitação/chave inventada
   // sem depender de rede; a situação real exige um provedor configurado
-  // (NFE_STATUS_API_URL/KEY).
-  if (nfeChave) {
+  // (NFE_STATUS_API_URL/KEY). Só roda pra 'produto': NFS-e não tem dígito verificador
+  // nacional nem uma API de situação única pra consultar — cada município tem a sua, e
+  // inventar uma validação nacional que não existe seria o mesmo erro que o SISCOAF nos
+  // ensinou a não repetir (lib/regulatoryReports.ts).
+  if (form.tipoDocumento === 'produto' && nfeChave) {
     if (!chaveNfeChecksumValida(nfeChave)) {
       createComplianceAlert({
         type: 'nfe_chave_invalida',
@@ -387,6 +469,7 @@ export async function submitEmitir(user: UserRow, form: EmitirForm, opts: { sand
       seguro: form.seguro,
       registradora: registradora.name,
       complianceSuspensa: suspended,
+      convite,
     },
   };
 }

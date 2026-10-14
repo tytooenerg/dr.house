@@ -13,11 +13,18 @@ import { parseWebhookTedRecebido } from '../lib/tedRail.js';
 import { getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { parseWebhookStablecoinRecebido } from '../lib/stablecoinRail.js';
 import { getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
-import { getUserByWhitelabelDomain } from '../db/users.js';
+import { getUserByWhitelabelDomain, getUserByEmail } from '../db/users.js';
 import { addLedgerEntry } from '../db/misc.js';
 import { cached } from '../lib/cache.js';
 import { logger } from '../lib/logger.js';
 import { isFeatureEnabled } from '../lib/featureFlags.js';
+import { respostaSchema, responderConvite, verConvite } from '../lib/aceiteConvite.js';
+import { cnpjChecksumValido, cnpjLookupEnabled, consultarCnpj } from '../lib/cnpjLookup.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
+import { demonstrativoPrimario } from '../lib/demonstrativo.js';
+import { computePurchasePrice } from '../lib/marketCompute.js';
+import { parseBRLNumber, parseFlexibleDate } from '../lib/format.js';
+import type { DuplicataRow } from '../db/types.js';
 import { listActiveApprovedAdvertisements, incrementImpressoes, registerClique } from '../db/advertisements.js';
 
 // Fully public, unauthenticated endpoints: the transparency page, the status page, and
@@ -35,8 +42,13 @@ export const publicRouter = Router();
 publicRouter.get('/brand', (req, res) => {
   const host = (req.get('host') || '').toLowerCase().split(':')[0];
   const owner = host ? getUserByWhitelabelDomain(host) : undefined;
+  // Also tells LoginPage whether to show the "contas de demonstração" hint — that block is
+  // only true/useful on an environment that actually has seeded demo data (SEED_DEMO_DATA,
+  // see db/seed.ts); showing it unconditionally on a real customer-facing deployment
+  // publicly advertised a login/password (demo1234) that doesn't even work there.
+  const demoAccountsAvailable = !!getUserByEmail('cedente@lastro.demo');
   if (!owner || !owner.whitelabel_plus_enabled) {
-    res.json({ brand: null });
+    res.json({ brand: null, demoAccountsAvailable });
     return;
   }
   let brand: { nome: string; corPrimaria: string; logoUrl: string } | null = null;
@@ -45,7 +57,7 @@ publicRouter.get('/brand', (req, res) => {
   } catch {
     brand = null;
   }
-  res.json({ brand });
+  res.json({ brand, demoAccountsAvailable });
 });
 
 // Rate limiter shared by the four payment-rail webhook targets below. Their real
@@ -192,6 +204,56 @@ publicRouter.get('/status', (_req, res) => {
   });
 });
 
+// Aceite do sacado por link (lib/aceiteConvite.ts). Público: quem tem o link é quem o
+// cedente escolheu avisar. Limitado para ninguém varrer tokens.
+const aceiteLinkLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Muitas tentativas — aguarde um instante.' },
+});
+
+publicRouter.get('/aceite/:token', aceiteLinkLimiter, (req, res) => {
+  const out = verConvite(req.params.token);
+  res.status(out.status).json(out.body);
+});
+
+publicRouter.post('/aceite/:token', aceiteLinkLimiter, (req, res) => {
+  const parsed = respostaSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', message: 'Preencha CNPJ, nome e cargo de quem está respondendo.' });
+    return;
+  }
+  const out = responderConvite(req.params.token, parsed.data, { ip: req.ip ?? null, userAgent: req.get('user-agent') ?? null });
+  res.status(out.status).json(out.body);
+});
+
+// Cadastro: confere o CNPJ enquanto a pessoa digita e, com CNPJ_LOOKUP_LIVE, traz a razão
+// social e a situação da Receita (via BrasilAPI) para preencher o nome da empresa. Sem a
+// consulta real, diz isso (consultaReal: false) — só o dígito verificador foi checado.
+const cnpjLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'rate_limited', message: 'Muitas consultas — aguarde um instante.' },
+});
+
+publicRouter.get(
+  '/cnpj/:cnpj',
+  cnpjLimiter,
+  asyncHandler(async (req, res) => {
+    const digits = req.params.cnpj.replace(/\D/g, '');
+    if (!cnpjChecksumValido(digits)) {
+      res.json({ valido: false, consultaReal: cnpjLookupEnabled, razaoSocial: null, situacao: null, ativo: null });
+      return;
+    }
+    const info = await consultarCnpj(digits);
+    res.json({ valido: true, consultaReal: !!info, razaoSocial: info?.razaoSocial || null, situacao: info?.situacao ?? null, ativo: info ? info.ativo : null });
+  })
+);
+
 const simulateLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 30,
@@ -228,9 +290,14 @@ publicRouter.post('/simular', simulateLimiter, (req, res) => {
     valor: parsed.data.valor,
     vencimento: parsed.data.vencimento,
     seguro: false,
+    tipoDocumento: 'produto',
     nfAnexada: false,
     nfeChave: '',
+    comprovanteEntregaAnexado: false,
+    pedidoCompraAnexado: false,
     batchValores: [],
+    sacadoEmail: '',
+    sacadoTelefone: '',
   });
   res.json({
     valorFmt: preview.emitSummary.valorFmt,
@@ -238,5 +305,16 @@ publicRouter.post('/simular', simulateLimiter, (req, res) => {
     plataformaFeeFmt: preview.emitSummary.plataformaFeeFmt,
     sacadoRecognized: preview.sacadoRecognized,
     sacadoRecognizedText: preview.sacadoRecognizedText,
+    // A conta inteira em reais — quanto a empresa RECEBE, não só a taxa (lib/demonstrativo.ts,
+    // a mesma conta que a liquidação aplica). Precisa de valor e vencimento.
+    demonstrativo: demonstrativoSimulado(parsed.data.valor, parsed.data.vencimento, preview.emitSummary.taxaEstimadaAm),
   });
 });
+
+function demonstrativoSimulado(valorRaw: string, vencimento: string, taxaAm: number) {
+  const valor = parseBRLNumber(valorRaw);
+  if (!(valor > 0) || !vencimento || Number.isNaN(parseFlexibleDate(vencimento).getTime())) return null;
+  const d = { valor, vencimento } as DuplicataRow;
+  if (computePurchasePrice(d, taxaAm).prazoDias <= 0) return null;
+  return demonstrativoPrimario(valor, computePurchasePrice(d, taxaAm));
+}

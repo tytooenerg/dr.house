@@ -336,7 +336,7 @@ export function PerfilPage() {
             <div className="px-3.5 py-2.5 bg-bg text-[11.5px] font-bold text-textSecondary">E-MAIL</div>
             <div className="p-4">
               <div className="flex items-center gap-2 mb-2.5">
-                <div className="w-[26px] h-[26px] rounded-md bg-blue flex items-center justify-center font-extrabold text-white text-xs">L</div>
+                <div className="w-6.5 h-6.5 rounded-md bg-blue flex items-center justify-center font-extrabold text-white text-xs">L</div>
                 <div className="font-bold text-[13px]">Lastro</div>
               </div>
               <div className="font-bold text-[13px] mb-1">Novo lance no leilão DUP-2026-0842</div>
@@ -347,7 +347,7 @@ export function PerfilPage() {
             <div className="px-3.5 py-2.5 bg-bg text-[11.5px] font-bold text-textSecondary">PUSH</div>
             <div className="p-4">
               <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-[22px] h-[22px] rounded-md bg-navy flex items-center justify-center font-extrabold text-white text-[11.5px]">L</div>
+                <div className="w-5.5 h-5.5 rounded-md bg-navy flex items-center justify-center font-extrabold text-white text-[11.5px]">L</div>
                 <div className="font-bold text-[12.5px]">Lastro · agora</div>
               </div>
               <div className="text-[13px] font-semibold">Sacado confirmou a duplicata DUP-2026-0917 ✓</div>

@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { AiTag, Badge } from '../../components/ui/Badge';
 import { useLang } from '../../lib/i18n';
 import { PALETTE, SECTOR_COLORS } from '../../lib/palette';
+import { DemonstrativoOperacao, useDemonstrativoSimulado, type Demonstrativo } from '../../components/DemonstrativoOperacao';
 
 interface Insurer {
   key: string;
@@ -51,6 +52,11 @@ interface MeuLance {
   taxaFmt: string;
   precoFmt: string;
   liderando: boolean;
+}
+interface LoteResultado {
+  registrados: { duplicataId: string; taxaFmt: string; precoFmt: string }[];
+  recusados: { duplicataId: string; error: string; message: string }[];
+  totalPrecoFmt: string;
 }
 interface ExplanationFactor {
   label: string;
@@ -140,6 +146,7 @@ interface Offer {
   meuLance: MeuLance | null;
   bidCount: number;
   bids: Bid[];
+  demonstrativo: Demonstrativo;
   countdownSec: number;
   aceiteBadgeLabel: string;
   aceiteBadgeBg: string;
@@ -174,6 +181,14 @@ export function MarketplacePage() {
   const [explainFor, setExplainFor] = useState<string | null>(null);
   const [explanation, setExplanation] = useState<FundingExplanation | null>(null);
   const [explainLoading, setExplainLoading] = useState(false);
+  // Lance em lote: o fundo filtra, marca várias ofertas e lança em todas de uma vez
+  // (POST /market/lances/lote). Cada item segue as regras do lance único no servidor.
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [modoTaxaLote, setModoTaxaLote] = useState<'reserva' | 'fixa'>('reserva');
+  const [taxaLote, setTaxaLote] = useState('');
+  const [loteBusy, setLoteBusy] = useState(false);
+  const [loteErro, setLoteErro] = useState('');
+  const [loteResultado, setLoteResultado] = useState<LoteResultado | null>(null);
 
   // "Meus lances" precisa existir porque o lance deixou de resolver na hora: entre propor e
   // saber o resultado passa o prazo do leilão, e sem essa lista o investidor não teria onde
@@ -271,6 +286,48 @@ export function MarketplacePage() {
       setBidError((prev) => ({ ...prev, [offerId]: err instanceof ApiError ? err.message : 'Não foi possível cancelar o lance.' }));
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const selecionaveis = offers.filter((o) => o.canBuy);
+  const todasFiltradasSelecionadas = selecionaveis.length > 0 && selecionaveis.every((o) => selecionadas.has(o.id));
+  const toggleSelecao = (id: string) => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleTodasFiltradas = () => {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (todasFiltradasSelecionadas) selecionaveis.forEach((o) => next.delete(o.id));
+      else selecionaveis.forEach((o) => next.add(o.id));
+      return next;
+    });
+  };
+  const valorFaceSelecionado = liveOffers.filter((o) => selecionadas.has(o.id)).reduce((s, o) => s + o.valor, 0);
+  const sacadoDe = (id: string) => liveOffers.find((o) => o.id === id)?.sacado ?? id;
+
+  const darLancesEmLote = async () => {
+    setLoteErro('');
+    if (modoTaxaLote === 'fixa' && !taxaLote.trim()) {
+      setLoteErro('Informe a taxa (% a.m.) ou escolha lançar na reserva de cada uma.');
+      return;
+    }
+    setLoteBusy(true);
+    try {
+      const lances = [...selecionadas].map((duplicataId) => (modoTaxaLote === 'fixa' ? { duplicataId, taxaAm: taxaLote.trim() } : { duplicataId }));
+      const res = await api.post<LoteResultado>('/market/lances/lote', { lances });
+      setLoteResultado(res);
+      // Ficam marcadas só as recusadas, pro fundo ajustar a taxa e tentar de novo.
+      setSelecionadas(new Set(res.recusados.map((r) => r.duplicataId)));
+      void meusLances.reload();
+    } catch (err) {
+      setLoteErro(err instanceof ApiError ? err.message : 'Não foi possível enviar os lances.');
+    } finally {
+      setLoteBusy(false);
     }
   };
 
@@ -415,10 +472,46 @@ export function MarketplacePage() {
         )}
       </div>
 
+      {selecionaveis.length > 0 && (
+        <label className="flex items-center gap-2 mb-2.5 text-[12.5px] font-bold text-navy cursor-pointer w-fit">
+          <input type="checkbox" checked={todasFiltradasSelecionadas} onChange={toggleTodasFiltradas} className="w-4 h-4 accent-blue" />
+          Selecionar todas as {selecionaveis.length} ofertas filtradas com leilão aberto
+        </label>
+      )}
+
+      {loteResultado && (
+        <div className="bg-white border border-border rounded-card px-5 py-3.5 mb-2.5">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-[13px] font-bold">
+              <span className="text-green">{loteResultado.registrados.length} lance(s) registrado(s)</span>
+              {loteResultado.recusados.length > 0 && <span className="text-red"> · {loteResultado.recusados.length} recusado(s)</span>}
+              {loteResultado.registrados.length > 0 && (
+                <span className="text-textSecondary font-semibold"> · {loteResultado.totalPrecoFmt} se vencer todos</span>
+              )}
+            </div>
+            <button type="button" className="bg-transparent border-none text-textTertiary text-[11.5px] font-bold cursor-pointer underline" onClick={() => setLoteResultado(null)}>
+              Fechar
+            </button>
+          </div>
+          {loteResultado.recusados.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1">
+              {loteResultado.recusados.map((r) => (
+                <div key={r.duplicataId} className="text-[12.5px]">
+                  <span className="font-semibold">{sacadoDe(r.duplicataId)}</span>
+                  <span className="text-textSecondary"> — {r.message}</span>
+                </div>
+              ))}
+              <div className="text-[12px] text-textTertiary mt-1">As recusadas continuam selecionadas: ajuste a taxa e envie de novo.</div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div role="table" aria-label="Ofertas do marketplace" className="bg-white border border-border rounded-card overflow-hidden">
+        {/* Abaixo de 880px (o mesmo corte do menu lateral em layout/AppShell.tsx) as seis colunas não
+            cabem: a linha vira um cartão de duas colunas, com o rótulo em cima de cada valor. */}
         <div role="rowgroup"><div role="row"
-          className="grid gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
-          style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}
+          className="hidden min-[880px]:grid min-[880px]:grid-cols-[1.3fr_0.9fr_0.8fr_0.7fr_0.8fr_1.6fr] gap-3 px-5 py-3.5 bg-surface border-b border-border text-xs font-bold text-textSecondary uppercase tracking-wide"
         >
           <div role="columnheader">{t('marketplace.colSacado', 'Sacado')}</div>
           <div role="columnheader">{t('marketplace.colCedente', 'Cedente')}</div>
@@ -432,9 +525,18 @@ export function MarketplacePage() {
           const isExpanded = expanded.has(offer.id);
           return (
             <div key={offer.id} className="border-b border-border last:border-b-0">
-              <div role="row" className="grid gap-3 px-5 py-4 items-center text-sm" style={{ gridTemplateColumns: '1.3fr 0.9fr 0.8fr 0.7fr 0.8fr 1.6fr' }}>
-                <div role="cell">
+              <div role="row" className="grid grid-cols-2 min-[880px]:grid-cols-[1.3fr_0.9fr_0.8fr_0.7fr_0.8fr_1.6fr] gap-x-3 gap-y-2.5 px-5 py-4 items-center text-sm">
+                <div role="cell" className="col-span-2 min-[880px]:col-span-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    {offer.canBuy && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${offer.sacado} para lance em lote`}
+                        checked={selecionadas.has(offer.id)}
+                        onChange={() => toggleSelecao(offer.id)}
+                        className="w-4 h-4 accent-blue cursor-pointer"
+                      />
+                    )}
                     <span className="font-semibold">{offer.sacado}</span>
                     {offer.setor && offer.setorLabel && (
                       <Badge label={offer.setorLabel} bg={SETOR_STYLE[offer.setor]?.bg ?? PALETTE.hairline} color={SETOR_STYLE[offer.setor]?.color ?? PALETTE.textSecondary} className="text-[10.5px] px-2 py-0.5" />
@@ -442,8 +544,12 @@ export function MarketplacePage() {
                   </div>
                   {offer.aiMatch && <div className="text-[10.5px] font-bold text-blue mt-0.5">✦ Match de IA — {offer.aiMatchPct} aderente ao seu perfil</div>}
                 </div>
-                <div role="cell" className="text-textSecondary">{offer.cedente}</div>
+                <div role="cell" className="text-textSecondary">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colCedente', 'Cedente')}</span>
+                  {offer.cedente}
+                </div>
                 <div role="cell">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colValor', 'Valor')}</span>
                   <div className="font-bold font-mono-num">{offer.valorFmt}</div>
                   <div
                     className="text-[11.5px] text-textTertiary font-mono-num"
@@ -452,9 +558,15 @@ export function MarketplacePage() {
                     Reserva {offer.reservaPrecoFmt}
                   </div>
                 </div>
-                <div role="cell" className="text-green font-bold">{offer.desagio}</div>
-                <div role="cell" className="text-textSecondary">{offer.vencimento}</div>
-                <div role="cell" className="flex items-center gap-2 flex-wrap">
+                <div role="cell" className="text-green font-bold">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colDesagio', 'Deságio')}</span>
+                  {offer.desagio}
+                </div>
+                <div role="cell" className="text-textSecondary">
+                  <span className="block min-[880px]:hidden text-[10.5px] font-bold uppercase tracking-wide text-textTertiary">{t('marketplace.colVencimento', 'Vencimento')}</span>
+                  {offer.vencimento}
+                </div>
+                <div role="cell" className="col-span-2 min-[880px]:col-span-1 flex items-center gap-2 flex-wrap">
                   <span className="text-[11.5px] font-bold px-2 py-1 rounded-md" style={{ background: offer.scoreBg, color: offer.scoreColor }}>
                     {offer.score}
                   </span>
@@ -545,7 +657,7 @@ export function MarketplacePage() {
                               {semCapacidade ? ins.motivoSemCapacidade ?? ins.selo : ins.selo}
                             </div>
                           </div>
-                          <div className="font-mono-num font-bold text-[13px] text-blue flex-shrink-0">{ins.premioFmt}</div>
+                          <div className="font-mono-num font-bold text-[13px] text-blue shrink-0">{ins.premioFmt}</div>
                         </button>
                       );
                     })}
@@ -676,10 +788,14 @@ export function MarketplacePage() {
                   )}
                   {bidError[offer.id] && <div className="text-red text-[12.5px] font-semibold mb-2.5">{bidError[offer.id]}</div>}
 
+                  <div className="mb-2.5">
+                    <ContaDoLance offer={offer} taxaDigitada={offer.leilaoAberto ? bidTaxa[offer.id] ?? '' : ''} />
+                  </div>
+
                   <div className="flex flex-col gap-2">
                     {offer.bids.map((bid) => (
                       <div key={bid.id} className="flex items-center gap-3.5 bg-white rounded-lg px-3.5 py-2.5" style={{ border: `1px solid ${bid.borderColor}` }}>
-                        <div className="w-[26px] h-[26px] rounded-full text-white flex items-center justify-center text-[11.5px] font-bold flex-shrink-0" style={{ background: bid.avatarBg }}>
+                        <div className="w-6.5 h-6.5 rounded-full text-white flex items-center justify-center text-[11.5px] font-bold shrink-0" style={{ background: bid.avatarBg }}>
                           {bid.initials}
                         </div>
                         <div className="flex-1 text-[13px] font-semibold">{bid.name}</div>
@@ -706,6 +822,65 @@ export function MarketplacePage() {
 
         {offers.length === 0 && <EmptyState title={t('marketplace.emptyTitle', 'Nenhuma oferta encontrada')} hint={t('marketplace.emptyHint', 'Tente buscar por outro sacado ou cedente')} />}
       </div>
+
+      {/* pr-20: o botão flutuante do chat de IA (layout/AiChat.tsx, fixed bottom-7 right-8) cobriria o canto direito da barra. */}
+      {selecionadas.size > 0 && (
+        <div role="region" aria-label="Lance em lote" className="sticky bottom-3 z-30 mt-3 bg-navy text-white rounded-card pl-5 pr-20 py-3.5 shadow-dropdown">
+          <div className="flex items-center gap-x-4 gap-y-2.5 flex-wrap">
+            <div className="text-[13px] font-bold">
+              {selecionadas.size} selecionada(s) ·{' '}
+              <span className="font-mono-num">{valorFaceSelecionado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span> em valor de face
+            </div>
+            <label className="flex items-center gap-1.5 text-[12.5px] cursor-pointer">
+              <input type="radio" name="modo-taxa-lote" checked={modoTaxaLote === 'reserva'} onChange={() => setModoTaxaLote('reserva')} className="accent-blue" />
+              Na reserva de cada uma
+            </label>
+            <label className="flex items-center gap-1.5 text-[12.5px] cursor-pointer">
+              <input type="radio" name="modo-taxa-lote" checked={modoTaxaLote === 'fixa'} onChange={() => setModoTaxaLote('fixa')} className="accent-blue" />
+              Mesma taxa para todas:
+            </label>
+            {modoTaxaLote === 'fixa' && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-[90px]">
+                  <Input aria-label="Taxa de deságio mensal para todas as selecionadas, em %" value={taxaLote} onChange={(e) => setTaxaLote(e.target.value)} placeholder="2,50" />
+                </div>
+                <span className="text-[12.5px]">% a.m.</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              <button type="button" className="bg-transparent border-none text-white/70 text-[12px] font-bold cursor-pointer underline" onClick={() => setSelecionadas(new Set())}>
+                Limpar
+              </button>
+              <Button size="sm" disabled={loteBusy} onClick={darLancesEmLote}>
+                {loteBusy ? 'Enviando…' : `Dar ${selecionadas.size} lance(s)`}
+              </Button>
+            </div>
+          </div>
+          {loteErro && <div className="text-[12.5px] font-semibold mt-2 text-amberMid">{loteErro}</div>}
+          <div className="text-[11.5px] text-white/60 mt-1.5">Cada leilão é independente: o lote não é tudo-ou-nada, e lance acima da reserva de uma oferta é recusado só nela.</div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// A conta em reais do leilão: com uma taxa digitada, quanto o investidor pagaria e quanto a
+// empresa receberia se ESSE lance vencesse; sem nada digitado, a do melhor lance (ou da
+// reserva). Ver server/src/lib/demonstrativo.ts.
+function ContaDoLance({ offer, taxaDigitada }: { offer: Offer; taxaDigitada: string }) {
+  const taxa = taxaDigitada.trim();
+  const taxaValida = /^\d+([.,]\d+)?$/.test(taxa) && parseFloat(taxa.replace(',', '.')) > 0;
+  const { demonstrativo: simulado, carregando } = useDemonstrativoSimulado(
+    taxaValida ? `/market/${encodeURIComponent(offer.id)}/simulacao?taxaAm=${encodeURIComponent(taxa)}` : null
+  );
+  if (taxaValida && simulado) {
+    return <DemonstrativoOperacao demonstrativo={simulado} carregando={carregando} titulo={`Se o seu lance de ${taxa.replace('.', ',')}% a.m. vencer`} />;
+  }
+  return (
+    <DemonstrativoOperacao
+      demonstrativo={offer.demonstrativo}
+      carregando={taxaValida && carregando}
+      titulo={`${offer.leilaoAberto ? 'Se o leilão fechasse agora' : 'Conta da operação'} — ${offer.demonstrativo.referencia ?? ''}`}
+    />
   );
 }

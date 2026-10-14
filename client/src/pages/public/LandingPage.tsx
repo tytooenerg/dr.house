@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PublicNav, PublicFooter } from './PublicChrome';
 import { PALETTE } from '../../lib/palette';
+import { api, ApiError } from '../../lib/api';
+import { DemonstrativoOperacao, type Demonstrativo } from '../../components/DemonstrativoOperacao';
 
 interface PublicStats {
   volumeEmitidoFmt: string;
@@ -38,7 +40,7 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
   const ad = ads[index % ads.length];
 
   return (
-    <div className="px-14 py-10 max-w-[1360px] mx-auto">
+    <div className="px-5 md:px-14 py-10 max-w-[1360px] mx-auto">
       <div className="text-[11.5px] font-bold text-textTertiary uppercase tracking-wide mb-3 text-center">Publicidade</div>
       <a
         href={`/api/public/advertisements/${ad.id}/click`}
@@ -46,7 +48,7 @@ function AdCarousel({ ads }: { ads: Advertisement[] }) {
         rel="noopener noreferrer sponsored"
         className="flex items-center gap-5 border border-border rounded-card p-6 hover:bg-surface transition-colors"
       >
-        <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-surface flex-shrink-0" />
+        <img src={ad.logoUrl} alt={ad.titulo} className="w-16 h-16 rounded-lg object-contain bg-surface shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="font-bold text-[15px]">{ad.titulo}</div>
           <div className="text-textSecondary text-[13px] mt-1">{ad.texto}</div>
@@ -80,7 +82,7 @@ const PROBLEMAS = [
 
 const PASSOS = [
   { n: '1', t: 'Emissão', d: 'A empresa cadastra a duplicata; a NF-e é lida automaticamente.' },
-  { n: '2', t: 'Registro', d: 'Roteamento automático para a registradora certa — B3, CERC, Núclea ou Grafeno.' },
+  { n: '2', t: 'Registro', d: 'Roteamento automático para a registradora certa — B3, CERC ou Núclea (Grafeno, quando homologada).' },
   { n: '3', t: 'Leilão', d: 'Investidores dão lances; o menor deságio vence.' },
   { n: '4', t: 'Aceite', d: 'O sacado confirma eletronicamente, com prazo legal monitorado.' },
   { n: '5', t: 'Liquidação', d: 'Pix ou TED credita o cedente — sem esperar o vencimento.' },
@@ -95,7 +97,7 @@ const PERFIS = [
 
 const PILARES = [
   { t: 'Compliance com IA', d: 'Score de risco 0–100 combinando histórico interno, rede compartilhada, bureau de crédito e Open Finance — com revisão humana acima do limiar.' },
-  { t: 'Multi-registradora', d: 'Roteamento automático entre B3, CERC, Núclea e Grafeno pelo melhor custo e confiabilidade.' },
+  { t: 'Multi-registradora', d: 'Roteamento automático entre B3, CERC e Núclea pelo melhor custo e confiabilidade — Grafeno entra quando homologada.' },
   { t: 'PLD/KYC real', d: 'Triagem contra listas OFAC e ONU, KYC biométrico e monitoramento de atividade suspeita.' },
   { t: 'Conectores de ERP', d: 'Integrações reais com SAP, TOTVS e Omie para emitir direto do seu sistema.' },
 ];
@@ -123,23 +125,31 @@ export function LandingPage() {
       <PublicNav />
 
       {/* HERO */}
-      <div className="grid gap-10 px-14 py-20 max-w-[1360px] mx-auto items-center" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid gap-10 px-5 md:px-14 py-12 md:py-20 max-w-[1360px] mx-auto items-center grid-cols-1 lg:grid-cols-2">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-chip text-blue text-[12.5px] font-bold mb-5.5">
             <span className="rounded-full bg-blue" style={{ width: 6, height: 6 }} />
             Infraestrutura para duplicata escritural
           </div>
-          <div className="text-[52px] font-extrabold leading-[1.05] tracking-tight">Do recebível travado ao caixa em minutos.</div>
+          <div className="text-[34px] md:text-[52px] font-extrabold leading-[1.05] tracking-tight">Do recebível travado ao caixa em minutos.</div>
           <div className="text-lg text-textSecondary mt-5 leading-relaxed max-w-[520px]">
             A Lastro conecta empresas, investidores, sacados e seguradoras em um único fluxo digital — emissão, registro eletrônico, leilão e liquidação real via Pix, TED, boleto ou stablecoin, para investidor institucional local ou estrangeiro.
           </div>
-          <div className="flex gap-3 mt-8">
-            <Link to="/legal#contato" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
-              Falar com a Lastro
+          {/* Os dois botões levavam a /legal#contato — a empresa que queria antecipar não
+              tinha caminho para se cadastrar nem para ver quanto receberia. */}
+          <div className="flex gap-3 mt-8 flex-wrap">
+            <Link to="/login?mode=register&role=cedente" className="px-6 py-3.5 rounded-lg bg-blue text-white font-bold text-[15px]">
+              Criar conta grátis
             </Link>
-            <a href="#como-funciona" className="px-6 py-3.5 rounded-lg border border-inputBorder text-navy font-bold text-[15px]">
-              Ver como funciona
+            <a href="#simulador" className="px-6 py-3.5 rounded-lg border border-inputBorder text-navy font-bold text-[15px]">
+              Simular quanto recebo
             </a>
+          </div>
+          <div className="mt-3 text-[13px] text-textSecondary">
+            É banco ou fundo?{' '}
+            <Link to="/legal#contato" className="text-blue font-semibold">
+              Fale com a Lastro
+            </Link>
           </div>
         </div>
 
@@ -148,7 +158,7 @@ export function LandingPage() {
           <div className="flex flex-col gap-2.5">
             {[
               ['Empresa (cedente)', 'Emite e antecipa a duplicata'],
-              ['Registradora (B3/CERC/Núclea/Grafeno)', 'Registro eletrônico obrigatório'],
+              ['Registradora (B3/CERC/Núclea)', 'Registro eletrônico obrigatório'],
               ['Leilão de investidores', 'Precificação por deságio'],
               ['Sacado & seguradora', 'Aceite e proteção de crédito'],
             ].map(([label, desc], i) => (
@@ -163,12 +173,17 @@ export function LandingPage() {
         </div>
       </div>
 
+      <SimuladorEmpresa />
+
       {/* WHY NOW BAR */}
-      <div className="px-14 py-7 bg-surface border-t border-b border-hairline">
+      <div className="px-5 md:px-14 py-7 bg-surface border-t border-b border-hairline">
         <div className="max-w-[1360px] mx-auto flex items-center justify-between flex-wrap gap-5">
           <div className="text-[12.5px] font-bold text-textTertiary uppercase tracking-wide">Lei 13.775/2018 tornou a duplicata escritural obrigatória via registradora</div>
           <div className="flex gap-8 font-mono-num text-[13px] font-semibold text-onNavyDim flex-wrap">
-            {['B3', 'CERC', 'Núclea', 'Grafeno (SPC)'].map((n) => (
+            {/* Só as 3 autorizadas pelo BCB no primeiro ciclo (Resolução nº 339/2023) — Grafeno
+                está em homologação, não confirmada, e não pertence a uma barra de confiança
+                regulatória como esta. */}
+            {['B3', 'CERC', 'Núclea'].map((n) => (
               <div key={n}>{n}</div>
             ))}
           </div>
@@ -176,12 +191,12 @@ export function LandingPage() {
       </div>
 
       {/* PROBLEMA */}
-      <div className="px-14 py-20 max-w-[1360px] mx-auto">
+      <div className="px-5 md:px-14 py-12 md:py-20 max-w-[1360px] mx-auto">
         <div className="max-w-[640px] mb-12">
           <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">O problema</div>
           <div className="text-[34px] font-extrabold tracking-tight">Recebível bom não deveria significar caixa parado.</div>
         </div>
-        <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {PROBLEMAS.map((p) => (
             <div key={p.t} className="border border-border rounded-card p-6.5">
               <div className="w-[38px] h-[38px] rounded-[9px] bg-chip flex items-center justify-center mb-4">
@@ -195,13 +210,13 @@ export function LandingPage() {
       </div>
 
       {/* COMO FUNCIONA */}
-      <div id="como-funciona" className="px-14 py-20 bg-surface border-t border-b border-hairline scroll-mt-6">
+      <div id="como-funciona" className="px-5 md:px-14 py-12 md:py-20 bg-surface border-t border-b border-hairline scroll-mt-6">
         <div className="max-w-[1360px] mx-auto">
           <div className="max-w-[640px] mb-12">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Como funciona</div>
             <div className="text-[34px] font-extrabold tracking-tight">Da emissão ao caixa em cinco etapas.</div>
           </div>
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
             {PASSOS.map((p, i) => (
               <div key={p.t} className="relative">
                 <div className="bg-white border border-border rounded-card p-5.5 h-full">
@@ -219,12 +234,12 @@ export function LandingPage() {
       </div>
 
       {/* PARA CADA PERFIL */}
-      <div className="px-14 py-20 max-w-[1360px] mx-auto">
+      <div className="px-5 md:px-14 py-12 md:py-20 max-w-[1360px] mx-auto">
         <div className="max-w-[640px] mb-12">
           <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Uma plataforma, quatro pontas</div>
           <div className="text-[34px] font-extrabold tracking-tight">Feita para quem participa da operação — não só para quem vende.</div>
         </div>
-        <div className="grid gap-4.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="grid gap-4.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {PERFIS.map((p) => (
             <div key={p.t} className="bg-white border border-border rounded-card p-6">
               <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center mb-3.5">
@@ -238,13 +253,13 @@ export function LandingPage() {
       </div>
 
       {/* PRODUTO & TECNOLOGIA */}
-      <div className="px-14 py-20 bg-surface border-t border-b border-hairline">
+      <div className="px-5 md:px-14 py-12 md:py-20 bg-surface border-t border-b border-hairline">
         <div className="max-w-[1360px] mx-auto">
           <div className="max-w-[640px] mb-12">
             <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Produto</div>
             <div className="text-[34px] font-extrabold tracking-tight">O que torna a operação segura em escala.</div>
           </div>
-          <div className="grid gap-4.5" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="grid gap-4.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {PILARES.map((p) => (
               <div key={p.t} className="bg-white border border-border rounded-card p-6">
                 <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center mb-3.5">
@@ -264,7 +279,7 @@ export function LandingPage() {
       </div>
 
       {/* NÚMEROS REAIS (live) */}
-      <div className="bg-navy px-14 py-16 text-white">
+      <div className="bg-navy px-5 md:px-14 py-16 text-white">
         <div className="max-w-[1360px] mx-auto">
           <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
             <div>
@@ -275,7 +290,7 @@ export function LandingPage() {
               Ver todos os números →
             </Link>
           </div>
-          <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <div className="text-[34px] font-extrabold tracking-tight">{stats?.volumeEmitidoFmt ?? '—'}</div>
               <div className="text-onNavy text-[13px] mt-2">em duplicatas registradas na plataforma</div>
@@ -299,7 +314,7 @@ export function LandingPage() {
       <AdCarousel ads={ads} />
 
       {/* CTA FINAL */}
-      <div className="px-14 py-20 text-center bg-surface">
+      <div className="px-5 md:px-14 py-12 md:py-20 text-center bg-surface">
         <div className="text-[34px] font-extrabold tracking-tight">Quer saber mais sobre a Lastro?</div>
         <div className="text-textSecondary text-[15px] mt-2.5">Fale com nosso time — parcerias, imprensa ou dúvidas gerais sobre a plataforma.</div>
         <div className="flex gap-3 justify-center mt-6.5">
@@ -313,6 +328,91 @@ export function LandingPage() {
       </div>
 
       <PublicFooter />
+    </div>
+  );
+}
+
+// "Quanto a minha empresa recebe?" — a pergunta que a empresa faz antes de se cadastrar.
+// Usa o mesmo cálculo da emissão e da liquidação (POST /public/simular → lib/demonstrativo.ts),
+// com a taxa de mercado do dia; nada é gravado.
+function SimuladorEmpresa() {
+  const [valor, setValor] = useState('50.000');
+  const [dias, setDias] = useState('60');
+  const [resultado, setResultado] = useState<Demonstrativo | null>(null);
+  const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
+
+  const simular = async () => {
+    setCarregando(true);
+    setErro('');
+    const prazo = Math.max(1, Math.min(360, parseInt(dias, 10) || 0));
+    const vencimento = new Date(Date.now() + prazo * 86_400_000).toISOString().slice(0, 10);
+    try {
+      const r = await api.post<{ demonstrativo: Demonstrativo | null }>('/public/simular', { valor, vencimento });
+      setResultado(r.demonstrativo);
+      if (!r.demonstrativo) setErro('Informe um valor e um prazo válidos.');
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : 'Simulação indisponível agora.');
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  return (
+    <div id="simulador" className="px-5 md:px-14 py-12 md:py-16 scroll-mt-6">
+      <div className="max-w-[1100px] mx-auto grid gap-8 grid-cols-1 lg:grid-cols-2 items-start">
+        <div>
+          <div className="text-[13px] font-bold text-blue uppercase tracking-wide mb-2.5">Simulador</div>
+          <div className="text-[28px] md:text-[34px] font-extrabold tracking-tight">Quanto a sua empresa recebe hoje?</div>
+          <div className="text-textSecondary text-[15px] mt-3 leading-relaxed">
+            Informe o valor da duplicata e em quantos dias ela vence. A conta usa a taxa de mercado de hoje — no leilão, os financiadores disputam e a
+            taxa costuma cair.
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-6 max-w-[420px]">
+            <label className="text-[12.5px] font-bold text-textSecondary">
+              Valor da duplicata (R$)
+              <input
+                value={valor}
+                onChange={(e) => setValor(e.target.value)}
+                inputMode="decimal"
+                className="mt-1.5 w-full px-3 py-2.5 rounded-lg border border-inputBorder text-[15px] text-navy font-mono-num bg-white"
+              />
+            </label>
+            <label className="text-[12.5px] font-bold text-textSecondary">
+              Vence em (dias)
+              <input
+                value={dias}
+                onChange={(e) => setDias(e.target.value)}
+                inputMode="numeric"
+                className="mt-1.5 w-full px-3 py-2.5 rounded-lg border border-inputBorder text-[15px] text-navy font-mono-num bg-white"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={simular}
+            disabled={carregando}
+            className="mt-4 px-6 py-3 rounded-lg bg-blue text-white font-bold text-[15px] border-none cursor-pointer disabled:opacity-60"
+          >
+            {carregando ? 'Calculando…' : 'Simular'}
+          </button>
+          {erro && <div className="mt-3 text-red text-[13px] font-semibold">{erro}</div>}
+        </div>
+        <div>
+          {resultado ? (
+            <>
+              <DemonstrativoOperacao demonstrativo={resultado} titulo="Estimativa com a taxa de mercado de hoje" />
+              <Link to="/login?mode=register&role=cedente" className="inline-block mt-4 px-6 py-3 rounded-lg bg-green text-white font-bold text-[15px] no-underline">
+                Criar conta e antecipar
+              </Link>
+            </>
+          ) : (
+            <div className="border-2 border-dashed border-border rounded-xl p-8 text-center text-textSecondary text-[14px]">
+              A conta completa aparece aqui: quanto o financiador paga, a taxa da plataforma e quanto entra na sua conta.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

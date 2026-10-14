@@ -1,3 +1,4 @@
+import { dataDeResgate } from './investorPositions.js';
 import PDFDocument from 'pdfkit';
 import type { Response } from 'express';
 import { listPurchasesByInvestor } from '../db/duplicatas.js';
@@ -34,6 +35,8 @@ export interface IncomeTaxLine {
   sacado: string;
   dataAplicacao: string;
   dataResgate: string;
+  // 'revenda' quando o investidor saiu antes do vencimento — a data acima é a da revenda.
+  evento: 'vencimento' | 'revenda';
   diasCarencia: number;
   rendimentoBrutoFmt: string;
   aliquotaLabel: string;
@@ -52,13 +55,20 @@ export interface IncomeTaxStatement {
 }
 
 export function buildIncomeTaxStatement(userId: number, investorName: string, year: number): IncomeTaxStatement {
-  const purchases = listPurchasesByInvestor(userId).filter((p) => new Date(toIsoUtc(p.created_at)).getUTCFullYear() === year);
+  // O rendimento entra no ano em que foi RECEBIDO — no vencimento da duplicata ou, para quem
+  // revendeu antes, na data da revenda (lib/investorPositions.ts's dataDeResgate). Filtrava pelo
+  // ano da COMPRA: uma aplicação de dezembro que vence em fevereiro caía no informe errado, e
+  // uma posição ainda não resgatada aparecia como se o rendimento já existisse.
+  const agora = Date.now();
+  const purchases = listPurchasesByInvestor(userId)
+    .map((p) => ({ p, resgate: dataDeResgate(p) }))
+    .filter(({ resgate }) => resgate.data.getUTCFullYear() === year && resgate.data.getTime() <= agora);
 
   let totalBruto = 0;
   let totalIr = 0;
-  const lines: IncomeTaxLine[] = purchases.map((p) => {
+  const lines: IncomeTaxLine[] = purchases.map(({ p, resgate }) => {
     const dataAplicacao = new Date(toIsoUtc(p.created_at));
-    const dataResgate = parseFlexibleDate(p.vencimento);
+    const dataResgate = resgate.data;
     const diasCarencia = Math.max(0, Math.round((dataResgate.getTime() - dataAplicacao.getTime()) / (24 * 3600 * 1000)));
     const band = aliquotaForDias(diasCarencia);
     const irEstimado = p.retorno * band.aliquota;
@@ -70,6 +80,7 @@ export function buildIncomeTaxStatement(userId: number, investorName: string, ye
       sacado: p.sacado_nome,
       dataAplicacao: dataAplicacao.toLocaleDateString('pt-BR'),
       dataResgate: dataResgate.toLocaleDateString('pt-BR'),
+      evento: resgate.evento,
       diasCarencia,
       rendimentoBrutoFmt: fmtBRL(p.retorno),
       aliquotaLabel: band.label,
@@ -116,7 +127,7 @@ export function streamIncomeTaxStatementPdf(res: Response, statement: IncomeTaxS
     doc.fontSize(8.5).fillColor('#0B1F3A');
     doc.text(l.sacado, colX[0], y, { width: 155 });
     doc.text(l.dataAplicacao, colX[1], y, { width: 70 });
-    doc.text(l.dataResgate, colX[2], y, { width: 60 });
+    doc.text(l.evento === 'revenda' ? `${l.dataResgate} (rev.)` : l.dataResgate, colX[2], y, { width: 60 });
     doc.text(String(l.diasCarencia), colX[3], y, { width: 55 });
     doc.text(l.rendimentoBrutoFmt, colX[4], y, { width: 55 });
     doc.text(l.irEstimadoFmt, colX[5], y, { width: 95 });

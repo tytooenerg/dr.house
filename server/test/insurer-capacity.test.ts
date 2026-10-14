@@ -37,7 +37,7 @@ async function emitir(token: string, valor: string, sacado = 'Grupo Atlas Varejo
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${token}`)
-      .send({ sacado, cnpj, valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+      .send({ sacado, cnpj, valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
     if (res.status === 200) return res.body.duplicataId as string;
   }
   throw new Error('não consegui emitir');

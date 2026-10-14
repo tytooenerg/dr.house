@@ -113,8 +113,14 @@ export function buildCvmPeriodStats(period: string): CvmPeriodStats {
     .prepare(`SELECT COUNT(*) as n, COALESCE(SUM(valor), 0) as total FROM duplicatas WHERE sandbox = 0 AND created_at >= ? AND created_at < ?`)
     .get(start, end) as { n: number; total: number };
 
+  // Só a primeira compra de cada duplicata é mercado primário — as revendas também viram
+  // linhas de purchases e eram contadas aqui E no secundário logo abaixo. Valor = o que o
+  // financiador pagou (purchases.valor, migração 0080).
   const primario = db
-    .prepare(`SELECT COUNT(*) as n, COALESCE(SUM(valor), 0) as total FROM purchases WHERE created_at >= ? AND created_at < ?`)
+    .prepare(
+      `SELECT COUNT(*) as n, COALESCE(SUM(p.valor), 0) as total FROM purchases p
+       WHERE p.created_at >= ? AND p.created_at < ? AND p.id = (SELECT MIN(p2.id) FROM purchases p2 WHERE p2.duplicata_id = p.duplicata_id)`
+    )
     .get(start, end) as { n: number; total: number };
 
   // Secondary-market trades never got their own ledgered-transaction table (unlike

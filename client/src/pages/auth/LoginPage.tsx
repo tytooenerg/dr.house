@@ -55,21 +55,30 @@ export function RoleShape({ shape }: { shape: 'circle' | 'square' | 'diamond' | 
 }
 
 export function LoginPage() {
-  const { user, loading, login, verifyTwoFactor, register, authError } = useSession();
+  const { user, loading, login, verifyTwoFactor, requestPasswordReset, register, authError } = useSession();
   const navigate = useNavigate();
   const initialParams = new URLSearchParams(window.location.search);
-  const [mode, setMode] = useState<'login' | 'register'>(initialParams.get('mode') === 'register' ? 'register' : 'login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialParams.get('mode') === 'register' ? 'register' : 'login');
   const [submitting, setSubmitting] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
 
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
+  // Empresa e sacado informam o CNPJ já no cadastro: ele confere o dígito na hora, preenche o
+  // nome pela Receita quando a consulta está ligada no servidor e fica guardado para o
+  // credenciamento — a empresa não digita de novo depois.
+  const [cnpj, setCnpj] = useState('');
+  const [cnpjInfo, setCnpjInfo] = useState<{ valido: boolean; consultaReal: boolean; razaoSocial: string | null; situacao: string | null } | null>(null);
+  const [telefone, setTelefone] = useState('');
+  const [whatsapp, setWhatsapp] = useState(true);
   // Deep-link support (?mode=register&role=api_partner) — used by the Score/PLD API
   // marketing sections (PrecosPage/DevelopersPage) so "Quero só a API" lands directly on
   // the right pre-selected registration option instead of a generic /login.
@@ -86,6 +95,7 @@ export function LoginPage() {
   // login. { brand: null } é a resposta normal (não um erro) para todo domínio padrão da
   // Lastro — a maioria das visitas nunca vai bater num domínio com marca configurada.
   const [brand, setBrand] = useState<{ nome: string; corPrimaria: string; logoUrl: string } | null>(null);
+  const [demoAccountsAvailable, setDemoAccountsAvailable] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -109,9 +119,10 @@ export function LoginPage() {
 
   useEffect(() => {
     api
-      .get<{ brand: { nome: string; corPrimaria: string; logoUrl: string } | null }>('/public/brand')
+      .get<{ brand: { nome: string; corPrimaria: string; logoUrl: string } | null; demoAccountsAvailable: boolean }>('/public/brand')
       .then((d) => {
         setBrand(d.brand);
+        setDemoAccountsAvailable(d.demoAccountsAvailable);
         if (d.brand?.nome) document.title = d.brand.nome;
       })
       .catch(() => setBrand(null));
@@ -127,6 +138,32 @@ export function LoginPage() {
     window.location.href = `/api/auth/saml/login${ref ? `?ref=${encodeURIComponent(ref)}` : ''}`;
   };
 
+  const pedeCnpj = role === 'cedente' || role === 'sacado';
+
+  // Antes de qualquer return antecipado (if (loading) return null) — hook depois dele
+  // muda a ordem dos hooks entre renderizações e o React derruba a página (erro #310).
+  useEffect(() => {
+    const digits = cnpj.replace(/\D/g, '');
+    if (digits.length !== 14) {
+      setCnpjInfo(null);
+      return;
+    }
+    let cancelado = false;
+    api
+      .get<{ valido: boolean; consultaReal: boolean; razaoSocial: string | null; situacao: string | null }>(`/public/cnpj/${digits}`)
+      .then((info) => {
+        if (cancelado) return;
+        setCnpjInfo(info);
+        if (info.razaoSocial) setCompanyName((atual) => atual || info.razaoSocial!);
+      })
+      .catch(() => {
+        if (!cancelado) setCnpjInfo(null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [cnpj]);
+
   if (loading) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -135,6 +172,19 @@ export function LoginPage() {
     try {
       const result = await login(loginEmail, loginPassword);
       if (result.twoFactorRequired && result.challengeToken) setChallengeToken(result.challengeToken);
+    } catch {
+      // authError is surfaced below
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await requestPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
     } catch {
       // authError is surfaced below
     } finally {
@@ -162,7 +212,18 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const referralCode = new URLSearchParams(window.location.search).get('ref') ?? undefined;
-      await register({ nome, email, password, companyName, role, insurerKey: role === 'seguradora' ? insurerKey! : undefined, referralCode });
+      await register({
+        nome,
+        email,
+        password,
+        companyName,
+        role,
+        insurerKey: role === 'seguradora' ? insurerKey! : undefined,
+        referralCode,
+        cnpj: pedeCnpj ? cnpj : undefined,
+        telefone: telefone || undefined,
+        whatsapp: !!telefone && whatsapp,
+      });
     } catch {
       // authError is surfaced below
     } finally {
@@ -317,14 +378,56 @@ export function LoginPage() {
                 <Input type="password" required autoComplete="current-password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="••••••••" />
               </Field>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setForgotEmail(loginEmail);
+                setForgotSent(false);
+                setMode('forgot');
+              }}
+              className="bg-transparent border-none text-blue text-[12.5px] font-bold cursor-pointer -mt-3 mb-4 p-0"
+            >
+              Esqueci minha senha
+            </button>
             {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
             <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={submitting}>
               {submitting ? 'Entrando…' : 'Entrar'}
             </Button>
-            <div className="mt-5 p-3.5 rounded-lg bg-bg text-[12.5px] text-textSecondary leading-relaxed">
-              <b>Contas de demonstração</b> (senha <code>demo1234</code>):<br />
-              investidor@lastro.demo · cedente@lastro.demo · sacado@lastro.demo · seguradora@lastro.demo
-            </div>
+            {demoAccountsAvailable && (
+              <div className="mt-5 p-3.5 rounded-lg bg-bg text-[12.5px] text-textSecondary leading-relaxed">
+                <b>Contas de demonstração</b> (senha <code>demo1234</code>):<br />
+                investidor@lastro.demo · cedente@lastro.demo · sacado@lastro.demo · seguradora@lastro.demo
+              </div>
+            )}
+          </form>
+        ) : mode === 'forgot' ? (
+          <form onSubmit={handleForgotPassword}>
+            <div className="text-xl font-extrabold mb-1">Esqueci minha senha</div>
+            <div className="text-textSecondary text-[13px] mb-6">Digite seu e-mail e enviaremos um link para definir uma senha nova.</div>
+            {forgotSent ? (
+              <Notice variant="success" className="mb-4">
+                Se esse e-mail existir na nossa base, enviamos um link de redefinição — confira também a caixa de spam.
+              </Notice>
+            ) : (
+              <>
+                <div className="mb-5">
+                  <Field label="E-mail">
+                    <Input type="email" required autoFocus autoComplete="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="voce@empresa.com.br" />
+                  </Field>
+                </div>
+                {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
+                <Button type="submit" className="w-full" disabled={submitting || !forgotEmail.trim()}>
+                  {submitting ? 'Enviando…' : 'Enviar link de redefinição'}
+                </Button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className="mt-4 w-full text-center text-textSecondary text-[12.5px] font-semibold bg-transparent border-none cursor-pointer"
+            >
+              Voltar para o login
+            </button>
           </form>
         ) : (
           <form onSubmit={handleRegister}>
@@ -345,7 +448,7 @@ export function LoginPage() {
                     className="flex items-center gap-3 px-4 py-3.5 rounded-[10px] cursor-pointer text-left transition-colors"
                     style={{ border: `2px solid ${selected ? PALETTE.blue : PALETTE.border}`, background: selected ? PALETTE.chip : '#fff' }}
                   >
-                    <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center flex-shrink-0">
+                    <div className="w-[34px] h-[34px] rounded-lg bg-chip flex items-center justify-center shrink-0">
                       <RoleShape shape={r.shape} />
                     </div>
                     <div>
@@ -359,7 +462,7 @@ export function LoginPage() {
 
             {role === 'seguradora' && (
               <div className="mb-4">
-                <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">Qual seguradora sua conta representa?</div>
+                <div className="text-[12.5px] font-bold text-textSecondary mb-1.5">Qual seguradora sua conta representa? (obrigatório)</div>
                 <div className="flex flex-col gap-2">
                   {INSURER_OPTIONS.map((ins) => (
                     <button
@@ -377,6 +480,21 @@ export function LoginPage() {
             )}
 
             <div className="flex flex-col gap-3.5 mb-5">
+              {pedeCnpj && (
+                <div>
+                  <Field label="CNPJ da empresa">
+                    <Input required value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" inputMode="numeric" />
+                  </Field>
+                  {cnpjInfo && !cnpjInfo.valido && <div className="text-[12px] font-semibold text-red mt-1">CNPJ inválido — confira os números.</div>}
+                  {cnpjInfo?.valido && cnpjInfo.razaoSocial && (
+                    <div className="text-[12px] text-green font-semibold mt-1">
+                      {cnpjInfo.razaoSocial}
+                      {cnpjInfo.situacao ? ` · ${cnpjInfo.situacao}` : ''}
+                    </div>
+                  )}
+                  {cnpjInfo?.valido && !cnpjInfo.razaoSocial && <div className="text-[12px] text-textSecondary mt-1">CNPJ válido ✓ — confira o nome da empresa abaixo.</div>}
+                </div>
+              )}
               <Field label="Seu nome">
                 <Input required value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Marina Costa" />
               </Field>
@@ -389,10 +507,19 @@ export function LoginPage() {
               <Field label="Senha">
                 <Input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
               </Field>
+              <Field label="Celular / WhatsApp (opcional)">
+                <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(11) 99999-9999" inputMode="tel" />
+              </Field>
+              {telefone && (
+                <label className="flex items-center gap-2 text-[12.5px] text-textSecondary -mt-1.5">
+                  <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} className="accent-blue" />
+                  Quero receber os avisos importantes (aceite, leilão, pagamento) pelo WhatsApp
+                </label>
+              )}
             </div>
 
             {authError && <Notice variant="danger" className="mb-4">{authError}</Notice>}
-            <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={!role || (role === 'seguradora' && !insurerKey) || submitting}>
+            <Button type="submit" className="w-full" style={brand ? { background: brand.corPrimaria } : undefined} disabled={!role || (role === 'seguradora' && !insurerKey) || (pedeCnpj && cnpjInfo?.valido !== true) || submitting}>
               {submitting ? 'Criando conta…' : 'Criar conta e entrar'}
             </Button>
           </form>

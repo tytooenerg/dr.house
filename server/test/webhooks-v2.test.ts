@@ -117,7 +117,7 @@ describe('Webhooks v2 — secret rotation', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(200);
@@ -136,7 +136,9 @@ describe('Webhooks v2 — secret rotation', () => {
     const created = await request(app)
       .post('/api/dev/webhooks')
       .set('Authorization', `Bearer ${owner.token}`)
-      .send({ url: 'https://example.com/hook', event: 'duplicata.registrada' });
+      // Loopback, como os outros testes deste arquivo: um domínio público exigiria DNS (lib/ssrfGuard.ts
+      // resolve o endereço) e o teste quebraria em ambiente sem internet — e nada é entregue aqui.
+      .send({ url: 'http://127.0.0.1:9/hook', event: 'duplicata.registrada' });
     const webhookId = created.body.webhooks[0].id as number;
 
     const res = await request(app).post(`/api/dev/webhooks/${webhookId}/rotate-secret`).set('Authorization', `Bearer ${stranger.token}`);
@@ -167,7 +169,7 @@ describe('Webhooks v2 — sinistro.decidido', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedente.token}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-95', valor: '20.000', vencimento: vencimentoFuturo(), seguro: true, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '12.345.678/0001-95', valor: '20.000', vencimento: vencimentoFuturo(), seguro: true, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       emitStatus = res.status;
       if (res.status === 200) duplicataId = res.body.duplicataId as string;
     }

@@ -17,7 +17,7 @@ export function Field({ label, children }: { label: string; children: ReactEleme
 export function Input({ className = '', mono = false, ...props }: InputHTMLAttributes<HTMLInputElement> & { mono?: boolean }) {
   return (
     <input
-      className={`w-full px-3.5 py-3 rounded-lg border border-inputBorder outline-none text-sm focus:border-blue transition-colors ${mono ? 'font-mono-num' : ''} ${className}`}
+      className={`w-full px-3.5 py-3 rounded-lg border border-inputBorder outline-hidden text-sm focus:border-blue transition-colors ${mono ? 'font-mono-num' : ''} ${className}`}
       {...props}
     />
   );
@@ -26,7 +26,7 @@ export function Input({ className = '', mono = false, ...props }: InputHTMLAttri
 export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`px-3.5 py-3 rounded-lg border border-inputBorder outline-none text-[13px] bg-white cursor-pointer ${className}`}
+      className={`px-3.5 py-3 rounded-lg border border-inputBorder outline-hidden text-[13px] bg-white cursor-pointer ${className}`}
       {...props}
     />
   );
@@ -35,7 +35,7 @@ export function Select({ className = '', ...props }: SelectHTMLAttributes<HTMLSe
 export function Textarea({ className = '', ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={`w-full px-3.5 py-3 rounded-lg border border-inputBorder outline-none text-sm focus:border-blue transition-colors ${className}`}
+      className={`w-full px-3.5 py-3 rounded-lg border border-inputBorder outline-hidden text-sm focus:border-blue transition-colors ${className}`}
       {...props}
     />
   );

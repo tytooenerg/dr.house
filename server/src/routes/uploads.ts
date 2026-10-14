@@ -5,16 +5,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requireAuth } from '../auth/middleware.js';
 import { addUpload } from '../db/misc.js';
-import { markKybDone, updateSettings } from '../db/users.js';
+import { getDuplicata } from '../db/duplicatas.js';
+import { markKybDone, updateSettings, effectiveOwnerId } from '../db/users.js';
 import { extractNfeFields } from '../lib/nfeExtraction.js';
+import { extractNfseFields } from '../lib/nfseExtraction.js';
 import { analyzeContract } from '../lib/contractAnalysis.js';
 import { recordContractAnalysis } from '../db/contractAnalyses.js';
 import { verificarProvaDeVida } from '../lib/biometricKyc.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
+import { KINDS_DE_LASTRO, reavaliarLastro } from '../lib/lastroCompletar.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadDir = path.resolve(__dirname, '../../uploads');
+// Exportado pra lib/uploadsDiskUsage.ts reusar o mesmo caminho em vez de duplicá-lo.
+export const uploadDir = path.resolve(__dirname, '../../uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -57,15 +61,42 @@ uploadsRouter.post(
       return;
     }
     const kind = typeof req.body.kind === 'string' ? req.body.kind : 'outro';
-    const record = addUpload(req.user!.id, kind, req.file.originalname, req.file.filename);
+
+    // Vincula o upload a uma duplicata específica quando informado — essencial pro
+    // instrumento de cessão (kind='contrato_cessao'), que sem isso ficava só preso à conta
+    // de quem enviou, sem registro de qual operação ele realmente comprova. Checa posse
+    // (effectiveOwnerId, mesma regra de lib/auctionOpen.ts) pra uma conta nunca conseguir
+    // anexar documento à duplicata de outra.
+    let duplicataId: string | null = null;
+    if (typeof req.body.duplicataId === 'string' && req.body.duplicataId.trim()) {
+      const d = getDuplicata(req.body.duplicataId.trim());
+      if (!d || d.cedente_id !== effectiveOwnerId(req.user!)) {
+        res.status(404).json({ error: 'duplicata_not_found', message: 'Duplicata não encontrada ou não pertence a esta conta.' });
+        return;
+      }
+      duplicataId = d.id;
+    }
+
+    const record = addUpload(req.user!.id, kind, req.file.originalname, req.file.filename, duplicataId);
 
     if (kind === 'kyb_doc') markKybDone(req.user!.id);
 
-    // Real NF-e data extraction via Claude (lib/nfeExtraction.ts) — reads the actual
-    // uploaded file instead of always returning the same hardcoded sample. Returns null
-    // (not a fabricated guess) when ANTHROPIC_API_KEY isn't set or extraction fails, so
-    // the cedente just fills the form manually as before.
-    const extracted = kind === 'nfe' ? await extractNfeFields(req.file.path, req.file.mimetype, req.user!.id) : null;
+    // Documento que faltou na emissão, anexado depois pela tela de Minhas Duplicatas: pode
+    // completar o lastro e liberar a duplicata para leilão (lib/lastroCompletar.ts).
+    const lastro = duplicataId && KINDS_DE_LASTRO.has(kind) ? reavaliarLastro(duplicataId) : null;
+
+    // Real NF-e/NFS-e data extraction via Claude (lib/nfeExtraction.ts,
+    // lib/nfseExtraction.ts) — reads the actual uploaded file instead of always returning
+    // the same hardcoded sample. Returns null (not a fabricated guess) when
+    // ANTHROPIC_API_KEY isn't set or extraction fails, so the cedente just fills the form
+    // manually as before. Separate extractors, não um if/else no mesmo prompt — NFS-e não
+    // segue o layout nacional da NF-e (ver lib/nfseExtraction.ts).
+    const extracted =
+      kind === 'nfe'
+        ? await extractNfeFields(req.file.path, req.file.mimetype, req.user!.id)
+        : kind === 'nfse'
+          ? await extractNfseFields(req.file.path, req.file.mimetype, req.user!.id)
+          : null;
 
     // Real contract clause analysis (lib/contractAnalysis.ts) — replaces the static
     // CONTRACT_FLAGS demo copy on Compliance's "Leitura de contratos" card. Persisted so
@@ -90,6 +121,12 @@ uploadsRouter.post(
       }
     }
 
-    res.status(201).json({ upload: { id: record.id, filename: record.filename, kind: record.kind, createdAt: record.created_at }, extracted, analysis, biometria });
+    res.status(201).json({
+      upload: { id: record.id, filename: record.filename, kind: record.kind, duplicataId: record.duplicata_id, createdAt: record.created_at },
+      lastro,
+      extracted,
+      analysis,
+      biometria,
+    });
   })
 );

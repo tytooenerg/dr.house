@@ -39,6 +39,7 @@ const FULL_SHAPE_KEYS = [
   'sectorDiversification',
   'autoBidActivity',
   'marketMakerEnabled',
+  'marketMakerGloballyEnabled',
   'marketMakerMaxExposicao',
   'marketMakerMinScore',
 ] as const;

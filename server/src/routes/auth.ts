@@ -14,9 +14,11 @@ import {
   updateKybForm,
   setVeiculo,
   updateSettings,
+  updateProfile,
   approveKyb,
+  updatePasswordHash,
 } from '../db/users.js';
-import { acceptTeamInvite, findTeamInviteByToken } from '../db/misc.js';
+import { acceptTeamInvite, findTeamInviteByToken, hasUploadOfKind } from '../db/misc.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import {
   generateRefreshToken,
@@ -32,7 +34,12 @@ import {
   verifySamlRelayState,
   signSamlSignupToken,
   verifySamlSignupToken,
+  signPasswordResetToken,
+  peekPasswordResetTokenUserId,
+  verifyPasswordResetToken,
 } from '../auth/jwt.js';
+import { sendEmail } from '../lib/mailer.js';
+import { cnpjChecksumValido } from '../lib/cnpjLookup.js';
 import { googleOAuthEnabled, buildGoogleAuthUrl, exchangeCodeForProfile } from '../lib/googleOAuth.js';
 import { samlSsoEnabled, buildLoginRequestUrl, validateAssertion } from '../lib/samlSso.js';
 import express from 'express';
@@ -43,6 +50,8 @@ import { recordAuditEvent } from '../db/audit.js';
 import { INSURERS, VEICULOS, VEICULO_KEYS, VEICULO_DISCLAIMER, ONBOARDING_STEPS, ROLE_TABS } from '../data/seed.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { runPldScreening } from '../lib/pldScreening.js';
+import { cedenteKybDocsComplete, CEDENTE_KYB_KINDS } from '../lib/cedenteKyb.js';
+import { isFeatureEnabled } from '../lib/featureFlags.js';
 import { runAgent } from '../lib/agentRuntime.js';
 import { onboardingAgent } from '../lib/agents/onboarding.js';
 import { claudeEnabled } from '../lib/claude.js';
@@ -50,7 +59,6 @@ import { aiFeatureLimiter } from '../lib/aiRateLimit.js';
 import { generateTotpSecret, verifyTotp, otpauthUrl, generateRecoveryCode } from '../lib/totp.js';
 import { setTotpSecret, enableTotp, disableTotp, storeRecoveryCodes, consumeRecoveryCode, countRemainingRecoveryCodes } from '../db/twoFactor.js';
 import { logger } from '../lib/logger.js';
-import { isFeatureEnabled } from '../lib/featureFlags.js';
 import type { UserRow } from '../db/types.js';
 
 // Shared by all three registration entry points (email/senha, Google, SAML) — an admin
@@ -66,9 +74,13 @@ export const authRouter = Router();
 
 // Only guards the credential-guessable endpoints — /me, /refresh etc. are hit
 // automatically and often, and rate-limiting those would just break active sessions.
+// AUTH_RATE_LIMIT existe para o e2e (e2e/playwright.config.ts): a suíte inteira roda de um
+// IP só e passa de 20 logins/cadastros em 15 minutos. Em produção fica o padrão, 20.
+const authRateLimit = Number(process.env.AUTH_RATE_LIMIT) > 0 ? Number(process.env.AUTH_RATE_LIMIT) : 20;
+
 const bruteForceLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: authRateLimit,
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => !!process.env.VITEST,
@@ -85,6 +97,13 @@ const registerSchema = z.object({
     .enum(INSURERS.map((i) => i.key) as [string, ...string[]])
     .optional(),
   referralCode: z.string().trim().optional(),
+  // Opcionais na API (contas de teste, parceiros, SDKs não mandam), exigidos pela tela de
+  // cadastro para empresa e sacado. Quando vierem, o CNPJ precisa passar no dígito
+  // verificador e já fica guardado para o credenciamento (kyb_form), e o telefone liga os
+  // avisos por WhatsApp se a pessoa marcou.
+  cnpj: z.string().trim().optional().default(''),
+  telefone: z.string().trim().optional().default(''),
+  whatsapp: z.boolean().optional().default(false),
 });
 
 const loginSchema = z.object({
@@ -118,8 +137,27 @@ function publicUser(user: UserRow) {
     kybRejectReason: user.kyb_reject_reason,
     needsKyb: user.role === 'investidor' && (user.kyb_status === 'none' || user.kyb_status === 'rejected'),
     kybPending: user.role === 'investidor' && user.kyb_status === 'pending',
+    // O cliente usa isto (não kybStatus puro) pra decidir se mostra o bloqueio de emissão —
+    // sem o flag, TODO cedente novo tem kyb_status='none' por padrão da coluna (nunca foi
+    // aprovado automaticamente), e sem este campo o EmitirPage travaria a emissão de
+    // qualquer cedente novo mesmo com o flag desligado.
+    cedenteKybRequired: user.role === 'cedente' && isFeatureEnabled('cedente_kyb_required', { userId: user.id }),
+    // Pra CedenteKybGate (EmitirPage.tsx) não começar sempre do zero visualmente — sem
+    // isto, um cedente que já enviou 2 dos 3 documentos numa sessão anterior via ao
+    // recarregar a página com os 3 botões "não enviado", e reenviaria à toa um documento
+    // que o servidor já tem guardado.
+    cedenteKybDocsStatus:
+      user.role === 'cedente'
+        ? {
+            cnpj: hasUploadOfKind(user.id, CEDENTE_KYB_KINDS[0]),
+            contratoSocial: hasUploadOfKind(user.id, CEDENTE_KYB_KINDS[1]),
+            representante: hasUploadOfKind(user.id, CEDENTE_KYB_KINDS[2]),
+          }
+        : null,
     showOnboarding: !onboardingSeen,
-    onboardingSteps: steps,
+    // O título trazia "Bem-vinda, Marina" fixo para todo mundo; agora usa o primeiro nome.
+    menuCompleto: settings.menuCompleto,
+    onboardingSteps: steps.map((st) => ({ ...st, title: st.title.replace('{nome}', user.nome.trim().split(/\s+/)[0] || user.company_name) })),
     sessionLabel:
       user.role === 'sacado'
         ? 'Sessão Sacado'
@@ -165,7 +203,16 @@ authRouter.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
-    const { nome, email, password, companyName, role, insurerKey, referralCode } = parsed.data;
+    const { nome, email, password, companyName, role, insurerKey, referralCode, cnpj, telefone, whatsapp } = parsed.data;
+    if (cnpj && !cnpjChecksumValido(cnpj.replace(/\D/g, ''))) {
+      res.status(400).json({ error: 'validation_error', message: 'CNPJ inválido — confira os 14 dígitos.' });
+      return;
+    }
+    const telefoneDigitos = telefone.replace(/\D/g, '');
+    if (telefone && telefoneDigitos.length < 10) {
+      res.status(400).json({ error: 'validation_error', message: 'Telefone inválido — informe DDD e número.' });
+      return;
+    }
     if (role === 'seguradora' && !insurerKey) {
       res.status(400).json({ error: 'validation_error', message: 'Selecione qual seguradora sua conta representa.' });
       return;
@@ -175,7 +222,13 @@ authRouter.post(
       return;
     }
     const passwordHash = await hashPassword(password);
-    const user = createUser({ email, passwordHash, nome, companyName, role, insurerKey, referredByCode: referralCode });
+    let user = createUser({ email, passwordHash, nome, companyName, role, insurerKey, referredByCode: referralCode });
+    if (cnpj) updateKybForm(user.id, 'cnpj', cnpj);
+    if (telefoneDigitos) {
+      updateProfile(user.id, { telefone: telefoneDigitos });
+      if (whatsapp) updateSettings(user.id, { notifyViaWhatsapp: true });
+    }
+    user = getUserById(user.id)!;
     const { accessToken, refreshToken } = issueTokens(user);
     recordAuditEvent(user.id, user.company_name, 'user.registered', { role });
     res.status(201).json({ token: accessToken, refreshToken, user: publicUser(user) });
@@ -274,8 +327,85 @@ authRouter.post(
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
 
-function googleRedirectUri(req: import('express').Request): string {
-  return process.env.GOOGLE_OAUTH_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+const forgotPasswordSchema = z.object({ email: z.string().trim().email('E-mail inválido.') });
+
+// Never reveals whether the e-mail exists — the response is the same either way, so this
+// can't be used to enumerate registered accounts. Works for any role, including admin
+// (previously the only self-service gap: an admin locked out had no option besides a
+// human with server access running scripts/resetAdminCredentials.ts).
+authRouter.post(
+  '/forgot-password',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const user = getUserByEmail(parsed.data.email.trim().toLowerCase());
+    if (user) {
+      const token = signPasswordResetToken(user.id, user.password_hash);
+      const link = `${APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+      await sendEmail(
+        user.email,
+        'Lastro — redefinir sua senha',
+        `Olá, ${user.nome}.\n\nRecebemos um pedido para redefinir a senha da sua conta Lastro. Se foi você, clique no link abaixo (válido por 30 minutos):\n\n${link}\n\nSe não foi você, ignore este e-mail — sua senha continua a mesma.`
+      );
+      recordAuditEvent(user.id, user.company_name, 'user.password_reset_requested', {});
+    }
+    res.json({ ok: true, message: 'Se esse e-mail existir na nossa base, enviamos um link de redefinição.' });
+  })
+);
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(10, 'Link inválido.'),
+  newPassword: z.string().min(6, 'A senha precisa ter ao menos 6 caracteres.'),
+});
+
+authRouter.post(
+  '/reset-password',
+  bruteForceLimiter,
+  asyncHandler(async (req, res) => {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    // peekPasswordResetTokenUserId is unverified — only used to know whose current
+    // password_hash to bind-check against. verifyPasswordResetToken does the real,
+    // signature-checked validation right after.
+    const peekedUserId = peekPasswordResetTokenUserId(parsed.data.token);
+    const candidate = peekedUserId ? getUserById(peekedUserId) : null;
+    const userId = candidate ? verifyPasswordResetToken(parsed.data.token, candidate.password_hash) : null;
+    if (!userId || !candidate) {
+      res.status(400).json({ error: 'invalid_token', message: 'Link inválido ou expirado. Peça um novo link de redefinição.' });
+      return;
+    }
+    const passwordHash = await hashPassword(parsed.data.newPassword);
+    const updated = updatePasswordHash(userId, passwordHash);
+    // Mesmo padrão de account.ts's /delete: uma ação que troca a credencial precisa
+    // invalidar sessões já abertas. Sem isto, um refresh token roubado antes do reset
+    // (o motivo mais comum de alguém usar "esqueci minha senha" por suspeita de invasão)
+    // continuaria renovando access tokens por até 30 dias — o reset não resolveria nada.
+    revokeAllRefreshTokensForUser(userId);
+    recordAuditEvent(userId, updated.company_name, 'user.password_reset_completed', {});
+
+    // Same 2FA gate as a normal login — resetting the password never bypasses it.
+    if (updated.totp_enabled) {
+      res.json({ twoFactorRequired: true, challengeToken: signChallengeToken(updated.id) });
+      return;
+    }
+    const { accessToken, refreshToken } = issueTokens(updated);
+    res.json({ token: accessToken, refreshToken, user: publicUser(updated) });
+  })
+);
+
+// Built from APP_URL, not req.protocol/req.get('host') — behind the Caddy reverse proxy
+// (see DEPLOY.md) the app only ever sees plain HTTP internally, so req.protocol resolves to
+// 'http' without an explicit trust-proxy setup, producing a redirect_uri that mismatches the
+// https:// one registered in Google Cloud Console (error 400: redirect_uri_mismatch).
+function googleRedirectUri(): string {
+  return process.env.GOOGLE_OAUTH_REDIRECT_URI || `${APP_URL}/api/auth/google/callback`;
 }
 
 // Public — lets the client decide whether to show "Continuar com Google" at all, since
@@ -291,7 +421,7 @@ authRouter.get('/google/start', (req, res) => {
   }
   const referralCode = typeof req.query.ref === 'string' ? req.query.ref : undefined;
   const state = signGoogleOAuthState(referralCode);
-  res.redirect(302, buildGoogleAuthUrl(state, googleRedirectUri(req)));
+  res.redirect(302, buildGoogleAuthUrl(state, googleRedirectUri()));
 });
 
 authRouter.get(
@@ -310,7 +440,7 @@ authRouter.get(
     }
     let profile;
     try {
-      profile = await exchangeCodeForProfile(code, googleRedirectUri(req));
+      profile = await exchangeCodeForProfile(code, googleRedirectUri());
     } catch (err) {
       logger.error({ err }, '[google-oauth] falha ao trocar código pelo perfil');
       res.redirect(302, `${APP_URL}/?googleError=falha_google`);
@@ -403,8 +533,11 @@ authRouter.post(
   })
 );
 
-function samlAcsUrl(req: import('express').Request): string {
-  return process.env.SAML_SP_ACS_URL || `${req.protocol}://${req.get('host')}/api/auth/saml/acs`;
+// Same fix as googleRedirectUri() above: built from APP_URL, not req.protocol/req.get('host'),
+// which resolves to 'http' behind the Caddy reverse proxy without an explicit trust-proxy
+// setup and would send the IdP a Location/ACS URL that mismatches what's registered there.
+function samlAcsUrl(): string {
+  return process.env.SAML_SP_ACS_URL || `${APP_URL}/api/auth/saml/acs`;
 }
 
 // Public — same reasoning as /google/config: lets the client decide whether to show
@@ -421,7 +554,7 @@ authRouter.get('/saml/login', (req, res) => {
   }
   const referralCode = typeof req.query.ref === 'string' ? req.query.ref : undefined;
   const relayState = signSamlRelayState(referralCode);
-  const url = buildLoginRequestUrl(samlAcsUrl(req), relayState);
+  const url = buildLoginRequestUrl(samlAcsUrl(), relayState);
   if (!url) {
     res.status(500).json({ error: 'saml_misconfigured', message: 'Não foi possível montar a requisição de login SAML.' });
     return;
@@ -448,7 +581,7 @@ authRouter.post(
     }
     let profile;
     try {
-      profile = await validateAssertion(samlAcsUrl(req), req.body);
+      profile = await validateAssertion(samlAcsUrl(), req.body);
     } catch (err) {
       logger.error({ err }, '[saml-sso] falha ao validar a resposta SAML');
       res.redirect(302, `${APP_URL}/?samlError=falha_saml`);
@@ -617,9 +750,73 @@ authRouter.post(
   })
 );
 
+const cedenteKybSchema = z.object({ cnpj: z.string().trim().min(1, 'Informe o CNPJ da empresa.') });
+
+// KYB documental do cedente — mesma máquina de estado do investidor acima (kyb_status:
+// none → pending → approved/rejected, fila em GET/POST /admin/kyb), mas sem o formulário
+// de veículo/PL/patrimônio que só faz sentido pra quem compra crédito. O que conta como
+// "pronto pra enviar" aqui é diferente: três documentos (lib/cedenteKyb.ts), não um só.
+authRouter.post(
+  '/kyb/cedente',
+  requireAuth,
+  aiFeatureLimiter,
+  asyncHandler(async (req, res) => {
+    if (req.user!.role !== 'cedente') {
+      res.status(403).json({ error: 'forbidden', message: 'Este credenciamento é só para contas cedente.' });
+      return;
+    }
+    const parsed = cedenteKybSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+      return;
+    }
+    const userId = req.user!.id;
+    if (!cedenteKybDocsComplete(userId)) {
+      res.status(400).json({
+        error: 'documentos_pendentes',
+        message: 'Envie o CNPJ, o contrato social e o documento do representante legal antes de enviar para análise.',
+      });
+      return;
+    }
+    updateKybForm(userId, 'cnpj', parsed.data.cnpj);
+    submitKybForReview(userId);
+    recordAuditEvent(userId, req.user!.company_name, 'kyb.submitted', { cnpj: parsed.data.cnpj, role: 'cedente' });
+    await runPldScreening(userId, req.user!.company_name, parsed.data.cnpj);
+
+    // Mesma pré-triagem fire-and-forget que o KYB do investidor já dispara (acima) — sem
+    // isso, buildAiTriage (routes/admin.ts) nunca encontra um run pra nenhuma entrada de
+    // cedente na fila, e o card de recomendação da IA no KybPanel.tsx simplesmente nunca
+    // aparece pra esse papel, sem nenhum aviso de que é esperado.
+    if (claudeEnabled) {
+      void runAgent(onboardingAgent, {
+        input: `Uma empresa (cedente) acabou de submeter o KYB para análise (userId=${userId}). Investigue sanções/PEP e histórico judicial e recomende aprovar ou rejeitar, com evidências concretas.`,
+        subjectType: 'user',
+        subjectId: String(userId),
+      }).catch((err) => logger.warn({ err, userId }, '[onboarding-agent] falha na pré-triagem automática'));
+    }
+
+    const refreshed = getUserById(userId)!;
+    res.json({ user: publicUser(refreshed) });
+  })
+);
+
 authRouter.post('/onboarding/complete', requireAuth, (req, res) => {
   updateSettings(req.user!.id, { onboardingSeen: true });
   res.json({ ok: true });
+});
+
+// Modo essencial do menu da empresa (client/src/data/navConfig.ts's ABAS_ESSENCIAIS): 18 abas
+// assustam quem só quer antecipar uma duplicata. Só muda a exibição — as permissões
+// (ROLE_TABS) continuam as mesmas, e uma aba escondida segue acessível pelo endereço.
+const menuSchema = z.object({ completo: z.boolean() });
+authRouter.post('/menu', requireAuth, (req, res) => {
+  const parsed = menuSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
+    return;
+  }
+  updateSettings(req.user!.id, { menuCompleto: parsed.data.completo });
+  res.json({ user: publicUser(getUserById(req.user!.id)!) });
 });
 
 // Generates a new secret and returns it for the user to add to their authenticator app —

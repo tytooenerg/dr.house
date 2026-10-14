@@ -263,7 +263,7 @@ export function DevelopersPage() {
           <div className="border border-border rounded-card p-6.5">
             <div className="font-mono-num text-[11.5px] font-bold text-blue mb-2">POST</div>
             <div className="font-bold text-base mb-2">Registro API</div>
-            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">O mesmo roteamento inteligente entre CERC/B3/Núclea/Grafeno que a Lastro usa internamente, sem entrar no marketplace — R$ 3,50 por registro.</div>
+            <div className="text-textSecondary text-[13px] leading-relaxed mb-3">O mesmo roteamento inteligente entre CERC/B3/Núclea (+ Grafeno, quando homologada) que a Lastro usa internamente, sem entrar no marketplace — R$ 3,50 por registro.</div>
             <div className="font-mono-num text-[12.5px] text-textTertiary">POST /v1/registro</div>
           </div>
           <div className="border border-border rounded-card p-6.5">

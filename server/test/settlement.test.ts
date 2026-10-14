@@ -73,7 +73,7 @@ describe('real settlement on a marketplace purchase', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '10.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).not.toBe('');
@@ -123,7 +123,7 @@ describe('real settlement on a marketplace purchase', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '20.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '20.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).not.toBe('');
@@ -152,7 +152,7 @@ describe('real settlement on a marketplace purchase', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '20.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '20.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       if (res.status === 200) duplicataId2 = res.body.duplicataId;
     }
     aceitarDuplicata(duplicataId2);
@@ -223,7 +223,7 @@ describe('real settlement on a mercado secundário resale', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: sacadoCompany, cnpj: '', valor: '18.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: sacadoCompany, cnpj: '', valor: '18.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).toBeTruthy();

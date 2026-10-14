@@ -115,13 +115,14 @@ export function createDuplicata(input: {
   desagio?: string | null;
   registradora?: string | null;
   nfeChave?: string | null;
+  lastroItens?: Record<string, boolean> | null;
   id?: string;
   sandbox?: boolean;
 }): DuplicataRow {
   const id = input.id ?? nextId('DUP-2026');
   db.prepare(
-    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, setor, registradora, nfe_chave, sandbox)
-     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @setor, @registradora, @nfeChave, @sandbox)`
+    `INSERT INTO duplicatas (id, cedente_id, cedente_nome, sacado_nome, sacado_cnpj, valor, vencimento, emissao, status, lastro_pct, seguro, registro, desagio, score, setor, registradora, nfe_chave, sandbox, lastro_itens)
+     VALUES (@id, @cedenteId, @cedenteNome, @sacadoNome, @sacadoCnpj, @valor, @vencimento, @emissao, @status, @lastroPct, @seguro, @registro, @desagio, @score, @setor, @registradora, @nfeChave, @sandbox, @lastroItens)`
   ).run({
     id,
     cedenteId: input.cedenteId,
@@ -141,6 +142,7 @@ export function createDuplicata(input: {
     registradora: input.registradora ?? null,
     nfeChave: input.nfeChave || null,
     sandbox: input.sandbox ? 1 : 0,
+    lastroItens: input.lastroItens ? JSON.stringify(input.lastroItens) : null,
   });
   return getDuplicata(id)!;
 }
@@ -161,6 +163,14 @@ export function sacadoValorStats(sacadoCnpj: string): { avg: number; n: number }
 
 export function setStatus(id: string, status: string) {
   db.prepare('UPDATE duplicatas SET status = ? WHERE id = ?').run(status, id);
+}
+
+export function setLastro(id: string, pct: number, itens: Record<string, boolean>) {
+  db.prepare('UPDATE duplicatas SET lastro_pct = ?, lastro_itens = ? WHERE id = ?').run(pct, JSON.stringify(itens), id);
+}
+
+export function setSacadoCnpj(id: string, cnpj: string) {
+  db.prepare('UPDATE duplicatas SET sacado_cnpj = ? WHERE id = ?').run(cnpj, id);
 }
 
 export function setComplianceScore(id: string, score: number) {
@@ -273,16 +283,13 @@ export interface PurchaseRow {
   active: number;
   com_regresso: number;
   created_at: string;
+  // Quando a posição foi encerrada por revenda (migração 0081); null enquanto ativa.
+  encerrada_em: string | null;
 }
 
-// purchases.valor tem dois significados dependendo da origem da compra: valor de face
-// numa compra primária/cesta/Confirming (market.ts, cestasCore.ts, confirmingCore.ts
-// sempre chamam createPurchase com duplicata.valor), mas preço pago numa compra
-// originada de revenda (resaleCore.ts's executeResaleTrade passa o preço da revenda).
-// `faceValor` (d.valor, sempre o valor de face real) permite recuperar o preço
-// efetivamente pago em qualquer caso via `faceValor - retorno` — retorno já é, de forma
-// universal, valor de face menos preço pago (mesma fórmula usada desde a correção do
-// retorno fabricado) — sem precisar saber a origem da linha.
+// purchases.valor = quanto o investidor pagou (base de custo), em toda linha — compra
+// primária (lib/auctionClose.ts) ou revenda (lib/resaleCore.ts); ver migração 0080.
+// `faceValor` (d.valor) é o valor de face, que não muda entre revendas.
 export function listPurchasesByInvestor(
   investorId: number
 ): (PurchaseRow & { sacado_nome: string; score: number | null; seguro: number; vencimento: string; faceValor: number; duplicata_status: string })[] {
@@ -304,7 +311,9 @@ export function listPurchasesByInvestor(
 export function sumOutstandingPurchasesByInvestor(investorId: number): number {
   const row = db
     .prepare(
-      `SELECT COALESCE(SUM(p.valor), 0) as total FROM purchases p
+      // Valor de FACE (d.valor): é o que essas posições vão render no vencimento, e é o que o
+      // NAV do fundo soma (lib/confirmingFundo.ts). purchases.valor é o preço pago.
+      `SELECT COALESCE(SUM(d.valor), 0) as total FROM purchases p
        JOIN duplicatas d ON d.id = p.duplicata_id
        WHERE p.investor_id = ? AND p.active = 1 AND d.status != 'paga'`
     )

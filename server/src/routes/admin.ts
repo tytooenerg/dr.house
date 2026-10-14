@@ -8,7 +8,8 @@ import { screenAdvertisement } from '../lib/adCopilot.js';
 import { getDispute, listAllOpenDisputes, listEvents, resolveDispute } from '../db/disputes.js';
 import { getAceite, setAceiteStatus } from '../db/aceites.js';
 import { getDuplicata, listOverdueDuplicatas, setStatus as setDuplicataStatus } from '../db/duplicatas.js';
-import { addNotification, addLedgerEntry } from '../db/misc.js';
+import { addNotification, addLedgerEntry, getLatestUploadOfKind } from '../db/misc.js';
+import { CEDENTE_KYB_KINDS } from '../lib/cedenteKyb.js';
 import { recordAuditEvent, listAuditLog, verifyAuditChain } from '../db/audit.js';
 import { COLORS, VEICULO_KEYS, VEICULO_LABEL, type VeiculoKey } from '../data/seed.js';
 import { fmtBRL, fmtRelative } from '../lib/format.js';
@@ -37,7 +38,8 @@ import { sendForSignature, checkSignatureStatus, esignatureEnabled } from '../li
 import { recordRegulatoryNote, listRegulatoryNotes, acknowledgeRegulatoryNote } from '../db/regulatoryNotes.js';
 import { getSuccessFeePct, setSuccessFeePct, DEFAULT_SUCCESS_FEE_PCT, recordRecovery } from '../lib/legalCollectionFee.js';
 import { listAllLegalCollectionFees } from '../db/legalCollectionFees.js';
-import { runBackup, listBackups, backupEnabled } from '../lib/backup.js';
+import { runBackup, listBackups, backupEnabled, offsiteStatus } from '../lib/backup.js';
+import { computeUploadsDiskUsage } from '../lib/uploadsDiskUsage.js';
 import { prontidao } from '../lib/preflight.js';
 import { listPendingTedDeposits, getTedDeposit, concludeTedDeposit } from '../db/ted.js';
 import { listPendingStablecoinDeposits, getStablecoinDeposit, concludeStablecoinDeposit } from '../db/stablecoin.js';
@@ -60,6 +62,7 @@ import { getLatestAgentRunForSubject, listPendingActionsForRun } from '../db/age
 import { trainModel, getModel, MIN_TRAINING_SAMPLES, MIN_NEURAL_NET_SAMPLES } from '../lib/mlScoring.js';
 import { runFraudAnomalyScan } from '../lib/fraudAnomalyDetection.js';
 import { computeMetrics } from '../lib/metrics.js';
+import { computeIndicadoresNegocio } from '../lib/businessMetrics.js';
 import { listFeatureFlagViews, setFeatureFlag } from '../lib/featureFlags.js';
 import { streamCoafReportPdf, buildCvmPeriodStats, streamCvmReportPdf } from '../lib/regulatoryReports.js';
 import { buildDarfSummary, streamDarfPdf } from '../lib/darfGenerator.js';
@@ -112,10 +115,22 @@ adminRouter.get('/kyb', (_req, res) => {
       nome: u.nome,
       email: u.email,
       companyName: u.company_name,
+      role: u.role as 'investidor' | 'cedente',
       kybForm,
       veiculo: u.veiculo,
       veiculoLabel: VEICULO_LABEL[u.veiculo] ?? 'Não informado',
       naoResidente: !!kybForm.naoResidente,
+      // Cedente não passa pelo formulário de veículo/PL do investidor — o que ele envia são
+      // três documentos (lib/cedenteKyb.ts). null pra investidor, pra não confundir as duas
+      // telas no client.
+      cedenteDocs:
+        u.role === 'cedente'
+          ? {
+              cnpj: getLatestUploadOfKind(u.id, CEDENTE_KYB_KINDS[0])?.filename ?? null,
+              contratoSocial: getLatestUploadOfKind(u.id, CEDENTE_KYB_KINDS[1])?.filename ?? null,
+              representante: getLatestUploadOfKind(u.id, CEDENTE_KYB_KINDS[2])?.filename ?? null,
+            }
+          : null,
       submittedAt: fmtRelative(u.created_at),
       pldStatus: u.pld_status,
       pldMatchNote: u.pld_match_note,
@@ -143,6 +158,15 @@ adminRouter.post(
     }
     approveKyb(userId);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'kyb.approved', { targetUserId: userId });
+    // A conta não ficava sabendo — só descobria tentando emitir/dar lance de novo.
+    addNotification(
+      userId,
+      alvo?.role === 'cedente'
+        ? 'Documentos da empresa aprovados — você já pode emitir duplicatas.'
+        : 'Credenciamento aprovado — você já pode dar lances.',
+      COLORS.GREEN,
+      'compliance'
+    );
     res.json({ ok: true });
   })
 );
@@ -160,6 +184,7 @@ adminRouter.post(
     const userId = Number(req.params.userId);
     rejectKyb(userId, parsed.data.reason);
     recordAuditEvent(req.user!.id, req.user!.company_name, 'kyb.rejected', { targetUserId: userId, reason: parsed.data.reason });
+    addNotification(userId, `Documentos recusados: ${parsed.data.reason}. Envie novamente em Conta & Liquidação.`, COLORS.RED, 'compliance');
     res.json({ ok: true });
   })
 );
@@ -381,6 +406,12 @@ adminRouter.get('/fraud-anomalies', (_req, res) => {
 adminRouter.get('/metrics', (req, res) => {
   const windowMinutes = Math.max(1, Math.min(1440, Number(req.query.windowMinutes) || 60));
   res.json(computeMetrics(windowMinutes));
+});
+
+// Indicadores de negócio do plano de ação (volume, leilões, deságio, prazo, receita) —
+// /metrics acima é saúde técnica do servidor; este é saúde do marketplace.
+adminRouter.get('/indicadores', (_req, res) => {
+  res.json(computeIndicadoresNegocio());
 });
 
 // Compliance AI Engine's auto-suspend bar (see lib/complianceEngine.ts) — admin-tunable
@@ -1104,7 +1135,16 @@ adminRouter.post(
 
 adminRouter.get('/backups', (_req, res) => {
   const backups = listBackups().map((b) => ({ ...b, quando: fmtRelative(b.createdAt) }));
-  res.json({ enabled: backupEnabled, backups });
+  const offsite = offsiteStatus();
+  res.json({
+    enabled: backupEnabled,
+    backups,
+    offsite: {
+      ...offsite,
+      ultimoEnvioQuando: offsite.ultimoEnvioEm ? fmtRelative(offsite.ultimoEnvioEm) : null,
+      ultimoErroQuando: offsite.ultimoErroEm ? fmtRelative(offsite.ultimoErroEm) : null,
+    },
+  });
 });
 
 adminRouter.post(
@@ -1119,6 +1159,14 @@ adminRouter.post(
     res.json({ backup: { ...backup, quando: fmtRelative(backup.createdAt) } });
   })
 );
+
+// Nenhum upload (comprovantes, contratos, documentos de KYB) é apagado em nenhum ponto do
+// código — provavelmente certo pra compliance (KYC costuma exigir retenção, não exclusão),
+// mas sem visibilidade um disco cheio só seria descoberto quando algo já tivesse quebrado.
+// Só soma o que já existe; não apaga nada.
+adminRouter.get('/uploads/disk-usage', (_req, res) => {
+  res.json(computeUploadsDiskUsage());
+});
 
 // Feature flags — see lib/featureFlags.ts for the registry and every real gate that
 // respects these. GET always returns every known flag (even ones never overridden), so

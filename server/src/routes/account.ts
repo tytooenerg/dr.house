@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { sacarViaPix, saldoDisponivel } from '../lib/saque.js';
+import { pilotoSchema, salvarPiloto } from '../lib/pilotoAutomatico.js';
+import { cnpjChecksumValido } from '../lib/cnpjLookup.js';
 import { requireAuth } from '../auth/middleware.js';
 import { anonymizeUser, getSettings, updateSettings } from '../db/users.js';
 import { addLedgerEntry, listLedger, listNotifications } from '../db/misc.js';
@@ -82,22 +85,46 @@ function extratoView(userId: number) {
   return withRunningBalance;
 }
 
-function saldoDisponivel(userId: number): number {
-  return listLedger(userId).reduce((sum, r) => sum + r.valor, 0);
+
+function kycItensReais(user: import('../db/types.js').UserRow) {
+  const form = JSON.parse(user.kyb_form || '{}') as { cnpj?: string };
+  const cnpjOk = !!form.cnpj && cnpjChecksumValido(form.cnpj.replace(/\D/g, ''));
+  const podeEnviar = user.role === 'cedente';
+  const verde = { bg: '#EAF3EE', color: '#0A5C36' };
+  const cinza = { bg: '#F0F2F5', color: '#5B6472' };
+  const ambar = { bg: '#FBF1E0', color: '#B8790A' };
+  const vermelho = { bg: '#F7E9E7', color: '#B03A2E' };
+  const docs =
+    user.kyb_status === 'approved'
+      ? { status: 'Aprovado', ...verde, action: null }
+      : user.kyb_status === 'pending'
+        ? { status: 'Em análise (até 2 dias úteis)', ...ambar, action: null }
+        : user.kyb_status === 'rejected'
+          ? { status: `Recusado — ${user.kyb_reject_reason || 'veja o motivo'}`, ...vermelho, action: podeEnviar ? { label: 'Reenviar documentos', key: 'kyb' } : null }
+          : { status: 'Pendente', ...cinza, action: podeEnviar ? { label: 'Enviar documentos', key: 'kyb' } : null };
+  return [
+    {
+      label: 'CNPJ da empresa',
+      status: cnpjOk ? 'Concluído' : 'Pendente',
+      ...(cnpjOk ? verde : cinza),
+      action: !cnpjOk && podeEnviar && user.kyb_status !== 'pending' ? { label: 'Informar CNPJ', key: 'kyb' } : null,
+    },
+    { label: 'Documentos da empresa (cartão CNPJ, contrato social, documento do representante)', ...docs },
+  ];
 }
 
 function payload(req: import('express').Request) {
   const settings = getSettings(req.user!);
   return {
+    // Só a empresa tem piloto automático (lib/pilotoAutomatico.ts).
+    pilotoAutomatico: req.user!.role === 'cedente' ? settings.pilotoAutomatico : null,
     kycChecklist: [
-      { label: 'Dados cadastrais da empresa', status: 'Concluído', bg: '#EAF3EE', color: '#0A5C36', action: null },
-      {
-        label: 'Documentos societários (contrato social)',
-        status: settings.kycDocsUploaded ? 'Concluído' : settings.kycDocsRejected ? 'Recusado — foto ilegível' : 'Pendente',
-        bg: settings.kycDocsUploaded ? '#EAF3EE' : settings.kycDocsRejected ? '#F7E9E7' : '#F0F2F5',
-        color: settings.kycDocsUploaded ? '#0A5C36' : settings.kycDocsRejected ? '#B03A2E' : '#5B6472',
-        action: settings.kycDocsUploaded ? null : { label: settings.kycDocsRejected ? 'Reenviar documentos' : 'Enviar documentos', key: 'docs' },
-      },
+      // Os dois itens abaixo eram de mentira: "Dados cadastrais" era sempre "Concluído", e
+      // "Documentos societários" não recebia arquivo nenhum — o botão recusava a primeira
+      // tentativa ("foto ilegível") e aprovava a segunda, sem relação com o credenciamento
+      // real (lib/cedenteKyb.ts), que ficava escondido na tela de Emitir. Agora refletem o
+      // credenciamento de verdade, e a ação abre o mesmo envio de documentos.
+      ...kycItensReais(req.user!),
       {
         label: 'Verificação antifraude (prova de vida)',
         status: settings.biometricVerified ? 'Verificado ✓' : 'Pendente',
@@ -371,24 +398,11 @@ accountRouter.post(
       res.status(400).json({ error: 'validation_error', issues: parsed.error.issues });
       return;
     }
-    const settings = getSettings(req.user!);
-    if (!settings.pixChave) {
-      res.status(409).json({ error: 'no_pix_key', message: 'Cadastre uma chave Pix antes de sacar.' });
+    const saque = await sacarViaPix(req.user!, parsed.data.valor);
+    if (!saque.ok) {
+      res.status(saque.status).json({ error: saque.error, message: saque.message });
       return;
     }
-    const disponivel = saldoDisponivel(req.user!.id);
-    if (parsed.data.valor > disponivel) {
-      res.status(409).json({ error: 'insufficient_balance', message: `Saldo disponível: ${fmtBRL(disponivel)}` });
-      return;
-    }
-    const payout = await enviarPix({ chaveDestino: settings.pixChave, valor: parsed.data.valor, descricao: `Saque Lastro — ${req.user!.company_name}` });
-    recordPixPayout({ userId: req.user!.id, valor: parsed.data.valor, chaveDestino: settings.pixChave, simulado: payout.simulado, endToEndId: payout.endToEndId });
-    addLedgerEntry(
-      req.user!.id,
-      new Date().toLocaleDateString('pt-BR'),
-      `Saque via Pix para ${settings.pixChave}${payout.simulado ? ' (simulado)' : ''}`,
-      -parsed.data.valor
-    );
     res.json(payload(req));
   })
 );
@@ -528,14 +542,18 @@ accountRouter.post(
   })
 );
 
-accountRouter.post('/kyc/docs', (req, res) => {
-  const settings = getSettings(req.user!);
-  const attempts = settings.kycDocsAttempts + 1;
-  const merged =
-    attempts === 1
-      ? updateSettings(req.user!.id, { kycDocsAttempts: attempts, kycDocsRejected: true })
-      : updateSettings(req.user!.id, { kycDocsAttempts: attempts, kycDocsRejected: false, kycDocsUploaded: true });
-  req.user!.settings = JSON.stringify(merged);
+accountRouter.post('/piloto-automatico', (req, res) => {
+  if (req.user!.role !== 'cedente') {
+    res.status(403).json({ error: 'forbidden', message: 'O piloto automático é da conta da empresa.' });
+    return;
+  }
+  const parsed = pilotoSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'validation_error', message: 'Taxa máxima inválida — use um número entre 0 e 20% a.m.' });
+    return;
+  }
+  salvarPiloto(req.user!, parsed.data);
+  req.user!.settings = JSON.stringify({ ...getSettings(req.user!), pilotoAutomatico: parsed.data });
   res.json(payload(req));
 });
 

@@ -43,7 +43,7 @@ async function ofertaPropria(valor = '84.500') {
     const res = await request(app)
       .post('/api/emitir/submit')
       .set('Authorization', `Bearer ${ced.body.token}`)
-      .send({ sacado: `Sacado Quotes ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+      .send({ sacado: `Sacado Quotes ${unique()}`, cnpj: '55.444.333/0001-22', valor, vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
     if (res.status === 200) duplicataId = res.body.duplicataId;
   }
   expect(duplicataId).toBeTruthy();

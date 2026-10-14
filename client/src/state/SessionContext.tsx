@@ -26,10 +26,18 @@ export interface SessionUser {
   kybRejectReason: string;
   needsKyb: boolean;
   kybPending: boolean;
+  // Diferente de kybStatus puro: isto já embute se o feature flag
+  // 'cedente_kyb_required' está realmente ligado (server/src/routes/auth.ts) — sem checar
+  // isto, qualquer cedente novo (kybStatus='none' por padrão) ficaria bloqueado mesmo com
+  // o flag desligado.
+  cedenteKybRequired: boolean;
+  cedenteKybDocsStatus: { cnpj: boolean; contratoSocial: boolean; representante: boolean } | null;
   showOnboarding: boolean;
   onboardingSteps: OnboardingStep[];
   sessionLabel: string;
   navTabs: string[];
+  // Menu da empresa: false = modo essencial (navConfig.ts's ABAS_ESSENCIAIS_CEDENTE).
+  menuCompleto?: boolean;
   plan: Plan;
   subscriptionStatus: 'none' | 'active' | 'active_demo' | 'canceled' | 'past_due';
   insurerKey: string | null;
@@ -43,12 +51,14 @@ interface SessionContextValue {
   authError: string | null;
   login: (email: string, password: string) => Promise<{ twoFactorRequired: boolean; challengeToken?: string }>;
   verifyTwoFactor: (challengeToken: string, code: string) => Promise<void>;
-  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => Promise<void>;
+  register: (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string; cnpj?: string; telefone?: string; whatsapp?: boolean }) => Promise<void>;
   acceptTeamInvite: (input: { token: string; nome?: string; password: string }) => Promise<void>;
   loginWithTokens: (token: string, refreshToken: string) => Promise<void>;
   completeGoogleSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   completeSamlSignup: (input: { signupToken: string; companyName: string; role: Role; insurerKey?: string }) => Promise<void>;
   logout: () => void;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<{ twoFactorRequired: boolean; challengeToken?: string }>;
   submitKyb: (form: {
     cnpj: string;
     tipo: string;
@@ -58,6 +68,7 @@ interface SessionContextValue {
     taxIdEstrangeiro?: string;
     representanteLegal?: string;
   }) => Promise<void>;
+  submitCedenteKyb: (form: { cnpj: string }) => Promise<void>;
   completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -117,7 +128,34 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string }) => {
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setAuthError(null);
+    try {
+      await api.post('/auth/forgot-password', { email });
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível enviar o link de redefinição.');
+      throw err;
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    setAuthError(null);
+    try {
+      const data = await api.post<{ token?: string; refreshToken?: string; user?: SessionUser; twoFactorRequired?: boolean; challengeToken?: string }>(
+        '/auth/reset-password',
+        { token, newPassword }
+      );
+      if (data.twoFactorRequired) return { twoFactorRequired: true, challengeToken: data.challengeToken };
+      setSessionTokens(data.token!, data.refreshToken!);
+      setUser(data.user!);
+      return { twoFactorRequired: false };
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Não foi possível redefinir a senha.');
+      throw err;
+    }
+  }, []);
+
+  const register = useCallback(async (input: { nome: string; email: string; password: string; companyName: string; role: Role; insurerKey?: string; referralCode?: string; cnpj?: string; telefone?: string; whatsapp?: boolean }) => {
     setAuthError(null);
     try {
       const data = await api.post<{ token: string; refreshToken: string; user: SessionUser }>('/auth/register', input);
@@ -185,6 +223,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }, []);
 
+  const submitCedenteKyb = useCallback(async (form: { cnpj: string }) => {
+    const data = await api.post<{ user: SessionUser }>('/auth/kyb/cedente', form);
+    setUser(data.user);
+  }, []);
+
   const completeOnboarding = useCallback(async () => {
     await api.post('/auth/onboarding/complete');
     setUser((u) => (u ? { ...u, showOnboarding: false } : u));
@@ -196,6 +239,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     authError,
     login,
     verifyTwoFactor,
+    requestPasswordReset,
+    resetPassword,
     register,
     acceptTeamInvite,
     loginWithTokens,
@@ -203,6 +248,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     completeSamlSignup,
     logout,
     submitKyb,
+    submitCedenteKyb,
     completeOnboarding,
     refresh,
   };

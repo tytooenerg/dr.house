@@ -22,6 +22,8 @@ import { settleFractionalAtMaturity } from './fractionalOfferings.js';
 import { fmtBRL, fmtRelative } from './format.js';
 import { COLORS } from '../data/seed.js';
 import type { UserRow, DuplicataRow } from '../db/types.js';
+import { getUltimoConvite } from '../db/aceiteConvites.js';
+import { tentarLeilaoAutomatico } from './pilotoAutomatico.js';
 
 export const STATUS_META = {
   aguardando: { label: 'Aguardando manifestação', bg: '#FBF1E0', color: COLORS.AMBER },
@@ -93,7 +95,18 @@ function view(
     slaDiasRestantes: sla.diasRestantes,
     slaVencido: sla.vencido,
     disputeProposal,
+    // Só a empresa (não editable): convidar o sacado a responder por link (lib/aceiteConvite.ts).
+    podeConvidar: !editable && a.status === 'aguardando' && !sla.vencido,
+    convite: editable ? null : ultimoConviteView(a.id),
   };
+}
+
+// Mora aqui (e não em lib/aceiteConvite.ts) porque aquele módulo importa applyAceiteDecision
+// deste — importar de volta fecharia um ciclo.
+function ultimoConviteView(aceiteId: number) {
+  const c = getUltimoConvite(aceiteId);
+  if (!c) return null;
+  return { email: c.email, telefone: c.telefone, enviadoHa: fmtRelative(c.created_at), respondido: !!c.usado_em };
 }
 
 // Achado corrigido (usuário apontou o requisito regulatório): uma duplicata só pode
@@ -125,12 +138,14 @@ export function listAceitesForUser(user: UserRow, sandbox = false) {
 // sistema aplicando aceite tácito quando o prazo vence sem manifestação, mesma mecânica,
 // nenhum UserRow de sacado disponível). Não inclui a checagem de autorização nem o
 // recordAuditEvent (cada chamador registra o evento com o autor certo).
-function applyAceiteDecision(aceite: { id: number }, duplicata: DuplicataRow, decision: AceiteStatusInput['status']) {
+// Exportada também para o aceite por link (lib/aceiteConvite.ts) — mesma decisão, mesmos
+// efeitos; `motivo` é o que o sacado escreveu ao contestar pelo link.
+export function applyAceiteDecision(aceite: { id: number }, duplicata: DuplicataRow, decision: AceiteStatusInput['status'], motivo?: string) {
   setAceiteStatus(aceite.id, decision);
   if (decision === 'contestada' && !getDisputeByAceite(aceite.id)) {
-    createDispute(aceite.id, 'Sacado contestou os dados da duplicata — divergência a esclarecer com o cedente.', {
+    createDispute(aceite.id, motivo ? `Sacado contestou: ${motivo}` : 'Sacado contestou os dados da duplicata — divergência a esclarecer com o cedente.', {
       autor: duplicata.sacado_nome,
-      texto: 'Contestou a duplicata.',
+      texto: motivo ?? 'Contestou a duplicata.',
     });
   }
   if (duplicata.cedente_id) {
@@ -148,6 +163,9 @@ function applyAceiteDecision(aceite: { id: number }, duplicata: DuplicataRow, de
       addSignal(duplicata.sacado_cnpj, duplicata.cedente_id, decision === 'aceita' ? 'pagamento_pontual' : 'contestacao');
     }
   }
+  // Piloto automático (lib/pilotoAutomatico.ts): com o aceite dado, a empresa que ligou o
+  // "leilão automático" não precisa voltar à tela para clicar em Disparar leilão.
+  if (decision === 'aceita') tentarLeilaoAutomatico(duplicata.id);
 }
 
 // Achado corrigido: a UI (AceitePage.tsx) e o texto de compliance (data/seed.ts's

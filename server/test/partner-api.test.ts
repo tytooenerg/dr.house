@@ -138,7 +138,7 @@ describe('real webhook delivery', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${token}`)
-        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Grupo Atlas Varejo', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(200);
@@ -164,7 +164,7 @@ describe('partner API — aceites', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: sacadoNome, cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: sacadoNome, cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).not.toBe('');
@@ -194,7 +194,7 @@ describe('partner API — aceites', () => {
       const res = await request(app)
         .post('/api/emitir/submit')
         .set('Authorization', `Bearer ${cedenteToken}`)
-        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true });
+        .send({ sacado: 'Distribuidora Bom Preço', cnpj: '', valor: '5.000', vencimento: vencimentoFuturo(), seguro: false, nfAnexada: true, comprovanteEntregaAnexado: true, pedidoCompraAnexado: true });
       if (res.status === 200) duplicataId = res.body.duplicataId;
     }
     expect(duplicataId).not.toBe('');

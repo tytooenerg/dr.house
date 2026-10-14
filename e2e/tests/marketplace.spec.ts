@@ -26,10 +26,41 @@ test('investidor can browse the live marketplace and place a real bid', async ({
   // O painel do leilão abre já com a taxa de reserva preenchida — enviar como está é um
   // lance válido (é exatamente o teto que o cedente aceita).
   await expect(page.getByText(/Reserva do cedente/).first()).toBeVisible();
+
+  // A conta em reais acompanha a taxa digitada: quanto o investidor paga, a taxa da
+  // plataforma e quanto a empresa recebe (server/src/lib/demonstrativo.ts).
+  const taxa = page.getByLabel('Taxa de deságio mensal do seu lance, em %').first();
+  const reserva = await taxa.inputValue();
+  await taxa.fill('1,00');
+  const conta = page.getByTestId('demonstrativo').first();
+  await expect(conta).toContainText('Se o seu lance de 1,00% a.m. vencer', { timeout: 10_000 });
+  await expect(conta).toContainText('Banco/fundo paga hoje');
+  await expect(conta).toContainText('Taxa da plataforma Lastro');
+  await expect(conta).toContainText('Empresa recebe');
+  await taxa.fill(reserva);
+
   await page.getByRole('button', { name: 'Enviar lance' }).first().click();
 
   await expect(page.getByText('Seu lance').first()).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole('button', { name: /Meus lances/ })).toBeVisible({ timeout: 10_000 });
+});
+
+test('investidor seleciona duas ofertas e dá lance em lote na reserva de cada uma', async ({ page }) => {
+  await loginAsInvestidor(page);
+  await page.goto('/app/marketplace', { waitUntil: 'domcontentloaded' });
+  await dismissOnboardingIfPresent(page);
+  await expect(page.getByText('Atualizações ao vivo')).toBeVisible({ timeout: 15_000 });
+
+  const caixas = page.getByRole('checkbox', { name: /para lance em lote/ });
+  await caixas.nth(0).check();
+  await caixas.nth(1).check();
+
+  const barra = page.getByRole('region', { name: 'Lance em lote' });
+  await expect(barra.getByText('2 selecionada(s)')).toBeVisible();
+  await barra.getByRole('button', { name: 'Dar 2 lance(s)' }).click();
+
+  await expect(page.getByText('2 lance(s) registrado(s)')).toBeVisible({ timeout: 10_000 });
+  await expect(barra).toBeHidden();
 });
 
 test('investidor opens funding-matching explainability ("Por que essa oferta?") on a live offer', async ({ page }) => {

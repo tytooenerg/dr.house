@@ -25,6 +25,10 @@ jobs:
     if: ${{ inputs.publish_node }}
     runs-on: ubuntu-latest
     environment: npm-publish
+    # `secrets` não pode aparecer no `if:` de um passo (o GitHub rejeita o arquivo inteiro e
+    # registra uma falha a cada push) — passa por env do job e o `if:` lê o env.
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,7 +49,7 @@ jobs:
         run: npm run build --workspace=sdks/node
 
       - name: Fail loudly if NPM_TOKEN isn't configured
-        if: ${{ !secrets.NPM_TOKEN }}
+        if: ${{ env.NPM_TOKEN == '' }}
         run: |
           echo "::error::NPM_TOKEN repo secret is not set — see sdks/PUBLISHING.md. Nothing was published."
           exit 1
@@ -65,6 +69,8 @@ jobs:
     if: ${{ inputs.publish_python }}
     runs-on: ubuntu-latest
     environment: pypi-publish
+    env:
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -93,7 +99,7 @@ jobs:
         run: python -m build
 
       - name: Fail loudly if PYPI_API_TOKEN isn't configured
-        if: ${{ !secrets.PYPI_API_TOKEN }}
+        if: ${{ env.PYPI_API_TOKEN == '' }}
         run: |
           echo "::error::PYPI_API_TOKEN repo secret is not set — see sdks/PUBLISHING.md. Nothing was published."
           exit 1

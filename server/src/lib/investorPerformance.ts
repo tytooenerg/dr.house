@@ -1,6 +1,6 @@
 import { listPurchasesByInvestor } from '../db/duplicatas.js';
 import { fmtBRL, parseFlexibleDate, toIsoUtc } from './format.js';
-import { precoPago } from './investorPositions.js';
+import { precoPago, dataDeResgate } from './investorPositions.js';
 
 // Real risk-adjusted performance for an investor's own book — retorno vs. volatilidade,
 // not just the flat "saldo + histórico" Carteira & Histórico already shows. Built entirely
@@ -84,7 +84,8 @@ export function buildPerformanceDashboard(userId: number, opts: { year?: number 
 
   const positions: PerformancePosition[] = purchases.map((p) => {
     const dataAplicacao = new Date(toIsoUtc(p.created_at));
-    const dataResgate = parseFlexibleDate(p.vencimento);
+    // Até a revenda, para quem saiu antes do vencimento (lib/investorPositions.ts).
+    const dataResgate = dataDeResgate(p).data;
     const diasCarencia = Math.max(1, Math.round((dataResgate.getTime() - dataAplicacao.getTime()) / (24 * 3600 * 1000)));
     const valor = precoPago(p);
     const retornoPeriodoPct = valor > 0 ? (p.retorno / valor) * 100 : 0;
@@ -125,6 +126,8 @@ export function buildPerformanceDashboard(userId: number, opts: { year?: number 
   let atraso90 = 0;
   for (const p of purchases) {
     if (p.duplicata_status === 'paga') continue;
+    // Quem revendeu a posição já saiu dela — o risco de atraso é do novo dono.
+    if (!p.active) continue;
     const diasAtraso = Math.floor((agora - parseFlexibleDate(p.vencimento).getTime()) / (24 * 3600 * 1000));
     if (diasAtraso <= 0) continue;
     const investido = precoPago(p);
