@@ -15,6 +15,8 @@ export interface CreateAdminInput {
 // the public self-serve /auth/register endpoint (6 chars — see routes/auth.ts).
 const MIN_PASSWORD_LENGTH = 8;
 
+const NOMES_DE_EXEMPLO = new Set(['sua equipe', 'seu nome completo']);
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // The only way to get a real admin account onto a production database: the public
@@ -35,6 +37,11 @@ export async function createAdminAccount(input: CreateAdminInput) {
   const nome = input.nome?.trim();
   if (!nome) {
     throw new CreateAdminError('Informe um nome para a conta.');
+  }
+  // O texto do exemplo (DEPLOY.md, scripts/createAdmin.ts) era 'Sua Equipe' e foi copiado ao pé
+  // da letra — a conta de admin de produção nasceu chamada "Sua Equipe".
+  if (NOMES_DE_EXEMPLO.has(nome.toLowerCase())) {
+    throw new CreateAdminError(`"${nome}" é o texto do exemplo — use o seu nome de verdade em ADMIN_NOME.`);
   }
   if (getUserByEmail(email)) {
     throw new CreateAdminError(`Já existe uma conta com o e-mail ${email}.`);

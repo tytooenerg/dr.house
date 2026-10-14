@@ -146,7 +146,7 @@ crie sua própria conta admin com uma senha de verdade:
 docker compose -f docker-compose.prod.yml exec \
   -e ADMIN_EMAIL=voce@lastrox.com.br \
   -e ADMIN_PASSWORD='escolha-uma-senha-forte-de-verdade' \
-  -e ADMIN_NOME='Sua Equipe' \
+  -e ADMIN_NOME='Seu Nome Completo' \
   app node server/dist/scripts/createAdmin.js
 ```
 

@@ -136,7 +136,9 @@ describe('Webhooks v2 — secret rotation', () => {
     const created = await request(app)
       .post('/api/dev/webhooks')
       .set('Authorization', `Bearer ${owner.token}`)
-      .send({ url: 'https://example.com/hook', event: 'duplicata.registrada' });
+      // Loopback, como os outros testes deste arquivo: um domínio público exigiria DNS (lib/ssrfGuard.ts
+      // resolve o endereço) e o teste quebraria em ambiente sem internet — e nada é entregue aqui.
+      .send({ url: 'http://127.0.0.1:9/hook', event: 'duplicata.registrada' });
     const webhookId = created.body.webhooks[0].id as number;
 
     const res = await request(app).post(`/api/dev/webhooks/${webhookId}/rotate-secret`).set('Authorization', `Bearer ${stranger.token}`);

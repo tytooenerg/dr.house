@@ -35,6 +35,11 @@ describe('createAdminAccount — real bootstrap for the first production admin',
     expect(admin.company_name).toBe('Minha Empresa Ltda');
   });
 
+  it('recusa o nome do exemplo da documentação ("Sua Equipe") — foi assim que a conta de produção ficou com esse nome', async () => {
+    await expect(createAdminAccount({ email: `admin-${unique()}@example.com`, password: 'senha-forte-123', nome: 'Sua Equipe' })).rejects.toThrow(/texto do exemplo/);
+    await expect(createAdminAccount({ email: `admin-${unique()}@example.com`, password: 'senha-forte-123', nome: '  seu nome completo ' })).rejects.toThrow(CreateAdminError);
+  });
+
   it('rejects a password shorter than the admin-specific minimum (8 chars)', async () => {
     await expect(createAdminAccount({ email: `admin-${unique()}@example.com`, password: 'short1', nome: 'X' })).rejects.toThrow(CreateAdminError);
   });

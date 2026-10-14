@@ -4,11 +4,11 @@
 // account once NODE_ENV=production (see db/seed.ts) — so this is the actual, supported way
 // to get a real admin login on a real deployment. Never runs automatically; invoke
 // explicitly, e.g.:
-//   ADMIN_EMAIL=voce@suaempresa.com.br ADMIN_PASSWORD='...' ADMIN_NOME='Sua Equipe' \
+//   ADMIN_EMAIL=voce@suaempresa.com.br ADMIN_PASSWORD='...' ADMIN_NOME='Seu Nome Completo' \
 //     npm run create-admin --workspace=server
 // or, against a running container:
 //   docker compose -f docker-compose.prod.yml exec \
-//     -e ADMIN_EMAIL=voce@suaempresa.com.br -e ADMIN_PASSWORD='...' -e ADMIN_NOME='Sua Equipe' \
+//     -e ADMIN_EMAIL=voce@suaempresa.com.br -e ADMIN_PASSWORD='...' -e ADMIN_NOME='Seu Nome Completo' \
 //     app node server/dist/scripts/createAdmin.js
 // See DEPLOY.md for the full walkthrough.
 import { createAdminAccount, CreateAdminError } from '../lib/createAdminAccount.js';
@@ -25,7 +25,7 @@ async function main() {
         'Uso: defina as variáveis de ambiente ADMIN_EMAIL, ADMIN_PASSWORD e ADMIN_NOME antes de rodar este script.',
         '',
         'Exemplo:',
-        "  ADMIN_EMAIL=voce@suaempresa.com.br ADMIN_PASSWORD='senha-forte-de-verdade' ADMIN_NOME='Sua Equipe' \\",
+        "  ADMIN_EMAIL=voce@suaempresa.com.br ADMIN_PASSWORD='senha-forte-de-verdade' ADMIN_NOME='Seu Nome Completo' \\",
         '    npm run create-admin --workspace=server',
         '',
         '(ADMIN_COMPANY é opcional.)',
