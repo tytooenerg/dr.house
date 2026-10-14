@@ -283,6 +283,8 @@ export interface PurchaseRow {
   active: number;
   com_regresso: number;
   created_at: string;
+  // Quando a posição foi encerrada por revenda (migração 0081); null enquanto ativa.
+  encerrada_em: string | null;
 }
 
 // purchases.valor = quanto o investidor pagou (base de custo), em toda linha — compra

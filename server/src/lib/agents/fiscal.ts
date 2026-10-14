@@ -1,3 +1,4 @@
+import { dataDeResgate } from '../investorPositions.js';
 import { getUserById } from '../../db/users.js';
 import { getPurchaseById } from '../../db/resaleListings.js';
 import { getDuplicata } from '../../db/duplicatas.js';
@@ -84,14 +85,14 @@ export const fiscalAgent: AgentDefinition = {
         if (!p) return { erro: 'posição não encontrada' };
         const d = getDuplicata(p.duplicata_id);
         if (!d) return { erro: 'duplicata da posição não encontrada' };
-        const dias = Math.max(
-          0,
-          Math.round((parseFlexibleDate(d.vencimento).getTime() - new Date(p.created_at + 'Z').getTime()) / 86_400_000)
-        );
+        // Posição já revendida: o ganho foi realizado na revenda, e é até ela que conta o prazo.
+        const resgate = dataDeResgate({ active: p.active, encerrada_em: p.encerrada_em, vencimento: d.vencimento });
+        const dias = Math.max(0, Math.round((resgate.data.getTime() - new Date(p.created_at + 'Z').getTime()) / 86_400_000));
         const faixa = aliquotaForDias(dias);
         const ir = p.retorno * faixa.aliquota;
         return {
           duplicataId: p.duplicata_id,
+          evento: resgate.evento === 'revenda' ? 'Posição encerrada por revenda — IR sobre o ganho realizado na revenda.' : 'IR no vencimento da duplicata.',
           prazoDias: dias,
           faixa: faixa.label,
           rendimento: fmtBRL(p.retorno),

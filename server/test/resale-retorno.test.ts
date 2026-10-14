@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import { seedIfEmpty } from '../src/db/seed.js';
+import { db } from '../src/db/index.js';
 import { platformFee } from '../src/lib/settlement.js';
 import { computePurchasePrice } from '../src/lib/marketCompute.js';
 import { getDuplicata } from '../src/db/duplicatas.js';
@@ -94,6 +95,9 @@ describe('mercado secundário — retorno realizado da posição original após 
 
     const buyResale = await request(app).post(`/api/secundario/${listing.id}/comprar`).set('Authorization', `Bearer ${buyer.token}`);
     expect(buyResale.status).toBe(200);
+    // A revenda grava quando a posição do vendedor foi encerrada — é a data do imposto (migração 0081).
+    const encerrada = db.prepare('SELECT encerrada_em FROM purchases WHERE duplicata_id = ? AND investor_id = ?').get(duplicataId, seller.userId) as { encerrada_em: string | null };
+    expect(encerrada.encerrada_em).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 
     const fee = platformFee(askingValor);
     const net = askingValor - fee;

@@ -945,7 +945,17 @@ Fecha de vez o duplo sentido acima. O remendo `preço pago = face − retorno` s
 
 Testes: `server/test/purchases-valor-migracao.test.ts` (migração sobre linhas no formato antigo, idempotência, arremate grava o preço pago, resumo fiscal ignora revendas); `purchases-valor-preco-pago`, `resale-retorno`, `block-trade`, `fiscal-cedente` e `investor-performance` atualizados para o novo significado.
 
-Em aberto (achados nesta rodada, não corrigidos): DARF e Informe de Rendimentos usam o vencimento como data de tributação mesmo quando a posição foi encerrada por revenda; a performance conta posições revendidas como "em atraso".
+Os dois achados em aberto desta rodada foram fechados logo em seguida — ver a seção abaixo.
+
+### Data do resgate: revenda conta na data da revenda (migração 0081)
+
+DARF, Informe de Rendimentos, agente fiscal e performance usavam o **vencimento** da duplicata como data do resgate até para quem já tinha saído da posição vendendo no secundário — o ganho realizado caía no mês/ano errado e a alíquota da tabela regressiva saía pelo prazo até o vencimento. O Informe, além disso, separava o ano pela data da **compra**.
+
+- `purchases.encerrada_em` (0081): gravada por `deactivatePurchase` na revenda; as posições antigas recebem a data da compra seguinte da mesma duplicata (a do novo dono).
+- `dataDeResgate()` (`lib/investorPositions.ts`): revenda → `encerrada_em`, senão vencimento. Usada pelo DARF (seleção do mês, prazo, alíquota, marca "rev." no PDF), Informe (ano do rendimento recebido, só resgates já ocorridos), agente fiscal e `diasCarencia` da performance.
+- Performance: posição revendida não entra em atraso/inadimplência — o risco é do novo dono.
+
+Testes: `server/test/resgate-por-revenda.test.ts`; `income-tax-statement.test.ts` ajustado (uma posição que ainda não venceu não entra no informe).
 
 ### Auditoria de conformidade com as regras mais recentes da duplicata escritural
 
